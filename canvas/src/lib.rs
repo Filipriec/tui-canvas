@@ -11,12 +11,20 @@ pub mod config;
 pub mod suggestions;
 pub mod dispatcher;
 
+// GUI module (optional, enabled with "gui" feature)
+#[cfg(feature = "gui")]
+pub mod gui;
+
 // Re-export the main types for easy use
 pub use state::{CanvasState, ActionContext};
 pub use actions::{CanvasAction, ActionResult, execute_edit_action, execute_canvas_action};
 pub use modes::{AppMode, ModeManager, HighlightState};
 pub use suggestions::SuggestionState;
 pub use dispatcher::ActionDispatcher;
+
+// Re-export GUI types when available
+#[cfg(feature = "gui")]
+pub use gui::{CanvasTheme, render_canvas};
 
 // High-level convenience API
 pub mod prelude {
@@ -33,4 +41,7 @@ pub mod prelude {
         HighlightState,
         SuggestionState,
     };
+    
+    #[cfg(feature = "gui")]
+    pub use crate::{CanvasTheme, render_canvas};
 }

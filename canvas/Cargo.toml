@@ -11,7 +11,7 @@ categories.workspace = true
 
 [dependencies]
 common = { path = "../common" }
-ratatui = { workspace = true }
+ratatui = { workspace = true, optional = true }
 crossterm = { workspace = true }
 anyhow = { workspace = true }
 tokio = { workspace = true }
@@ -20,6 +20,10 @@ serde = { workspace = true }
 
 [dev-dependencies]
 tokio-test = "0.4.4"
+
+[features]
+default = []
+gui = ["ratatui"]
 
 [[example]]
 name = "simple_login"
