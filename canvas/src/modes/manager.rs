@@ -1,7 +1,6 @@
 // src/modes/handlers/mode_manager.rs
 // canvas/src/modes/manager.rs
 
-use crate::modes::highlight::HighlightState;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AppMode {
