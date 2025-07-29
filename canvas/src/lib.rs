@@ -7,6 +7,7 @@
 pub mod state;
 pub mod actions;
 pub mod modes;
+pub mod config;
 pub mod suggestions;
 pub mod dispatcher;
 
