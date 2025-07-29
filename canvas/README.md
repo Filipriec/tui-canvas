@@ -170,7 +170,7 @@ impl CanvasState for MyForm {
             CanvasAction::SelectSuggestion => {
                 if let Some(suggestion) = self.suggestions.get_selected() {
                     *self.get_current_input_mut() = suggestion.clone();
-                    self.deactivate_suggestions();
+                    self.deactivate_autocomplete();
                     Some("Applied suggestion".to_string())
                 }
                 None

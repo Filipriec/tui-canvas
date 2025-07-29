@@ -21,7 +21,7 @@
 use crate::state::pages::canvas_state::CanvasState;
 
 // NEW  
-use canvas::CanvasState;
+use canvas::canvas::CanvasState;
 ```
 
 **Files that need updating:**
@@ -84,7 +84,7 @@ The canvas crate expects a `CanvasTheme` trait. You need to implement this for y
 
 ```rust
 // In client/src/config/colors/themes.rs
-use canvas::CanvasTheme;
+use canvas::canvas::CanvasTheme;
 use ratatui::style::Color;
 
 impl CanvasTheme for Theme {
