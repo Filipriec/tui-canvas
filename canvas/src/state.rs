@@ -1,9 +1,11 @@
 // canvas/src/state.rs
 
+use crate::actions::CanvasAction;
+
 /// Context passed to feature-specific action handlers
 #[derive(Debug)]
 pub struct ActionContext {
-    pub key_code: Option<crossterm::event::KeyCode>,
+    pub key_code: Option<crossterm::event::KeyCode>, // Kept for backwards compatibility
     pub ideal_cursor_column: usize,
     pub current_input: String,
     pub current_field: usize,
@@ -43,12 +45,29 @@ pub trait CanvasState {
         // Default: no-op (override if you support suggestions)
     }
     fn deactivate_suggestions(&mut self) {
-        // Default: no-op (override if you support suggestions)  
+        // Default: no-op (override if you support suggestions)
     }
-    
-    // --- Feature-specific action handling ---
-    fn handle_feature_action(&mut self, action: &str, context: &ActionContext) -> Option<String> {
+
+    // --- Feature-specific action handling (NEW: Type-safe) ---
+    fn handle_feature_action(&mut self, _action: &CanvasAction, _context: &ActionContext) -> Option<String> {
         None // Default: no feature-specific handling
+    }
+
+    // --- Legacy string-based action handling (for backwards compatibility) ---
+    fn handle_feature_action_legacy(&mut self, action: &str, context: &ActionContext) -> Option<String> {
+        // Convert string to typed action and delegate
+        let typed_action = match action {
+            "insert_char" => {
+                // This is tricky - we need the char from the KeyCode in context
+                if let Some(crossterm::event::KeyCode::Char(c)) = context.key_code {
+                    CanvasAction::InsertChar(c)
+                } else {
+                    CanvasAction::Custom(action.to_string())
+                }
+            }
+            _ => CanvasAction::from_string(action),
+        };
+        self.handle_feature_action(&typed_action, context)
     }
 
     // --- Display Overrides (for links, computed values, etc.) ---
