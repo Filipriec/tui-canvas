@@ -7,39 +7,45 @@ use crossterm::event::KeyCode;
 pub enum CanvasAction {
     // Character input
     InsertChar(char),
-    
+
     // Deletion
     DeleteBackward,
     DeleteForward,
-    
+
     // Basic cursor movement
     MoveLeft,
     MoveRight,
     MoveUp,
     MoveDown,
-    
+
     // Line movement
     MoveLineStart,
     MoveLineEnd,
     MoveFirstLine,
     MoveLastLine,
-    
+
     // Word movement
     MoveWordNext,
     MoveWordEnd,
     MoveWordPrev,
     MoveWordEndPrev,
-    
+
     // Field navigation
     NextField,
     PrevField,
-    
-    // Suggestions
+
+    // AUTOCOMPLETE ACTIONS (NEW)
+    /// Manually trigger autocomplete for current field
+    TriggerAutocomplete,
+    /// Move to next suggestion
     SuggestionUp,
+    /// Move to previous suggestion  
     SuggestionDown,
+    /// Select the currently highlighted suggestion
     SelectSuggestion,
+    /// Cancel/exit autocomplete mode
     ExitSuggestions,
-    
+
     // Custom actions (escape hatch for feature-specific behavior)
     Custom(String),
 }
@@ -69,6 +75,8 @@ impl CanvasAction {
             "move_word_end_prev" => Self::MoveWordEndPrev,
             "next_field" => Self::NextField,
             "prev_field" => Self::PrevField,
+            // Autocomplete actions
+            "trigger_autocomplete" => Self::TriggerAutocomplete,
             "suggestion_up" => Self::SuggestionUp,
             "suggestion_down" => Self::SuggestionDown,
             "select_suggestion" => Self::SelectSuggestion,
@@ -76,7 +84,7 @@ impl CanvasAction {
             _ => Self::Custom(action.to_string()),
         }
     }
-    
+
     /// Get string representation (for logging, debugging)
     pub fn as_str(&self) -> &str {
         match self {
@@ -97,6 +105,8 @@ impl CanvasAction {
             Self::MoveWordEndPrev => "move_word_end_prev",
             Self::NextField => "next_field",
             Self::PrevField => "prev_field",
+            // Autocomplete actions
+            Self::TriggerAutocomplete => "trigger_autocomplete",
             Self::SuggestionUp => "suggestion_up",
             Self::SuggestionDown => "suggestion_down",
             Self::SelectSuggestion => "select_suggestion",
@@ -104,7 +114,7 @@ impl CanvasAction {
             Self::Custom(s) => s,
         }
     }
-    
+
     /// Create action from KeyCode for common cases
     pub fn from_key(key: KeyCode) -> Option<Self> {
         match key {
@@ -122,17 +132,17 @@ impl CanvasAction {
             _ => None,
         }
     }
-    
+
     /// Check if this action modifies content
     pub fn is_modifying(&self) -> bool {
-        matches!(self, 
-            Self::InsertChar(_) | 
-            Self::DeleteBackward | 
+        matches!(self,
+            Self::InsertChar(_) |
+            Self::DeleteBackward |
             Self::DeleteForward |
             Self::SelectSuggestion
         )
     }
-    
+
     /// Check if this action moves the cursor
     pub fn is_movement(&self) -> bool {
         matches!(self,
@@ -142,11 +152,11 @@ impl CanvasAction {
             Self::NextField | Self::PrevField
         )
     }
-    
+
     /// Check if this is a suggestion-related action
     pub fn is_suggestion(&self) -> bool {
         matches!(self,
-            Self::SuggestionUp | Self::SuggestionDown | 
+            Self::TriggerAutocomplete | Self::SuggestionUp | Self::SuggestionDown |
             Self::SelectSuggestion | Self::ExitSuggestions
         )
     }
@@ -169,19 +179,19 @@ impl ActionResult {
     pub fn success() -> Self {
         Self::Success(None)
     }
-    
+
     pub fn success_with_message(msg: impl Into<String>) -> Self {
         Self::Success(Some(msg.into()))
     }
-    
+
     pub fn error(msg: impl Into<String>) -> Self {
         Self::Error(msg.into())
     }
-    
+
     pub fn is_success(&self) -> bool {
         matches!(self, Self::Success(_) | Self::HandledByFeature(_))
     }
-    
+
     pub fn message(&self) -> Option<&str> {
         match self {
             Self::Success(msg) => msg.as_deref(),
@@ -195,14 +205,15 @@ impl ActionResult {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_action_from_string() {
         assert_eq!(CanvasAction::from_string("move_left"), CanvasAction::MoveLeft);
         assert_eq!(CanvasAction::from_string("delete_char_backward"), CanvasAction::DeleteBackward);
+        assert_eq!(CanvasAction::from_string("trigger_autocomplete"), CanvasAction::TriggerAutocomplete);
         assert_eq!(CanvasAction::from_string("unknown"), CanvasAction::Custom("unknown".to_string()));
     }
-    
+
     #[test]
     fn test_action_from_key() {
         assert_eq!(CanvasAction::from_key(KeyCode::Char('a')), Some(CanvasAction::InsertChar('a')));
@@ -210,16 +221,17 @@ mod tests {
         assert_eq!(CanvasAction::from_key(KeyCode::Backspace), Some(CanvasAction::DeleteBackward));
         assert_eq!(CanvasAction::from_key(KeyCode::F(1)), None);
     }
-    
+
     #[test]
     fn test_action_properties() {
         assert!(CanvasAction::InsertChar('a').is_modifying());
         assert!(!CanvasAction::MoveLeft.is_modifying());
-        
+
         assert!(CanvasAction::MoveLeft.is_movement());
         assert!(!CanvasAction::InsertChar('a').is_movement());
-        
+
         assert!(CanvasAction::SuggestionUp.is_suggestion());
+        assert!(CanvasAction::TriggerAutocomplete.is_suggestion());
         assert!(!CanvasAction::MoveLeft.is_suggestion());
     }
 }

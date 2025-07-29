@@ -1,6 +1,7 @@
 // canvas/src/state.rs
 
 use crate::actions::CanvasAction;
+use crate::autocomplete::{AutocompleteState, SuggestionItem};
 
 /// Context passed to feature-specific action handlers
 #[derive(Debug)]
@@ -31,29 +32,133 @@ pub trait CanvasState {
     fn has_unsaved_changes(&self) -> bool;
     fn set_has_unsaved_changes(&mut self, changed: bool);
 
-    // --- Autocomplete/Suggestions (Optional) ---
+    // --- AUTOCOMPLETE SUPPORT (NEW) ---
+
+    /// Associated type for suggestion data (e.g., Hit, String, CustomType)
+    type SuggestionData: Clone + Send + 'static;
+
+    /// Check if a field supports autocomplete
+    fn supports_autocomplete(&self, _field_index: usize) -> bool {
+        false // Default: no autocomplete support
+    }
+
+    /// Get autocomplete state (read-only)
+    fn autocomplete_state(&self) -> Option<&AutocompleteState<Self::SuggestionData>> {
+        None // Default: no autocomplete state
+    }
+
+    /// Get autocomplete state (mutable)
+    fn autocomplete_state_mut(&mut self) -> Option<&mut AutocompleteState<Self::SuggestionData>> {
+        None // Default: no autocomplete state
+    }
+
+    /// CLIENT API: Activate autocomplete for current field
+    fn activate_autocomplete(&mut self) {
+        let current_field = self.current_field(); // Get field first
+        if let Some(state) = self.autocomplete_state_mut() {
+            state.activate(current_field); // Then use it
+        }
+    }
+
+    /// CLIENT API: Deactivate autocomplete
+    fn deactivate_autocomplete(&mut self) {
+        if let Some(state) = self.autocomplete_state_mut() {
+            state.deactivate();
+        }
+    }
+
+    /// CLIENT API: Set suggestions (called after async fetch completes)
+    fn set_autocomplete_suggestions(&mut self, suggestions: Vec<SuggestionItem<Self::SuggestionData>>) {
+        if let Some(state) = self.autocomplete_state_mut() {
+            state.set_suggestions(suggestions);
+        }
+    }
+
+    /// CLIENT API: Set loading state
+    fn set_autocomplete_loading(&mut self, loading: bool) {
+        if let Some(state) = self.autocomplete_state_mut() {
+            state.is_loading = loading;
+        }
+    }
+
+    /// Check if autocomplete is currently active
+    fn is_autocomplete_active(&self) -> bool {
+        self.autocomplete_state()
+            .map(|state| state.is_active)
+            .unwrap_or(false)
+    }
+
+    /// Check if autocomplete is ready for interaction
+    fn is_autocomplete_ready(&self) -> bool {
+        self.autocomplete_state()
+            .map(|state| state.is_ready())
+            .unwrap_or(false)
+    }
+
+    /// INTERNAL: Apply selected autocomplete value to current field
+    fn apply_autocomplete_selection(&mut self) -> Option<String> {
+        // First, get the selected value and display text (if any)
+        let selection_info = if let Some(state) = self.autocomplete_state() {
+            state.get_selected().map(|selected| {
+                (selected.value_to_store.clone(), selected.display_text.clone())
+            })
+        } else {
+            None
+        };
+
+        // Apply the selection if we have one
+        if let Some((value, display)) = selection_info {
+            // Apply the value to current field
+            *self.get_current_input_mut() = value;
+            self.set_has_unsaved_changes(true);
+
+            // Deactivate autocomplete
+            if let Some(state_mut) = self.autocomplete_state_mut() {
+                state_mut.deactivate();
+            }
+
+            Some(format!("Selected: {}", display))
+        } else {
+            None
+        }
+    }
+
+    // --- LEGACY AUTOCOMPLETE SUPPORT (for backwards compatibility) ---
+
+    /// Legacy suggestion support (deprecated - use autocomplete_state instead)
     fn get_suggestions(&self) -> Option<&[String]> {
         None
     }
+
+    /// Legacy selected suggestion index (deprecated)
     fn get_selected_suggestion_index(&self) -> Option<usize> {
-        None
-    }
-    fn set_selected_suggestion_index(&mut self, _index: Option<usize>) {
-        // Default: no-op (override if you support suggestions)
-    }
-    fn activate_suggestions(&mut self, _suggestions: Vec<String>) {
-        // Default: no-op (override if you support suggestions)
-    }
-    fn deactivate_suggestions(&mut self) {
-        // Default: no-op (override if you support suggestions)
+        self.autocomplete_state()
+            .and_then(|state| state.selected_index)
     }
 
-    // --- Feature-specific action handling (NEW: Type-safe) ---
+    /// Legacy suggestion index setter (deprecated)
+    fn set_selected_suggestion_index(&mut self, _index: Option<usize>) {
+        // Deprecated - canvas manages selection internally
+    }
+
+    /// Legacy activate suggestions (deprecated)
+    fn activate_suggestions(&mut self, _suggestions: Vec<String>) {
+        // Deprecated - use set_autocomplete_suggestions instead
+    }
+
+    /// Legacy deactivate suggestions (deprecated)
+    fn deactivate_suggestions(&mut self) {
+        self.deactivate_autocomplete();
+    }
+
+    // --- Feature-specific action handling ---
+
+    /// Feature-specific action handling (NEW: Type-safe)
     fn handle_feature_action(&mut self, _action: &CanvasAction, _context: &ActionContext) -> Option<String> {
         None // Default: no feature-specific handling
     }
 
-    // --- Legacy string-based action handling (for backwards compatibility) ---
+    /// Legacy string-based action handling (for backwards compatibility)
     fn handle_feature_action_legacy(&mut self, action: &str, context: &ActionContext) -> Option<String> {
         // Convert string to typed action and delegate
         let typed_action = match action {
@@ -71,12 +176,14 @@ pub trait CanvasState {
     }
 
     // --- Display Overrides (for links, computed values, etc.) ---
+
     fn get_display_value_for_field(&self, index: usize) -> &str {
         self.inputs()
             .get(index)
             .map(|s| s.as_str())
             .unwrap_or("")
     }
+
     fn has_display_override(&self, _index: usize) -> bool {
         false
     }

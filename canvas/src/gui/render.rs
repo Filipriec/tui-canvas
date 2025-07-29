@@ -5,7 +5,7 @@ use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, BorderType, Paragraph},
+    widgets::{Block, Borders, BorderType, List, ListItem, ListState, Paragraph},
     Frame,
 };
 use crate::state::CanvasState;
@@ -14,6 +14,8 @@ use crate::modes::HighlightState;
 use super::theme::CanvasTheme;
 #[cfg(feature = "gui")]
 use std::cmp::{max, min};
+#[cfg(feature = "gui")]
+use unicode_width::UnicodeWidthStr;
 
 /// Render canvas using the CanvasState trait and CanvasTheme
 #[cfg(feature = "gui")]
@@ -28,8 +30,8 @@ pub fn render_canvas<T: CanvasTheme>(
     let fields: Vec<&str> = form_state.fields();
     let current_field_idx = form_state.current_field();
     let inputs: Vec<&String> = form_state.inputs();
-    
-    render_canvas_impl(
+
+    let active_field_rect = render_canvas_impl(
         f,
         area,
         &fields,
@@ -42,10 +44,137 @@ pub fn render_canvas<T: CanvasTheme>(
         form_state.has_unsaved_changes(),
         |i| form_state.get_display_value_for_field(i).to_string(),
         |i| form_state.has_display_override(i),
-    )
+    );
+
+    // NEW: Render autocomplete dropdown if active
+    if let Some(autocomplete_state) = form_state.autocomplete_state() {
+        if autocomplete_state.is_active {
+            if let Some(field_rect) = active_field_rect {
+                render_autocomplete_dropdown(f, area, field_rect, theme, autocomplete_state);
+            }
+        }
+    }
+
+    active_field_rect
 }
 
-/// Internal implementation of canvas rendering
+/// Render autocomplete dropdown
+#[cfg(feature = "gui")]
+fn render_autocomplete_dropdown<T: CanvasTheme, S: CanvasState>(
+    f: &mut Frame,
+    frame_area: Rect,
+    input_rect: Rect,
+    theme: &T,
+    autocomplete_state: &crate::autocomplete::AutocompleteState<S::SuggestionData>,
+) {
+    if autocomplete_state.is_loading {
+        // Show loading indicator
+        let loading_text = "Loading suggestions...";
+        let loading_width = loading_text.width() as u16 + 2;
+        let loading_height = 3;
+
+        let mut dropdown_area = Rect {
+            x: input_rect.x,
+            y: input_rect.y + 1,
+            width: loading_width,
+            height: loading_height,
+        };
+
+        // Adjust position to stay within frame
+        if dropdown_area.bottom() > frame_area.height {
+            dropdown_area.y = input_rect.y.saturating_sub(loading_height);
+        }
+        if dropdown_area.right() > frame_area.width {
+            dropdown_area.x = frame_area.width.saturating_sub(loading_width);
+        }
+
+        let loading_block = Block::default()
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(theme.accent()))
+            .style(Style::default().bg(theme.bg()));
+
+        let loading_paragraph = Paragraph::new(loading_text)
+            .block(loading_block)
+            .style(Style::default().fg(theme.fg()))
+            .alignment(Alignment::Center);
+
+        f.render_widget(loading_paragraph, dropdown_area);
+        return;
+    }
+
+    if autocomplete_state.suggestions.is_empty() {
+        return;
+    }
+
+    // Calculate dropdown dimensions
+    let display_texts: Vec<&str> = autocomplete_state.suggestions
+        .iter()
+        .map(|item| item.display_text.as_str())
+        .collect();
+
+    let max_width = display_texts
+        .iter()
+        .map(|text| text.width())
+        .max()
+        .unwrap_or(0) as u16;
+    
+    let horizontal_padding = 4; // 2 for borders + 2 for internal padding
+    let dropdown_width = (max_width + horizontal_padding).max(12);
+    let dropdown_height = (autocomplete_state.suggestions.len() as u16).min(8) + 2; // +2 for borders
+
+    let mut dropdown_area = Rect {
+        x: input_rect.x,
+        y: input_rect.y + 1,
+        width: dropdown_width,
+        height: dropdown_height,
+    };
+
+    // Adjust position to stay within frame bounds
+    if dropdown_area.bottom() > frame_area.height {
+        dropdown_area.y = input_rect.y.saturating_sub(dropdown_height);
+    }
+    if dropdown_area.right() > frame_area.width {
+        dropdown_area.x = frame_area.width.saturating_sub(dropdown_width);
+    }
+    dropdown_area.x = dropdown_area.x.max(0);
+    dropdown_area.y = dropdown_area.y.max(0);
+
+    // Create dropdown background
+    let dropdown_block = Block::default()
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(theme.accent()))
+        .style(Style::default().bg(theme.bg()));
+
+    // Create list items
+    let items: Vec<ListItem> = display_texts
+        .iter()
+        .enumerate()
+        .map(|(i, text)| {
+            let is_selected = autocomplete_state.selected_index == Some(i);
+            let text_width = text.width() as u16;
+            let available_width = dropdown_width.saturating_sub(horizontal_padding);
+            let padding_needed = available_width.saturating_sub(text_width);
+            let padded_text = format!("{}{}", text, " ".repeat(padding_needed as usize));
+
+            ListItem::new(padded_text).style(if is_selected {
+                Style::default()
+                    .fg(theme.bg())
+                    .bg(theme.highlight())
+                    .add_modifier(Modifier::BOLD)
+            } else {
+                Style::default().fg(theme.fg()).bg(theme.bg())
+            })
+        })
+        .collect();
+
+    let list = List::new(items).block(dropdown_block);
+    let mut list_state = ListState::default();
+    list_state.select(autocomplete_state.selected_index);
+
+    f.render_stateful_widget(list, dropdown_area, &mut list_state);
+}
+
+/// Internal implementation of canvas rendering (unchanged from previous version)
 #[cfg(feature = "gui")]
 fn render_canvas_impl<T: CanvasTheme, F1, F2>(
     f: &mut Frame,
@@ -77,7 +206,7 @@ where
     } else {
         Style::default().fg(theme.secondary())
     };
-    
+
     let input_container = Block::default()
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)

@@ -23,8 +23,8 @@ pub async fn execute_canvas_action<S: CanvasState>(
         return Ok(ActionResult::HandledByFeature(result));
     }
 
-    // 2. Handle suggestion actions
-    if let Some(result) = handle_suggestion_action(&action, state)? {
+    // 2. Handle autocomplete actions
+    if let Some(result) = handle_autocomplete_action(&action, state)? {
         return Ok(result);
     }
 
@@ -51,52 +51,67 @@ pub async fn execute_edit_action<S: CanvasState>(
     };
 
     let result = execute_canvas_action(typed_action, state, ideal_cursor_column).await?;
-    
+
     // Convert ActionResult back to string for backwards compatibility
     Ok(result.message().unwrap_or("").to_string())
 }
 
-/// Handle suggestion-related actions
-fn handle_suggestion_action<S: CanvasState>(
+/// Handle autocomplete-related actions
+fn handle_autocomplete_action<S: CanvasState>(
     action: &CanvasAction,
     state: &mut S,
 ) -> Result<Option<ActionResult>> {
     match action {
+        CanvasAction::TriggerAutocomplete => {
+            if state.supports_autocomplete(state.current_field()) {
+                state.activate_autocomplete();
+                Ok(Some(ActionResult::success_with_message("Autocomplete activated - fetching suggestions...")))
+            } else {
+                Ok(Some(ActionResult::error("Autocomplete not supported for this field")))
+            }
+        }
+
         CanvasAction::SuggestionDown => {
-            if let Some(suggestions) = state.get_suggestions() {
-                if !suggestions.is_empty() {
-                    let current = state.get_selected_suggestion_index().unwrap_or(0);
-                    let next = (current + 1) % suggestions.len();
-                    state.set_selected_suggestion_index(Some(next));
+            if state.is_autocomplete_ready() {
+                if let Some(autocomplete_state) = state.autocomplete_state_mut() {
+                    autocomplete_state.select_next();
                     return Ok(Some(ActionResult::success()));
                 }
             }
-            Ok(None)
+            Ok(None) // Not handled - no active autocomplete
         }
-        
+
         CanvasAction::SuggestionUp => {
-            if let Some(suggestions) = state.get_suggestions() {
-                if !suggestions.is_empty() {
-                    let current = state.get_selected_suggestion_index().unwrap_or(0);
-                    let prev = if current == 0 { suggestions.len() - 1 } else { current - 1 };
-                    state.set_selected_suggestion_index(Some(prev));
+            if state.is_autocomplete_ready() {
+                if let Some(autocomplete_state) = state.autocomplete_state_mut() {
+                    autocomplete_state.select_previous();
                     return Ok(Some(ActionResult::success()));
                 }
             }
-            Ok(None)
+            Ok(None) // Not handled - no active autocomplete
         }
-        
+
         CanvasAction::SelectSuggestion => {
-            // Let feature handle this via handle_feature_action since it's feature-specific
-            Ok(None)
+            if state.is_autocomplete_ready() {
+                if let Some(message) = state.apply_autocomplete_selection() {
+                    return Ok(Some(ActionResult::success_with_message(message)));
+                } else {
+                    return Ok(Some(ActionResult::error("No suggestion selected")));
+                }
+            }
+            Ok(None) // Not handled - no active autocomplete
         }
-        
+
         CanvasAction::ExitSuggestions => {
-            state.deactivate_suggestions();
-            Ok(Some(ActionResult::success()))
+            if state.is_autocomplete_active() {
+                state.deactivate_autocomplete();
+                Ok(Some(ActionResult::success_with_message("Autocomplete cancelled")))
+            } else {
+                Ok(None) // Not handled - autocomplete not active
+            }
         }
-        
-        _ => Ok(None),
+
+        _ => Ok(None), // Not an autocomplete action
     }
 }
 
@@ -111,7 +126,7 @@ async fn handle_generic_canvas_action<S: CanvasState>(
             let cursor_pos = state.current_cursor_pos();
             let field_value = state.get_current_input_mut();
             let mut chars: Vec<char> = field_value.chars().collect();
-            
+
             if cursor_pos <= chars.len() {
                 chars.insert(cursor_pos, c);
                 *field_value = chars.into_iter().collect();
@@ -129,7 +144,7 @@ async fn handle_generic_canvas_action<S: CanvasState>(
                 let cursor_pos = state.current_cursor_pos();
                 let field_value = state.get_current_input_mut();
                 let mut chars: Vec<char> = field_value.chars().collect();
-                
+
                 if cursor_pos <= chars.len() {
                     chars.remove(cursor_pos - 1);
                     *field_value = chars.into_iter().collect();
@@ -146,7 +161,7 @@ async fn handle_generic_canvas_action<S: CanvasState>(
             let cursor_pos = state.current_cursor_pos();
             let field_value = state.get_current_input_mut();
             let mut chars: Vec<char> = field_value.chars().collect();
-            
+
             if cursor_pos < chars.len() {
                 chars.remove(cursor_pos);
                 *field_value = chars.into_iter().collect();
@@ -321,15 +336,15 @@ async fn handle_generic_canvas_action<S: CanvasState>(
             Ok(ActionResult::error(format!("Unknown or unhandled custom action: {}", action_str)))
         }
 
-        // Suggestion actions should have been handled above
-        CanvasAction::SuggestionUp | CanvasAction::SuggestionDown | 
+        // Autocomplete actions should have been handled above
+        CanvasAction::TriggerAutocomplete | CanvasAction::SuggestionUp | CanvasAction::SuggestionDown |
         CanvasAction::SelectSuggestion | CanvasAction::ExitSuggestions => {
-            Ok(ActionResult::error("Suggestion action not handled properly"))
+            Ok(ActionResult::error("Autocomplete action not handled properly"))
         }
     }
 }
 
-// Word movement helper functions
+// Word movement helper functions (unchanged from previous implementation)
 
 #[derive(PartialEq)]
 enum CharType {
