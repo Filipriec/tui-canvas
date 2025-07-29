@@ -1,4 +1,4 @@
-// canvas/src/gui/canvas.rs
+// canvas/src/canvas/gui.rs
 
 #[cfg(feature = "gui")]
 use ratatui::{
@@ -9,9 +9,11 @@ use ratatui::{
     Frame,
 };
 
-use crate::state::CanvasState;
-use crate::modes::HighlightState;
-use super::theme::CanvasTheme;
+use crate::canvas::state::CanvasState;
+use crate::canvas::modes::HighlightState;
+
+#[cfg(feature = "gui")]
+use crate::canvas::theme::CanvasTheme;
 
 #[cfg(feature = "gui")]
 use std::cmp::{max, min};

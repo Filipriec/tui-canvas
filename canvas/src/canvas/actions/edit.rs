@@ -1,7 +1,8 @@
 // canvas/src/actions/edit.rs
 
-use crate::state::{CanvasState, AutocompleteCanvasState, ActionContext};
-use crate::actions::types::{CanvasAction, ActionResult};
+use crate::canvas::state::{CanvasState, ActionContext};
+use crate::autocomplete::state::AutocompleteCanvasState;
+use crate::canvas::actions::types::{CanvasAction, ActionResult};
 use crossterm::event::{KeyCode, KeyEvent};
 use anyhow::Result;
 

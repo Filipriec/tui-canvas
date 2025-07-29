@@ -1,4 +1,4 @@
-// canvas/src/gui/autocomplete.rs
+// canvas/src/autocomplete/gui.rs
 
 #[cfg(feature = "gui")]
 use ratatui::{
@@ -9,7 +9,9 @@ use ratatui::{
 };
 
 use crate::autocomplete::AutocompleteState;
-use super::theme::CanvasTheme;
+
+#[cfg(feature = "gui")]
+use crate::canvas::theme::CanvasTheme;
 
 #[cfg(feature = "gui")]
 use unicode_width::UnicodeWidthStr;

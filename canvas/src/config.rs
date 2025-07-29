@@ -476,5 +476,5 @@ impl CanvasConfig {
 }
 
 // Re-export for convenience
-pub use crate::actions::CanvasAction;
+pub use crate::canvas::actions::CanvasAction;
 pub use crate::dispatcher::ActionDispatcher;

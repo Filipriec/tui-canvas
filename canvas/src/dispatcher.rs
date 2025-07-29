@@ -1,7 +1,7 @@
 // canvas/src/dispatcher.rs
 
-use crate::state::CanvasState;
-use crate::actions::{CanvasAction, ActionResult, execute_canvas_action};
+use crate::canvas::state::CanvasState;
+use crate::canvas::actions::{CanvasAction, ActionResult, execute_canvas_action};
 
 /// High-level action dispatcher that coordinates between different action types
 pub struct ActionDispatcher;
