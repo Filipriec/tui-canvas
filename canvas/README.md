@@ -100,35 +100,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
-## 📚 Examples
-
-The `examples/` directory contains comprehensive examples showing different usage patterns:
-
-### Run the Examples
-
-```bash
-# Basic login form with TUI
-cargo run --example simple_login
-
-# Advanced configuration screen with suggestions and validation
-cargo run --example config_screen
-
-# API usage patterns and quick start guide
-cargo run --example basic_usage
-
-# Advanced integration patterns (state machines, events, validation)
-cargo run --example integration_patterns
-```
-
-### Example Overview
-
-| Example | Description | Key Features |
-|---------|-------------|--------------|
-| `simple_login` | Interactive login form TUI | Basic form, custom actions, password masking |
-| `config_screen` | Configuration editor | Auto-suggestions, field validation, complex UI |
-| `basic_usage` | API demonstration | All core patterns, non-interactive |
-| `integration_patterns` | Architecture patterns | State machines, events, validation pipelines |
-
 ## 🎯 Type-Safe Actions
 
 The Canvas system uses strongly-typed actions instead of error-prone strings:

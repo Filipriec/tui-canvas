@@ -24,19 +24,3 @@ tokio-test = "0.4.4"
 [features]
 default = []
 gui = ["ratatui"]
-
-[[example]]
-name = "simple_login"
-path = "examples/simple_login.rs"
-
-[[example]]
-name = "config_screen"
-path = "examples/config_screen.rs"
-
-[[example]]
-name = "basic_usage"
-path = "examples/basic_usage.rs"
-
-[[example]]
-name = "integration_patterns"
-path = "examples/integration_patterns.rs"
