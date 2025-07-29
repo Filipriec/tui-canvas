@@ -226,50 +226,219 @@ impl CanvasConfig {
     }
 
     fn matches_keybinding(&self, binding: &str, key: KeyCode, modifiers: KeyModifiers) -> bool {
-        // Handle multi-character bindings (like "gg")
+        // Special handling for shift+character combinations
+        if binding.to_lowercase().starts_with("shift+") {
+            let parts: Vec<&str> = binding.split('+').collect();
+            if parts.len() == 2 && parts[1].len() == 1 {
+                let expected_lowercase = parts[1].chars().next().unwrap().to_lowercase().next().unwrap();
+                let expected_uppercase = expected_lowercase.to_uppercase().next().unwrap();
+                if let KeyCode::Char(actual_char) = key {
+                    if actual_char == expected_uppercase && modifiers.contains(KeyModifiers::SHIFT) {
+                        return true;
+                    }
+                }
+            }
+        }
+
+        // Handle Shift+Tab -> BackTab
+        if binding.to_lowercase() == "shift+tab" && key == KeyCode::BackTab && modifiers.is_empty() {
+            return true;
+        }
+
+        // Handle multi-character bindings (all standard keys without modifiers)
         if binding.len() > 1 && !binding.contains('+') {
             return match binding.to_lowercase().as_str() {
+                // Navigation keys
                 "left" => key == KeyCode::Left,
                 "right" => key == KeyCode::Right,
                 "up" => key == KeyCode::Up,
                 "down" => key == KeyCode::Down,
-                "esc" => key == KeyCode::Esc,
-                "enter" => key == KeyCode::Enter,
-                "delete" => key == KeyCode::Delete,
-                "backspace" => key == KeyCode::Backspace,
-                "tab" => key == KeyCode::Tab,
                 "home" => key == KeyCode::Home,
                 "end" => key == KeyCode::End,
-                "gg" => false, // Multi-key sequences need special handling
-                _ => false,
+                "pageup" | "pgup" => key == KeyCode::PageUp,
+                "pagedown" | "pgdn" => key == KeyCode::PageDown,
+                
+                // Editing keys
+                "insert" | "ins" => key == KeyCode::Insert,
+                "delete" | "del" => key == KeyCode::Delete,
+                "backspace" => key == KeyCode::Backspace,
+                
+                // Tab keys
+                "tab" => key == KeyCode::Tab,
+                "backtab" => key == KeyCode::BackTab,
+                
+                // Special keys
+                "enter" | "return" => key == KeyCode::Enter,
+                "escape" | "esc" => key == KeyCode::Esc,
+                "space" => key == KeyCode::Char(' '),
+                
+                // Function keys F1-F24
+                "f1" => key == KeyCode::F(1),
+                "f2" => key == KeyCode::F(2),
+                "f3" => key == KeyCode::F(3),
+                "f4" => key == KeyCode::F(4),
+                "f5" => key == KeyCode::F(5),
+                "f6" => key == KeyCode::F(6),
+                "f7" => key == KeyCode::F(7),
+                "f8" => key == KeyCode::F(8),
+                "f9" => key == KeyCode::F(9),
+                "f10" => key == KeyCode::F(10),
+                "f11" => key == KeyCode::F(11),
+                "f12" => key == KeyCode::F(12),
+                "f13" => key == KeyCode::F(13),
+                "f14" => key == KeyCode::F(14),
+                "f15" => key == KeyCode::F(15),
+                "f16" => key == KeyCode::F(16),
+                "f17" => key == KeyCode::F(17),
+                "f18" => key == KeyCode::F(18),
+                "f19" => key == KeyCode::F(19),
+                "f20" => key == KeyCode::F(20),
+                "f21" => key == KeyCode::F(21),
+                "f22" => key == KeyCode::F(22),
+                "f23" => key == KeyCode::F(23),
+                "f24" => key == KeyCode::F(24),
+                
+                // Lock keys (may not work reliably in all terminals)
+                "capslock" => key == KeyCode::CapsLock,
+                "scrolllock" => key == KeyCode::ScrollLock,
+                "numlock" => key == KeyCode::NumLock,
+                
+                // System keys
+                "printscreen" => key == KeyCode::PrintScreen,
+                "pause" => key == KeyCode::Pause,
+                "menu" => key == KeyCode::Menu,
+                "keypadbegin" => key == KeyCode::KeypadBegin,
+                
+                // Media keys (rarely supported but included for completeness)
+                "mediaplay" => key == KeyCode::Media(crossterm::event::MediaKeyCode::Play),
+                "mediapause" => key == KeyCode::Media(crossterm::event::MediaKeyCode::Pause),
+                "mediaplaypause" => key == KeyCode::Media(crossterm::event::MediaKeyCode::PlayPause),
+                "mediareverse" => key == KeyCode::Media(crossterm::event::MediaKeyCode::Reverse),
+                "mediastop" => key == KeyCode::Media(crossterm::event::MediaKeyCode::Stop),
+                "mediafastforward" => key == KeyCode::Media(crossterm::event::MediaKeyCode::FastForward),
+                "mediarewind" => key == KeyCode::Media(crossterm::event::MediaKeyCode::Rewind),
+                "mediatracknext" => key == KeyCode::Media(crossterm::event::MediaKeyCode::TrackNext),
+                "mediatrackprevious" => key == KeyCode::Media(crossterm::event::MediaKeyCode::TrackPrevious),
+                "mediarecord" => key == KeyCode::Media(crossterm::event::MediaKeyCode::Record),
+                "medialowervolume" => key == KeyCode::Media(crossterm::event::MediaKeyCode::LowerVolume),
+                "mediaraisevolume" => key == KeyCode::Media(crossterm::event::MediaKeyCode::RaiseVolume),
+                "mediamutevolume" => key == KeyCode::Media(crossterm::event::MediaKeyCode::MuteVolume),
+                
+                // Modifier keys (these work better as part of combinations)
+                "leftshift" => key == KeyCode::Modifier(crossterm::event::ModifierKeyCode::LeftShift),
+                "leftcontrol" | "leftctrl" => key == KeyCode::Modifier(crossterm::event::ModifierKeyCode::LeftControl),
+                "leftalt" => key == KeyCode::Modifier(crossterm::event::ModifierKeyCode::LeftAlt),
+                "leftsuper" | "leftwindows" | "leftcmd" => key == KeyCode::Modifier(crossterm::event::ModifierKeyCode::LeftSuper),
+                "lefthyper" => key == KeyCode::Modifier(crossterm::event::ModifierKeyCode::LeftHyper),
+                "leftmeta" => key == KeyCode::Modifier(crossterm::event::ModifierKeyCode::LeftMeta),
+                "rightshift" => key == KeyCode::Modifier(crossterm::event::ModifierKeyCode::RightShift),
+                "rightcontrol" | "rightctrl" => key == KeyCode::Modifier(crossterm::event::ModifierKeyCode::RightControl),
+                "rightalt" => key == KeyCode::Modifier(crossterm::event::ModifierKeyCode::RightAlt),
+                "rightsuper" | "rightwindows" | "rightcmd" => key == KeyCode::Modifier(crossterm::event::ModifierKeyCode::RightSuper),
+                "righthyper" => key == KeyCode::Modifier(crossterm::event::ModifierKeyCode::RightHyper),
+                "rightmeta" => key == KeyCode::Modifier(crossterm::event::ModifierKeyCode::RightMeta),
+                "isolevel3shift" => key == KeyCode::Modifier(crossterm::event::ModifierKeyCode::IsoLevel3Shift),
+                "isolevel5shift" => key == KeyCode::Modifier(crossterm::event::ModifierKeyCode::IsoLevel5Shift),
+                
+                // Multi-key sequences need special handling
+                "gg" => false, // This needs sequence handling
+                _ => {
+                    // Handle single characters and punctuation
+                    if binding.len() == 1 {
+                        if let Some(c) = binding.chars().next() {
+                            key == KeyCode::Char(c)
+                        } else {
+                            false
+                        }
+                    } else {
+                        false
+                    }
+                }
             };
         }
 
-        // Handle modifier combinations (like "Ctrl+p")
+        // Handle modifier combinations (like "Ctrl+F5", "Alt+Shift+A")
         let parts: Vec<&str> = binding.split('+').collect();
         let mut expected_modifiers = KeyModifiers::empty();
         let mut expected_key = None;
 
         for part in parts {
             match part.to_lowercase().as_str() {
-                "ctrl" => expected_modifiers |= KeyModifiers::CONTROL,
+                // Modifiers
+                "ctrl" | "control" => expected_modifiers |= KeyModifiers::CONTROL,
                 "shift" => expected_modifiers |= KeyModifiers::SHIFT,
                 "alt" => expected_modifiers |= KeyModifiers::ALT,
+                "super" | "windows" | "cmd" => expected_modifiers |= KeyModifiers::SUPER,
+                "hyper" => expected_modifiers |= KeyModifiers::HYPER,
+                "meta" => expected_modifiers |= KeyModifiers::META,
+                
+                // Navigation keys
                 "left" => expected_key = Some(KeyCode::Left),
                 "right" => expected_key = Some(KeyCode::Right),
                 "up" => expected_key = Some(KeyCode::Up),
                 "down" => expected_key = Some(KeyCode::Down),
-                "esc" => expected_key = Some(KeyCode::Esc),
-                "enter" => expected_key = Some(KeyCode::Enter),
-                "delete" => expected_key = Some(KeyCode::Delete),
-                "backspace" => expected_key = Some(KeyCode::Backspace),
-                "tab" => expected_key = Some(KeyCode::Tab),
                 "home" => expected_key = Some(KeyCode::Home),
                 "end" => expected_key = Some(KeyCode::End),
+                "pageup" | "pgup" => expected_key = Some(KeyCode::PageUp),
+                "pagedown" | "pgdn" => expected_key = Some(KeyCode::PageDown),
+                
+                // Editing keys
+                "insert" | "ins" => expected_key = Some(KeyCode::Insert),
+                "delete" | "del" => expected_key = Some(KeyCode::Delete),
+                "backspace" => expected_key = Some(KeyCode::Backspace),
+                
+                // Tab keys
+                "tab" => expected_key = Some(KeyCode::Tab),
+                "backtab" => expected_key = Some(KeyCode::BackTab),
+                
+                // Special keys
+                "enter" | "return" => expected_key = Some(KeyCode::Enter),
+                "escape" | "esc" => expected_key = Some(KeyCode::Esc),
+                "space" => expected_key = Some(KeyCode::Char(' ')),
+                
+                // Function keys
+                "f1" => expected_key = Some(KeyCode::F(1)),
+                "f2" => expected_key = Some(KeyCode::F(2)),
+                "f3" => expected_key = Some(KeyCode::F(3)),
+                "f4" => expected_key = Some(KeyCode::F(4)),
+                "f5" => expected_key = Some(KeyCode::F(5)),
+                "f6" => expected_key = Some(KeyCode::F(6)),
+                "f7" => expected_key = Some(KeyCode::F(7)),
+                "f8" => expected_key = Some(KeyCode::F(8)),
+                "f9" => expected_key = Some(KeyCode::F(9)),
+                "f10" => expected_key = Some(KeyCode::F(10)),
+                "f11" => expected_key = Some(KeyCode::F(11)),
+                "f12" => expected_key = Some(KeyCode::F(12)),
+                "f13" => expected_key = Some(KeyCode::F(13)),
+                "f14" => expected_key = Some(KeyCode::F(14)),
+                "f15" => expected_key = Some(KeyCode::F(15)),
+                "f16" => expected_key = Some(KeyCode::F(16)),
+                "f17" => expected_key = Some(KeyCode::F(17)),
+                "f18" => expected_key = Some(KeyCode::F(18)),
+                "f19" => expected_key = Some(KeyCode::F(19)),
+                "f20" => expected_key = Some(KeyCode::F(20)),
+                "f21" => expected_key = Some(KeyCode::F(21)),
+                "f22" => expected_key = Some(KeyCode::F(22)),
+                "f23" => expected_key = Some(KeyCode::F(23)),
+                "f24" => expected_key = Some(KeyCode::F(24)),
+                
+                // Lock keys
+                "capslock" => expected_key = Some(KeyCode::CapsLock),
+                "scrolllock" => expected_key = Some(KeyCode::ScrollLock),
+                "numlock" => expected_key = Some(KeyCode::NumLock),
+                
+                // System keys
+                "printscreen" => expected_key = Some(KeyCode::PrintScreen),
+                "pause" => expected_key = Some(KeyCode::Pause),
+                "menu" => expected_key = Some(KeyCode::Menu),
+                "keypadbegin" => expected_key = Some(KeyCode::KeypadBegin),
+                
+                // Single character (letters, numbers, punctuation)
                 part => {
                     if part.len() == 1 {
-                        let c = part.chars().next().unwrap();
-                        expected_key = Some(KeyCode::Char(c));
+                        if let Some(c) = part.chars().next() {
+                            expected_key = Some(KeyCode::Char(c));
+                        }
                     }
                 }
             }
