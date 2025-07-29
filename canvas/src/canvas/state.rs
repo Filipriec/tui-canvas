@@ -31,33 +31,6 @@ pub trait CanvasState {
     fn has_unsaved_changes(&self) -> bool;
     fn set_has_unsaved_changes(&mut self, changed: bool);
 
-    // --- LEGACY AUTOCOMPLETE SUPPORT (for backwards compatibility) ---
-
-    /// Legacy suggestion support (deprecated - use AutocompleteCanvasState for rich features)
-    fn get_suggestions(&self) -> Option<&[String]> {
-        None
-    }
-
-    /// Legacy selected suggestion index (deprecated)
-    fn get_selected_suggestion_index(&self) -> Option<usize> {
-        None
-    }
-
-    /// Legacy suggestion index setter (deprecated)
-    fn set_selected_suggestion_index(&mut self, _index: Option<usize>) {
-        // Default: no-op
-    }
-
-    /// Legacy activate suggestions (deprecated)
-    fn activate_suggestions(&mut self, _suggestions: Vec<String>) {
-        // Default: no-op
-    }
-
-    /// Legacy deactivate suggestions (deprecated)
-    fn deactivate_suggestions(&mut self) {
-        // Default: no-op
-    }
-
     // --- Feature-specific action handling ---
 
     /// Feature-specific action handling (NEW: Type-safe)
@@ -65,25 +38,7 @@ pub trait CanvasState {
         None // Default: no feature-specific handling
     }
 
-    /// Legacy string-based action handling (for backwards compatibility)
-    fn handle_feature_action_legacy(&mut self, action: &str, context: &ActionContext) -> Option<String> {
-        // Convert string to typed action and delegate
-        let typed_action = match action {
-            "insert_char" => {
-                // This is tricky - we need the char from the KeyCode in context
-                if let Some(crossterm::event::KeyCode::Char(c)) = context.key_code {
-                    CanvasAction::InsertChar(c)
-                } else {
-                    CanvasAction::Custom(action.to_string())
-                }
-            }
-            _ => CanvasAction::from_string(action),
-        };
-        self.handle_feature_action(&typed_action, context)
-    }
-
     // --- Display Overrides (for links, computed values, etc.) ---
-
     fn get_display_value_for_field(&self, index: usize) -> &str {
         self.inputs()
             .get(index)

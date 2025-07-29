@@ -8,7 +8,7 @@ use ratatui::{
     Frame,
 };
 
-use crate::autocomplete::AutocompleteState;
+use crate::autocomplete::types::AutocompleteState;
 
 #[cfg(feature = "gui")]
 use crate::canvas::theme::CanvasTheme;
