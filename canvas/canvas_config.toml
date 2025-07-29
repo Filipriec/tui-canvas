@@ -24,7 +24,7 @@ move_word_end_prev = ["ge"]
 move_line_start = ["0"]
 move_line_end = ["$"]
 move_first_line = ["gg"]
-move_last_line = ["G"]
+move_last_line = ["shift+g"]
 next_field = ["Tab"]
 prev_field = ["Shift+Tab"]
 

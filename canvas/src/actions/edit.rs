@@ -1,6 +1,6 @@
 // canvas/src/actions/edit.rs
 
-use crate::state::{CanvasState, ActionContext};
+use crate::state::{CanvasState, AutocompleteCanvasState, ActionContext};
 use crate::actions::types::{CanvasAction, ActionResult};
 use crossterm::event::{KeyCode, KeyEvent};
 use anyhow::Result;
@@ -13,7 +13,7 @@ pub async fn execute_canvas_action<S: CanvasState>(
 ) -> Result<ActionResult> {
     // 1. Try feature-specific handler first
     let context = ActionContext {
-        key_code: None, // We don't need KeyCode anymore since action is typed
+        key_code: None,
         ideal_cursor_column: *ideal_cursor_column,
         current_input: state.get_current_input().to_string(),
         current_field: state.current_field(),
@@ -23,8 +23,35 @@ pub async fn execute_canvas_action<S: CanvasState>(
         return Ok(ActionResult::HandledByFeature(result));
     }
 
-    // 2. Handle autocomplete actions
+    // 2. Handle autocomplete actions (falls back to legacy methods)
     if let Some(result) = handle_autocomplete_action(&action, state)? {
+        return Ok(result);
+    }
+
+    // 3. Handle generic canvas actions
+    handle_generic_canvas_action(action, state, ideal_cursor_column).await
+}
+
+/// Version for states that implement rich autocomplete
+pub async fn execute_canvas_action_with_autocomplete<S: CanvasState + AutocompleteCanvasState>(
+    action: CanvasAction,
+    state: &mut S,
+    ideal_cursor_column: &mut usize,
+) -> Result<ActionResult> {
+    // 1. Try feature-specific handler first
+    let context = ActionContext {
+        key_code: None,
+        ideal_cursor_column: *ideal_cursor_column,
+        current_input: state.get_current_input().to_string(),
+        current_field: state.current_field(),
+    };
+
+    if let Some(result) = state.handle_feature_action(&action, &context) {
+        return Ok(ActionResult::HandledByFeature(result));
+    }
+
+    // 2. Handle rich autocomplete actions
+    if let Some(result) = handle_rich_autocomplete_action(&action, state)? {
         return Ok(result);
     }
 
@@ -56,8 +83,76 @@ pub async fn execute_edit_action<S: CanvasState>(
     Ok(result.message().unwrap_or("").to_string())
 }
 
-/// Handle autocomplete-related actions
+/// Handle autocomplete actions for basic CanvasState (uses legacy methods)
 fn handle_autocomplete_action<S: CanvasState>(
+    action: &CanvasAction,
+    state: &mut S,
+) -> Result<Option<ActionResult>> {
+    match action {
+        CanvasAction::TriggerAutocomplete => {
+            // For basic CanvasState, just return an error or no-op
+            Ok(Some(ActionResult::error("Autocomplete not supported - implement AutocompleteCanvasState for rich autocomplete")))
+        }
+
+        CanvasAction::SuggestionDown => {
+            // Try legacy suggestions
+            if let Some(suggestions) = state.get_suggestions() {
+                if !suggestions.is_empty() {
+                    let current = state.get_selected_suggestion_index().unwrap_or(0);
+                    let next = (current + 1) % suggestions.len();
+                    state.set_selected_suggestion_index(Some(next));
+                    return Ok(Some(ActionResult::success()));
+                }
+            }
+            Ok(None)
+        }
+
+        CanvasAction::SuggestionUp => {
+            // Try legacy suggestions
+            if let Some(suggestions) = state.get_suggestions() {
+                if !suggestions.is_empty() {
+                    let current = state.get_selected_suggestion_index().unwrap_or(0);
+                    let prev = if current == 0 { suggestions.len() - 1 } else { current - 1 };
+                    state.set_selected_suggestion_index(Some(prev));
+                    return Ok(Some(ActionResult::success()));
+                }
+            }
+            Ok(None)
+        }
+
+        CanvasAction::SelectSuggestion => {
+            // Try legacy suggestions
+            if let Some(suggestions) = state.get_suggestions() {
+                if let Some(index) = state.get_selected_suggestion_index() {
+                    if let Some(selected) = suggestions.get(index) {
+                        // Clone the string first to avoid borrowing issues
+                        let selected_text = selected.clone();
+                        
+                        // Now we can mutate state without holding any references
+                        *state.get_current_input_mut() = selected_text.clone();
+                        state.set_current_cursor_pos(selected_text.len());
+                        state.set_has_unsaved_changes(true);
+                        state.deactivate_suggestions();
+                        return Ok(Some(ActionResult::success_with_message(
+                            format!("Selected: {}", selected_text)
+                        )));
+                    }
+                }
+            }
+            Ok(None)
+        }
+
+        CanvasAction::ExitSuggestions => {
+            state.deactivate_suggestions();
+            Ok(Some(ActionResult::success_with_message("Suggestions cancelled")))
+        }
+
+        _ => Ok(None),
+    }
+}
+
+/// Handle rich autocomplete actions for AutocompleteCanvasState
+fn handle_rich_autocomplete_action<S: CanvasState + AutocompleteCanvasState>(
     action: &CanvasAction,
     state: &mut S,
 ) -> Result<Option<ActionResult>> {
@@ -78,7 +173,7 @@ fn handle_autocomplete_action<S: CanvasState>(
                     return Ok(Some(ActionResult::success()));
                 }
             }
-            Ok(None) // Not handled - no active autocomplete
+            Ok(None)
         }
 
         CanvasAction::SuggestionUp => {
@@ -88,7 +183,7 @@ fn handle_autocomplete_action<S: CanvasState>(
                     return Ok(Some(ActionResult::success()));
                 }
             }
-            Ok(None) // Not handled - no active autocomplete
+            Ok(None)
         }
 
         CanvasAction::SelectSuggestion => {
@@ -99,7 +194,7 @@ fn handle_autocomplete_action<S: CanvasState>(
                     return Ok(Some(ActionResult::error("No suggestion selected")));
                 }
             }
-            Ok(None) // Not handled - no active autocomplete
+            Ok(None)
         }
 
         CanvasAction::ExitSuggestions => {
@@ -107,11 +202,11 @@ fn handle_autocomplete_action<S: CanvasState>(
                 state.deactivate_autocomplete();
                 Ok(Some(ActionResult::success_with_message("Autocomplete cancelled")))
             } else {
-                Ok(None) // Not handled - autocomplete not active
+                Ok(None)
             }
         }
 
-        _ => Ok(None), // Not an autocomplete action
+        _ => Ok(None),
     }
 }
 
@@ -336,7 +431,6 @@ async fn handle_generic_canvas_action<S: CanvasState>(
             Ok(ActionResult::error(format!("Unknown or unhandled custom action: {}", action_str)))
         }
 
-        // Autocomplete actions should have been handled above
         CanvasAction::TriggerAutocomplete | CanvasAction::SuggestionUp | CanvasAction::SuggestionDown |
         CanvasAction::SelectSuggestion | CanvasAction::ExitSuggestions => {
             Ok(ActionResult::error("Autocomplete action not handled properly"))
@@ -344,8 +438,7 @@ async fn handle_generic_canvas_action<S: CanvasState>(
     }
 }
 
-// Word movement helper functions (unchanged from previous implementation)
-
+// Word movement helper functions
 #[derive(PartialEq)]
 enum CharType {
     Whitespace,

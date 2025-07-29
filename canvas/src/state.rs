@@ -1,7 +1,6 @@
 // canvas/src/state.rs
 
 use crate::actions::CanvasAction;
-use crate::autocomplete::{AutocompleteState, SuggestionItem};
 
 /// Context passed to feature-specific action handlers
 #[derive(Debug)]
@@ -32,8 +31,74 @@ pub trait CanvasState {
     fn has_unsaved_changes(&self) -> bool;
     fn set_has_unsaved_changes(&mut self, changed: bool);
 
-    // --- AUTOCOMPLETE SUPPORT (NEW) ---
+    // --- LEGACY AUTOCOMPLETE SUPPORT (for backwards compatibility) ---
 
+    /// Legacy suggestion support (deprecated - use AutocompleteCanvasState for rich features)
+    fn get_suggestions(&self) -> Option<&[String]> {
+        None
+    }
+
+    /// Legacy selected suggestion index (deprecated)
+    fn get_selected_suggestion_index(&self) -> Option<usize> {
+        None
+    }
+
+    /// Legacy suggestion index setter (deprecated)
+    fn set_selected_suggestion_index(&mut self, _index: Option<usize>) {
+        // Default: no-op
+    }
+
+    /// Legacy activate suggestions (deprecated)
+    fn activate_suggestions(&mut self, _suggestions: Vec<String>) {
+        // Default: no-op
+    }
+
+    /// Legacy deactivate suggestions (deprecated)
+    fn deactivate_suggestions(&mut self) {
+        // Default: no-op
+    }
+
+    // --- Feature-specific action handling ---
+
+    /// Feature-specific action handling (NEW: Type-safe)
+    fn handle_feature_action(&mut self, _action: &CanvasAction, _context: &ActionContext) -> Option<String> {
+        None // Default: no feature-specific handling
+    }
+
+    /// Legacy string-based action handling (for backwards compatibility)
+    fn handle_feature_action_legacy(&mut self, action: &str, context: &ActionContext) -> Option<String> {
+        // Convert string to typed action and delegate
+        let typed_action = match action {
+            "insert_char" => {
+                // This is tricky - we need the char from the KeyCode in context
+                if let Some(crossterm::event::KeyCode::Char(c)) = context.key_code {
+                    CanvasAction::InsertChar(c)
+                } else {
+                    CanvasAction::Custom(action.to_string())
+                }
+            }
+            _ => CanvasAction::from_string(action),
+        };
+        self.handle_feature_action(&typed_action, context)
+    }
+
+    // --- Display Overrides (for links, computed values, etc.) ---
+
+    fn get_display_value_for_field(&self, index: usize) -> &str {
+        self.inputs()
+            .get(index)
+            .map(|s| s.as_str())
+            .unwrap_or("")
+    }
+
+    fn has_display_override(&self, _index: usize) -> bool {
+        false
+    }
+}
+
+/// OPTIONAL extension trait for states that want rich autocomplete functionality.
+/// Only implement this if you need the new autocomplete features.
+pub trait AutocompleteCanvasState: CanvasState {
     /// Associated type for suggestion data (e.g., Hit, String, CustomType)
     type SuggestionData: Clone + Send + 'static;
 
@@ -43,12 +108,12 @@ pub trait CanvasState {
     }
 
     /// Get autocomplete state (read-only)
-    fn autocomplete_state(&self) -> Option<&AutocompleteState<Self::SuggestionData>> {
+    fn autocomplete_state(&self) -> Option<&crate::autocomplete::AutocompleteState<Self::SuggestionData>> {
         None // Default: no autocomplete state
     }
 
     /// Get autocomplete state (mutable)
-    fn autocomplete_state_mut(&mut self) -> Option<&mut AutocompleteState<Self::SuggestionData>> {
+    fn autocomplete_state_mut(&mut self) -> Option<&mut crate::autocomplete::AutocompleteState<Self::SuggestionData>> {
         None // Default: no autocomplete state
     }
 
@@ -68,7 +133,7 @@ pub trait CanvasState {
     }
 
     /// CLIENT API: Set suggestions (called after async fetch completes)
-    fn set_autocomplete_suggestions(&mut self, suggestions: Vec<SuggestionItem<Self::SuggestionData>>) {
+    fn set_autocomplete_suggestions(&mut self, suggestions: Vec<crate::autocomplete::SuggestionItem<Self::SuggestionData>>) {
         if let Some(state) = self.autocomplete_state_mut() {
             state.set_suggestions(suggestions);
         }
@@ -121,70 +186,5 @@ pub trait CanvasState {
         } else {
             None
         }
-    }
-
-    // --- LEGACY AUTOCOMPLETE SUPPORT (for backwards compatibility) ---
-
-    /// Legacy suggestion support (deprecated - use autocomplete_state instead)
-    fn get_suggestions(&self) -> Option<&[String]> {
-        None
-    }
-
-    /// Legacy selected suggestion index (deprecated)
-    fn get_selected_suggestion_index(&self) -> Option<usize> {
-        self.autocomplete_state()
-            .and_then(|state| state.selected_index)
-    }
-
-    /// Legacy suggestion index setter (deprecated)
-    fn set_selected_suggestion_index(&mut self, _index: Option<usize>) {
-        // Deprecated - canvas manages selection internally
-    }
-
-    /// Legacy activate suggestions (deprecated)
-    fn activate_suggestions(&mut self, _suggestions: Vec<String>) {
-        // Deprecated - use set_autocomplete_suggestions instead
-    }
-
-    /// Legacy deactivate suggestions (deprecated)
-    fn deactivate_suggestions(&mut self) {
-        self.deactivate_autocomplete();
-    }
-
-    // --- Feature-specific action handling ---
-
-    /// Feature-specific action handling (NEW: Type-safe)
-    fn handle_feature_action(&mut self, _action: &CanvasAction, _context: &ActionContext) -> Option<String> {
-        None // Default: no feature-specific handling
-    }
-
-    /// Legacy string-based action handling (for backwards compatibility)
-    fn handle_feature_action_legacy(&mut self, action: &str, context: &ActionContext) -> Option<String> {
-        // Convert string to typed action and delegate
-        let typed_action = match action {
-            "insert_char" => {
-                // This is tricky - we need the char from the KeyCode in context
-                if let Some(crossterm::event::KeyCode::Char(c)) = context.key_code {
-                    CanvasAction::InsertChar(c)
-                } else {
-                    CanvasAction::Custom(action.to_string())
-                }
-            }
-            _ => CanvasAction::from_string(action),
-        };
-        self.handle_feature_action(&typed_action, context)
-    }
-
-    // --- Display Overrides (for links, computed values, etc.) ---
-
-    fn get_display_value_for_field(&self, index: usize) -> &str {
-        self.inputs()
-            .get(index)
-            .map(|s| s.as_str())
-            .unwrap_or("")
-    }
-
-    fn has_display_override(&self, _index: usize) -> bool {
-        false
     }
 }
