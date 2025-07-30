@@ -1,7 +1,8 @@
-// canvas/src/actions/edit.rs
+// canvas/src/canvas/actions/edit.rs
 
 use crate::canvas::state::{CanvasState, ActionContext};
 use crate::canvas::actions::types::{CanvasAction, ActionResult};
+use crate::config::CanvasConfig;
 use anyhow::Result;
 
 /// Execute a typed canvas action on any CanvasState implementation
@@ -9,6 +10,7 @@ pub async fn execute_canvas_action<S: CanvasState>(
     action: CanvasAction,
     state: &mut S,
     ideal_cursor_column: &mut usize,
+    config: Option<&CanvasConfig>,
 ) -> Result<ActionResult> {
     let context = ActionContext {
         key_code: None,
@@ -21,7 +23,7 @@ pub async fn execute_canvas_action<S: CanvasState>(
         return Ok(ActionResult::HandledByFeature(result));
     }
 
-    handle_generic_canvas_action(action, state, ideal_cursor_column).await
+    handle_generic_canvas_action(action, state, ideal_cursor_column, config).await
 }
 
 /// Handle core canvas actions with full type safety
@@ -29,126 +31,84 @@ pub async fn handle_generic_canvas_action<S: CanvasState>(
     action: CanvasAction,
     state: &mut S,
     ideal_cursor_column: &mut usize,
+    config: Option<&CanvasConfig>,
 ) -> Result<ActionResult> {
     match action {
         CanvasAction::InsertChar(c) => {
             let cursor_pos = state.current_cursor_pos();
-            let field_value = state.get_current_input_mut();
-            let mut chars: Vec<char> = field_value.chars().collect();
+            let input = state.get_current_input_mut();
+            input.insert(cursor_pos, c);
+            state.set_current_cursor_pos(cursor_pos + 1);
+            state.set_has_unsaved_changes(true);
+            *ideal_cursor_column = cursor_pos + 1;
+            Ok(ActionResult::success())
+        }
 
-            if cursor_pos <= chars.len() {
-                chars.insert(cursor_pos, c);
-                *field_value = chars.into_iter().collect();
-                state.set_current_cursor_pos(cursor_pos + 1);
-                state.set_has_unsaved_changes(true);
-                *ideal_cursor_column = state.current_cursor_pos();
-                Ok(ActionResult::success())
-            } else {
-                Ok(ActionResult::error("Invalid cursor position for character insertion"))
-            }
+        CanvasAction::NextField | CanvasAction::PrevField => {
+            let old_field = state.current_field();
+            let total_fields = state.fields().len();
+
+            // Perform field navigation
+            let new_field = match action {
+                CanvasAction::NextField => {
+                    if config.map_or(true, |c| c.behavior.wrap_around_fields) {
+                        (old_field + 1) % total_fields
+                    } else {
+                        (old_field + 1).min(total_fields - 1)
+                    }
+                }
+                CanvasAction::PrevField => {
+                    if config.map_or(true, |c| c.behavior.wrap_around_fields) {
+                        if old_field == 0 { total_fields - 1 } else { old_field - 1 }
+                    } else {
+                        old_field.saturating_sub(1)
+                    }
+                }
+                _ => unreachable!(),
+            };
+
+            state.set_current_field(new_field);
+            *ideal_cursor_column = state.current_cursor_pos();
+            Ok(ActionResult::success())
         }
 
         CanvasAction::DeleteBackward => {
-            if state.current_cursor_pos() > 0 {
-                let cursor_pos = state.current_cursor_pos();
-                let field_value = state.get_current_input_mut();
-                let mut chars: Vec<char> = field_value.chars().collect();
-
-                if cursor_pos <= chars.len() {
-                    chars.remove(cursor_pos - 1);
-                    *field_value = chars.into_iter().collect();
-                    let new_pos = cursor_pos - 1;
-                    state.set_current_cursor_pos(new_pos);
-                    state.set_has_unsaved_changes(true);
-                    *ideal_cursor_column = new_pos;
-                }
+            let cursor_pos = state.current_cursor_pos();
+            if cursor_pos > 0 {
+                let input = state.get_current_input_mut();
+                input.remove(cursor_pos - 1);
+                state.set_current_cursor_pos(cursor_pos - 1);
+                state.set_has_unsaved_changes(true);
+                *ideal_cursor_column = cursor_pos - 1;
             }
             Ok(ActionResult::success())
         }
 
         CanvasAction::DeleteForward => {
             let cursor_pos = state.current_cursor_pos();
-            let field_value = state.get_current_input_mut();
-            let mut chars: Vec<char> = field_value.chars().collect();
-
-            if cursor_pos < chars.len() {
-                chars.remove(cursor_pos);
-                *field_value = chars.into_iter().collect();
+            let input = state.get_current_input_mut();
+            if cursor_pos < input.len() {
+                input.remove(cursor_pos);
                 state.set_has_unsaved_changes(true);
-                *ideal_cursor_column = cursor_pos;
-            }
-            Ok(ActionResult::success())
-        }
-
-        CanvasAction::NextField => {
-            let num_fields = state.fields().len();
-            if num_fields > 0 {
-                let current_field = state.current_field();
-                let new_field = (current_field + 1) % num_fields;
-                state.set_current_field(new_field);
-                let current_input = state.get_current_input();
-                let max_pos = current_input.len();
-                state.set_current_cursor_pos((*ideal_cursor_column).min(max_pos));
-            }
-            Ok(ActionResult::success())
-        }
-
-        CanvasAction::PrevField => {
-            let num_fields = state.fields().len();
-            if num_fields > 0 {
-                let current_field = state.current_field();
-                let new_field = if current_field == 0 {
-                    num_fields - 1
-                } else {
-                    current_field - 1
-                };
-                state.set_current_field(new_field);
-                let current_input = state.get_current_input();
-                let max_pos = current_input.len();
-                state.set_current_cursor_pos((*ideal_cursor_column).min(max_pos));
             }
             Ok(ActionResult::success())
         }
 
         CanvasAction::MoveLeft => {
-            let new_pos = state.current_cursor_pos().saturating_sub(1);
-            state.set_current_cursor_pos(new_pos);
-            *ideal_cursor_column = new_pos;
+            let cursor_pos = state.current_cursor_pos();
+            if cursor_pos > 0 {
+                state.set_current_cursor_pos(cursor_pos - 1);
+                *ideal_cursor_column = cursor_pos - 1;
+            }
             Ok(ActionResult::success())
         }
 
         CanvasAction::MoveRight => {
+            let cursor_pos = state.current_cursor_pos();
             let current_input = state.get_current_input();
-            let current_pos = state.current_cursor_pos();
-            if current_pos < current_input.len() {
-                let new_pos = current_pos + 1;
-                state.set_current_cursor_pos(new_pos);
-                *ideal_cursor_column = new_pos;
-            }
-            Ok(ActionResult::success())
-        }
-
-        CanvasAction::MoveUp => {
-            let num_fields = state.fields().len();
-            if num_fields > 0 {
-                let current_field = state.current_field();
-                let new_field = current_field.saturating_sub(1);
-                state.set_current_field(new_field);
-                let current_input = state.get_current_input();
-                let max_pos = current_input.len();
-                state.set_current_cursor_pos((*ideal_cursor_column).min(max_pos));
-            }
-            Ok(ActionResult::success())
-        }
-
-        CanvasAction::MoveDown => {
-            let num_fields = state.fields().len();
-            if num_fields > 0 {
-                let new_field = (state.current_field() + 1).min(num_fields - 1);
-                state.set_current_field(new_field);
-                let current_input = state.get_current_input();
-                let max_pos = current_input.len();
-                state.set_current_cursor_pos((*ideal_cursor_column).min(max_pos));
+            if cursor_pos < current_input.len() {
+                state.set_current_cursor_pos(cursor_pos + 1);
+                *ideal_cursor_column = cursor_pos + 1;
             }
             Ok(ActionResult::success())
         }
@@ -160,43 +120,55 @@ pub async fn handle_generic_canvas_action<S: CanvasState>(
         }
 
         CanvasAction::MoveLineEnd => {
-            let current_input = state.get_current_input();
-            let new_pos = current_input.len();
-            state.set_current_cursor_pos(new_pos);
-            *ideal_cursor_column = new_pos;
+            let end_pos = state.get_current_input().len();
+            state.set_current_cursor_pos(end_pos);
+            *ideal_cursor_column = end_pos;
+            Ok(ActionResult::success())
+        }
+
+        CanvasAction::MoveUp => {
+            // For single-line fields, move to previous field
+            let current_field = state.current_field();
+            if current_field > 0 {
+                state.set_current_field(current_field - 1);
+                *ideal_cursor_column = state.current_cursor_pos();
+            }
+            Ok(ActionResult::success())
+        }
+
+        CanvasAction::MoveDown => {
+            // For single-line fields, move to next field
+            let current_field = state.current_field();
+            let total_fields = state.fields().len();
+            if current_field < total_fields - 1 {
+                state.set_current_field(current_field + 1);
+                *ideal_cursor_column = state.current_cursor_pos();
+            }
             Ok(ActionResult::success())
         }
 
         CanvasAction::MoveFirstLine => {
-            let num_fields = state.fields().len();
-            if num_fields > 0 {
-                state.set_current_field(0);
-                let current_input = state.get_current_input();
-                let max_pos = current_input.len();
-                state.set_current_cursor_pos((*ideal_cursor_column).min(max_pos));
-            }
-            Ok(ActionResult::success_with_message("Moved to first field"))
+            state.set_current_field(0);
+            state.set_current_cursor_pos(0);
+            *ideal_cursor_column = 0;
+            Ok(ActionResult::success())
         }
 
         CanvasAction::MoveLastLine => {
-            let num_fields = state.fields().len();
-            if num_fields > 0 {
-                let new_field = num_fields - 1;
-                state.set_current_field(new_field);
-                let current_input = state.get_current_input();
-                let max_pos = current_input.len();
-                state.set_current_cursor_pos((*ideal_cursor_column).min(max_pos));
-            }
-            Ok(ActionResult::success_with_message("Moved to last field"))
+            let last_field = state.fields().len() - 1;
+            state.set_current_field(last_field);
+            let end_pos = state.get_current_input().len();
+            state.set_current_cursor_pos(end_pos);
+            *ideal_cursor_column = end_pos;
+            Ok(ActionResult::success())
         }
 
         CanvasAction::MoveWordNext => {
             let current_input = state.get_current_input();
             if !current_input.is_empty() {
                 let new_pos = find_next_word_start(current_input, state.current_cursor_pos());
-                let final_pos = new_pos.min(current_input.len());
-                state.set_current_cursor_pos(final_pos);
-                *ideal_cursor_column = final_pos;
+                state.set_current_cursor_pos(new_pos);
+                *ideal_cursor_column = new_pos;
             }
             Ok(ActionResult::success())
         }
@@ -204,19 +176,9 @@ pub async fn handle_generic_canvas_action<S: CanvasState>(
         CanvasAction::MoveWordEnd => {
             let current_input = state.get_current_input();
             if !current_input.is_empty() {
-                let current_pos = state.current_cursor_pos();
-                let new_pos = find_word_end(current_input, current_pos);
-
-                let final_pos = if new_pos == current_pos {
-                    find_word_end(current_input, new_pos + 1)
-                } else {
-                    new_pos
-                };
-
-                let max_valid_index = current_input.len().saturating_sub(1);
-                let clamped_pos = final_pos.min(max_valid_index);
-                state.set_current_cursor_pos(clamped_pos);
-                *ideal_cursor_column = clamped_pos;
+                let new_pos = find_word_end(current_input, state.current_cursor_pos());
+                state.set_current_cursor_pos(new_pos);
+                *ideal_cursor_column = new_pos;
             }
             Ok(ActionResult::success())
         }
@@ -231,148 +193,61 @@ pub async fn handle_generic_canvas_action<S: CanvasState>(
             Ok(ActionResult::success())
         }
 
-        CanvasAction::MoveWordEndPrev => {
-            let current_input = state.get_current_input();
-            if !current_input.is_empty() {
-                let new_pos = find_prev_word_end(current_input, state.current_cursor_pos());
-                state.set_current_cursor_pos(new_pos);
-                *ideal_cursor_column = new_pos;
-            }
-            Ok(ActionResult::success_with_message("Moved to previous word end"))
-        }
-
         CanvasAction::Custom(action_str) => {
-            Ok(ActionResult::error(format!("Unknown or unhandled custom action: {}", action_str)))
+            Ok(ActionResult::success_with_message(&format!("Custom action: {}", action_str)))
         }
 
-        // Autocomplete actions are handled by the autocomplete module
-        CanvasAction::TriggerAutocomplete | CanvasAction::SuggestionUp | CanvasAction::SuggestionDown |
-        CanvasAction::SelectSuggestion | CanvasAction::ExitSuggestions => {
-            Ok(ActionResult::error("Autocomplete actions should be handled by autocomplete module"))
-        }
+        _ => Ok(ActionResult::success_with_message("Action not implemented")),
     }
 }
 
-// Word movement helper functions
-#[derive(PartialEq)]
-enum CharType {
-    Whitespace,
-    Alphanumeric,
-    Punctuation,
-}
-
-fn get_char_type(c: char) -> CharType {
-    if c.is_whitespace() {
-        CharType::Whitespace
-    } else if c.is_alphanumeric() {
-        CharType::Alphanumeric
-    } else {
-        CharType::Punctuation
-    }
-}
-
-fn find_next_word_start(text: &str, current_pos: usize) -> usize {
+// Helper functions for word navigation
+fn find_next_word_start(text: &str, cursor_pos: usize) -> usize {
     let chars: Vec<char> = text.chars().collect();
-    let len = chars.len();
-    if len == 0 || current_pos >= len {
-        return len;
-    }
-
-    let mut pos = current_pos;
-    let initial_type = get_char_type(chars[pos]);
-
-    while pos < len && get_char_type(chars[pos]) == initial_type {
+    let mut pos = cursor_pos;
+    
+    // Skip current word
+    while pos < chars.len() && chars[pos].is_alphanumeric() {
         pos += 1;
     }
-
-    while pos < len && get_char_type(chars[pos]) == CharType::Whitespace {
+    
+    // Skip whitespace
+    while pos < chars.len() && chars[pos].is_whitespace() {
         pos += 1;
     }
-
+    
     pos
 }
 
-fn find_word_end(text: &str, current_pos: usize) -> usize {
+fn find_word_end(text: &str, cursor_pos: usize) -> usize {
     let chars: Vec<char> = text.chars().collect();
-    let len = chars.len();
-    if len == 0 {
-        return 0;
-    }
-
-    let mut pos = current_pos.min(len - 1);
-
-    if get_char_type(chars[pos]) == CharType::Whitespace {
-        pos = find_next_word_start(text, pos);
-    }
-
-    if pos >= len {
-        return len.saturating_sub(1);
-    }
-
-    let word_type = get_char_type(chars[pos]);
-    while pos < len && get_char_type(chars[pos]) == word_type {
+    let mut pos = cursor_pos;
+    
+    // Move to end of current word
+    while pos < chars.len() && chars[pos].is_alphanumeric() {
         pos += 1;
     }
-
-    pos.saturating_sub(1).min(len.saturating_sub(1))
-}
-
-fn find_prev_word_start(text: &str, current_pos: usize) -> usize {
-    let chars: Vec<char> = text.chars().collect();
-    if chars.is_empty() || current_pos == 0 {
-        return 0;
-    }
-
-    let mut pos = current_pos.saturating_sub(1);
-
-    while pos > 0 && get_char_type(chars[pos]) == CharType::Whitespace {
-        pos -= 1;
-    }
-
-    if pos == 0 && get_char_type(chars[pos]) == CharType::Whitespace {
-        return 0;
-    }
-
-    let word_type = get_char_type(chars[pos]);
-    while pos > 0 && get_char_type(chars[pos - 1]) == word_type {
-        pos -= 1;
-    }
-
+    
     pos
 }
 
-fn find_prev_word_end(text: &str, current_pos: usize) -> usize {
+fn find_prev_word_start(text: &str, cursor_pos: usize) -> usize {
+    if cursor_pos == 0 {
+        return 0;
+    }
+    
     let chars: Vec<char> = text.chars().collect();
-    let len = chars.len();
-    if len == 0 || current_pos == 0 {
-        return 0;
-    }
-
-    let mut pos = current_pos.saturating_sub(1);
-
-    while pos > 0 && get_char_type(chars[pos]) == CharType::Whitespace {
+    let mut pos = cursor_pos.saturating_sub(1);
+    
+    // Skip whitespace
+    while pos > 0 && chars[pos].is_whitespace() {
         pos -= 1;
     }
-
-    if pos == 0 && get_char_type(chars[pos]) == CharType::Whitespace {
-        return 0;
-    }
-    if pos == 0 && get_char_type(chars[pos]) != CharType::Whitespace {
-        return 0;
-    }
-
-    let word_type = get_char_type(chars[pos]);
-    while pos > 0 && get_char_type(chars[pos - 1]) == word_type {
+    
+    // Skip to start of word
+    while pos > 0 && chars[pos - 1].is_alphanumeric() {
         pos -= 1;
     }
-
-    while pos > 0 && get_char_type(chars[pos - 1]) == CharType::Whitespace {
-        pos -= 1;
-    }
-
-    if pos > 0 {
-        pos - 1
-    } else {
-        0
-    }
+    
+    pos
 }

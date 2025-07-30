@@ -2,6 +2,7 @@
 
 use crate::canvas::state::CanvasState;
 use crate::canvas::actions::{CanvasAction, ActionResult, execute_canvas_action};
+use crate::config::CanvasConfig;
 
 /// High-level action dispatcher that coordinates between different action types
 pub struct ActionDispatcher;
@@ -13,7 +14,9 @@ impl ActionDispatcher {
         state: &mut S,
         ideal_cursor_column: &mut usize,
     ) -> anyhow::Result<ActionResult> {
-        execute_canvas_action(action, state, ideal_cursor_column).await
+
+        // Load config once here instead of threading it everywhere
+        execute_canvas_action(action, state, ideal_cursor_column, Some(&CanvasConfig::load())).await
     }
 
     /// Quick action dispatch from KeyCode

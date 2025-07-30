@@ -4,4 +4,4 @@ pub mod edit;
 
 // Re-export the main types for convenience
 pub use types::{CanvasAction, ActionResult};
-pub use edit::execute_canvas_action;  // Remove execute_edit_action
+pub use edit::execute_canvas_action;

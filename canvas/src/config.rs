@@ -180,6 +180,20 @@ impl CanvasConfig {
         Self::from_toml(&contents)
     }
 
+    /// NEW: Check if autocomplete should auto-trigger (simple logic)
+    pub fn should_auto_trigger_autocomplete(&self) -> bool {
+        // If trigger_autocomplete keybinding exists anywhere, use manual mode only
+        // If no trigger_autocomplete keybinding, use auto-trigger mode
+        !self.has_trigger_autocomplete_keybinding()
+    }
+
+    /// NEW: Check if user has configured manual trigger keybinding
+    pub fn has_trigger_autocomplete_keybinding(&self) -> bool {
+        self.keybindings.edit.contains_key("trigger_autocomplete") ||
+        self.keybindings.read_only.contains_key("trigger_autocomplete") ||
+        self.keybindings.global.contains_key("trigger_autocomplete")
+    }
+
     /// Get action for key in read-only mode
     pub fn get_read_only_action(&self, key: KeyCode, modifiers: KeyModifiers) -> Option<&str> {
         self.get_action_in_mode(&self.keybindings.read_only, key, modifiers)

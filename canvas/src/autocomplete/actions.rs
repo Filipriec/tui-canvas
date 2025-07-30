@@ -1,9 +1,10 @@
-// src/autocomplete/actions.rs
+// canvas/src/autocomplete/actions.rs
 
 use crate::canvas::state::{CanvasState, ActionContext};
 use crate::autocomplete::state::AutocompleteCanvasState;
 use crate::canvas::actions::types::{CanvasAction, ActionResult};
-use crate::canvas::actions::edit::handle_generic_canvas_action;  // Import the core function
+use crate::canvas::actions::edit::handle_generic_canvas_action;
+use crate::config::CanvasConfig;
 use anyhow::Result;
 
 /// Version for states that implement rich autocomplete
@@ -11,6 +12,7 @@ pub async fn execute_canvas_action_with_autocomplete<S: CanvasState + Autocomple
     action: CanvasAction,
     state: &mut S,
     ideal_cursor_column: &mut usize,
+    config: Option<&CanvasConfig>,
 ) -> Result<ActionResult> {
     // 1. Try feature-specific handler first
     let context = ActionContext {
@@ -20,31 +22,77 @@ pub async fn execute_canvas_action_with_autocomplete<S: CanvasState + Autocomple
         current_field: state.current_field(),
     };
 
-    if let Some(result) = state.handle_feature_action(&action, &context) {
-        return Ok(ActionResult::HandledByFeature(result));
-    }
-
-    // 2. Handle rich autocomplete actions
-    if let Some(result) = handle_rich_autocomplete_action(&action, state)? {
+    if let Some(result) = handle_rich_autocomplete_action(action.clone(), state, &context) {
         return Ok(result);
     }
 
-    // 3. Handle generic canvas actions
-    handle_generic_canvas_action(action, state, ideal_cursor_column).await
+    // 2. Handle generic actions and add auto-trigger logic
+    let result = handle_generic_canvas_action(action.clone(), state, ideal_cursor_column, config).await?;
+    
+    // 3. AUTO-TRIGGER LOGIC: Check if we should activate/deactivate autocomplete
+    if let Some(cfg) = config {
+        println!("{:?}, {}", action, cfg.should_auto_trigger_autocomplete());
+        if cfg.should_auto_trigger_autocomplete() {
+            println!("AUTO-TRIGGER");
+            match action {
+                CanvasAction::InsertChar(_) => {
+                    println!("AUTO-T on Ins");
+                    let current_field = state.current_field();
+                    let current_input = state.get_current_input();
+                    
+                    if state.supports_autocomplete(current_field)
+                        && !state.is_autocomplete_active()
+                        && current_input.len() >= 1 
+                    {
+                        println!("ACT AUTOC");
+                        state.activate_autocomplete();
+                    }
+                }
+                
+                CanvasAction::NextField | CanvasAction::PrevField => {
+                    println!("AUTO-T on nav");
+                    let current_field = state.current_field();
+                    
+                    if state.supports_autocomplete(current_field) && !state.is_autocomplete_active() {
+                        state.activate_autocomplete();
+                    } else if !state.supports_autocomplete(current_field) && state.is_autocomplete_active() {
+                        state.deactivate_autocomplete();
+                    }
+                }
+                
+                _ => {} // No auto-trigger for other actions
+            }
+        }
+    }
+
+    Ok(result)
 }
 
 /// Handle rich autocomplete actions for AutocompleteCanvasState
 fn handle_rich_autocomplete_action<S: CanvasState + AutocompleteCanvasState>(
-    action: &CanvasAction,
+    action: CanvasAction,
     state: &mut S,
-) -> Result<Option<ActionResult>> {
+    _context: &ActionContext,
+) -> Option<ActionResult> {
     match action {
         CanvasAction::TriggerAutocomplete => {
-            if state.supports_autocomplete(state.current_field()) {
+            let current_field = state.current_field();
+            if state.supports_autocomplete(current_field) {
                 state.activate_autocomplete();
-                Ok(Some(ActionResult::success_with_message("Autocomplete activated - fetching suggestions...")))
+                Some(ActionResult::success_with_message("Autocomplete activated"))
             } else {
-                Ok(Some(ActionResult::error("Autocomplete not supported for this field")))
+                Some(ActionResult::success_with_message("Autocomplete not supported for this field"))
+            }
+        }
+
+        CanvasAction::SuggestionUp => {
+            if state.is_autocomplete_ready() {
+                if let Some(autocomplete_state) = state.autocomplete_state_mut() {
+                    autocomplete_state.select_previous();
+                }
+                Some(ActionResult::success())
+            } else {
+                Some(ActionResult::success_with_message("No suggestions available"))
             }
         }
 
@@ -52,42 +100,34 @@ fn handle_rich_autocomplete_action<S: CanvasState + AutocompleteCanvasState>(
             if state.is_autocomplete_ready() {
                 if let Some(autocomplete_state) = state.autocomplete_state_mut() {
                     autocomplete_state.select_next();
-                    return Ok(Some(ActionResult::success()));
                 }
+                Some(ActionResult::success())
+            } else {
+                Some(ActionResult::success_with_message("No suggestions available"))
             }
-            Ok(None)
-        }
-
-        CanvasAction::SuggestionUp => {
-            if state.is_autocomplete_ready() {
-                if let Some(autocomplete_state) = state.autocomplete_state_mut() {
-                    autocomplete_state.select_previous();
-                    return Ok(Some(ActionResult::success()));
-                }
-            }
-            Ok(None)
         }
 
         CanvasAction::SelectSuggestion => {
             if state.is_autocomplete_ready() {
-                if let Some(message) = state.apply_autocomplete_selection() {
-                    return Ok(Some(ActionResult::success_with_message(message)));
+                if let Some(msg) = state.apply_autocomplete_selection() {
+                    Some(ActionResult::success_with_message(&msg))
                 } else {
-                    return Ok(Some(ActionResult::error("No suggestion selected")));
+                    Some(ActionResult::success_with_message("No suggestion selected"))
                 }
+            } else {
+                Some(ActionResult::success_with_message("No suggestions available"))
             }
-            Ok(None)
         }
 
         CanvasAction::ExitSuggestions => {
             if state.is_autocomplete_active() {
                 state.deactivate_autocomplete();
-                Ok(Some(ActionResult::success_with_message("Autocomplete cancelled")))
+                Some(ActionResult::success_with_message("Exited autocomplete"))
             } else {
-                Ok(None)
+                Some(ActionResult::success())
             }
         }
 
-        _ => Ok(None),
+        _ => None, // Not a rich autocomplete action
     }
 }
