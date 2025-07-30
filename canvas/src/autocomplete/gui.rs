@@ -56,8 +56,6 @@ fn render_loading_indicator<T: CanvasTheme>(
     );
 
     let loading_block = Block::default()
-        .borders(Borders::ALL)
-        .border_style(Style::default().fg(theme.accent()))
         .style(Style::default().bg(theme.bg()));
 
     let loading_paragraph = Paragraph::new(loading_text)
@@ -92,8 +90,6 @@ fn render_suggestions_dropdown<T: CanvasTheme>(
 
     // Background
     let dropdown_block = Block::default()
-        .borders(Borders::ALL)
-        .border_style(Style::default().fg(theme.accent()))
         .style(Style::default().bg(theme.bg()));
 
     // List items
@@ -111,7 +107,7 @@ fn render_suggestions_dropdown<T: CanvasTheme>(
     f.render_stateful_widget(list, dropdown_area, &mut list_state);
 }
 
-/// Calculate dropdown size based on suggestions
+/// Calculate dropdown size based on suggestions - updated to match client dimensions
 #[cfg(feature = "gui")]
 fn calculate_dropdown_dimensions(display_texts: &[&str]) -> DropdownDimensions {
     let max_width = display_texts
@@ -120,9 +116,9 @@ fn calculate_dropdown_dimensions(display_texts: &[&str]) -> DropdownDimensions {
         .max()
         .unwrap_or(0) as u16;
 
-    let horizontal_padding = 4; // borders + padding
-    let width = (max_width + horizontal_padding).max(12);
-    let height = (display_texts.len() as u16).min(8) + 2; // max 8 visible items + borders
+    let horizontal_padding = 2; // Changed from 4 to 2 to match client
+    let width = (max_width + horizontal_padding).max(10); // Changed from 12 to 10 to match client
+    let height = (display_texts.len() as u16).min(5); // Removed +2 since no borders
 
     DropdownDimensions { width, height }
 }
@@ -155,7 +151,7 @@ fn calculate_dropdown_position(
     dropdown_area
 }
 
-/// Create styled list items
+/// Create styled list items - updated to match client spacing
 #[cfg(feature = "gui")]
 fn create_suggestion_list_items<'a, T: CanvasTheme>(
     display_texts: &'a [&'a str],
@@ -163,8 +159,8 @@ fn create_suggestion_list_items<'a, T: CanvasTheme>(
     dropdown_width: u16,
     theme: &T,
 ) -> Vec<ListItem<'a>> {
-    let horizontal_padding = 4;
-    let available_width = dropdown_width.saturating_sub(horizontal_padding);
+    let horizontal_padding = 2; // Changed from 4 to 2 to match client
+    let available_width = dropdown_width; // No border padding needed
 
     display_texts
         .iter()
