@@ -42,6 +42,8 @@ move_word_next = ["Ctrl+Right"]
 move_word_prev = ["Ctrl+Left"]
 next_field = ["Tab"]
 prev_field = ["Shift+Tab"]
+trigger_autocomplete = ["Ctrl+p"]
+
 
 # Suggestion/autocomplete keybindings
 [keybindings.suggestions]
