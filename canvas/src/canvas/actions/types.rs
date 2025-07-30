@@ -42,24 +42,7 @@ pub enum CanvasAction {
 }
 
 impl CanvasAction {
-    pub fn from_key(key: crossterm::event::KeyCode) -> Option<Self> {
-        match key {
-            crossterm::event::KeyCode::Char(c) => Some(Self::InsertChar(c)),
-            crossterm::event::KeyCode::Backspace => Some(Self::DeleteBackward),
-            crossterm::event::KeyCode::Delete => Some(Self::DeleteForward),
-            crossterm::event::KeyCode::Left => Some(Self::MoveLeft),
-            crossterm::event::KeyCode::Right => Some(Self::MoveRight),
-            crossterm::event::KeyCode::Up => Some(Self::MoveUp),
-            crossterm::event::KeyCode::Down => Some(Self::MoveDown),
-            crossterm::event::KeyCode::Home => Some(Self::MoveLineStart),
-            crossterm::event::KeyCode::End => Some(Self::MoveLineEnd),
-            crossterm::event::KeyCode::Tab => Some(Self::NextField),
-            crossterm::event::KeyCode::BackTab => Some(Self::PrevField),
-            _ => None,
-        }
-    }
-
-    // Backward compatibility method
+    /// Convert string action name to CanvasAction enum (config-driven)
     pub fn from_string(action: &str) -> Self {
         match action {
             "delete_char_backward" => Self::DeleteBackward,
