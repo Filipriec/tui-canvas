@@ -1,6 +1,7 @@
-// canvas/src/state.rs
+// src/canvas/state.rs
 
 use crate::canvas::actions::CanvasAction;
+use crate::canvas::modes::AppMode;
 
 /// Context passed to feature-specific action handlers
 #[derive(Debug)]
@@ -21,6 +22,9 @@ pub trait CanvasState {
     fn set_current_field(&mut self, index: usize);
     fn set_current_cursor_pos(&mut self, pos: usize);
 
+    // --- Mode Information ---
+    fn current_mode(&self) -> AppMode;
+
     // --- Data Access ---
     fn get_current_input(&self) -> &str;
     fn get_current_input_mut(&mut self) -> &mut String;
@@ -33,7 +37,7 @@ pub trait CanvasState {
 
     // --- Feature-specific action handling ---
 
-    /// Feature-specific action handling (NEW: Type-safe)
+    /// Feature-specific action handling (Type-safe)
     fn handle_feature_action(&mut self, _action: &CanvasAction, _context: &ActionContext) -> Option<String> {
         None // Default: no feature-specific handling
     }

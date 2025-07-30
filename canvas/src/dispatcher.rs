@@ -1,22 +1,61 @@
-// canvas/src/dispatcher.rs
+// src/dispatcher.rs
 
-use crate::canvas::state::CanvasState;
-use crate::canvas::actions::{CanvasAction, ActionResult, execute_canvas_action};
+use crate::canvas::state::{CanvasState, ActionContext};
+use crate::canvas::actions::{CanvasAction, ActionResult};
+use crate::canvas::actions::handlers::{handle_edit_action, handle_readonly_action, handle_highlight_action};
+use crate::canvas::modes::AppMode;
 use crate::config::CanvasConfig;
 use crossterm::event::{KeyCode, KeyModifiers};
 
-/// High-level action dispatcher that coordinates between different action types
+/// High-level action dispatcher that routes actions to mode-specific handlers
 pub struct ActionDispatcher;
 
 impl ActionDispatcher {
-    /// Dispatch any action to the appropriate handler
+    /// Dispatch any action to the appropriate mode handler
     pub async fn dispatch<S: CanvasState>(
         action: CanvasAction,
         state: &mut S,
         ideal_cursor_column: &mut usize,
     ) -> anyhow::Result<ActionResult> {
-        // Load config once here instead of threading it everywhere
-        execute_canvas_action(action, state, ideal_cursor_column, Some(&CanvasConfig::load())).await
+        let config = CanvasConfig::load();
+        Self::dispatch_with_config(action, state, ideal_cursor_column, Some(&config)).await
+    }
+
+    /// Dispatch action with provided config
+    pub async fn dispatch_with_config<S: CanvasState>(
+        action: CanvasAction,
+        state: &mut S,
+        ideal_cursor_column: &mut usize,
+        config: Option<&CanvasConfig>,
+    ) -> anyhow::Result<ActionResult> {
+        // Check for feature-specific handling first
+        let context = ActionContext {
+            key_code: None,
+            ideal_cursor_column: *ideal_cursor_column,
+            current_input: state.get_current_input().to_string(),
+            current_field: state.current_field(),
+        };
+
+        if let Some(result) = state.handle_feature_action(&action, &context) {
+            return Ok(ActionResult::HandledByFeature(result));
+        }
+
+        // Route to mode-specific handler
+        match state.current_mode() {
+            AppMode::Edit => {
+                handle_edit_action(action, state, ideal_cursor_column, config).await
+            }
+            AppMode::ReadOnly => {
+                handle_readonly_action(action, state, ideal_cursor_column, config).await
+            }
+            AppMode::Highlight => {
+                handle_highlight_action(action, state, ideal_cursor_column, config).await
+            }
+            AppMode::General | AppMode::Command => {
+                // These modes might not handle canvas actions directly
+                Ok(ActionResult::success_with_message("Mode does not handle canvas actions"))
+            }
+        }
     }
 
     /// Quick action dispatch from KeyCode using config
@@ -29,10 +68,10 @@ impl ActionDispatcher {
         has_suggestions: bool,
     ) -> anyhow::Result<Option<ActionResult>> {
         let config = CanvasConfig::load();
-        
+
         if let Some(action_name) = config.get_action_for_key(key, modifiers, is_edit_mode, has_suggestions) {
             let action = CanvasAction::from_string(action_name);
-            let result = Self::dispatch(action, state, ideal_cursor_column).await?;
+            let result = Self::dispatch_with_config(action, state, ideal_cursor_column, Some(&config)).await?;
             Ok(Some(result))
         } else {
             Ok(None)

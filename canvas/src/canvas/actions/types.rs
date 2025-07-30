@@ -25,6 +25,7 @@ pub enum CanvasAction {
     MoveWordNext,
     MoveWordEnd,
     MoveWordPrev,
+    MoveWordEndPrev,
 
     // Field navigation
     NextField,
@@ -58,6 +59,7 @@ impl CanvasAction {
             "move_word_next" => Self::MoveWordNext,
             "move_word_end" => Self::MoveWordEnd,
             "move_word_prev" => Self::MoveWordPrev,
+            "move_word_end_prev" => Self::MoveWordEndPrev,
             "next_field" => Self::NextField,
             "prev_field" => Self::PrevField,
             "trigger_autocomplete" => Self::TriggerAutocomplete,
