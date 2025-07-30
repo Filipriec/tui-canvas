@@ -1,9 +1,9 @@
-// canvas/src/autocomplete/actions.rs
+// src/autocomplete/actions.rs
 
 use crate::canvas::state::{CanvasState, ActionContext};
 use crate::autocomplete::state::AutocompleteCanvasState;
 use crate::canvas::actions::types::{CanvasAction, ActionResult};
-use crate::canvas::actions::edit::handle_generic_canvas_action;
+use crate::dispatcher::ActionDispatcher; // NEW: Use dispatcher directly
 use crate::config::CanvasConfig;
 use anyhow::Result;
 
@@ -26,9 +26,9 @@ pub async fn execute_canvas_action_with_autocomplete<S: CanvasState + Autocomple
         return Ok(result);
     }
 
-    // 2. Handle generic actions and add auto-trigger logic
-    let result = handle_generic_canvas_action(action.clone(), state, ideal_cursor_column, config).await?;
-    
+    // 2. Handle generic actions using the new dispatcher directly
+    let result = ActionDispatcher::dispatch_with_config(action.clone(), state, ideal_cursor_column, config).await?;
+
     // 3. AUTO-TRIGGER LOGIC: Check if we should activate/deactivate autocomplete
     if let Some(cfg) = config {
         println!("{:?}, {}", action, cfg.should_auto_trigger_autocomplete());
@@ -39,27 +39,27 @@ pub async fn execute_canvas_action_with_autocomplete<S: CanvasState + Autocomple
                     println!("AUTO-T on Ins");
                     let current_field = state.current_field();
                     let current_input = state.get_current_input();
-                    
+
                     if state.supports_autocomplete(current_field)
                         && !state.is_autocomplete_active()
-                        && current_input.len() >= 1 
+                        && current_input.len() >= 1
                     {
                         println!("ACT AUTOC");
                         state.activate_autocomplete();
                     }
                 }
-                
+
                 CanvasAction::NextField | CanvasAction::PrevField => {
                     println!("AUTO-T on nav");
                     let current_field = state.current_field();
-                    
+
                     if state.supports_autocomplete(current_field) && !state.is_autocomplete_active() {
                         state.activate_autocomplete();
                     } else if !state.supports_autocomplete(current_field) && state.is_autocomplete_active() {
                         state.deactivate_autocomplete();
                     }
                 }
-                
+
                 _ => {} // No auto-trigger for other actions
             }
         }

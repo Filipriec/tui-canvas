@@ -7,6 +7,16 @@ use crate::canvas::modes::AppMode;
 use crate::config::CanvasConfig;
 use crossterm::event::{KeyCode, KeyModifiers};
 
+/// Main entry point for executing canvas actions
+pub async fn execute_canvas_action<S: CanvasState>(
+    action: CanvasAction,
+    state: &mut S,
+    ideal_cursor_column: &mut usize,
+    config: Option<&CanvasConfig>,
+) -> anyhow::Result<ActionResult> {
+    ActionDispatcher::dispatch_with_config(action, state, ideal_cursor_column, config).await
+}
+
 /// High-level action dispatcher that routes actions to mode-specific handlers
 pub struct ActionDispatcher;
 
@@ -87,7 +97,7 @@ impl ActionDispatcher {
         let mut results = Vec::new();
         for action in actions {
             let result = Self::dispatch(action, state, ideal_cursor_column).await?;
-            let is_success = result.is_success(); // Check success before moving
+            let is_success = result.is_success();
             results.push(result);
 
             // Stop on first error
