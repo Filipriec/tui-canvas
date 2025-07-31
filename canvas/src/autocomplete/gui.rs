@@ -1,4 +1,4 @@
-// canvas/src/autocomplete/gui.rs
+// src/autocomplete/gui.rs
 
 #[cfg(feature = "gui")]
 use ratatui::{
@@ -8,6 +8,7 @@ use ratatui::{
     Frame,
 };
 
+// Use the correct import from our types module
 use crate::autocomplete::types::AutocompleteState;
 
 #[cfg(feature = "gui")]
@@ -18,12 +19,12 @@ use unicode_width::UnicodeWidthStr;
 
 /// Render autocomplete dropdown - call this AFTER rendering canvas
 #[cfg(feature = "gui")]
-pub fn render_autocomplete_dropdown<T: CanvasTheme>(
+pub fn render_autocomplete_dropdown<T: CanvasTheme, D: Clone + Send + 'static>(
     f: &mut Frame,
     frame_area: Rect,
     input_rect: Rect,
     theme: &T,
-    autocomplete_state: &AutocompleteState<impl Clone + Send + 'static>,
+    autocomplete_state: &AutocompleteState<D>,
 ) {
     if !autocomplete_state.is_active {
         return;
@@ -68,12 +69,12 @@ fn render_loading_indicator<T: CanvasTheme>(
 
 /// Show actual suggestions list
 #[cfg(feature = "gui")]
-fn render_suggestions_dropdown<T: CanvasTheme>(
+fn render_suggestions_dropdown<T: CanvasTheme, D: Clone + Send + 'static>(
     f: &mut Frame,
     frame_area: Rect,
     input_rect: Rect,
     theme: &T,
-    autocomplete_state: &AutocompleteState<impl Clone + Send + 'static>,
+    autocomplete_state: &AutocompleteState<D>,
 ) {
     let display_texts: Vec<&str> = autocomplete_state.suggestions
         .iter()

@@ -14,7 +14,7 @@ common = { path = "../common" }
 ratatui = { workspace = true, optional = true }
 crossterm = { workspace = true }
 anyhow = { workspace = true }
-tokio = { workspace = true }
+tokio = { workspace = true, optional = true }
 toml = { workspace = true }
 serde = { workspace = true }
 unicode-width.workspace = true
@@ -29,7 +29,14 @@ tokio-test = "0.4.4"
 [features]
 default = []
 gui = ["ratatui"]
+autocomplete = ["tokio"]
 
 [[example]]
-name = "ratatui_demo"
-path = "examples/ratatui_demo.rs"
+name = "autocomplete"
+required-features = ["autocomplete", "gui"]
+path = "examples/autocomplete.rs"
+
+[[example]]
+name = "canvas_gui_demo"
+required-features = ["gui"]
+path = "examples/canvas_gui_demo.rs"

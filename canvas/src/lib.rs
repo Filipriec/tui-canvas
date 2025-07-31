@@ -1,4 +1,4 @@
-// src/lib.rs - Updated to conditionally include autocomplete
+// src/lib.rs
 
 pub mod canvas;
 
@@ -23,8 +23,9 @@ pub use autocomplete::{
     AutocompleteCanvasState, 
     AutocompleteState, 
     SuggestionItem,
-    actions::execute_with_autocomplete,
+    execute_with_autocomplete,
+    handle_autocomplete_feature_action,
 };
 
 #[cfg(all(feature = "gui", feature = "autocomplete"))]
-pub use autocomplete::gui::render_autocomplete_dropdown;
+pub use autocomplete::render_autocomplete_dropdown;

@@ -1,10 +1,22 @@
 // src/autocomplete/mod.rs
+
 pub mod types;
-pub mod gui;
 pub mod state;
 pub mod actions;
 
-// Re-export autocomplete types
+#[cfg(feature = "gui")]
+pub mod gui;
+
+// Re-export the main autocomplete API
 pub use types::{SuggestionItem, AutocompleteState};
 pub use state::AutocompleteCanvasState;
-pub use actions::execute_canvas_action_with_autocomplete;
+
+// Re-export the new action functions
+pub use actions::{
+    execute_with_autocomplete,
+    handle_autocomplete_feature_action,
+};
+
+// Re-export GUI functions if available
+#[cfg(feature = "gui")]
+pub use gui::render_autocomplete_dropdown;
