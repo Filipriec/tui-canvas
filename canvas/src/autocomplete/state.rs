@@ -1,17 +1,19 @@
 // src/autocomplete/state.rs
 
 use crate::canvas::state::CanvasState;
+use async_trait::async_trait;
 
 /// OPTIONAL extension trait for states that want rich autocomplete functionality.
 /// Only implement this if you need the new autocomplete features.
-/// 
+///
 /// # User Workflow:
 /// 1. User presses trigger key (Tab, Ctrl+K, etc.)
-/// 2. User's key mapping calls CanvasAction::TriggerAutocomplete  
+/// 2. User's key mapping calls CanvasAction::TriggerAutocomplete
 /// 3. Library calls your trigger_autocomplete_suggestions() method
 /// 4. You implement async fetching logic in that method
 /// 5. You call set_autocomplete_suggestions() with results
 /// 6. Library manages UI state and navigation
+#[async_trait]
 pub trait AutocompleteCanvasState: CanvasState {
     /// Associated type for suggestion data (e.g., Hit, String, CustomType)
     type SuggestionData: Clone + Send + 'static;
@@ -92,34 +94,39 @@ pub trait AutocompleteCanvasState: CanvasState {
     fn should_trigger_autocomplete(&self) -> bool {
         let current_input = self.get_current_input();
         let current_field = self.current_field();
-        
-        self.supports_autocomplete(current_field) && 
+
+        self.supports_autocomplete(current_field) &&
         current_input.len() >= 2 && // Default: trigger after 2 chars
         !self.is_autocomplete_active()
     }
 
     /// **USER MUST IMPLEMENT**: Trigger autocomplete suggestions (async)
     /// This is where you implement your API calls, caching, etc.
-    /// 
+    ///
     /// # Example Implementation:
     /// ```rust
-    /// async fn trigger_autocomplete_suggestions(&mut self) {
-    ///     self.activate_autocomplete(); // Show loading state
+    /// #[async_trait]
+    /// impl AutocompleteCanvasState for MyState {
+    ///     type SuggestionData = MyData;
     ///     
-    ///     let query = self.get_current_input().to_string();
-    ///     let suggestions = my_api.search(&query).await.unwrap_or_default();
-    ///     
-    ///     self.set_autocomplete_suggestions(suggestions);
+    ///     async fn trigger_autocomplete_suggestions(&mut self) {
+    ///         self.activate_autocomplete(); // Show loading state
+    ///
+    ///         let query = self.get_current_input().to_string();
+    ///         let suggestions = my_api.search(&query).await.unwrap_or_default();
+    ///
+    ///         self.set_autocomplete_suggestions(suggestions);
+    ///     }
     /// }
     /// ```
     async fn trigger_autocomplete_suggestions(&mut self) {
         // Activate autocomplete UI
         self.activate_autocomplete();
-        
+
         // Default: just show loading state
         // User should override this to do actual async fetching
         self.set_autocomplete_loading(true);
-        
+
         // In a real implementation, you'd:
         // 1. Get current input: let query = self.get_current_input();
         // 2. Make API call: let results = api.search(query).await;
@@ -157,7 +164,7 @@ pub trait AutocompleteCanvasState: CanvasState {
         // Apply the value to current field
         *self.get_current_input_mut() = suggestion.value_to_store.clone();
         self.set_has_unsaved_changes(true);
-        
+
         // Clear autocomplete
         self.clear_autocomplete_suggestions();
     }

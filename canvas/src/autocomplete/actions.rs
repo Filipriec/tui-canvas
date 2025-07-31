@@ -8,18 +8,18 @@ use anyhow::Result;
 
 /// Enhanced execute function for states that support autocomplete
 /// This is the main entry point for autocomplete-aware canvas execution
-/// 
+///
 /// Use this instead of canvas::execute() if you want autocomplete behavior:
 /// ```rust
 /// execute_with_autocomplete(action, &mut state).await?;
 /// ```
-pub async fn execute_with_autocomplete<S: CanvasState + AutocompleteCanvasState>(
+pub async fn execute_with_autocomplete<S: CanvasState + AutocompleteCanvasState + Send>(
     action: CanvasAction,
     state: &mut S,
 ) -> Result<ActionResult> {
     match &action {
         // === AUTOCOMPLETE-SPECIFIC ACTIONS ===
-        
+
         CanvasAction::TriggerAutocomplete => {
             if state.supports_autocomplete(state.current_field()) {
                 state.trigger_autocomplete_suggestions().await;
@@ -61,7 +61,7 @@ pub async fn execute_with_autocomplete<S: CanvasState + AutocompleteCanvasState>
         }
 
         // === TEXT INSERTION WITH AUTO-TRIGGER ===
-        
+
         CanvasAction::InsertChar(_) => {
             // First, execute the character insertion normally
             let result = execute(action, state).await?;
@@ -75,7 +75,7 @@ pub async fn execute_with_autocomplete<S: CanvasState + AutocompleteCanvasState>
         }
 
         // === NAVIGATION/EDITING ACTIONS (clear autocomplete first) ===
-        
+
         CanvasAction::MoveLeft | CanvasAction::MoveRight |
         CanvasAction::MoveUp | CanvasAction::MoveDown |
         CanvasAction::NextField | CanvasAction::PrevField |
@@ -84,13 +84,13 @@ pub async fn execute_with_autocomplete<S: CanvasState + AutocompleteCanvasState>
             if state.is_autocomplete_active() {
                 state.clear_autocomplete_suggestions();
             }
-            
+
             // Execute the action normally
             execute(action, state).await
         }
 
         // === ALL OTHER ACTIONS (normal execution) ===
-        
+
         _ => {
             // For all other actions, just execute normally
             execute(action, state).await
@@ -99,7 +99,7 @@ pub async fn execute_with_autocomplete<S: CanvasState + AutocompleteCanvasState>
 }
 
 /// Helper function to integrate autocomplete actions with CanvasState.handle_feature_action()
-/// 
+///
 /// Use this in your CanvasState implementation like this:
 /// ```rust
 /// fn handle_feature_action(&mut self, action: &CanvasAction, context: &ActionContext) -> Option<String> {
@@ -107,12 +107,12 @@ pub async fn execute_with_autocomplete<S: CanvasState + AutocompleteCanvasState>
 ///     if let Some(result) = handle_autocomplete_feature_action(action, self) {
 ///         return Some(result);
 ///     }
-///     
+///
 ///     // Handle your other custom actions...
 ///     None
 /// }
 /// ```
-pub fn handle_autocomplete_feature_action<S: CanvasState + AutocompleteCanvasState>(
+pub fn handle_autocomplete_feature_action<S: CanvasState + AutocompleteCanvasState + Send>(
     action: &CanvasAction,
     state: &S,
 ) -> Option<String> {
@@ -160,7 +160,7 @@ pub fn handle_autocomplete_feature_action<S: CanvasState + AutocompleteCanvasSta
 /// Legacy compatibility function - kept for backward compatibility
 /// This is the old function signature, now it just wraps the new system
 #[deprecated(note = "Use execute_with_autocomplete instead")]
-pub async fn execute_canvas_action_with_autocomplete<S: CanvasState + AutocompleteCanvasState>(
+pub async fn execute_canvas_action_with_autocomplete<S: CanvasState + AutocompleteCanvasState + Send>(
     action: CanvasAction,
     state: &mut S,
     _ideal_cursor_column: &mut usize, // Ignored - new system manages this internally

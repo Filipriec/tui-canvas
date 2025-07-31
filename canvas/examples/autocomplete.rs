@@ -24,14 +24,17 @@ use canvas::{
         theme::CanvasTheme,
     },
     autocomplete::{
-        AutocompleteCanvasState, 
-        AutocompleteState, 
+        AutocompleteCanvasState,
+        AutocompleteState,
         SuggestionItem,
         execute_with_autocomplete,
         handle_autocomplete_feature_action,
     },
     CanvasAction,
 };
+
+// Add the async_trait import
+use async_trait::async_trait;
 
 // Simple theme implementation
 #[derive(Clone)]
@@ -64,7 +67,7 @@ struct AutocompleteFormState {
     mode: AppMode,
     has_changes: bool,
     debug_message: String,
-    
+
     // Autocomplete state
     autocomplete: AutocompleteState<EmailSuggestion>,
 }
@@ -97,14 +100,14 @@ impl AutocompleteFormState {
 impl CanvasState for AutocompleteFormState {
     fn current_field(&self) -> usize { self.current_field }
     fn current_cursor_pos(&self) -> usize { self.cursor_pos }
-    fn set_current_field(&mut self, index: usize) { 
+    fn set_current_field(&mut self, index: usize) {
         self.current_field = index.min(self.fields.len().saturating_sub(1));
         // Clear autocomplete when changing fields
         if self.is_autocomplete_active() {
             self.clear_autocomplete_suggestions();
         }
     }
-    fn set_current_cursor_pos(&mut self, pos: usize) { 
+    fn set_current_cursor_pos(&mut self, pos: usize) {
         let max_pos = if self.mode == AppMode::Edit {
             self.fields[self.current_field].len()
         } else {
@@ -146,6 +149,8 @@ impl CanvasState for AutocompleteFormState {
     }
 }
 
+// Add the #[async_trait] attribute to the implementation
+#[async_trait]
 impl AutocompleteCanvasState for AutocompleteFormState {
     type SuggestionData = EmailSuggestion;
 
@@ -165,9 +170,9 @@ impl AutocompleteCanvasState for AutocompleteFormState {
     fn should_trigger_autocomplete(&self) -> bool {
         let current_input = self.get_current_input();
         let current_field = self.current_field();
-        
+
         // Trigger for email field when we have "@" and at least 1 more character
-        self.supports_autocomplete(current_field) && 
+        self.supports_autocomplete(current_field) &&
         current_input.contains('@') &&
         current_input.len() > current_input.find('@').unwrap_or(0) + 1 &&
         !self.is_autocomplete_active()
@@ -181,7 +186,7 @@ impl AutocompleteCanvasState for AutocompleteFormState {
 
         // 2. Get current input for querying
         let query = self.get_current_input().to_string();
-        
+
         // 3. Extract domain part from email
         let domain_part = if let Some(at_pos) = query.find('@') {
             query[at_pos + 1..].to_string()
@@ -195,19 +200,19 @@ impl AutocompleteCanvasState for AutocompleteFormState {
         let suggestions = tokio::task::spawn_blocking(move || {
             // Simulate network delay
             std::thread::sleep(std::time::Duration::from_millis(200));
-            
+
             // Create mock suggestions based on domain input
             let popular_domains = vec![
                 ("gmail.com", "Gmail"),
-                ("yahoo.com", "Yahoo Mail"), 
+                ("yahoo.com", "Yahoo Mail"),
                 ("outlook.com", "Outlook"),
                 ("hotmail.com", "Hotmail"),
                 ("company.com", "Company Email"),
                 ("university.edu", "University"),
             ];
-            
+
             let mut results = Vec::new();
-            
+
             for (domain, provider) in popular_domains {
                 if domain.starts_with(&domain_part) || domain_part.is_empty() {
                     let full_email = format!("{}@{}", email_prefix, domain);
@@ -221,7 +226,7 @@ impl AutocompleteCanvasState for AutocompleteFormState {
                     ));
                 }
             }
-            
+
             results
         }).await.unwrap_or_default();
 
@@ -246,7 +251,7 @@ async fn handle_key_press(key: KeyCode, modifiers: KeyModifiers, state: &mut Aut
                 Some(CanvasAction::NextField) // Normal tab
             }
         }
-        
+
         KeyCode::BackTab => {
             if state.is_autocomplete_active() {
                 Some(CanvasAction::SuggestionUp)
@@ -254,7 +259,7 @@ async fn handle_key_press(key: KeyCode, modifiers: KeyModifiers, state: &mut Aut
                 Some(CanvasAction::PrevField)
             }
         }
-        
+
         KeyCode::Enter => {
             if state.is_autocomplete_active() {
                 Some(CanvasAction::SelectSuggestion) // Apply suggestion
@@ -262,7 +267,7 @@ async fn handle_key_press(key: KeyCode, modifiers: KeyModifiers, state: &mut Aut
                 Some(CanvasAction::NextField)
             }
         }
-        
+
         KeyCode::Esc => {
             if state.is_autocomplete_active() {
                 Some(CanvasAction::ExitSuggestions) // Close autocomplete
@@ -280,12 +285,12 @@ async fn handle_key_press(key: KeyCode, modifiers: KeyModifiers, state: &mut Aut
         KeyCode::End => Some(CanvasAction::MoveLineEnd),
         KeyCode::Backspace => Some(CanvasAction::DeleteBackward),
         KeyCode::Delete => Some(CanvasAction::DeleteForward),
-        
+
         // Character input
         KeyCode::Char(c) if !modifiers.contains(KeyModifiers::CONTROL) => {
             Some(CanvasAction::InsertChar(c))
         }
-        
+
         _ => None,
     };
 
@@ -371,7 +376,7 @@ fn ui(f: &mut Frame, state: &AutocompleteFormState, theme: &DemoTheme) {
     };
 
     let status_lines = vec![
-        Line::from(Span::raw(format!("Mode: {:?} | Field: {}/{} | Cursor: {}", 
+        Line::from(Span::raw(format!("Mode: {:?} | Field: {}/{} | Cursor: {}",
             state.mode, state.current_field + 1, state.fields.len(), state.cursor_pos))),
         Line::from(Span::raw(format!("Autocomplete: {}", autocomplete_status))),
         Line::from(Span::raw(state.debug_message.clone())),
