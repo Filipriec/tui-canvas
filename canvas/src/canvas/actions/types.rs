@@ -92,3 +92,93 @@ pub async fn execute<S: CanvasState>(
     
     super::handlers::dispatch_action(action, state, &mut ideal_cursor_column).await
 }
+
+impl CanvasAction {
+    /// Get a human-readable description of this action
+    pub fn description(&self) -> &'static str {
+        match self {
+            Self::MoveLeft => "move left",
+            Self::MoveRight => "move right",
+            Self::MoveUp => "move up",
+            Self::MoveDown => "move down",
+            Self::MoveWordNext => "next word",
+            Self::MoveWordPrev => "previous word",
+            Self::MoveWordEnd => "word end",
+            Self::MoveWordEndPrev => "previous word end",
+            Self::MoveLineStart => "line start",
+            Self::MoveLineEnd => "line end",
+            Self::NextField => "next field",
+            Self::PrevField => "previous field",
+            Self::MoveFirstLine => "first field",
+            Self::MoveLastLine => "last field",
+            Self::InsertChar(c) => "insert character",
+            Self::DeleteBackward => "delete backward",
+            Self::DeleteForward => "delete forward",
+            Self::TriggerAutocomplete => "trigger autocomplete",
+            Self::SuggestionUp => "suggestion up",
+            Self::SuggestionDown => "suggestion down",
+            Self::SelectSuggestion => "select suggestion",
+            Self::ExitSuggestions => "exit suggestions",
+            Self::Custom(name) => "custom action",
+        }
+    }
+
+    /// Get all movement-related actions
+    pub fn movement_actions() -> Vec<CanvasAction> {
+        vec![
+            Self::MoveLeft,
+            Self::MoveRight,
+            Self::MoveUp,
+            Self::MoveDown,
+            Self::MoveWordNext,
+            Self::MoveWordPrev,
+            Self::MoveWordEnd,
+            Self::MoveWordEndPrev,
+            Self::MoveLineStart,
+            Self::MoveLineEnd,
+            Self::NextField,
+            Self::PrevField,
+            Self::MoveFirstLine,
+            Self::MoveLastLine,
+        ]
+    }
+
+    /// Get all editing-related actions
+    pub fn editing_actions() -> Vec<CanvasAction> {
+        vec![
+            Self::InsertChar(' '), // Example char
+            Self::DeleteBackward,
+            Self::DeleteForward,
+        ]
+    }
+
+    /// Get all autocomplete-related actions
+    pub fn autocomplete_actions() -> Vec<CanvasAction> {
+        vec![
+            Self::TriggerAutocomplete,
+            Self::SuggestionUp,
+            Self::SuggestionDown,
+            Self::SelectSuggestion,
+            Self::ExitSuggestions,
+        ]
+    }
+
+    /// Check if this action modifies text content
+    pub fn is_editing_action(&self) -> bool {
+        matches!(self,
+            Self::InsertChar(_) |
+            Self::DeleteBackward |
+            Self::DeleteForward
+        )
+    }
+
+    /// Check if this action moves the cursor
+    pub fn is_movement_action(&self) -> bool {
+        matches!(self,
+            Self::MoveLeft | Self::MoveRight | Self::MoveUp | Self::MoveDown |
+            Self::MoveWordNext | Self::MoveWordPrev | Self::MoveWordEnd | Self::MoveWordEndPrev |
+            Self::MoveLineStart | Self::MoveLineEnd | Self::NextField | Self::PrevField |
+            Self::MoveFirstLine | Self::MoveLastLine
+        )
+    }
+}
