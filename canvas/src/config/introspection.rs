@@ -1,43 +1,60 @@
 // src/config/introspection.rs
+//! Handler capability introspection system
+//! 
+//! This module provides traits and utilities for handlers to report their capabilities,
+//! enabling automatic configuration generation and validation.
 
 use std::collections::HashMap;
 
+/// Specification for a single action that a handler can perform
 #[derive(Debug, Clone)]
 pub struct ActionSpec {
+    /// Action name (e.g., "move_left", "delete_char_backward")
     pub name: String,
+    /// Human-readable description of what this action does
     pub description: String,
+    /// Example keybindings for this action (e.g., ["Left", "h"])
     pub examples: Vec<String>,
+    /// Whether this action is required for the handler to function properly
     pub is_required: bool,
 }
 
+/// Complete capability description for a single handler
 #[derive(Debug, Clone)]
 pub struct HandlerCapabilities {
+    /// Mode name this handler operates in (e.g., "edit", "read_only")
     pub mode_name: String,
+    /// All actions this handler can perform
     pub actions: Vec<ActionSpec>,
-    pub auto_handled: Vec<String>, // Actions handled automatically (like insert_char)
+    /// Actions handled automatically without configuration (e.g., "insert_char")
+    pub auto_handled: Vec<String>,
 }
 
-/// Trait that each handler implements to report its capabilities
+/// Trait that handlers implement to report their capabilities
+/// 
+/// This enables the configuration system to automatically discover what actions
+/// are available and validate user configurations against actual implementations.
 pub trait ActionHandlerIntrospection {
-    /// Return the capabilities of this handler
+    /// Return complete capability information for this handler
     fn introspect() -> HandlerCapabilities;
 
-    /// Validate that this handler actually supports the claimed actions
+    /// Validate that this handler actually supports its claimed actions
+    /// Override this to add custom validation logic
     fn validate_capabilities() -> Result<(), String> {
-        // Default implementation - handlers can override for custom validation
-        Ok(())
+        Ok(()) // Default: assume handler is valid
     }
 }
 
-/// System that discovers all handler capabilities
+/// Discovers capabilities from all registered handlers
 pub struct HandlerDiscovery;
 
 impl HandlerDiscovery {
-    /// Discover all handler capabilities by calling their introspect methods
+    /// Discover capabilities from all known handlers
+    /// Add new handlers to this function as they are created
     pub fn discover_all() -> HashMap<String, HandlerCapabilities> {
         let mut capabilities = HashMap::new();
 
-        // Import and introspect each handler
+        // Register all known handlers here
         let edit_caps = crate::canvas::actions::handlers::edit::EditHandler::introspect();
         capabilities.insert("edit".to_string(), edit_caps);
 
@@ -50,10 +67,11 @@ impl HandlerDiscovery {
         capabilities
     }
 
-    /// Validate that all handlers actually support their claimed actions
+    /// Validate all handlers support their claimed capabilities
     pub fn validate_all_handlers() -> Result<(), Vec<String>> {
         let mut errors = Vec::new();
 
+        // Validate each handler
         if let Err(e) = crate::canvas::actions::handlers::edit::EditHandler::validate_capabilities() {
             errors.push(format!("Edit handler: {}", e));
         }

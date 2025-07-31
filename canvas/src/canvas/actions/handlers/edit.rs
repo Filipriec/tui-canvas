@@ -1,4 +1,8 @@
 // src/canvas/actions/handlers/edit.rs
+//! Edit mode action handler
+//! 
+//! Handles user input when in edit mode, supporting text entry, deletion,
+//! and cursor movement with edit-specific behavior (cursor can go past end of text).
 
 use crate::canvas::actions::types::{CanvasAction, ActionResult};
 use crate::config::introspection::{ActionHandlerIntrospection, HandlerCapabilities, ActionSpec};
@@ -7,11 +11,22 @@ use crate::canvas::state::CanvasState;
 use crate::config::CanvasConfig;
 use anyhow::Result;
 
-const FOR_EDIT_MODE: bool = true; // Edit mode flag
-                                  
+/// Edit mode uses cursor-past-end behavior for text insertion
+const FOR_EDIT_MODE: bool = true;
+
+/// Empty struct that implements edit mode capabilities
 pub struct EditHandler;
 
 /// Handle actions in edit mode with edit-specific cursor behavior
+/// 
+/// Edit mode allows text modification and uses cursor positioning that can
+/// go past the end of existing text to facilitate insertion.
+/// 
+/// # Arguments
+/// * `action` - The action to perform
+/// * `state` - Mutable canvas state
+/// * `ideal_cursor_column` - Desired column for vertical movement (maintained across line changes)
+/// * `config` - Optional configuration for behavior customization
 pub async fn handle_edit_action<S: CanvasState>(
     action: CanvasAction,
     state: &mut S,
@@ -20,6 +35,7 @@ pub async fn handle_edit_action<S: CanvasState>(
 ) -> Result<ActionResult> {
     match action {
         CanvasAction::InsertChar(c) => {
+            // Insert character at cursor position and advance cursor
             let cursor_pos = state.current_cursor_pos();
             let input = state.get_current_input_mut();
             input.insert(cursor_pos, c);
@@ -30,6 +46,7 @@ pub async fn handle_edit_action<S: CanvasState>(
         }
 
         CanvasAction::DeleteBackward => {
+            // Delete character before cursor (Backspace behavior)
             let cursor_pos = state.current_cursor_pos();
             if cursor_pos > 0 {
                 let input = state.get_current_input_mut();
@@ -42,6 +59,7 @@ pub async fn handle_edit_action<S: CanvasState>(
         }
 
         CanvasAction::DeleteForward => {
+            // Delete character at cursor position (Delete key behavior)
             let cursor_pos = state.current_cursor_pos();
             let input = state.get_current_input_mut();
             if cursor_pos < input.len() {
@@ -51,6 +69,7 @@ pub async fn handle_edit_action<S: CanvasState>(
             Ok(ActionResult::success())
         }
 
+        // Cursor movement actions
         CanvasAction::MoveLeft => {
             let new_pos = move_left(state.current_cursor_pos());
             state.set_current_cursor_pos(new_pos);
@@ -67,8 +86,8 @@ pub async fn handle_edit_action<S: CanvasState>(
             Ok(ActionResult::success())
         }
 
+        // Field navigation (treating single-line fields as "lines")
         CanvasAction::MoveUp => {
-            // For single-line fields, move to previous field
             let current_field = state.current_field();
             if current_field > 0 {
                 state.set_current_field(current_field - 1);
@@ -80,7 +99,6 @@ pub async fn handle_edit_action<S: CanvasState>(
         }
 
         CanvasAction::MoveDown => {
-            // For single-line fields, move to next field
             let current_field = state.current_field();
             let total_fields = state.fields().len();
             if current_field < total_fields - 1 {
@@ -92,6 +110,7 @@ pub async fn handle_edit_action<S: CanvasState>(
             Ok(ActionResult::success())
         }
 
+        // Line-based movement
         CanvasAction::MoveLineStart => {
             let new_pos = line_start_position();
             state.set_current_cursor_pos(new_pos);
@@ -107,6 +126,7 @@ pub async fn handle_edit_action<S: CanvasState>(
             Ok(ActionResult::success())
         }
 
+        // Document-level movement (first/last field)
         CanvasAction::MoveFirstLine => {
             state.set_current_field(0);
             let current_input = state.get_current_input();
@@ -126,6 +146,7 @@ pub async fn handle_edit_action<S: CanvasState>(
             Ok(ActionResult::success())
         }
 
+        // Word-based movement
         CanvasAction::MoveWordNext => {
             let current_input = state.get_current_input();
             if !current_input.is_empty() {
@@ -166,6 +187,7 @@ pub async fn handle_edit_action<S: CanvasState>(
             Ok(ActionResult::success())
         }
 
+        // Field navigation with wrapping behavior
         CanvasAction::NextField | CanvasAction::PrevField => {
             let current_field = state.current_field();
             let total_fields = state.fields().len();
@@ -173,16 +195,16 @@ pub async fn handle_edit_action<S: CanvasState>(
             let new_field = match action {
                 CanvasAction::NextField => {
                     if config.map_or(true, |c| c.behavior.wrap_around_fields) {
-                        (current_field + 1) % total_fields
+                        (current_field + 1) % total_fields // Wrap to first field
                     } else {
-                        (current_field + 1).min(total_fields - 1)
+                        (current_field + 1).min(total_fields - 1) // Stop at last field
                     }
                 }
                 CanvasAction::PrevField => {
                     if config.map_or(true, |c| c.behavior.wrap_around_fields) {
-                        if current_field == 0 { total_fields - 1 } else { current_field - 1 }
+                        if current_field == 0 { total_fields - 1 } else { current_field - 1 } // Wrap to last field
                     } else {
-                        current_field.saturating_sub(1)
+                        current_field.saturating_sub(1) // Stop at first field
                     }
                 }
                 _ => unreachable!(),
@@ -206,10 +228,12 @@ pub async fn handle_edit_action<S: CanvasState>(
 }
 
 impl ActionHandlerIntrospection for EditHandler {
+    /// Report all actions this handler supports with examples and requirements
+    /// Used for automatic config generation and validation
     fn introspect() -> HandlerCapabilities {
         let mut actions = Vec::new();
 
-        // REQUIRED ACTIONS - These must be configured for edit mode to work
+        // REQUIRED ACTIONS - These must be configured for edit mode to work properly
         actions.push(ActionSpec {
             name: "move_left".to_string(),
             description: "Move cursor one position to the left".to_string(),
@@ -240,7 +264,7 @@ impl ActionHandlerIntrospection for EditHandler {
 
         actions.push(ActionSpec {
             name: "delete_char_backward".to_string(),
-            description: "Delete character before cursor".to_string(),
+            description: "Delete character before cursor (Backspace)".to_string(),
             examples: vec!["Backspace".to_string()],
             is_required: true,
         });
@@ -318,7 +342,7 @@ impl ActionHandlerIntrospection for EditHandler {
 
         actions.push(ActionSpec {
             name: "delete_char_forward".to_string(),
-            description: "Delete character after cursor".to_string(),
+            description: "Delete character after cursor (Delete key)".to_string(),
             examples: vec!["Delete".to_string()],
             is_required: false,
         });
@@ -327,7 +351,7 @@ impl ActionHandlerIntrospection for EditHandler {
             mode_name: "edit".to_string(),
             actions,
             auto_handled: vec![
-                "insert_char".to_string(), // Any printable character
+                "insert_char".to_string(), // Any printable character is inserted automatically
             ],
         }
     }
