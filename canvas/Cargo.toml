@@ -29,3 +29,7 @@ tokio-test = "0.4.4"
 [features]
 default = []
 gui = ["ratatui"]
+
+[[example]]
+name = "ratatui_demo"
+path = "examples/ratatui_demo.rs"
