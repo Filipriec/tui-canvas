@@ -1,16 +1,11 @@
 // src/canvas/actions/handlers/highlight.rs
 
 use crate::canvas::actions::types::{CanvasAction, ActionResult};
-use crate::config::introspection::{ActionHandlerIntrospection, HandlerCapabilities, ActionSpec};
-
 use crate::canvas::actions::movement::*;
 use crate::canvas::state::CanvasState;
-use crate::config::CanvasConfig;
 use anyhow::Result;
 
 const FOR_EDIT_MODE: bool = false; // Highlight mode uses read-only cursor behavior
-                                   
-pub struct HighlightHandler;
 
 /// Handle actions in highlight/visual mode
 /// TODO: Implement selection logic and highlight-specific behaviors
@@ -18,7 +13,6 @@ pub async fn handle_highlight_action<S: CanvasState>(
     action: CanvasAction,
     state: &mut S,
     ideal_cursor_column: &mut usize,
-    config: Option<&CanvasConfig>,
 ) -> Result<ActionResult> {
     match action {
         // Movement actions work similar to read-only mode but with selection
@@ -93,8 +87,8 @@ pub async fn handle_highlight_action<S: CanvasState>(
         }
 
         // Highlight mode doesn't handle editing actions
-        CanvasAction::InsertChar(_) | 
-        CanvasAction::DeleteBackward | 
+        CanvasAction::InsertChar(_) |
+        CanvasAction::DeleteBackward |
         CanvasAction::DeleteForward => {
             Ok(ActionResult::success_with_message("Action not available in highlight mode"))
         }
@@ -108,98 +102,3 @@ pub async fn handle_highlight_action<S: CanvasState>(
         }
     }
 }
-
-impl ActionHandlerIntrospection for HighlightHandler {
-    fn introspect() -> HandlerCapabilities {
-        let mut actions = Vec::new();
-
-        // For now, highlight mode uses similar movement to readonly
-        // but this will be discovered from actual implementation
-
-        // REQUIRED ACTIONS - Basic movement in highlight mode
-        actions.push(ActionSpec {
-            name: "move_left".to_string(),
-            description: "Move cursor left and extend selection".to_string(),
-            examples: vec!["h".to_string(), "Left".to_string()],
-            is_required: true,
-        });
-
-        actions.push(ActionSpec {
-            name: "move_right".to_string(),
-            description: "Move cursor right and extend selection".to_string(),
-            examples: vec!["l".to_string(), "Right".to_string()],
-            is_required: true,
-        });
-
-        actions.push(ActionSpec {
-            name: "move_up".to_string(),
-            description: "Move up and extend selection".to_string(),
-            examples: vec!["k".to_string(), "Up".to_string()],
-            is_required: true,
-        });
-
-        actions.push(ActionSpec {
-            name: "move_down".to_string(),
-            description: "Move down and extend selection".to_string(),
-            examples: vec!["j".to_string(), "Down".to_string()],
-            is_required: true,
-        });
-
-        // OPTIONAL ACTIONS - Advanced highlight movement
-        actions.push(ActionSpec {
-            name: "move_word_next".to_string(),
-            description: "Move to next word and extend selection".to_string(),
-            examples: vec!["w".to_string()],
-            is_required: false,
-        });
-
-        actions.push(ActionSpec {
-            name: "move_word_end".to_string(),
-            description: "Move to word end and extend selection".to_string(),
-            examples: vec!["e".to_string()],
-            is_required: false,
-        });
-
-        actions.push(ActionSpec {
-            name: "move_word_prev".to_string(),
-            description: "Move to previous word and extend selection".to_string(),
-            examples: vec!["b".to_string()],
-            is_required: false,
-        });
-
-        actions.push(ActionSpec {
-            name: "move_line_start".to_string(),
-            description: "Move to line start and extend selection".to_string(),
-            examples: vec!["0".to_string()],
-            is_required: false,
-        });
-
-        actions.push(ActionSpec {
-            name: "move_line_end".to_string(),
-            description: "Move to line end and extend selection".to_string(),
-            examples: vec!["$".to_string()],
-            is_required: false,
-        });
-
-        HandlerCapabilities {
-            mode_name: "highlight".to_string(),
-            actions,
-            auto_handled: vec![], // Highlight mode has no auto-handled actions
-        }
-    }
-
-    fn validate_capabilities() -> Result<(), String> {
-        let caps = Self::introspect();
-        let required_count = caps.actions.iter().filter(|a| a.is_required).count();
-
-        if required_count < 4 { // We expect at least 4 required actions (basic movement)
-            return Err(format!(
-                "Highlight handler claims only {} required actions, expected at least 4",
-                required_count
-            ));
-        }
-
-        Ok(())
-    }
-}
-

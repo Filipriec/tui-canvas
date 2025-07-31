@@ -1,37 +1,30 @@
 // src/canvas/actions/handlers/edit.rs
 //! Edit mode action handler
-//! 
+//!
 //! Handles user input when in edit mode, supporting text entry, deletion,
 //! and cursor movement with edit-specific behavior (cursor can go past end of text).
 
 use crate::canvas::actions::types::{CanvasAction, ActionResult};
-use crate::config::introspection::{ActionHandlerIntrospection, HandlerCapabilities, ActionSpec};
 use crate::canvas::actions::movement::*;
 use crate::canvas::state::CanvasState;
-use crate::config::CanvasConfig;
 use anyhow::Result;
 
 /// Edit mode uses cursor-past-end behavior for text insertion
 const FOR_EDIT_MODE: bool = true;
 
-/// Empty struct that implements edit mode capabilities
-pub struct EditHandler;
-
 /// Handle actions in edit mode with edit-specific cursor behavior
-/// 
+///
 /// Edit mode allows text modification and uses cursor positioning that can
 /// go past the end of existing text to facilitate insertion.
-/// 
+///
 /// # Arguments
 /// * `action` - The action to perform
 /// * `state` - Mutable canvas state
 /// * `ideal_cursor_column` - Desired column for vertical movement (maintained across line changes)
-/// * `config` - Optional configuration for behavior customization
 pub async fn handle_edit_action<S: CanvasState>(
     action: CanvasAction,
     state: &mut S,
     ideal_cursor_column: &mut usize,
-    config: Option<&CanvasConfig>,
 ) -> Result<ActionResult> {
     match action {
         CanvasAction::InsertChar(c) => {
@@ -187,25 +180,17 @@ pub async fn handle_edit_action<S: CanvasState>(
             Ok(ActionResult::success())
         }
 
-        // Field navigation with wrapping behavior
+        // Field navigation with simple wrapping behavior
         CanvasAction::NextField | CanvasAction::PrevField => {
             let current_field = state.current_field();
             let total_fields = state.fields().len();
 
             let new_field = match action {
                 CanvasAction::NextField => {
-                    if config.map_or(true, |c| c.behavior.wrap_around_fields) {
-                        (current_field + 1) % total_fields // Wrap to first field
-                    } else {
-                        (current_field + 1).min(total_fields - 1) // Stop at last field
-                    }
+                    (current_field + 1) % total_fields // Simple wrap
                 }
                 CanvasAction::PrevField => {
-                    if config.map_or(true, |c| c.behavior.wrap_around_fields) {
-                        if current_field == 0 { total_fields - 1 } else { current_field - 1 } // Wrap to last field
-                    } else {
-                        current_field.saturating_sub(1) // Stop at first field
-                    }
+                    if current_field == 0 { total_fields - 1 } else { current_field - 1 } // Simple wrap
                 }
                 _ => unreachable!(),
             };
@@ -224,153 +209,5 @@ pub async fn handle_edit_action<S: CanvasState>(
         _ => {
             Ok(ActionResult::success_with_message("Action not implemented for edit mode"))
         }
-    }
-}
-
-impl ActionHandlerIntrospection for EditHandler {
-    /// Report all actions this handler supports with examples and requirements
-    /// Used for automatic config generation and validation
-    fn introspect() -> HandlerCapabilities {
-        let mut actions = Vec::new();
-
-        // REQUIRED ACTIONS - These must be configured for edit mode to work properly
-        actions.push(ActionSpec {
-            name: "move_left".to_string(),
-            description: "Move cursor one position to the left".to_string(),
-            examples: vec!["Left".to_string(), "h".to_string()],
-            is_required: true,
-        });
-
-        actions.push(ActionSpec {
-            name: "move_right".to_string(),
-            description: "Move cursor one position to the right".to_string(),
-            examples: vec!["Right".to_string(), "l".to_string()],
-            is_required: true,
-        });
-
-        actions.push(ActionSpec {
-            name: "move_up".to_string(),
-            description: "Move to previous field or line".to_string(),
-            examples: vec!["Up".to_string(), "k".to_string()],
-            is_required: true,
-        });
-
-        actions.push(ActionSpec {
-            name: "move_down".to_string(),
-            description: "Move to next field or line".to_string(),
-            examples: vec!["Down".to_string(), "j".to_string()],
-            is_required: true,
-        });
-
-        actions.push(ActionSpec {
-            name: "delete_char_backward".to_string(),
-            description: "Delete character before cursor (Backspace)".to_string(),
-            examples: vec!["Backspace".to_string()],
-            is_required: true,
-        });
-
-        actions.push(ActionSpec {
-            name: "next_field".to_string(),
-            description: "Move to next input field".to_string(),
-            examples: vec!["Tab".to_string(), "Enter".to_string()],
-            is_required: true,
-        });
-
-        actions.push(ActionSpec {
-            name: "prev_field".to_string(),
-            description: "Move to previous input field".to_string(),
-            examples: vec!["Shift+Tab".to_string()],
-            is_required: true,
-        });
-
-        // OPTIONAL ACTIONS - These enhance functionality but aren't required
-        actions.push(ActionSpec {
-            name: "move_word_next".to_string(),
-            description: "Move cursor to start of next word".to_string(),
-            examples: vec!["Ctrl+Right".to_string(), "w".to_string()],
-            is_required: false,
-        });
-
-        actions.push(ActionSpec {
-            name: "move_word_prev".to_string(),
-            description: "Move cursor to start of previous word".to_string(),
-            examples: vec!["Ctrl+Left".to_string(), "b".to_string()],
-            is_required: false,
-        });
-
-        actions.push(ActionSpec {
-            name: "move_word_end".to_string(),
-            description: "Move cursor to end of current/next word".to_string(),
-            examples: vec!["e".to_string()],
-            is_required: false,
-        });
-
-        actions.push(ActionSpec {
-            name: "move_word_end_prev".to_string(),
-            description: "Move cursor to end of previous word".to_string(),
-            examples: vec!["ge".to_string()],
-            is_required: false,
-        });
-
-        actions.push(ActionSpec {
-            name: "move_line_start".to_string(),
-            description: "Move cursor to beginning of line".to_string(),
-            examples: vec!["Home".to_string(), "0".to_string()],
-            is_required: false,
-        });
-
-        actions.push(ActionSpec {
-            name: "move_line_end".to_string(),
-            description: "Move cursor to end of line".to_string(),
-            examples: vec!["End".to_string(), "$".to_string()],
-            is_required: false,
-        });
-
-        actions.push(ActionSpec {
-            name: "move_first_line".to_string(),
-            description: "Move to first field".to_string(),
-            examples: vec!["Ctrl+Home".to_string(), "gg".to_string()],
-            is_required: false,
-        });
-
-        actions.push(ActionSpec {
-            name: "move_last_line".to_string(),
-            description: "Move to last field".to_string(),
-            examples: vec!["Ctrl+End".to_string(), "G".to_string()],
-            is_required: false,
-        });
-
-        actions.push(ActionSpec {
-            name: "delete_char_forward".to_string(),
-            description: "Delete character after cursor (Delete key)".to_string(),
-            examples: vec!["Delete".to_string()],
-            is_required: false,
-        });
-
-        HandlerCapabilities {
-            mode_name: "edit".to_string(),
-            actions,
-            auto_handled: vec![
-                "insert_char".to_string(), // Any printable character is inserted automatically
-            ],
-        }
-    }
-
-    fn validate_capabilities() -> Result<(), String> {
-        // TODO: Could add runtime validation that the handler actually
-        // implements all the actions it claims to support
-
-        // For now, just validate that we have the essential actions
-        let caps = Self::introspect();
-        let required_count = caps.actions.iter().filter(|a| a.is_required).count();
-
-        if required_count < 7 { // We expect at least 7 required actions
-            return Err(format!(
-                "Edit handler claims only {} required actions, expected at least 7",
-                required_count
-            ));
-        }
-
-        Ok(())
     }
 }

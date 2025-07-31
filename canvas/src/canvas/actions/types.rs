@@ -1,108 +1,94 @@
 // src/canvas/actions/types.rs
 
+use crate::canvas::state::CanvasState;
+use anyhow::Result;
+
+/// All available canvas actions
 #[derive(Debug, Clone, PartialEq)]
 pub enum CanvasAction {
-    // Character input
-    InsertChar(char),
-
-    // Deletion
-    DeleteBackward,
-    DeleteForward,
-
-    // Basic cursor movement
+    // Movement actions
     MoveLeft,
     MoveRight,
     MoveUp,
     MoveDown,
-
+    
+    // Word movement
+    MoveWordNext,
+    MoveWordPrev,
+    MoveWordEnd,
+    MoveWordEndPrev,
+    
     // Line movement
     MoveLineStart,
     MoveLineEnd,
-    MoveFirstLine,
-    MoveLastLine,
-
-    // Word movement
-    MoveWordNext,
-    MoveWordEnd,
-    MoveWordPrev,
-    MoveWordEndPrev,
-
-    // Field navigation
+    
+    // Field movement
     NextField,
     PrevField,
-
+    MoveFirstLine,
+    MoveLastLine,
+    
+    // Editing actions
+    InsertChar(char),
+    DeleteBackward,
+    DeleteForward,
+    
     // Autocomplete actions
     TriggerAutocomplete,
     SuggestionUp,
     SuggestionDown,
     SelectSuggestion,
     ExitSuggestions,
-
+    
     // Custom actions
     Custom(String),
 }
 
-impl CanvasAction {
-    /// Convert string action name to CanvasAction enum (config-driven)
-    pub fn from_string(action: &str) -> Self {
-        match action {
-            "delete_char_backward" => Self::DeleteBackward,
-            "delete_char_forward" => Self::DeleteForward,
-            "move_left" => Self::MoveLeft,
-            "move_right" => Self::MoveRight,
-            "move_up" => Self::MoveUp,
-            "move_down" => Self::MoveDown,
-            "move_line_start" => Self::MoveLineStart,
-            "move_line_end" => Self::MoveLineEnd,
-            "move_first_line" => Self::MoveFirstLine,
-            "move_last_line" => Self::MoveLastLine,
-            "move_word_next" => Self::MoveWordNext,
-            "move_word_end" => Self::MoveWordEnd,
-            "move_word_prev" => Self::MoveWordPrev,
-            "move_word_end_prev" => Self::MoveWordEndPrev,
-            "next_field" => Self::NextField,
-            "prev_field" => Self::PrevField,
-            "trigger_autocomplete" => Self::TriggerAutocomplete,
-            "suggestion_up" => Self::SuggestionUp,
-            "suggestion_down" => Self::SuggestionDown,
-            "select_suggestion" => Self::SelectSuggestion,
-            "exit_suggestions" => Self::ExitSuggestions,
-            _ => Self::Custom(action.to_string()),
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
+/// Result type for canvas actions
+#[derive(Debug, Clone)]
 pub enum ActionResult {
-    Success(Option<String>),
-    HandledByFeature(String),
-    RequiresContext(String),
+    Success,
+    Message(String),
+    HandledByApp(String),
+    HandledByFeature(String), // Keep for compatibility
     Error(String),
 }
 
 impl ActionResult {
     pub fn success() -> Self {
-        Self::Success(None)
+        Self::Success
     }
-
+    
     pub fn success_with_message(msg: &str) -> Self {
-        Self::Success(Some(msg.to_string()))
+        Self::Message(msg.to_string())
     }
-
+    
+    pub fn handled_by_app(msg: &str) -> Self {
+        Self::HandledByApp(msg.to_string())
+    }
+    
     pub fn error(msg: &str) -> Self {
-        Self::Error(msg.into())
+        Self::Error(msg.to_string())
     }
-
+    
     pub fn is_success(&self) -> bool {
-        matches!(self, Self::Success(_) | Self::HandledByFeature(_))
+        matches!(self, Self::Success | Self::Message(_) | Self::HandledByApp(_) | Self::HandledByFeature(_))
     }
-
+    
     pub fn message(&self) -> Option<&str> {
         match self {
-            Self::Success(msg) => msg.as_deref(),
-            Self::HandledByFeature(msg) => Some(msg),
-            Self::RequiresContext(msg) => Some(msg),
-            Self::Error(msg) => Some(msg),
+            Self::Message(msg) | Self::HandledByApp(msg) | Self::HandledByFeature(msg) | Self::Error(msg) => Some(msg),
+            Self::Success => None,
         }
     }
+}
+
+/// Execute a canvas action on the given state
+pub async fn execute<S: CanvasState>(
+    action: CanvasAction,
+    state: &mut S,
+) -> Result<ActionResult> {
+    let mut ideal_cursor_column = 0;
+    
+    super::handlers::dispatch_action(action, state, &mut ideal_cursor_column).await
 }
