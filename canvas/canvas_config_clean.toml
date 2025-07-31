@@ -1,0 +1,50 @@
+[keybindings.edit]
+# Required
+prev_field = ["Shift+Tab"]
+move_left = ["Left", "h"]
+move_up = ["Up", "k"]
+move_right = ["Right", "l"]
+move_down = ["Down", "j"]
+delete_char_backward = ["Backspace"]
+next_field = ["Tab", "Enter"]
+# Optional
+delete_char_forward = ["Delete"]
+move_line_start = ["Home", "0"]
+move_first_line = ["Ctrl+Home", "gg"]
+move_word_end_prev = ["ge"]
+move_word_prev = ["Ctrl+Left", "b"]
+move_word_next = ["Ctrl+Right", "w"]
+move_word_end = ["e"]
+move_line_end = ["End", "$"]
+move_last_line = ["Ctrl+End", "G"]
+
+[keybindings.read_only]
+# Required
+move_right = ["l", "Right"]
+move_left = ["h", "Left"]
+move_down = ["j", "Down"]
+move_up = ["k", "Up"]
+# Optional
+move_line_end = ["$"]
+move_line_start = ["0"]
+move_word_end_prev = ["ge"]
+move_first_line = ["gg"]
+move_word_next = ["w"]
+prev_field = ["Shift+Tab"]
+move_word_prev = ["b"]
+move_word_end = ["e"]
+next_field = ["Tab"]
+move_last_line = ["G"]
+
+[keybindings.suggestions]
+# Required
+suggestion_down = ["Down", "Ctrl+n"]
+suggestion_up = ["Up", "Ctrl+p"]
+select_suggestion = ["Enter", "Tab"]
+exit_suggestions = ["Esc"]
+
+[keybindings.global]
+# Optional
+move_up = ["Up"]
+move_down = ["Down"]
+

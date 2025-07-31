@@ -1,0 +1,114 @@
+# Canvas Library Configuration Template
+# Generated automatically - customize as needed
+
+[keybindings.edit]
+# REQUIRED ACTIONS - These must be configured
+# Move to next field or line
+move_down = ["Down", "j"]
+
+# Delete character before cursor
+delete_char_backward = ["Backspace"]
+
+# Move cursor one position to the left
+move_left = ["Left", "h"]
+
+# Move to previous input field
+prev_field = ["Shift+Tab"]
+
+# Move to next input field
+next_field = ["Tab", "Enter"]
+
+# Move to previous field or line
+move_up = ["Up", "k"]
+
+# Move cursor one position to the right
+move_right = ["Right", "l"]
+
+# OPTIONAL ACTIONS - Configure these if you want them enabled
+# Delete character after cursor
+# delete_char_forward = ["Delete"]
+
+# Move cursor to start of next word
+# move_word_next = ["Ctrl+Right", "w"]
+
+# Move cursor to end of line
+# move_line_end = ["End", "$"]
+
+# Move cursor to end of current/next word
+# move_word_end = ["e"]
+
+# Move cursor to end of previous word
+# move_word_end_prev = ["ge"]
+
+# Move cursor to beginning of line
+# move_line_start = ["Home", "0"]
+
+# Move to first field
+# move_first_line = ["Ctrl+Home", "gg"]
+
+# Move cursor to start of previous word
+# move_word_prev = ["Ctrl+Left", "b"]
+
+# Move to last field
+# move_last_line = ["Ctrl+End", "G"]
+
+[keybindings.read_only]
+# REQUIRED ACTIONS - These must be configured
+# Move cursor one position to the right
+move_right = ["l", "Right"]
+
+# Move to previous field
+move_up = ["k", "Up"]
+
+# Move to next field
+move_down = ["j", "Down"]
+
+# Move cursor one position to the left
+move_left = ["h", "Left"]
+
+# OPTIONAL ACTIONS - Configure these if you want them enabled
+# Move to next input field
+# next_field = ["Tab"]
+
+# Move to last field
+# move_last_line = ["G"]
+
+# Move to first field
+# move_first_line = ["gg"]
+
+# Move cursor to start of previous word
+# move_word_prev = ["b"]
+
+# Move cursor to start of next word
+# move_word_next = ["w"]
+
+# Move cursor to end of current/next word
+# move_word_end = ["e"]
+
+# Move cursor to beginning of line
+# move_line_start = ["0"]
+
+# Move cursor to end of line
+# move_line_end = ["$"]
+
+# Move to previous input field
+# prev_field = ["Shift+Tab"]
+
+# Move cursor to end of previous word
+# move_word_end_prev = ["ge"]
+
+[keybindings.suggestions]
+# REQUIRED ACTIONS - These must be configured
+# Move selection to previous suggestion
+suggestion_up = ["Up", "Ctrl+p"]
+
+# Close suggestions without selecting
+exit_suggestions = ["Esc"]
+
+# Select the currently highlighted suggestion
+select_suggestion = ["Enter", "Tab"]
+
+# Move selection to next suggestion
+suggestion_down = ["Down", "Ctrl+n"]
+
+
