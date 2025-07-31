@@ -1,0 +1,77 @@
+❯ git status
+On branch main
+Your branch is ahead of 'origin/main' by 1 commit.
+  (use "git push" to publish your local commits)
+
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+	modified:   src/canvas/actions/handlers/edit.rs
+	modified:   src/canvas/actions/types.rs
+
+no changes added to commit (use "git add" and/or "git commit -a")
+❯ git --no-pager diff
+diff --git a/canvas/src/canvas/actions/handlers/edit.rs b/canvas/src/canvas/actions/handlers/edit.rs
+index a26fe6f..fa1becb 100644
+--- a/canvas/src/canvas/actions/handlers/edit.rs
++++ b/canvas/src/canvas/actions/handlers/edit.rs
+@@ -29,6 +29,21 @@ pub async fn handle_edit_action<S: CanvasState>(
+             Ok(ActionResult::success())
+         }
+
++        CanvasAction::SelectAll => {
++            // Select all text in current field
++            let current_input = state.get_current_input();
++            let text_length = current_input.len();
++
++            // Set cursor to start and select all
++            state.set_current_cursor_pos(0);
++            // TODO: You'd need to add selection state to CanvasState trait
++            // For now, just move cursor to end to "select" all
++            state.set_current_cursor_pos(text_length);
++            *ideal_cursor_column = text_length;
++
++            Ok(ActionResult::success_with_message(&format!("Selected all {} characters", text_length)))
++        }
++
+         CanvasAction::DeleteBackward => {
+             let cursor_pos = state.current_cursor_pos();
+             if cursor_pos > 0 {
+@@ -323,6 +338,13 @@ impl ActionHandlerIntrospection for EditHandler {
+             is_required: false,
+         });
+
++        actions.push(ActionSpec {
++            name: "select_all".to_string(),
++            description: "Select all text in current field".to_string(),
++            examples: vec!["Ctrl+a".to_string()],
++            is_required: false, // Optional action
++        });
++
+         HandlerCapabilities {
+             mode_name: "edit".to_string(),
+             actions,
+diff --git a/canvas/src/canvas/actions/types.rs b/canvas/src/canvas/actions/types.rs
+index 433a4d5..3794596 100644
+--- a/canvas/src/canvas/actions/types.rs
++++ b/canvas/src/canvas/actions/types.rs
+@@ -31,6 +31,8 @@ pub enum CanvasAction {
+     NextField,
+     PrevField,
+
++    SelectAll,
++
+     // Autocomplete actions
+     TriggerAutocomplete,
+     SuggestionUp,
+@@ -62,6 +64,7 @@ impl CanvasAction {
+             "move_word_end_prev" => Self::MoveWordEndPrev,
+             "next_field" => Self::NextField,
+             "prev_field" => Self::PrevField,
++            "select_all" => Self::SelectAll,
+             "trigger_autocomplete" => Self::TriggerAutocomplete,
+             "suggestion_up" => Self::SuggestionUp,
+             "suggestion_down" => Self::SuggestionDown,
+╭─      ~/Doc/p/komp_ac/canvas  on    main ⇡1 !2 
+╰─
+
