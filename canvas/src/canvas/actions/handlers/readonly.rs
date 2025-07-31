@@ -1,6 +1,7 @@
 // src/canvas/actions/handlers/readonly.rs
 
 use crate::canvas::actions::types::{CanvasAction, ActionResult};
+use crate::config::introspection::{ActionHandlerIntrospection, HandlerCapabilities, ActionSpec};
 use crate::canvas::actions::movement::*;
 use crate::canvas::state::CanvasState;
 use crate::config::CanvasConfig;
@@ -189,5 +190,133 @@ pub async fn handle_readonly_action<S: CanvasState>(
         _ => {
             Ok(ActionResult::success_with_message("Action not implemented for read-only mode"))
         }
+    }
+}
+
+pub struct ReadOnlyHandler;
+
+impl ActionHandlerIntrospection for ReadOnlyHandler {
+    fn introspect() -> HandlerCapabilities {
+        let mut actions = Vec::new();
+
+        // REQUIRED ACTIONS - Navigation is essential in read-only mode
+        actions.push(ActionSpec {
+            name: "move_left".to_string(),
+            description: "Move cursor one position to the left".to_string(),
+            examples: vec!["h".to_string(), "Left".to_string()],
+            is_required: true,
+        });
+
+        actions.push(ActionSpec {
+            name: "move_right".to_string(),
+            description: "Move cursor one position to the right".to_string(),
+            examples: vec!["l".to_string(), "Right".to_string()],
+            is_required: true,
+        });
+
+        actions.push(ActionSpec {
+            name: "move_up".to_string(),
+            description: "Move to previous field".to_string(),
+            examples: vec!["k".to_string(), "Up".to_string()],
+            is_required: true,
+        });
+
+        actions.push(ActionSpec {
+            name: "move_down".to_string(),
+            description: "Move to next field".to_string(),
+            examples: vec!["j".to_string(), "Down".to_string()],
+            is_required: true,
+        });
+
+        // OPTIONAL ACTIONS - Advanced navigation features
+        actions.push(ActionSpec {
+            name: "move_word_next".to_string(),
+            description: "Move cursor to start of next word".to_string(),
+            examples: vec!["w".to_string()],
+            is_required: false,
+        });
+
+        actions.push(ActionSpec {
+            name: "move_word_prev".to_string(),
+            description: "Move cursor to start of previous word".to_string(),
+            examples: vec!["b".to_string()],
+            is_required: false,
+        });
+
+        actions.push(ActionSpec {
+            name: "move_word_end".to_string(),
+            description: "Move cursor to end of current/next word".to_string(),
+            examples: vec!["e".to_string()],
+            is_required: false,
+        });
+
+        actions.push(ActionSpec {
+            name: "move_word_end_prev".to_string(),
+            description: "Move cursor to end of previous word".to_string(),
+            examples: vec!["ge".to_string()],
+            is_required: false,
+        });
+
+        actions.push(ActionSpec {
+            name: "move_line_start".to_string(),
+            description: "Move cursor to beginning of line".to_string(),
+            examples: vec!["0".to_string()],
+            is_required: false,
+        });
+
+        actions.push(ActionSpec {
+            name: "move_line_end".to_string(),
+            description: "Move cursor to end of line".to_string(),
+            examples: vec!["$".to_string()],
+            is_required: false,
+        });
+
+        actions.push(ActionSpec {
+            name: "move_first_line".to_string(),
+            description: "Move to first field".to_string(),
+            examples: vec!["gg".to_string()],
+            is_required: false,
+        });
+
+        actions.push(ActionSpec {
+            name: "move_last_line".to_string(),
+            description: "Move to last field".to_string(),
+            examples: vec!["G".to_string()],
+            is_required: false,
+        });
+
+        actions.push(ActionSpec {
+            name: "next_field".to_string(),
+            description: "Move to next input field".to_string(),
+            examples: vec!["Tab".to_string()],
+            is_required: false,
+        });
+
+        actions.push(ActionSpec {
+            name: "prev_field".to_string(),
+            description: "Move to previous input field".to_string(),
+            examples: vec!["Shift+Tab".to_string()],
+            is_required: false,
+        });
+
+        HandlerCapabilities {
+            mode_name: "read_only".to_string(),
+            actions,
+            auto_handled: vec![], // Read-only mode has no auto-handled actions
+        }
+    }
+
+    fn validate_capabilities() -> Result<(), String> {
+        let caps = Self::introspect();
+        let required_count = caps.actions.iter().filter(|a| a.is_required).count();
+
+        if required_count < 4 { // We expect at least 4 required actions (basic movement)
+            return Err(format!(
+                "ReadOnly handler claims only {} required actions, expected at least 4",
+                required_count
+            ));
+        }
+
+        Ok(())
     }
 }
