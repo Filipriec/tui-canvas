@@ -31,12 +31,9 @@ pub async fn execute_canvas_action_with_autocomplete<S: CanvasState + Autocomple
 
     // 3. AUTO-TRIGGER LOGIC: Check if we should activate/deactivate autocomplete
     if let Some(cfg) = config {
-        println!("{:?}, {}", action, cfg.should_auto_trigger_autocomplete());
         if cfg.should_auto_trigger_autocomplete() {
-            println!("AUTO-TRIGGER");
             match action {
                 CanvasAction::InsertChar(_) => {
-                    println!("AUTO-T on Ins");
                     let current_field = state.current_field();
                     let current_input = state.get_current_input();
 
@@ -44,13 +41,11 @@ pub async fn execute_canvas_action_with_autocomplete<S: CanvasState + Autocomple
                         && !state.is_autocomplete_active()
                         && current_input.len() >= 1
                     {
-                        println!("ACT AUTOC");
                         state.activate_autocomplete();
                     }
                 }
 
                 CanvasAction::NextField | CanvasAction::PrevField => {
-                    println!("AUTO-T on nav");
                     let current_field = state.current_field();
 
                     if state.supports_autocomplete(current_field) && !state.is_autocomplete_active() {
