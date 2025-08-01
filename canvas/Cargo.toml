@@ -13,7 +13,7 @@ categories.workspace = true
 common = { path = "../common" }
 ratatui = { workspace = true, optional = true }
 crossterm = { workspace = true }
-anyhow = { workspace = true }
+anyhow.workspace = true
 tokio = { workspace = true, optional = true }
 toml = { workspace = true }
 serde = { workspace = true }
@@ -22,7 +22,7 @@ thiserror = { workspace = true }
 
 tracing = "0.1.41"
 tracing-subscriber = "0.3.19"
-async-trait = { workspace = true, optional = true }
+async-trait.workspace = true
 
 [dev-dependencies]
 tokio-test = "0.4.4"
@@ -30,7 +30,7 @@ tokio-test = "0.4.4"
 [features]
 default = []
 gui = ["ratatui"]
-autocomplete = ["tokio", "async-trait"]
+autocomplete = ["tokio"]
 
 [[example]]
 name = "autocomplete"

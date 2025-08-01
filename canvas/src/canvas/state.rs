@@ -1,117 +1,132 @@
 // src/canvas/state.rs
-//! Canvas state trait and related types
-//! 
-//! This module defines the core trait that any form or input system must implement
-//! to work with the canvas library.
+//! Library-owned UI state - user never directly modifies this
 
-use crate::canvas::actions::CanvasAction;
 use crate::canvas::modes::AppMode;
 
-/// Context information passed to feature-specific action handlers
-#[derive(Debug)]
-pub struct ActionContext {
-    /// Original key code that triggered this action (for backwards compatibility)
-    pub key_code: Option<crossterm::event::KeyCode>,
-    /// Current ideal cursor column for vertical movement
-    pub ideal_cursor_column: usize,
-    /// Current input text
-    pub current_input: String,
-    /// Current field index
-    pub current_field: usize,
+/// Library-owned UI state - user never directly modifies this
+#[derive(Debug, Clone)]
+pub struct EditorState {
+    // Navigation state
+    pub(crate) current_field: usize,
+    pub(crate) cursor_pos: usize,
+    pub(crate) ideal_cursor_column: usize,
+    
+    // Mode state  
+    pub(crate) current_mode: AppMode,
+    
+    // Autocomplete state
+    pub(crate) autocomplete: AutocompleteUIState,
+    
+    // Selection state (for vim visual mode)
+    pub(crate) selection: SelectionState,
 }
 
-/// Core trait that any form-like state must implement to work with canvas
-/// 
-/// This trait enables the same mode behaviors (edit, read-only, highlight) to work
-/// across any implementation - login forms, data entry forms, configuration screens, etc.
-/// 
-/// # Required Implementation
-/// 
-/// Your struct needs to track:
-/// - Current field index and cursor position
-/// - All input field values 
-/// - Current interaction mode
-/// - Whether there are unsaved changes
-/// 
-/// # Example Implementation
-/// 
-/// ```rust
-/// struct MyForm {
-///     fields: Vec<String>,
-///     current_field: usize, 
-///     cursor_pos: usize,
-///     mode: AppMode,
-///     dirty: bool,
-/// }
-/// 
-/// impl CanvasState for MyForm {
-///     fn current_field(&self) -> usize { self.current_field }
-///     fn current_cursor_pos(&self) -> usize { self.cursor_pos }
-///     // ... implement other required methods
-/// }
-/// ```
-pub trait CanvasState {
-    // --- Core Navigation ---
-    
-    /// Get current field index (0-based)
-    fn current_field(&self) -> usize;
-    
-    /// Get current cursor position within the current field
-    fn current_cursor_pos(&self) -> usize;
-    
-    /// Set current field index (should clamp to valid range)
-    fn set_current_field(&mut self, index: usize);
-    
-    /// Set cursor position within current field (should clamp to valid range)
-    fn set_current_cursor_pos(&mut self, pos: usize);
+#[derive(Debug, Clone)]
+pub struct AutocompleteUIState {
+    pub(crate) is_active: bool,
+    pub(crate) is_loading: bool,
+    pub(crate) selected_index: Option<usize>,
+    pub(crate) active_field: Option<usize>,
+}
 
-    // --- Mode Information ---
-    
-    /// Get current interaction mode (edit, read-only, highlight, etc.)
-    fn current_mode(&self) -> AppMode;
+#[derive(Debug, Clone)]
+pub enum SelectionState {
+    None,
+    Characterwise { anchor: (usize, usize) },
+    Linewise { anchor_field: usize },
+}
 
-    // --- Data Access ---
-    
-    /// Get immutable reference to current field's text
-    fn get_current_input(&self) -> &str;
-    
-    /// Get mutable reference to current field's text
-    fn get_current_input_mut(&mut self) -> &mut String;
-    
-    /// Get all input values as immutable references
-    fn inputs(&self) -> Vec<&String>;
-    
-    /// Get all field names/labels
-    fn fields(&self) -> Vec<&str>;
-
-    // --- State Management ---
-    
-    /// Check if there are unsaved changes
-    fn has_unsaved_changes(&self) -> bool;
-    
-    /// Mark whether there are unsaved changes
-    fn set_has_unsaved_changes(&mut self, changed: bool);
-
-    // --- Optional Overrides ---
-
-    /// Handle application-specific actions not covered by standard handlers
-    /// Return Some(message) if the action was handled, None to use standard handling
-    fn handle_feature_action(&mut self, _action: &CanvasAction, _context: &ActionContext) -> Option<String> {
-        None // Default: no custom handling
+impl EditorState {
+    pub fn new() -> Self {
+        Self {
+            current_field: 0,
+            cursor_pos: 0,
+            ideal_cursor_column: 0,
+            current_mode: AppMode::Edit,
+            autocomplete: AutocompleteUIState {
+                is_active: false,
+                is_loading: false,
+                selected_index: None,
+                active_field: None,
+            },
+            selection: SelectionState::None,
+        }
     }
-
-    /// Get display value for a field (may differ from actual value)
-    /// Used for things like password masking or computed display values
-    fn get_display_value_for_field(&self, index: usize) -> &str {
-        self.inputs()
-            .get(index)
-            .map(|s| s.as_str())
-            .unwrap_or("")
+    
+    // ===================================================================
+    // READ-ONLY ACCESS: User can fetch UI state for compatibility
+    // ===================================================================
+    
+    /// Get current field index (for user's business logic)
+    pub fn current_field(&self) -> usize {
+        self.current_field
     }
+    
+    /// Get current cursor position (for user's business logic)  
+    pub fn cursor_position(&self) -> usize {
+        self.cursor_pos
+    }
+    
+    /// Get current mode (for user's business logic)
+    pub fn mode(&self) -> AppMode {
+        self.current_mode
+    }
+    
+    /// Check if autocomplete is active (for user's business logic)
+    pub fn is_autocomplete_active(&self) -> bool {
+        self.autocomplete.is_active
+    }
+    
+    /// Check if autocomplete is loading (for user's business logic)
+    pub fn is_autocomplete_loading(&self) -> bool {
+        self.autocomplete.is_loading
+    }
+    
+    /// Get selection state (for user's business logic)
+    pub fn selection_state(&self) -> &SelectionState {
+        &self.selection
+    }
+    
+    // ===================================================================
+    // INTERNAL MUTATIONS: Only library modifies these
+    // ===================================================================
+    
+    pub(crate) fn move_to_field(&mut self, field_index: usize, field_count: usize) {
+        if field_index < field_count {
+            self.current_field = field_index;
+            // Reset cursor to safe position - will be clamped by movement logic
+            self.cursor_pos = 0;
+        }
+    }
+    
+    pub(crate) fn set_cursor(&mut self, position: usize, max_position: usize, for_edit_mode: bool) {
+        if for_edit_mode {
+            // Edit mode: can go past end for insertion
+            self.cursor_pos = position.min(max_position);
+        } else {
+            // ReadOnly/Highlight: stay within text bounds
+            self.cursor_pos = position.min(max_position.saturating_sub(1));
+        }
+        self.ideal_cursor_column = self.cursor_pos;
+    }
+    
+    pub(crate) fn activate_autocomplete(&mut self, field_index: usize) {
+        self.autocomplete.is_active = true;
+        self.autocomplete.is_loading = true;
+        self.autocomplete.active_field = Some(field_index);
+        self.autocomplete.selected_index = None;
+    }
+    
+    pub(crate) fn deactivate_autocomplete(&mut self) {
+        self.autocomplete.is_active = false;
+        self.autocomplete.is_loading = false;
+        self.autocomplete.active_field = None;
+        self.autocomplete.selected_index = None;
+    }
+}
 
-    /// Check if a field has a custom display value
-    /// Return true if get_display_value_for_field returns something different than the actual value
-    fn has_display_override(&self, _index: usize) -> bool {
-        false
+impl Default for EditorState {
+    fn default() -> Self {
+        Self::new()
     }
 }

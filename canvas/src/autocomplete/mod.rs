@@ -9,7 +9,6 @@ pub mod gui;
 
 // Re-export the main autocomplete API
 pub use types::{SuggestionItem, AutocompleteState};
-pub use state::AutocompleteCanvasState;
 
 // Re-export the new action functions
 pub use actions::{

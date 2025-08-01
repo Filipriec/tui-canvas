@@ -1,4 +1,5 @@
 // src/autocomplete/gui.rs
+//! Autocomplete GUI updated to work with FormEditor
 
 #[cfg(feature = "gui")]
 use ratatui::{
@@ -8,32 +9,33 @@ use ratatui::{
     Frame,
 };
 
-// Use the correct import from our types module
-use crate::autocomplete::types::AutocompleteState;
-
 #[cfg(feature = "gui")]
 use crate::canvas::theme::CanvasTheme;
+use crate::data_provider::{DataProvider, SuggestionItem};
+use crate::editor::FormEditor;
 
 #[cfg(feature = "gui")]
 use unicode_width::UnicodeWidthStr;
 
-/// Render autocomplete dropdown - call this AFTER rendering canvas
+/// Render autocomplete dropdown for FormEditor - call this AFTER rendering canvas
 #[cfg(feature = "gui")]
-pub fn render_autocomplete_dropdown<T: CanvasTheme, D: Clone + Send + 'static>(
+pub fn render_autocomplete_dropdown<T: CanvasTheme, D: DataProvider>(
     f: &mut Frame,
     frame_area: Rect,
     input_rect: Rect,
     theme: &T,
-    autocomplete_state: &AutocompleteState<D>,
+    editor: &FormEditor<D>,
 ) {
-    if !autocomplete_state.is_active {
+    let ui_state = editor.ui_state();
+    
+    if !ui_state.is_autocomplete_active() {
         return;
     }
 
-    if autocomplete_state.is_loading {
+    if ui_state.autocomplete.is_loading {
         render_loading_indicator(f, frame_area, input_rect, theme);
-    } else if !autocomplete_state.suggestions.is_empty() {
-        render_suggestions_dropdown(f, frame_area, input_rect, theme, autocomplete_state);
+    } else if !editor.suggestions().is_empty() {
+        render_suggestions_dropdown(f, frame_area, input_rect, theme, editor.suggestions(), ui_state.autocomplete.selected_index);
     }
 }
 
@@ -69,14 +71,15 @@ fn render_loading_indicator<T: CanvasTheme>(
 
 /// Show actual suggestions list
 #[cfg(feature = "gui")]
-fn render_suggestions_dropdown<T: CanvasTheme, D: Clone + Send + 'static>(
+fn render_suggestions_dropdown<T: CanvasTheme>(
     f: &mut Frame,
     frame_area: Rect,
     input_rect: Rect,
     theme: &T,
-    autocomplete_state: &AutocompleteState<D>,
+    suggestions: &[SuggestionItem<String>],
+    selected_index: Option<usize>,
 ) {
-    let display_texts: Vec<&str> = autocomplete_state.suggestions
+    let display_texts: Vec<&str> = suggestions
         .iter()
         .map(|item| item.display_text.as_str())
         .collect();
@@ -96,19 +99,19 @@ fn render_suggestions_dropdown<T: CanvasTheme, D: Clone + Send + 'static>(
     // List items
     let items = create_suggestion_list_items(
         &display_texts,
-        autocomplete_state.selected_index,
+        selected_index,
         dropdown_dimensions.width,
         theme,
     );
 
     let list = List::new(items).block(dropdown_block);
     let mut list_state = ListState::default();
-    list_state.select(autocomplete_state.selected_index);
+    list_state.select(selected_index);
 
     f.render_stateful_widget(list, dropdown_area, &mut list_state);
 }
 
-/// Calculate dropdown size based on suggestions - updated to match client dimensions
+/// Calculate dropdown size based on suggestions
 #[cfg(feature = "gui")]
 fn calculate_dropdown_dimensions(display_texts: &[&str]) -> DropdownDimensions {
     let max_width = display_texts
@@ -117,9 +120,9 @@ fn calculate_dropdown_dimensions(display_texts: &[&str]) -> DropdownDimensions {
         .max()
         .unwrap_or(0) as u16;
 
-    let horizontal_padding = 2; // Changed from 4 to 2 to match client
-    let width = (max_width + horizontal_padding).max(10); // Changed from 12 to 10 to match client
-    let height = (display_texts.len() as u16).min(5); // Removed +2 since no borders
+    let horizontal_padding = 2;
+    let width = (max_width + horizontal_padding).max(10);
+    let height = (display_texts.len() as u16).min(5);
 
     DropdownDimensions { width, height }
 }
@@ -152,7 +155,7 @@ fn calculate_dropdown_position(
     dropdown_area
 }
 
-/// Create styled list items - updated to match client spacing
+/// Create styled list items
 #[cfg(feature = "gui")]
 fn create_suggestion_list_items<'a, T: CanvasTheme>(
     display_texts: &'a [&'a str],
@@ -160,8 +163,7 @@ fn create_suggestion_list_items<'a, T: CanvasTheme>(
     dropdown_width: u16,
     theme: &T,
 ) -> Vec<ListItem<'a>> {
-    let horizontal_padding = 2; // Changed from 4 to 2 to match client
-    let available_width = dropdown_width; // No border padding needed
+    let available_width = dropdown_width;
 
     display_texts
         .iter()

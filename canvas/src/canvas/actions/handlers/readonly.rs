@@ -1,183 +1,136 @@
 // src/canvas/actions/handlers/readonly.rs
+//! ReadOnly mode action handler with EditorState
 
 use crate::canvas::actions::types::{CanvasAction, ActionResult};
 use crate::canvas::actions::movement::*;
-use crate::canvas::state::CanvasState;
-use anyhow::Result;
+use crate::canvas::state::EditorState;
 
 const FOR_EDIT_MODE: bool = false; // Read-only mode flag
 
 /// Handle actions in read-only mode with read-only specific cursor behavior
-pub async fn handle_readonly_action<S: CanvasState>(
+pub(crate) fn handle_readonly_action(
     action: CanvasAction,
-    state: &mut S,
-    ideal_cursor_column: &mut usize,
-) -> Result<ActionResult> {
+    editor_state: &mut EditorState,
+    current_text: &str,
+) -> ActionResult {
     match action {
         CanvasAction::MoveLeft => {
-            let new_pos = move_left(state.current_cursor_pos());
-            state.set_current_cursor_pos(new_pos);
-            *ideal_cursor_column = new_pos;
-            Ok(ActionResult::success())
+            let new_pos = move_left(editor_state.cursor_pos);
+            editor_state.cursor_pos = new_pos;
+            editor_state.ideal_cursor_column = new_pos;
+            ActionResult::success()
         }
 
         CanvasAction::MoveRight => {
-            let current_input = state.get_current_input();
-            let current_pos = state.current_cursor_pos();
-            let new_pos = move_right(current_pos, current_input, FOR_EDIT_MODE);
-            state.set_current_cursor_pos(new_pos);
-            *ideal_cursor_column = new_pos;
-            Ok(ActionResult::success())
+            let new_pos = move_right(editor_state.cursor_pos, current_text, FOR_EDIT_MODE);
+            editor_state.cursor_pos = new_pos;
+            editor_state.ideal_cursor_column = new_pos;
+            ActionResult::success()
         }
 
         CanvasAction::MoveUp => {
-            let current_field = state.current_field();
-            let new_field = current_field.saturating_sub(1);
-            state.set_current_field(new_field);
-
-            // Apply ideal cursor column with read-only bounds
-            let current_input = state.get_current_input();
-            let new_pos = safe_cursor_position(current_input, *ideal_cursor_column, FOR_EDIT_MODE);
-            state.set_current_cursor_pos(new_pos);
-            Ok(ActionResult::success())
+            if editor_state.current_field > 0 {
+                editor_state.current_field -= 1;
+                let new_pos = safe_cursor_position(current_text, editor_state.ideal_cursor_column, FOR_EDIT_MODE);
+                editor_state.cursor_pos = new_pos;
+            }
+            ActionResult::success()
         }
 
         CanvasAction::MoveDown => {
-            let current_field = state.current_field();
-            let total_fields = state.fields().len();
-            if total_fields == 0 {
-                return Ok(ActionResult::success_with_message("No fields to navigate"));
-            }
-
-            let new_field = (current_field + 1).min(total_fields - 1);
-            state.set_current_field(new_field);
-
-            // Apply ideal cursor column with read-only bounds
-            let current_input = state.get_current_input();
-            let new_pos = safe_cursor_position(current_input, *ideal_cursor_column, FOR_EDIT_MODE);
-            state.set_current_cursor_pos(new_pos);
-            Ok(ActionResult::success())
+            // Note: bounds checking happens at FormEditor level
+            editor_state.current_field += 1;
+            let new_pos = safe_cursor_position(current_text, editor_state.ideal_cursor_column, FOR_EDIT_MODE);
+            editor_state.cursor_pos = new_pos;
+            ActionResult::success()
         }
 
         CanvasAction::MoveFirstLine => {
-            let total_fields = state.fields().len();
-            if total_fields == 0 {
-                return Ok(ActionResult::success_with_message("No fields to navigate"));
-            }
-
-            state.set_current_field(0);
-            let current_input = state.get_current_input();
-            let new_pos = safe_cursor_position(current_input, *ideal_cursor_column, FOR_EDIT_MODE);
-            state.set_current_cursor_pos(new_pos);
-            *ideal_cursor_column = new_pos;
-            Ok(ActionResult::success())
+            editor_state.current_field = 0;
+            let new_pos = safe_cursor_position(current_text, editor_state.ideal_cursor_column, FOR_EDIT_MODE);
+            editor_state.cursor_pos = new_pos;
+            editor_state.ideal_cursor_column = new_pos;
+            ActionResult::success()
         }
 
         CanvasAction::MoveLastLine => {
-            let total_fields = state.fields().len();
-            if total_fields == 0 {
-                return Ok(ActionResult::success_with_message("No fields to navigate"));
-            }
-
-            let last_field = total_fields - 1;
-            state.set_current_field(last_field);
-            let current_input = state.get_current_input();
-            let new_pos = safe_cursor_position(current_input, *ideal_cursor_column, FOR_EDIT_MODE);
-            state.set_current_cursor_pos(new_pos);
-            *ideal_cursor_column = new_pos;
-            Ok(ActionResult::success())
+            // Note: field count validation happens at FormEditor level
+            let new_pos = safe_cursor_position(current_text, editor_state.ideal_cursor_column, FOR_EDIT_MODE);
+            editor_state.cursor_pos = new_pos;
+            editor_state.ideal_cursor_column = new_pos;
+            ActionResult::success()
         }
 
         CanvasAction::MoveLineStart => {
             let new_pos = line_start_position();
-            state.set_current_cursor_pos(new_pos);
-            *ideal_cursor_column = new_pos;
-            Ok(ActionResult::success())
+            editor_state.cursor_pos = new_pos;
+            editor_state.ideal_cursor_column = new_pos;
+            ActionResult::success()
         }
 
         CanvasAction::MoveLineEnd => {
-            let current_input = state.get_current_input();
-            let new_pos = line_end_position(current_input, FOR_EDIT_MODE);
-            state.set_current_cursor_pos(new_pos);
-            *ideal_cursor_column = new_pos;
-            Ok(ActionResult::success())
+            let new_pos = line_end_position(current_text, FOR_EDIT_MODE);
+            editor_state.cursor_pos = new_pos;
+            editor_state.ideal_cursor_column = new_pos;
+            ActionResult::success()
         }
 
         CanvasAction::MoveWordNext => {
-            let current_input = state.get_current_input();
-            if !current_input.is_empty() {
-                let new_pos = find_next_word_start(current_input, state.current_cursor_pos());
-                let final_pos = clamp_cursor_position(new_pos, current_input, FOR_EDIT_MODE);
-                state.set_current_cursor_pos(final_pos);
-                *ideal_cursor_column = final_pos;
+            if !current_text.is_empty() {
+                let new_pos = find_next_word_start(current_text, editor_state.cursor_pos);
+                let final_pos = clamp_cursor_position(new_pos, current_text, FOR_EDIT_MODE);
+                editor_state.cursor_pos = final_pos;
+                editor_state.ideal_cursor_column = final_pos;
             }
-            Ok(ActionResult::success())
+            ActionResult::success()
         }
 
         CanvasAction::MoveWordEnd => {
-            let current_input = state.get_current_input();
-            if !current_input.is_empty() {
-                let current_pos = state.current_cursor_pos();
-                let new_pos = find_word_end(current_input, current_pos);
-                let final_pos = clamp_cursor_position(new_pos, current_input, FOR_EDIT_MODE);
-                state.set_current_cursor_pos(final_pos);
-                *ideal_cursor_column = final_pos;
+            if !current_text.is_empty() {
+                let new_pos = find_word_end(current_text, editor_state.cursor_pos);
+                let final_pos = clamp_cursor_position(new_pos, current_text, FOR_EDIT_MODE);
+                editor_state.cursor_pos = final_pos;
+                editor_state.ideal_cursor_column = final_pos;
             }
-            Ok(ActionResult::success())
+            ActionResult::success()
         }
 
         CanvasAction::MoveWordPrev => {
-            let current_input = state.get_current_input();
-            if !current_input.is_empty() {
-                let new_pos = find_prev_word_start(current_input, state.current_cursor_pos());
-                state.set_current_cursor_pos(new_pos);
-                *ideal_cursor_column = new_pos;
+            if !current_text.is_empty() {
+                let new_pos = find_prev_word_start(current_text, editor_state.cursor_pos);
+                editor_state.cursor_pos = new_pos;
+                editor_state.ideal_cursor_column = new_pos;
             }
-            Ok(ActionResult::success())
+            ActionResult::success()
         }
 
         CanvasAction::MoveWordEndPrev => {
-            let current_input = state.get_current_input();
-            if !current_input.is_empty() {
-                let new_pos = find_prev_word_end(current_input, state.current_cursor_pos());
-                state.set_current_cursor_pos(new_pos);
-                *ideal_cursor_column = new_pos;
+            if !current_text.is_empty() {
+                let new_pos = find_prev_word_end(current_text, editor_state.cursor_pos);
+                editor_state.cursor_pos = new_pos;
+                editor_state.ideal_cursor_column = new_pos;
             }
-            Ok(ActionResult::success())
+            ActionResult::success()
         }
 
+        // Field navigation - handled at FormEditor level
         CanvasAction::NextField | CanvasAction::PrevField => {
-            let current_field = state.current_field();
-            let total_fields = state.fields().len();
-
-            let new_field = match action {
-                CanvasAction::NextField => {
-                    (current_field + 1) % total_fields // Simple wrap
-                }
-                CanvasAction::PrevField => {
-                    if current_field == 0 { total_fields - 1 } else { current_field - 1 } // Simple wrap
-                }
-                _ => unreachable!(),
-            };
-
-            state.set_current_field(new_field);
-            *ideal_cursor_column = state.current_cursor_pos();
-            Ok(ActionResult::success())
+            ActionResult::success_with_message("Field navigation handled by FormEditor")
         }
 
         // Read-only mode doesn't handle editing actions
         CanvasAction::InsertChar(_) |
         CanvasAction::DeleteBackward |
         CanvasAction::DeleteForward => {
-            Ok(ActionResult::success_with_message("Action not available in read-only mode"))
+            ActionResult::success_with_message("Action not available in read-only mode")
         }
 
         CanvasAction::Custom(action_str) => {
-            Ok(ActionResult::success_with_message(&format!("Custom readonly action: {}", action_str)))
+            ActionResult::success_with_message(&format!("Custom readonly action: {}", action_str))
         }
 
         _ => {
-            Ok(ActionResult::success_with_message("Action not implemented for read-only mode"))
+            ActionResult::success_with_message("Action not implemented for read-only mode")
         }
     }
 }

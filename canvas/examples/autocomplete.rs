@@ -20,21 +20,14 @@ use canvas::{
     canvas::{
         gui::render_canvas,
         modes::AppMode,
-        state::{ActionContext, CanvasState},
         theme::CanvasTheme,
     },
-    autocomplete::{
-        AutocompleteCanvasState,
-        AutocompleteState,
-        SuggestionItem,
-        execute_with_autocomplete,
-        handle_autocomplete_feature_action,
-    },
-    CanvasAction,
+    autocomplete::gui::render_autocomplete_dropdown,
+    FormEditor, DataProvider, AutocompleteProvider, SuggestionItem,
 };
 
-// Add the async_trait import
 use async_trait::async_trait;
+use anyhow::Result;
 
 // Simple theme implementation
 #[derive(Clone)]
@@ -58,150 +51,94 @@ struct EmailSuggestion {
     provider: String,
 }
 
-// Demo form state with autocomplete
-struct AutocompleteFormState {
-    fields: Vec<String>,
-    field_names: Vec<String>,
-    current_field: usize,
-    cursor_pos: usize,
-    mode: AppMode,
-    has_changes: bool,
-    debug_message: String,
+// ===================================================================
+// SIMPLE DATA PROVIDER - Only business data, no UI concerns!
+// ===================================================================
 
-    // Autocomplete state
-    autocomplete: AutocompleteState<EmailSuggestion>,
+struct ContactForm {
+    // Only business data - no UI state!
+    name: String,
+    email: String,
+    phone: String,
+    city: String,
 }
 
-impl AutocompleteFormState {
+impl ContactForm {
     fn new() -> Self {
         Self {
-            fields: vec![
-                "John Doe".to_string(),
-                "john@".to_string(), // Partial email to demonstrate autocomplete
-                "+1 234 567 8900".to_string(),
-                "San Francisco".to_string(),
-            ],
-            field_names: vec![
-                "Name".to_string(),
-                "Email".to_string(),
-                "Phone".to_string(),
-                "City".to_string(),
-            ],
-            current_field: 1, // Start on email field
-            cursor_pos: 5, // Position after "john@"
-            mode: AppMode::Edit,
-            has_changes: false,
-            debug_message: "Type in email field, Tab to trigger autocomplete, Enter to select, Esc to cancel".to_string(),
-            autocomplete: AutocompleteState::new(),
+            name: "John Doe".to_string(),
+            email: "john@".to_string(), // Partial email for demo
+            phone: "+1 234 567 8900".to_string(),
+            city: "San Francisco".to_string(),
         }
     }
 }
 
-impl CanvasState for AutocompleteFormState {
-    fn current_field(&self) -> usize { self.current_field }
-    fn current_cursor_pos(&self) -> usize { self.cursor_pos }
-    fn set_current_field(&mut self, index: usize) {
-        self.current_field = index.min(self.fields.len().saturating_sub(1));
-        // Clear autocomplete when changing fields
-        if self.is_autocomplete_active() {
-            self.clear_autocomplete_suggestions();
+// Simple trait implementation - only 4 methods!
+impl DataProvider for ContactForm {
+    fn field_count(&self) -> usize { 4 }
+    
+    fn field_name(&self, index: usize) -> &str {
+        match index {
+            0 => "Name",
+            1 => "Email", 
+            2 => "Phone",
+            3 => "City",
+            _ => "",
         }
     }
-    fn set_current_cursor_pos(&mut self, pos: usize) {
-        let max_pos = if self.mode == AppMode::Edit {
-            self.fields[self.current_field].len()
-        } else {
-            self.fields[self.current_field].len().saturating_sub(1)
-        };
-        self.cursor_pos = pos.min(max_pos);
-    }
-    fn current_mode(&self) -> AppMode { self.mode }
-    fn get_current_input(&self) -> &str { &self.fields[self.current_field] }
-    fn get_current_input_mut(&mut self) -> &mut String { &mut self.fields[self.current_field] }
-    fn inputs(&self) -> Vec<&String> { self.fields.iter().collect() }
-    fn fields(&self) -> Vec<&str> { self.field_names.iter().map(|s| s.as_str()).collect() }
-    fn has_unsaved_changes(&self) -> bool { self.has_changes }
-    fn set_has_unsaved_changes(&mut self, changed: bool) { self.has_changes = changed; }
-
-    fn handle_feature_action(&mut self, action: &CanvasAction, _context: &ActionContext) -> Option<String> {
-        // Handle autocomplete actions first
-        if let Some(result) = handle_autocomplete_feature_action(action, self) {
-            return Some(result);
-        }
-
-        // Handle other custom actions
-        match action {
-            CanvasAction::Custom(cmd) => {
-                match cmd.as_str() {
-                    "toggle_mode" => {
-                        self.mode = match self.mode {
-                            AppMode::Edit => AppMode::ReadOnly,
-                            AppMode::ReadOnly => AppMode::Edit,
-                            _ => AppMode::Edit,
-                        };
-                        Some(format!("Switched to {:?} mode", self.mode))
-                    }
-                    _ => None,
-                }
-            }
-            _ => None,
+    
+    fn field_value(&self, index: usize) -> &str {
+        match index {
+            0 => &self.name,
+            1 => &self.email,
+            2 => &self.phone,
+            3 => &self.city,
+            _ => "",
         }
     }
-}
-
-// Add the #[async_trait] attribute to the implementation
-#[async_trait]
-impl AutocompleteCanvasState for AutocompleteFormState {
-    type SuggestionData = EmailSuggestion;
-
+    
+    fn set_field_value(&mut self, index: usize, value: String) {
+        match index {
+            0 => self.name = value,
+            1 => self.email = value,
+            2 => self.phone = value,
+            3 => self.city = value,
+            _ => {}
+        }
+    }
+    
     fn supports_autocomplete(&self, field_index: usize) -> bool {
-        // Only enable autocomplete for email field (index 1)
-        field_index == 1
+        field_index == 1 // Only email field
     }
+}
 
-    fn autocomplete_state(&self) -> Option<&AutocompleteState<Self::SuggestionData>> {
-        Some(&self.autocomplete)
-    }
+// ===================================================================
+// SIMPLE AUTOCOMPLETE PROVIDER - Only data fetching!
+// ===================================================================
 
-    fn autocomplete_state_mut(&mut self) -> Option<&mut AutocompleteState<Self::SuggestionData>> {
-        Some(&mut self.autocomplete)
-    }
+struct EmailAutocomplete;
 
-    fn should_trigger_autocomplete(&self) -> bool {
-        let current_input = self.get_current_input();
-        let current_field = self.current_field();
-
-        // Trigger for email field when we have "@" and at least 1 more character
-        self.supports_autocomplete(current_field) &&
-        current_input.contains('@') &&
-        current_input.len() > current_input.find('@').unwrap_or(0) + 1 &&
-        !self.is_autocomplete_active()
-    }
-
-    /// This is where the magic happens - user implements their own async fetching
-    async fn trigger_autocomplete_suggestions(&mut self) {
-        // 1. Activate UI (shows loading spinner)
-        self.activate_autocomplete();
-        self.set_autocomplete_loading(true);
-
-        // 2. Get current input for querying
-        let query = self.get_current_input().to_string();
-
-        // 3. Extract domain part from email
-        let domain_part = if let Some(at_pos) = query.find('@') {
-            query[at_pos + 1..].to_string()
+#[async_trait]
+impl AutocompleteProvider for EmailAutocomplete {
+    type SuggestionData = EmailSuggestion;
+    
+    async fn fetch_suggestions(&mut self, _field_index: usize, query: &str) 
+        -> Result<Vec<SuggestionItem<Self::SuggestionData>>> 
+    {
+        // Extract domain part from email
+        let (email_prefix, domain_part) = if let Some(at_pos) = query.find('@') {
+            (query[..at_pos].to_string(), query[at_pos + 1..].to_string())
         } else {
-            self.set_autocomplete_loading(false);
-            return; // No @ symbol, can't suggest
+            return Ok(Vec::new()); // No @ symbol
         };
 
-        // 4. SIMULATE ASYNC API CALL (in real code, this would be HTTP request)
-        let email_prefix = query[..query.find('@').unwrap()].to_string();
+        // Simulate async API call
         let suggestions = tokio::task::spawn_blocking(move || {
             // Simulate network delay
             std::thread::sleep(std::time::Duration::from_millis(200));
 
-            // Create mock suggestions based on domain input
+            // Mock email suggestions
             let popular_domains = vec![
                 ("gmail.com", "Gmail"),
                 ("yahoo.com", "Yahoo Mail"),
@@ -212,110 +149,148 @@ impl AutocompleteCanvasState for AutocompleteFormState {
             ];
 
             let mut results = Vec::new();
-
             for (domain, provider) in popular_domains {
                 if domain.starts_with(&domain_part) || domain_part.is_empty() {
                     let full_email = format!("{}@{}", email_prefix, domain);
-                    results.push(SuggestionItem::new(
-                        EmailSuggestion {
+                    results.push(SuggestionItem {
+                        data: EmailSuggestion {
                             email: full_email.clone(),
                             provider: provider.to_string(),
                         },
-                        format!("{} ({})", full_email, provider), // display text
-                        full_email, // value to store
-                    ));
+                        display_text: format!("{} ({})", full_email, provider),
+                        value_to_store: full_email,
+                    });
                 }
             }
-
             results
         }).await.unwrap_or_default();
 
-        // 5. Provide suggestions back to library
-        self.set_autocomplete_suggestions(suggestions);
+        Ok(suggestions)
     }
 }
 
-async fn handle_key_press(key: KeyCode, modifiers: KeyModifiers, state: &mut AutocompleteFormState) -> bool {
+// ===================================================================
+// APPLICATION STATE - Much simpler!
+// ===================================================================
+
+struct AppState {
+    editor: FormEditor<ContactForm>,
+    autocomplete: EmailAutocomplete,
+    debug_message: String,
+}
+
+impl AppState {
+    fn new() -> Self {
+        let contact_form = ContactForm::new();
+        let mut editor = FormEditor::new(contact_form);
+        
+        // Start on email field (index 1) at end of existing text
+        editor.set_mode(AppMode::Edit);
+        // TODO: Add method to set initial field/cursor position
+        
+        Self {
+            editor,
+            autocomplete: EmailAutocomplete,
+            debug_message: "Type in email field, Tab to trigger autocomplete, Enter to select, Esc to cancel".to_string(),
+        }
+    }
+}
+
+// ===================================================================
+// INPUT HANDLING - Much cleaner!
+// ===================================================================
+
+async fn handle_key_press(key: KeyCode, modifiers: KeyModifiers, state: &mut AppState) -> bool {
     if key == KeyCode::F(10) || (key == KeyCode::Char('c') && modifiers.contains(KeyModifiers::CONTROL)) {
         return false; // Quit
     }
 
-    let action = match key {
+    // Handle input based on key
+    let result = match key {
         // === AUTOCOMPLETE KEYS ===
         KeyCode::Tab => {
-            if state.is_autocomplete_active() {
-                Some(CanvasAction::SuggestionDown) // Navigate suggestions
-            } else if state.supports_autocomplete(state.current_field()) {
-                Some(CanvasAction::TriggerAutocomplete) // Manual trigger
+            if state.editor.is_autocomplete_active() {
+                state.editor.autocomplete_next();
+                Ok("Navigated to next suggestion".to_string())
+            } else if state.editor.data_provider().supports_autocomplete(state.editor.current_field()) {
+                state.editor.trigger_autocomplete(&mut state.autocomplete).await
+                    .map(|_| "Triggered autocomplete".to_string())
             } else {
-                Some(CanvasAction::NextField) // Normal tab
-            }
-        }
-
-        KeyCode::BackTab => {
-            if state.is_autocomplete_active() {
-                Some(CanvasAction::SuggestionUp)
-            } else {
-                Some(CanvasAction::PrevField)
+                state.editor.move_to_next_field();
+                Ok("Moved to next field".to_string())
             }
         }
 
         KeyCode::Enter => {
-            if state.is_autocomplete_active() {
-                Some(CanvasAction::SelectSuggestion) // Apply suggestion
+            if state.editor.is_autocomplete_active() {
+                if let Some(applied) = state.editor.apply_autocomplete() {
+                    Ok(format!("Applied: {}", applied))
+                } else {
+                    Ok("No suggestion to apply".to_string())
+                }
             } else {
-                Some(CanvasAction::NextField)
+                state.editor.move_to_next_field();
+                Ok("Moved to next field".to_string())
             }
         }
 
         KeyCode::Esc => {
-            if state.is_autocomplete_active() {
-                Some(CanvasAction::ExitSuggestions) // Close autocomplete
+            if state.editor.is_autocomplete_active() {
+                // Autocomplete will be cleared automatically by mode change
+                Ok("Cancelled autocomplete".to_string())
             } else {
-                Some(CanvasAction::Custom("toggle_mode".to_string()))
+                // Toggle between edit and readonly mode
+                let new_mode = match state.editor.mode() {
+                    AppMode::Edit => AppMode::ReadOnly,
+                    _ => AppMode::Edit,
+                };
+                state.editor.set_mode(new_mode);
+                Ok(format!("Switched to {:?} mode", new_mode))
             }
         }
 
-        // === STANDARD CANVAS KEYS ===
-        KeyCode::Left => Some(CanvasAction::MoveLeft),
-        KeyCode::Right => Some(CanvasAction::MoveRight),
-        KeyCode::Up => Some(CanvasAction::MoveUp),
-        KeyCode::Down => Some(CanvasAction::MoveDown),
-        KeyCode::Home => Some(CanvasAction::MoveLineStart),
-        KeyCode::End => Some(CanvasAction::MoveLineEnd),
-        KeyCode::Backspace => Some(CanvasAction::DeleteBackward),
-        KeyCode::Delete => Some(CanvasAction::DeleteForward),
-
-        // Character input
-        KeyCode::Char(c) if !modifiers.contains(KeyModifiers::CONTROL) => {
-            Some(CanvasAction::InsertChar(c))
+        // === MOVEMENT KEYS ===
+        KeyCode::Left => {
+            state.editor.move_left();
+            Ok("Moved left".to_string())
+        }
+        KeyCode::Right => {
+            state.editor.move_right();
+            Ok("Moved right".to_string())
+        }
+        KeyCode::Up => {
+            state.editor.move_to_next_field(); // TODO: Add move_up method
+            Ok("Moved up".to_string())
+        }
+        KeyCode::Down => {
+            state.editor.move_to_next_field(); // TODO: Add move_down method  
+            Ok("Moved down".to_string())
         }
 
-        _ => None,
+        // === TEXT INPUT ===
+        KeyCode::Char(c) if !modifiers.contains(KeyModifiers::CONTROL) => {
+            state.editor.insert_char(c)
+                .map(|_| format!("Inserted '{}'", c))
+        }
+
+        KeyCode::Backspace => {
+            // TODO: Add delete_backward method to FormEditor
+            Ok("Backspace (not implemented yet)".to_string())
+        }
+
+        _ => Ok(format!("Unhandled key: {:?}", key)),
     };
 
-    if let Some(action) = action {
-        match execute_with_autocomplete(action.clone(), state).await {
-            Ok(result) => {
-                if let Some(msg) = result.message() {
-                    state.debug_message = msg.to_string();
-                } else {
-                    state.debug_message = format!("Executed: {:?}", action);
-                }
-                true
-            }
-            Err(e) => {
-                state.debug_message = format!("Error: {}", e);
-                true
-            }
-        }
-    } else {
-        state.debug_message = format!("Unhandled key: {:?}", key);
-        true
+    // Update debug message
+    match result {
+        Ok(msg) => state.debug_message = msg,
+        Err(e) => state.debug_message = format!("Error: {}", e),
     }
+
+    true
 }
 
-async fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut state: AutocompleteFormState) -> io::Result<()> {
+async fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut state: AppState) -> io::Result<()> {
     let theme = DemoTheme;
 
     loop {
@@ -332,7 +307,7 @@ async fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut state: Autocomplete
     Ok(())
 }
 
-fn ui(f: &mut Frame, state: &AutocompleteFormState, theme: &DemoTheme) {
+fn ui(f: &mut Frame, state: &AppState, theme: &DemoTheme) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
@@ -341,33 +316,31 @@ fn ui(f: &mut Frame, state: &AutocompleteFormState, theme: &DemoTheme) {
         ])
         .split(f.area());
 
-    // Render the canvas form
+    // Render the canvas form - much simpler!
     let active_field_rect = render_canvas(
         f,
         chunks[0],
-        state,
+        &state.editor,
         theme,
-        state.mode == AppMode::Edit,
-        &canvas::HighlightState::Off,
     );
 
-    // Render autocomplete dropdown on top if active
+    // Render autocomplete dropdown if active
     if let Some(input_rect) = active_field_rect {
-        canvas::render_autocomplete_dropdown(
+        render_autocomplete_dropdown(
             f,
             chunks[0],
             input_rect,
             theme,
-            &state.autocomplete,
+            &state.editor,
         );
     }
 
     // Status info
-    let autocomplete_status = if state.is_autocomplete_active() {
-        if state.autocomplete.is_loading {
+    let autocomplete_status = if state.editor.is_autocomplete_active() {
+        if state.editor.ui_state().is_autocomplete_loading() {
             "Loading suggestions..."
-        } else if state.has_autocomplete_suggestions() {
-            "Use Tab/Shift+Tab to navigate, Enter to select, Esc to cancel"
+        } else if !state.editor.suggestions().is_empty() {
+            "Use Tab to navigate, Enter to select, Esc to cancel"
         } else {
             "No suggestions found"
         }
@@ -377,7 +350,10 @@ fn ui(f: &mut Frame, state: &AutocompleteFormState, theme: &DemoTheme) {
 
     let status_lines = vec![
         Line::from(Span::raw(format!("Mode: {:?} | Field: {}/{} | Cursor: {}",
-            state.mode, state.current_field + 1, state.fields.len(), state.cursor_pos))),
+            state.editor.mode(), 
+            state.editor.current_field() + 1, 
+            state.editor.data_provider().field_count(), 
+            state.editor.cursor_position()))),
         Line::from(Span::raw(format!("Autocomplete: {}", autocomplete_status))),
         Line::from(Span::raw(state.debug_message.clone())),
         Line::from(Span::raw("F10: Quit | Tab: Trigger/Navigate autocomplete | Enter: Select | Esc: Cancel/Toggle mode")),
@@ -397,8 +373,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
-    let state = AutocompleteFormState::new();
-
+    let state = AppState::new();
     let res = run_app(&mut terminal, state).await;
 
     disable_raw_mode()?;

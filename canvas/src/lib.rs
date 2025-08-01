@@ -1,31 +1,47 @@
 // src/lib.rs
 
 pub mod canvas;
+pub mod editor;
+pub mod data_provider;
 
 // Only include autocomplete module if feature is enabled
 #[cfg(feature = "autocomplete")]
 pub mod autocomplete;
 
-// Re-export the main API for easy access
-pub use canvas::actions::{CanvasAction, ActionResult, execute};
-pub use canvas::state::{CanvasState, ActionContext};
-pub use canvas::modes::{AppMode, ModeManager, HighlightState};
+// ===================================================================
+// NEW API: Library-owned state pattern
+// ===================================================================
 
+// Main API exports
+pub use editor::FormEditor;
+pub use data_provider::{DataProvider, AutocompleteProvider, SuggestionItem};
+
+// UI state (read-only access for users)
+pub use canvas::state::EditorState;
+pub use canvas::modes::AppMode;
+
+// Actions and results (for users who want to handle actions manually)
+pub use canvas::actions::{CanvasAction, ActionResult};
+
+// Theming and GUI
 #[cfg(feature = "gui")]
 pub use canvas::theme::CanvasTheme;
 
 #[cfg(feature = "gui")]
 pub use canvas::gui::render_canvas;
 
-// Re-export autocomplete API if feature is enabled
-#[cfg(feature = "autocomplete")]
-pub use autocomplete::{
-    AutocompleteCanvasState, 
-    AutocompleteState, 
-    SuggestionItem,
-    execute_with_autocomplete,
-    handle_autocomplete_feature_action,
-};
-
 #[cfg(all(feature = "gui", feature = "autocomplete"))]
-pub use autocomplete::render_autocomplete_dropdown;
+pub use autocomplete::gui::render_autocomplete_dropdown;
+
+// ===================================================================
+// LEGACY COMPATIBILITY: Old trait-based API (deprecated)
+// ===================================================================
+
+// Legacy exports for backward compatibility - mark as deprecated
+
+#[deprecated(note = "Use FormEditor and AutocompleteProvider instead")]
+#[cfg(feature = "autocomplete")]
+pub use crate::autocomplete::state::AutocompleteCanvasState;
+
+// Mode management (still used)
+pub use canvas::modes::{ModeManager, HighlightState};

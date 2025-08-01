@@ -1,7 +1,6 @@
 // src/canvas/actions/types.rs
 
-use crate::canvas::state::CanvasState;
-use anyhow::Result;
+use crate::canvas::state::EditorState;
 
 /// All available canvas actions
 #[derive(Debug, Clone, PartialEq)]
@@ -11,35 +10,35 @@ pub enum CanvasAction {
     MoveRight,
     MoveUp,
     MoveDown,
-    
+
     // Word movement
     MoveWordNext,
     MoveWordPrev,
     MoveWordEnd,
     MoveWordEndPrev,
-    
+
     // Line movement
     MoveLineStart,
     MoveLineEnd,
-    
+
     // Field movement
     NextField,
     PrevField,
     MoveFirstLine,
     MoveLastLine,
-    
+
     // Editing actions
     InsertChar(char),
     DeleteBackward,
     DeleteForward,
-    
+
     // Autocomplete actions
     TriggerAutocomplete,
     SuggestionUp,
     SuggestionDown,
     SelectSuggestion,
     ExitSuggestions,
-    
+
     // Custom actions
     Custom(String),
 }
@@ -58,23 +57,23 @@ impl ActionResult {
     pub fn success() -> Self {
         Self::Success
     }
-    
+
     pub fn success_with_message(msg: &str) -> Self {
         Self::Message(msg.to_string())
     }
-    
+
     pub fn handled_by_app(msg: &str) -> Self {
         Self::HandledByApp(msg.to_string())
     }
-    
+
     pub fn error(msg: &str) -> Self {
         Self::Error(msg.to_string())
     }
-    
+
     pub fn is_success(&self) -> bool {
         matches!(self, Self::Success | Self::Message(_) | Self::HandledByApp(_) | Self::HandledByFeature(_))
     }
-    
+
     pub fn message(&self) -> Option<&str> {
         match self {
             Self::Message(msg) | Self::HandledByApp(msg) | Self::HandledByFeature(msg) | Self::Error(msg) => Some(msg),
@@ -83,17 +82,13 @@ impl ActionResult {
     }
 }
 
-/// Execute a canvas action on the given state
-pub async fn execute<S: CanvasState>(
-    action: CanvasAction,
-    state: &mut S,
-) -> Result<ActionResult> {
-    let mut ideal_cursor_column = 0;
-    
-    super::handlers::dispatch_action(action, state, &mut ideal_cursor_column).await
-}
-
 impl CanvasAction {
+    /// Internal method used by FormEditor
+    pub(crate) fn apply_to_editor_state(self, editor_state: &mut EditorState, current_text: &str) -> ActionResult {
+        // Internal method used by FormEditor
+        crate::canvas::actions::handlers::dispatch_action_internal(self, editor_state, current_text)
+    }
+
     /// Get a human-readable description of this action
     pub fn description(&self) -> &'static str {
         match self {
@@ -111,7 +106,7 @@ impl CanvasAction {
             Self::PrevField => "previous field",
             Self::MoveFirstLine => "first field",
             Self::MoveLastLine => "last field",
-            Self::InsertChar(c) => "insert character",
+            Self::InsertChar(_c) => "insert character",
             Self::DeleteBackward => "delete backward",
             Self::DeleteForward => "delete forward",
             Self::TriggerAutocomplete => "trigger autocomplete",
@@ -119,7 +114,7 @@ impl CanvasAction {
             Self::SuggestionDown => "suggestion down",
             Self::SelectSuggestion => "select suggestion",
             Self::ExitSuggestions => "exit suggestions",
-            Self::Custom(name) => "custom action",
+            Self::Custom(_name) => "custom action",
         }
     }
 

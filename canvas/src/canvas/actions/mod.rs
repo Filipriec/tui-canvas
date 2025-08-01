@@ -5,4 +5,4 @@ pub mod handlers;
 pub mod movement;
 
 // Re-export the main API
-pub use types::{CanvasAction, ActionResult, execute};
+pub use types::{CanvasAction, ActionResult};

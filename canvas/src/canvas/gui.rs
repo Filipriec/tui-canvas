@@ -1,4 +1,5 @@
-// canvas/src/canvas/gui.rs
+// src/canvas/gui.rs
+//! Canvas GUI updated to work with FormEditor
 
 #[cfg(feature = "gui")]
 use ratatui::{
@@ -9,29 +10,43 @@ use ratatui::{
     Frame,
 };
 
-use crate::canvas::state::CanvasState;
-use crate::canvas::modes::HighlightState;
-
 #[cfg(feature = "gui")]
 use crate::canvas::theme::CanvasTheme;
+use crate::canvas::modes::HighlightState;
+use crate::data_provider::DataProvider;
+use crate::editor::FormEditor;
 
 #[cfg(feature = "gui")]
 use std::cmp::{max, min};
 
 /// Render ONLY the canvas form fields - no autocomplete
+/// Updated to work with FormEditor instead of CanvasState trait
 #[cfg(feature = "gui")]
-pub fn render_canvas<T: CanvasTheme>(
+pub fn render_canvas<T: CanvasTheme, D: DataProvider>(
     f: &mut Frame,
     area: Rect,
-    form_state: &impl CanvasState,
+    editor: &FormEditor<D>,
     theme: &T,
-    is_edit_mode: bool,
-    highlight_state: &HighlightState,
 ) -> Option<Rect> {
-    let fields: Vec<&str> = form_state.fields();
-    let current_field_idx = form_state.current_field();
-    let inputs: Vec<&String> = form_state.inputs();
-
+    let ui_state = editor.ui_state();
+    let data_provider = editor.data_provider();
+    
+    // Build field information
+    let field_count = data_provider.field_count();
+    let mut fields: Vec<&str> = Vec::with_capacity(field_count);
+    let mut inputs: Vec<String> = Vec::with_capacity(field_count);
+    
+    for i in 0..field_count {
+        fields.push(data_provider.field_name(i));
+        inputs.push(data_provider.field_value(i).to_string());
+    }
+    
+    let current_field_idx = ui_state.current_field();
+    let is_edit_mode = matches!(ui_state.mode(), crate::canvas::modes::AppMode::Edit);
+    
+    // For now, create a default highlight state (TODO: get from editor state)
+    let highlight_state = HighlightState::Off;
+    
     render_canvas_fields(
         f,
         area,
@@ -40,11 +55,13 @@ pub fn render_canvas<T: CanvasTheme>(
         &inputs,
         theme,
         is_edit_mode,
-        highlight_state,
-        form_state.current_cursor_pos(),
-        form_state.has_unsaved_changes(),
-        |i| form_state.get_display_value_for_field(i).to_string(),
-        |i| form_state.has_display_override(i),
+        &highlight_state,
+        ui_state.cursor_position(),
+        false, // TODO: track unsaved changes in editor
+        |i| {
+            data_provider.display_value(i).unwrap_or(data_provider.field_value(i)).to_string()
+        },
+        |i| data_provider.display_value(i).is_some(),
     )
 }
 
@@ -55,7 +72,7 @@ fn render_canvas_fields<T: CanvasTheme, F1, F2>(
     area: Rect,
     fields: &[&str],
     current_field_idx: &usize,
-    inputs: &[&String],
+    inputs: &[String],
     theme: &T,
     is_edit_mode: bool,
     highlight_state: &HighlightState,
@@ -112,7 +129,7 @@ where
     // Render field values and return active field rect
     render_field_values(
         f,
-        input_rows.to_vec(), // Fix: Convert Rc<[Rect]> to Vec<Rect>
+        input_rows.to_vec(),
         inputs,
         current_field_idx,
         theme,
@@ -154,7 +171,7 @@ fn render_field_labels<T: CanvasTheme>(
 fn render_field_values<T: CanvasTheme, F1, F2>(
     f: &mut Frame,
     input_rows: Vec<Rect>,
-    inputs: &[&String],
+    inputs: &[String],
     current_field_idx: &usize,
     theme: &T,
     highlight_state: &HighlightState,
@@ -171,7 +188,7 @@ where
     for (i, _input) in inputs.iter().enumerate() {
         let is_active = i == *current_field_idx;
         let text = get_display_value(i);
-        
+
         // Apply highlighting
         let line = apply_highlighting(
             &text,
@@ -301,7 +318,7 @@ fn apply_linewise_highlighting<'a, T: CanvasTheme>(
 ) -> Line<'a> {
     let start_field = min(*anchor_line, *current_field_idx);
     let end_field = max(*anchor_line, *current_field_idx);
-    
+
     let highlight_style = Style::default()
         .fg(theme.highlight())
         .bg(theme.highlight_bg())
