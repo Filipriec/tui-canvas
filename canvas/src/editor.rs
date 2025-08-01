@@ -2,7 +2,6 @@
 //! Main API for the canvas library - FormEditor with library-owned state
 
 use anyhow::Result;
-use async_trait::async_trait;
 use crate::canvas::state::EditorState;
 use crate::data_provider::{DataProvider, AutocompleteProvider, SuggestionItem};
 use crate::canvas::modes::AppMode;

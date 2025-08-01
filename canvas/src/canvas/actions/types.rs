@@ -1,7 +1,5 @@
 // src/canvas/actions/types.rs
 
-use crate::canvas::state::EditorState;
-
 /// All available canvas actions
 #[derive(Debug, Clone, PartialEq)]
 pub enum CanvasAction {
@@ -83,12 +81,6 @@ impl ActionResult {
 }
 
 impl CanvasAction {
-    /// Internal method used by FormEditor
-    pub(crate) fn apply_to_editor_state(self, editor_state: &mut EditorState, current_text: &str) -> ActionResult {
-        // Internal method used by FormEditor
-        crate::canvas::actions::handlers::dispatch_action_internal(self, editor_state, current_text)
-    }
-
     /// Get a human-readable description of this action
     pub fn description(&self) -> &'static str {
         match self {

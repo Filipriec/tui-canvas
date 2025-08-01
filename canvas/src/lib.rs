@@ -32,16 +32,3 @@ pub use canvas::gui::render_canvas;
 
 #[cfg(all(feature = "gui", feature = "autocomplete"))]
 pub use autocomplete::gui::render_autocomplete_dropdown;
-
-// ===================================================================
-// LEGACY COMPATIBILITY: Old trait-based API (deprecated)
-// ===================================================================
-
-// Legacy exports for backward compatibility - mark as deprecated
-
-#[deprecated(note = "Use FormEditor and AutocompleteProvider instead")]
-#[cfg(feature = "autocomplete")]
-pub use crate::autocomplete::state::AutocompleteCanvasState;
-
-// Mode management (still used)
-pub use canvas::modes::{ModeManager, HighlightState};

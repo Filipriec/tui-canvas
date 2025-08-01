@@ -1,20 +1,11 @@
 // src/autocomplete/mod.rs
 
-pub mod types;
 pub mod state;
-pub mod actions;
-
 #[cfg(feature = "gui")]
 pub mod gui;
 
-// Re-export the main autocomplete API
-pub use types::{SuggestionItem, AutocompleteState};
-
-// Re-export the new action functions
-pub use actions::{
-    execute_with_autocomplete,
-    handle_autocomplete_feature_action,
-};
+// Re-export the main autocomplete types
+pub use state::{AutocompleteProvider, SuggestionItem};
 
 // Re-export GUI functions if available
 #[cfg(feature = "gui")]
