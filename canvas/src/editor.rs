@@ -165,6 +165,25 @@ impl<D: DataProvider> FormEditor<D> {
         }
     }
 
+    /// Enter edit mode with cursor positioned for append (vim 'a' command)
+    pub fn enter_append_mode(&mut self) {
+        let current_text = self.current_text();
+        
+        // Calculate append position: always move right, even at line end
+        let append_pos = if current_text.is_empty() {
+            0
+        } else {
+            (self.ui_state.cursor_pos + 1).min(current_text.len())
+        };
+        
+        // Set cursor position for append
+        self.ui_state.cursor_pos = append_pos;
+        self.ui_state.ideal_cursor_column = append_pos;
+        
+        // Enter edit mode (which will update cursor style)
+        self.set_mode(AppMode::Edit);
+    }
+
     // ===================================================================
     // ASYNC OPERATIONS: Only autocomplete needs async
     // ===================================================================
