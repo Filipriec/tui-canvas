@@ -5,7 +5,7 @@
 use ratatui::{
     layout::{Alignment, Rect},
     style::{Modifier, Style},
-    widgets::{Block, Borders, List, ListItem, ListState, Paragraph},
+    widgets::{Block, List, ListItem, ListState, Paragraph},  // Removed Borders
     Frame,
 };
 
@@ -27,7 +27,7 @@ pub fn render_autocomplete_dropdown<T: CanvasTheme, D: DataProvider>(
     editor: &FormEditor<D>,
 ) {
     let ui_state = editor.ui_state();
-    
+
     if !ui_state.is_autocomplete_active() {
         return;
     }
@@ -76,7 +76,7 @@ fn render_suggestions_dropdown<T: CanvasTheme>(
     frame_area: Rect,
     input_rect: Rect,
     theme: &T,
-    suggestions: &[SuggestionItem<String>],
+    suggestions: &[SuggestionItem],  // Fixed: Removed <String> generic parameter
     selected_index: Option<usize>,
 ) {
     let display_texts: Vec<&str> = suggestions

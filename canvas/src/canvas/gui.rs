@@ -11,7 +11,7 @@ use ratatui::{
 };
 
 #[cfg(feature = "gui")]
-use crate::canvas::theme::CanvasTheme;
+use crate::canvas::theme::{CanvasTheme, DefaultCanvasTheme};
 use crate::canvas::modes::HighlightState;
 use crate::data_provider::DataProvider;
 use crate::editor::FormEditor;
@@ -352,4 +352,15 @@ fn set_cursor_position(
     };
     let cursor_y = field_rect.y;
     f.set_cursor_position((cursor_x, cursor_y));
+}
+
+/// Set default theme if custom not specified
+#[cfg(feature = "gui")]
+pub fn render_canvas_default<D: DataProvider>(
+    f: &mut Frame,
+    area: Rect,
+    editor: &FormEditor<D>,
+) -> Option<Rect> {
+    let theme = DefaultCanvasTheme::default();
+    render_canvas(f, area, editor, &theme)
 }

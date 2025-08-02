@@ -15,3 +15,36 @@ pub trait CanvasTheme {
     fn highlight_bg(&self) -> Color;
     fn warning(&self) -> Color;
 }
+
+
+#[cfg(feature = "gui")]
+#[derive(Debug, Clone, Default)]
+pub struct DefaultCanvasTheme;
+
+#[cfg(feature = "gui")]
+impl CanvasTheme for DefaultCanvasTheme {
+    fn bg(&self) -> Color {
+        Color::Black
+    }
+    fn fg(&self) -> Color {
+        Color::White
+    }
+    fn border(&self) -> Color {
+        Color::DarkGray
+    }
+    fn accent(&self) -> Color {
+        Color::Cyan
+    }
+    fn secondary(&self) -> Color {
+        Color::Gray
+    }
+    fn highlight(&self) -> Color {
+        Color::Yellow
+    }
+    fn highlight_bg(&self) -> Color {
+        Color::Blue
+    }
+    fn warning(&self) -> Color {
+        Color::Red
+    }
+}

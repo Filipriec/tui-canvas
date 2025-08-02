@@ -25,10 +25,13 @@ pub use canvas::actions::{CanvasAction, ActionResult};
 
 // Theming and GUI
 #[cfg(feature = "gui")]
-pub use canvas::theme::CanvasTheme;
+pub use canvas::theme::{CanvasTheme, DefaultCanvasTheme};
 
 #[cfg(feature = "gui")]
 pub use canvas::gui::render_canvas;
+
+#[cfg(feature = "gui")]
+pub use canvas::gui::render_canvas_default;
 
 #[cfg(all(feature = "gui", feature = "autocomplete"))]
 pub use autocomplete::gui::render_autocomplete_dropdown;
