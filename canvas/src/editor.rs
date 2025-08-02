@@ -220,4 +220,241 @@ impl<D: DataProvider> FormEditor<D> {
         }
         None
     }
+
+    // ===================================================================
+    // ADD THESE MISSING MOVEMENT METHODS
+    // ===================================================================
+
+    /// Move to previous field (vim k / up arrow)
+    pub fn move_up(&mut self) {
+        let field_count = self.data_provider.field_count();
+        if field_count == 0 {
+            return;
+        }
+        
+        let current_field = self.ui_state.current_field;
+        let new_field = current_field.saturating_sub(1);
+        
+        self.ui_state.move_to_field(new_field, field_count);
+        self.clamp_cursor_to_current_field();
+    }
+
+    /// Move to next field (vim j / down arrow) 
+    pub fn move_down(&mut self) {
+        let field_count = self.data_provider.field_count();
+        if field_count == 0 {
+            return;
+        }
+        
+        let current_field = self.ui_state.current_field;
+        let new_field = (current_field + 1).min(field_count - 1);
+        
+        self.ui_state.move_to_field(new_field, field_count);
+        self.clamp_cursor_to_current_field();
+    }
+
+    /// Move to first field (vim gg)
+    pub fn move_first_line(&mut self) {
+        let field_count = self.data_provider.field_count();
+        if field_count == 0 {
+            return;
+        }
+        
+        self.ui_state.move_to_field(0, field_count);
+        self.clamp_cursor_to_current_field();
+    }
+
+    /// Move to last field (vim G)
+    pub fn move_last_line(&mut self) {
+        let field_count = self.data_provider.field_count();
+        if field_count == 0 {
+            return;
+        }
+        
+        let last_field = field_count - 1;
+        self.ui_state.move_to_field(last_field, field_count);
+        self.clamp_cursor_to_current_field();
+    }
+
+    /// Move to previous field (alternative to move_up)
+    pub fn prev_field(&mut self) {
+        self.move_up();
+    }
+
+    /// Move to next field (alternative to move_down) 
+    pub fn next_field(&mut self) {
+        self.move_down();
+    }
+
+    /// Move to start of current field (vim 0)
+    pub fn move_line_start(&mut self) {
+        use crate::canvas::actions::movement::line::line_start_position;
+        let new_pos = line_start_position();
+        self.ui_state.cursor_pos = new_pos;
+        self.ui_state.ideal_cursor_column = new_pos;
+    }
+
+    /// Move to end of current field (vim $)
+    pub fn move_line_end(&mut self) {
+        use crate::canvas::actions::movement::line::line_end_position;
+        let current_text = self.current_text();
+        let is_edit_mode = self.ui_state.current_mode == AppMode::Edit;
+        
+        let new_pos = line_end_position(current_text, is_edit_mode);
+        self.ui_state.cursor_pos = new_pos;
+        self.ui_state.ideal_cursor_column = new_pos;
+    }
+
+    /// Move to start of next word (vim w)
+    pub fn move_word_next(&mut self) {
+        use crate::canvas::actions::movement::word::find_next_word_start;
+        let current_text = self.current_text();
+        
+        if current_text.is_empty() {
+            return;
+        }
+        
+        let new_pos = find_next_word_start(current_text, self.ui_state.cursor_pos);
+        let is_edit_mode = self.ui_state.current_mode == AppMode::Edit;
+        
+        // Clamp to valid bounds for current mode
+        let final_pos = if is_edit_mode {
+            new_pos.min(current_text.len())
+        } else {
+            new_pos.min(current_text.len().saturating_sub(1))
+        };
+        
+        self.ui_state.cursor_pos = final_pos;
+        self.ui_state.ideal_cursor_column = final_pos;
+    }
+
+    /// Move to start of previous word (vim b)
+    pub fn move_word_prev(&mut self) {
+        use crate::canvas::actions::movement::word::find_prev_word_start;
+        let current_text = self.current_text();
+        
+        if current_text.is_empty() {
+            return;
+        }
+        
+        let new_pos = find_prev_word_start(current_text, self.ui_state.cursor_pos);
+        self.ui_state.cursor_pos = new_pos;
+        self.ui_state.ideal_cursor_column = new_pos;
+    }
+
+    /// Move to end of current/next word (vim e)
+    pub fn move_word_end(&mut self) {
+        use crate::canvas::actions::movement::word::find_word_end;
+        let current_text = self.current_text();
+        
+        if current_text.is_empty() {
+            return;
+        }
+        
+        let current_pos = self.ui_state.cursor_pos;
+        let new_pos = find_word_end(current_text, current_pos);
+        
+        // If we didn't move, try next word
+        let final_pos = if new_pos == current_pos && current_pos + 1 < current_text.len() {
+            find_word_end(current_text, current_pos + 1)
+        } else {
+            new_pos
+        };
+        
+        // Clamp for read-only mode
+        let is_edit_mode = self.ui_state.current_mode == AppMode::Edit;
+        let clamped_pos = if is_edit_mode {
+            final_pos.min(current_text.len())
+        } else {
+            final_pos.min(current_text.len().saturating_sub(1))
+        };
+        
+        self.ui_state.cursor_pos = clamped_pos;
+        self.ui_state.ideal_cursor_column = clamped_pos;
+    }
+
+    /// Move to end of previous word (vim ge)
+    pub fn move_word_end_prev(&mut self) {
+        use crate::canvas::actions::movement::word::find_prev_word_end;
+        let current_text = self.current_text();
+        
+        if current_text.is_empty() {
+            return;
+        }
+        
+        let new_pos = find_prev_word_end(current_text, self.ui_state.cursor_pos);
+        self.ui_state.cursor_pos = new_pos;
+        self.ui_state.ideal_cursor_column = new_pos;
+    }
+
+    /// Delete character before cursor (vim x in insert mode / backspace)
+    pub fn delete_backward(&mut self) -> Result<()> {
+        if self.ui_state.current_mode != AppMode::Edit {
+            return Ok(()); // Silently ignore in non-edit modes
+        }
+        
+        if self.ui_state.cursor_pos == 0 {
+            return Ok(()); // Nothing to delete
+        }
+        
+        let field_index = self.ui_state.current_field;
+        let mut current_text = self.data_provider.field_value(field_index).to_string();
+        
+        if self.ui_state.cursor_pos <= current_text.len() {
+            current_text.remove(self.ui_state.cursor_pos - 1);
+            self.data_provider.set_field_value(field_index, current_text);
+            self.ui_state.cursor_pos -= 1;
+            self.ui_state.ideal_cursor_column = self.ui_state.cursor_pos;
+        }
+        
+        Ok(())
+    }
+
+    /// Delete character under cursor (vim x / delete key)
+    pub fn delete_forward(&mut self) -> Result<()> {
+        if self.ui_state.current_mode != AppMode::Edit {
+            return Ok(()); // Silently ignore in non-edit modes
+        }
+        
+        let field_index = self.ui_state.current_field;
+        let mut current_text = self.data_provider.field_value(field_index).to_string();
+        
+        if self.ui_state.cursor_pos < current_text.len() {
+            current_text.remove(self.ui_state.cursor_pos);
+            self.data_provider.set_field_value(field_index, current_text);
+        }
+        
+        Ok(())
+    }
+
+    /// Exit edit mode to read-only mode (vim Escape)
+    pub fn exit_edit_mode(&mut self) {
+        self.set_mode(AppMode::ReadOnly);
+        // Deactivate autocomplete when exiting edit mode
+        self.ui_state.deactivate_autocomplete();
+    }
+
+    /// Enter edit mode from read-only mode (vim i/a/o)
+    pub fn enter_edit_mode(&mut self) {
+        self.set_mode(AppMode::Edit);
+    }
+
+    // ===================================================================
+    // HELPER METHODS
+    // ===================================================================
+
+    /// Clamp cursor position to valid bounds for current field and mode
+    fn clamp_cursor_to_current_field(&mut self) {
+        let current_text = self.current_text();
+        let is_edit_mode = self.ui_state.current_mode == AppMode::Edit;
+        
+        use crate::canvas::actions::movement::line::safe_cursor_position;
+        let safe_pos = safe_cursor_position(
+            current_text, 
+            self.ui_state.ideal_cursor_column, 
+            is_edit_mode
+        );
+        
+        self.ui_state.cursor_pos = safe_pos;
+    }
 }

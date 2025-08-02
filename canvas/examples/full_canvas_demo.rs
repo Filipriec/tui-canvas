@@ -1,5 +1,5 @@
 // examples/full_canvas_demo.rs
-//! Demonstrates the FULL potential of the canvas library (excluding autocomplete)
+//! Demonstrates the FULL potential of the canvas library using the native API
 
 use std::io;
 use crossterm::{
@@ -24,16 +24,11 @@ use canvas::{
     canvas::{
         gui::render_canvas_default,
         modes::{AppMode, ModeManager, HighlightState},
-        actions::movement::{
-            find_next_word_start, find_word_end, find_prev_word_start, find_prev_word_end,
-            line_start_position, line_end_position, safe_cursor_position,
-            clamp_cursor_position,
-        },
     },
     DataProvider, FormEditor,
 };
 
-// Enhanced FormEditor that exposes the full action system
+// Enhanced FormEditor that adds visual mode and status tracking
 struct EnhancedFormEditor<D: DataProvider> {
     editor: FormEditor<D>,
     highlight_state: HighlightState,
@@ -51,162 +46,8 @@ impl<D: DataProvider> EnhancedFormEditor<D> {
         }
     }
 
-    // === EXPOSE ALL THE MISSING METHODS ===
-
-    /// Word movement using library's sophisticated logic
-    fn move_word_next(&mut self) {
-        let current_text = self.editor.current_text().to_string();
-        let current_pos = self.editor.cursor_position();
-        let new_pos = find_next_word_start(&current_text, current_pos);
-        let is_edit = self.editor.mode() == AppMode::Edit;
-
-        self.set_cursor_clamped(new_pos, &current_text, is_edit);
-        self.update_visual_selection();
-    }
-
-    fn move_word_prev(&mut self) {
-        let current_text = self.editor.current_text().to_string();
-        let current_pos = self.editor.cursor_position();
-        let new_pos = find_prev_word_start(&current_text, current_pos);
-        let is_edit = self.editor.mode() == AppMode::Edit;
-
-        self.set_cursor_clamped(new_pos, &current_text, is_edit);
-        self.update_visual_selection();
-    }
-
-    fn move_word_end(&mut self) {
-        let current_text = self.editor.current_text().to_string();
-        let current_pos = self.editor.cursor_position();
-        let new_pos = find_word_end(&current_text, current_pos);
-        let is_edit = self.editor.mode() == AppMode::Edit;
-
-        self.set_cursor_clamped(new_pos, &current_text, is_edit);
-        self.update_visual_selection();
-    }
-
-    fn move_word_end_prev(&mut self) {
-        let current_text = self.editor.current_text().to_string();
-        let current_pos = self.editor.cursor_position();
-        let new_pos = find_prev_word_end(&current_text, current_pos);
-        let is_edit = self.editor.mode() == AppMode::Edit;
-
-        self.set_cursor_clamped(new_pos, &current_text, is_edit);
-        self.update_visual_selection();
-    }
-
-    /// Line movement using library's functions
-    fn move_line_start(&mut self) {
-        let pos = line_start_position();
-        let current_text = self.editor.current_text().to_string();
-        let is_edit = self.editor.mode() == AppMode::Edit;
-
-        self.set_cursor_clamped(pos, &current_text, is_edit);
-        self.update_visual_selection();
-    }
-
-    fn move_line_end(&mut self) {
-        let current_text = self.editor.current_text().to_string();
-        let is_edit = self.editor.mode() == AppMode::Edit;
-        let pos = line_end_position(&current_text, is_edit);
-
-        self.set_cursor_clamped(pos, &current_text, is_edit);
-        self.update_visual_selection();
-    }
-
-    /// Field movement - proper implementations
-    fn move_to_prev_field(&mut self) {
-        let current = self.editor.current_field();
-        let total = self.editor.data_provider().field_count();
-        let _prev = if current == 0 { total - 1 } else { current - 1 };
-
-        // Move to previous field and position cursor properly
-        for _ in 0..(total - 1) {
-            self.editor.move_to_next_field();
-        }
-
-        // Position cursor using safe positioning
-        let current_text = self.editor.current_text().to_string();
-        let ideal_column = 0; // Start of field when switching
-        let is_edit = self.editor.mode() == AppMode::Edit;
-        let safe_pos = safe_cursor_position(&current_text, ideal_column, is_edit);
-        self.set_cursor_clamped(safe_pos, &current_text, is_edit);
-        self.update_visual_selection();
-    }
-
-    fn move_to_first_field(&mut self) {
-        let current = self.editor.current_field();
-        let total = self.editor.data_provider().field_count();
-
-        // Move to first field (index 0)
-        for _ in 0..(total - current) {
-            self.editor.move_to_next_field();
-        }
-
-        let current_text = self.editor.current_text().to_string();
-        let is_edit = self.editor.mode() == AppMode::Edit;
-        self.set_cursor_clamped(0, &current_text, is_edit);
-        self.update_visual_selection();
-    }
-
-    fn move_to_last_field(&mut self) {
-        let current = self.editor.current_field();
-        let total = self.editor.data_provider().field_count();
-        let moves_needed = (total - 1 - current) % total;
-
-        // Move to last field
-        for _ in 0..moves_needed {
-            self.editor.move_to_next_field();
-        }
-
-        let current_text = self.editor.current_text().to_string();
-        let is_edit = self.editor.mode() == AppMode::Edit;
-        self.set_cursor_clamped(0, &current_text, is_edit);
-        self.update_visual_selection();
-    }
-
-    /// Delete operations - proper implementations
-    fn delete_backward(&mut self) -> anyhow::Result<()> {
-        if self.editor.mode() != AppMode::Edit || self.editor.cursor_position() == 0 {
-            return Ok(());
-        }
-
-        let field_idx = self.editor.current_field();
-        let cursor_pos = self.editor.cursor_position();
-        let mut text = self.editor.data_provider().field_value(field_idx).to_string();
-
-        if cursor_pos > 0 && cursor_pos <= text.len() {
-            text.remove(cursor_pos - 1);
-
-            // This is a limitation - we need mutable access to update the field
-            // For now, we'll show a message that this would work with a proper API
-            self.debug_message =
-                "Delete backward: API limitation - would remove character".to_string();
-            self.has_unsaved_changes = true;
-        }
-
-        Ok(())
-    }
-
-    fn delete_forward(&mut self) -> anyhow::Result<()> {
-        if self.editor.mode() != AppMode::Edit {
-            return Ok(());
-        }
-
-        let field_idx = self.editor.current_field();
-        let cursor_pos = self.editor.cursor_position();
-        let text = self.editor.data_provider().field_value(field_idx);
-
-        if cursor_pos < text.len() {
-            // Same limitation as above
-            self.debug_message =
-                "Delete forward: API limitation - would remove character".to_string();
-            self.has_unsaved_changes = true;
-        }
-
-        Ok(())
-    }
-
-    /// Visual/Highlight mode support
+    // === VISUAL/HIGHLIGHT MODE SUPPORT ===
+    
     fn enter_visual_mode(&mut self) {
         if ModeManager::can_enter_highlight_mode(self.editor.mode()) {
             self.editor.set_mode(AppMode::Highlight);
@@ -237,49 +78,14 @@ impl<D: DataProvider> EnhancedFormEditor<D> {
         }
     }
 
-    /// Enhanced movement with visual selection updates
-    fn move_left(&mut self) {
-        self.editor.move_left();
-        self.update_visual_selection();
-    }
-
-    fn move_right(&mut self) {
-        self.editor.move_right();
-        self.update_visual_selection();
-    }
-
-    fn move_up(&mut self) {
-        self.move_to_prev_field();
-    }
-
-    fn move_down(&mut self) {
-        self.editor.move_to_next_field();
-        self.update_visual_selection();
-    }
-
-    // === UTILITY METHODS ===
-
-    fn set_cursor_clamped(&mut self, pos: usize, text: &str, is_edit: bool) {
-        let clamped_pos = clamp_cursor_position(pos, text, is_edit);
-        // Since we can't directly set cursor, we need to move to it
-        while self.editor.cursor_position() < clamped_pos {
-            self.editor.move_right();
-        }
-        while self.editor.cursor_position() > clamped_pos {
-            self.editor.move_left();
-        }
-    }
-
     fn update_visual_selection(&mut self) {
         if self.editor.mode() == AppMode::Highlight {
             match &self.highlight_state {
                 HighlightState::Characterwise { anchor: _ } => {
-                    let _current_pos =
-                        (self.editor.current_field(), self.editor.cursor_position());
                     self.debug_message = format!(
-                        "Visual selection: char {} to {}",
+                        "Visual selection: char {} in field {}",
                         self.editor.cursor_position(),
-                        self.editor.cursor_position()
+                        self.editor.current_field()
                     );
                 }
                 HighlightState::Linewise { anchor_line: _ } => {
@@ -293,23 +99,141 @@ impl<D: DataProvider> EnhancedFormEditor<D> {
         }
     }
 
+    // === ENHANCED MOVEMENT WITH VISUAL UPDATES ===
+    
+    fn move_left(&mut self) {
+        self.editor.move_left();
+        self.update_visual_selection();
+    }
+
+    fn move_right(&mut self) {
+        self.editor.move_right();
+        self.update_visual_selection();
+    }
+
+    fn move_up(&mut self) {
+        self.editor.move_up();
+        self.update_visual_selection();
+    }
+
+    fn move_down(&mut self) {
+        self.editor.move_down();
+        self.update_visual_selection();
+    }
+
+    fn move_word_next(&mut self) {
+        self.editor.move_word_next();
+        self.update_visual_selection();
+    }
+
+    fn move_word_prev(&mut self) {
+        self.editor.move_word_prev();
+        self.update_visual_selection();
+    }
+
+    fn move_word_end(&mut self) {
+        self.editor.move_word_end();
+        self.update_visual_selection();
+    }
+
+    fn move_word_end_prev(&mut self) {
+        self.editor.move_word_end_prev();
+        self.update_visual_selection();
+    }
+
+    fn move_line_start(&mut self) {
+        self.editor.move_line_start();
+        self.update_visual_selection();
+    }
+
+    fn move_line_end(&mut self) {
+        self.editor.move_line_end();
+        self.update_visual_selection();
+    }
+
+    fn move_first_line(&mut self) {
+        self.editor.move_first_line();
+        self.update_visual_selection();
+    }
+
+    fn move_last_line(&mut self) {
+        self.editor.move_last_line();
+        self.update_visual_selection();
+    }
+
+    fn prev_field(&mut self) {
+        self.editor.prev_field();
+        self.update_visual_selection();
+    }
+
+    fn next_field(&mut self) {
+        self.editor.next_field();
+        self.update_visual_selection();
+    }
+
+    // === DELETE OPERATIONS ===
+    
+    fn delete_backward(&mut self) -> anyhow::Result<()> {
+        let result = self.editor.delete_backward();
+        if result.is_ok() {
+            self.has_unsaved_changes = true;
+            self.debug_message = "Deleted character backward".to_string();
+        }
+        Ok(result?)
+    }
+
+    fn delete_forward(&mut self) -> anyhow::Result<()> {
+        let result = self.editor.delete_forward();
+        if result.is_ok() {
+            self.has_unsaved_changes = true;
+            self.debug_message = "Deleted character forward".to_string();
+        }
+        Ok(result?)
+    }
+
+    // === MODE TRANSITIONS ===
+    
+    fn enter_edit_mode(&mut self) {
+        self.editor.enter_edit_mode();
+        self.debug_message = "-- INSERT --".to_string();
+    }
+
+    fn exit_edit_mode(&mut self) {
+        self.editor.exit_edit_mode();
+        self.exit_visual_mode();
+        self.debug_message = "".to_string();
+    }
+
+    fn insert_char(&mut self, ch: char) -> anyhow::Result<()> {
+        let result = self.editor.insert_char(ch);
+        if result.is_ok() {
+            self.has_unsaved_changes = true;
+        }
+        Ok(result?)
+    }
+
     // === DELEGATE TO ORIGINAL EDITOR ===
 
     fn current_field(&self) -> usize {
         self.editor.current_field()
     }
+    
     fn cursor_position(&self) -> usize {
         self.editor.cursor_position()
     }
+    
     fn mode(&self) -> AppMode {
         self.editor.mode()
     }
+    
     fn current_text(&self) -> &str {
         self.editor.current_text()
     }
+    
     fn data_provider(&self) -> &D {
         self.editor.data_provider()
     }
+    
     fn ui_state(&self) -> &canvas::EditorState {
         self.editor.ui_state()
     }
@@ -321,14 +245,8 @@ impl<D: DataProvider> EnhancedFormEditor<D> {
         }
     }
 
-    fn insert_char(&mut self, ch: char) -> anyhow::Result<()> {
-        let result = self.editor.insert_char(ch);
-        if result.is_ok() {
-            self.has_unsaved_changes = true;
-        }
-        result
-    }
-
+    // === STATUS AND DEBUG ===
+    
     fn set_debug_message(&mut self, msg: String) {
         self.debug_message = msg;
     }
@@ -380,24 +298,29 @@ impl DataProvider for FullDemoData {
     fn field_count(&self) -> usize {
         self.fields.len()
     }
+    
     fn field_name(&self, index: usize) -> &str {
         &self.fields[index].0
     }
+    
     fn field_value(&self, index: usize) -> &str {
         &self.fields[index].1
     }
+    
     fn set_field_value(&mut self, index: usize, value: String) {
         self.fields[index].1 = value;
     }
+    
     fn supports_autocomplete(&self, _field_index: usize) -> bool {
         false
     }
+    
     fn display_value(&self, _index: usize) -> Option<&str> {
         None
     }
 }
 
-/// Full vim-like key handling using ALL library features
+/// Full vim-like key handling using the native FormEditor API
 fn handle_key_press(
     key: KeyCode,
     modifiers: KeyModifiers,
@@ -416,24 +339,22 @@ fn handle_key_press(
     match (mode, key, modifiers) {
         // === MODE TRANSITIONS ===
         (AppMode::ReadOnly, KeyCode::Char('i'), _) => {
-            if ModeManager::can_enter_edit_mode(mode) {
-                editor.set_mode(AppMode::Edit);
-                editor.set_debug_message("-- INSERT --".to_string());
-            }
+            editor.enter_edit_mode();
         }
         (AppMode::ReadOnly, KeyCode::Char('a'), _) => {
-            editor.move_line_end();
-            if ModeManager::can_enter_edit_mode(mode) {
-                editor.set_mode(AppMode::Edit);
-                editor.set_debug_message("-- INSERT -- (append)".to_string());
-            }
+            editor.move_right(); // Move after current character
+            editor.enter_edit_mode();
+            editor.set_debug_message("-- INSERT -- (append)".to_string());
         }
         (AppMode::ReadOnly, KeyCode::Char('A'), _) => {
             editor.move_line_end();
-            if ModeManager::can_enter_edit_mode(mode) {
-                editor.set_mode(AppMode::Edit);
-                editor.set_debug_message("-- INSERT -- (end of line)".to_string());
-            }
+            editor.enter_edit_mode();
+            editor.set_debug_message("-- INSERT -- (end of line)".to_string());
+        }
+        (AppMode::ReadOnly, KeyCode::Char('o'), _) => {
+            editor.move_line_end();
+            editor.enter_edit_mode();
+            editor.set_debug_message("-- INSERT -- (open line)".to_string());
         }
         (AppMode::ReadOnly, KeyCode::Char('v'), _) => {
             editor.enter_visual_mode();
@@ -442,94 +363,104 @@ fn handle_key_press(
             editor.enter_visual_line_mode();
         }
         (_, KeyCode::Esc, _) => {
-            if ModeManager::can_enter_read_only_mode(mode) {
-                editor.set_mode(AppMode::ReadOnly);
-                editor.exit_visual_mode();
-                editor.set_debug_message("".to_string());
-            }
+            editor.exit_edit_mode();
         }
 
-        // === MOVEMENT: All the vim goodness ===
+        // === MOVEMENT: VIM-STYLE NAVIGATION ===
 
-        // Basic movement
+        // Basic movement (hjkl and arrows)
         (AppMode::ReadOnly | AppMode::Highlight, KeyCode::Char('h'), _)
         | (AppMode::ReadOnly | AppMode::Highlight, KeyCode::Left, _) => {
             editor.move_left();
-            editor.set_debug_message("move left".to_string());
+            editor.set_debug_message("← left".to_string());
         }
         (AppMode::ReadOnly | AppMode::Highlight, KeyCode::Char('l'), _)
         | (AppMode::ReadOnly | AppMode::Highlight, KeyCode::Right, _) => {
             editor.move_right();
-            editor.set_debug_message("move right".to_string());
+            editor.set_debug_message("→ right".to_string());
         }
         (AppMode::ReadOnly | AppMode::Highlight, KeyCode::Char('j'), _)
         | (AppMode::ReadOnly | AppMode::Highlight, KeyCode::Down, _) => {
             editor.move_down();
-            editor.set_debug_message("move down".to_string());
+            editor.set_debug_message("↓ next field".to_string());
         }
         (AppMode::ReadOnly | AppMode::Highlight, KeyCode::Char('k'), _)
         | (AppMode::ReadOnly | AppMode::Highlight, KeyCode::Up, _) => {
             editor.move_up();
-            editor.set_debug_message("move up".to_string());
+            editor.set_debug_message("↑ previous field".to_string());
         }
 
-        // Word movement - THE FULL VIM EXPERIENCE
+        // Word movement - Full vim word navigation
         (AppMode::ReadOnly | AppMode::Highlight, KeyCode::Char('w'), _) => {
             editor.move_word_next();
-            editor.set_debug_message("next word start".to_string());
+            editor.set_debug_message("w: next word start".to_string());
         }
         (AppMode::ReadOnly | AppMode::Highlight, KeyCode::Char('b'), _) => {
             editor.move_word_prev();
-            editor.set_debug_message("previous word start".to_string());
+            editor.set_debug_message("b: previous word start".to_string());
         }
         (AppMode::ReadOnly | AppMode::Highlight, KeyCode::Char('e'), _) => {
             editor.move_word_end();
-            editor.set_debug_message("word end".to_string());
+            editor.set_debug_message("e: word end".to_string());
         }
-        (AppMode::ReadOnly | AppMode::Highlight, KeyCode::Char('B'), _) => {
+        (AppMode::ReadOnly | AppMode::Highlight, KeyCode::Char('W'), _) => {
             editor.move_word_end_prev();
-            editor.set_debug_message("previous word end".to_string());
+            editor.set_debug_message("W: previous word end".to_string());
         }
 
         // Line movement
         (AppMode::ReadOnly | AppMode::Highlight, KeyCode::Char('0'), _)
         | (AppMode::ReadOnly | AppMode::Highlight, KeyCode::Home, _) => {
             editor.move_line_start();
-            editor.set_debug_message("line start".to_string());
+            editor.set_debug_message("0: line start".to_string());
         }
         (AppMode::ReadOnly | AppMode::Highlight, KeyCode::Char('$'), _)
         | (AppMode::ReadOnly | AppMode::Highlight, KeyCode::End, _) => {
             editor.move_line_end();
-            editor.set_debug_message("line end".to_string());
+            editor.set_debug_message("$: line end".to_string());
         }
 
-        // Field movement - advanced navigation
+        // Field/document movement
         (AppMode::ReadOnly | AppMode::Highlight, KeyCode::Char('g'), _) => {
-            editor.move_to_first_field();
-            editor.set_debug_message("first field".to_string());
+            editor.move_first_line();
+            editor.set_debug_message("gg: first field".to_string());
         }
         (AppMode::ReadOnly | AppMode::Highlight, KeyCode::Char('G'), _) => {
-            editor.move_to_last_field();
-            editor.set_debug_message("last field".to_string());
+            editor.move_last_line();
+            editor.set_debug_message("G: last field".to_string());
         }
 
-        // === EDIT MODE ===
-        (AppMode::Edit, KeyCode::Left, _) => editor.move_left(),
-        (AppMode::Edit, KeyCode::Right, _) => editor.move_right(),
-        (AppMode::Edit, KeyCode::Up, _) => editor.move_up(),
-        (AppMode::Edit, KeyCode::Down, _) => editor.move_down(),
-        (AppMode::Edit, KeyCode::Home, _) => editor.move_line_start(),
-        (AppMode::Edit, KeyCode::End, _) => editor.move_line_end(),
+        // === EDIT MODE MOVEMENT ===
+        (AppMode::Edit, KeyCode::Left, _) => {
+            editor.move_left();
+        }
+        (AppMode::Edit, KeyCode::Right, _) => {
+            editor.move_right();
+        }
+        (AppMode::Edit, KeyCode::Up, _) => {
+            editor.move_up();
+        }
+        (AppMode::Edit, KeyCode::Down, _) => {
+            editor.move_down();
+        }
+        (AppMode::Edit, KeyCode::Home, _) => {
+            editor.move_line_start();
+        }
+        (AppMode::Edit, KeyCode::End, _) => {
+            editor.move_line_end();
+        }
 
         // Word movement in edit mode with Ctrl
         (AppMode::Edit, KeyCode::Left, m) if m.contains(KeyModifiers::CONTROL) => {
             editor.move_word_prev();
+            editor.set_debug_message("Ctrl+← word back".to_string());
         }
         (AppMode::Edit, KeyCode::Right, m) if m.contains(KeyModifiers::CONTROL) => {
             editor.move_word_next();
+            editor.set_debug_message("Ctrl+→ word forward".to_string());
         }
 
-        // DELETE OPERATIONS
+        // === DELETE OPERATIONS ===
         (AppMode::Edit, KeyCode::Backspace, _) => {
             editor.delete_backward()?;
         }
@@ -537,23 +468,47 @@ fn handle_key_press(
             editor.delete_forward()?;
         }
 
-        // Tab navigation
-        (_, KeyCode::Tab, _) => {
-            editor.editor.move_to_next_field();
-            editor.set_debug_message("next field".to_string());
+        // Delete operations in normal mode (vim x)
+        (AppMode::ReadOnly, KeyCode::Char('x'), _) => {
+            editor.delete_forward()?;
+            editor.set_debug_message("x: deleted character".to_string());
         }
-        (_, KeyCode::BackTab, _) => {
-            editor.move_to_prev_field();
-            editor.set_debug_message("previous field".to_string());
+        (AppMode::ReadOnly, KeyCode::Char('X'), _) => {
+            editor.delete_backward()?;
+            editor.set_debug_message("X: deleted character backward".to_string());
         }
 
-        // Character input
+        // === TAB NAVIGATION ===
+        (_, KeyCode::Tab, _) => {
+            editor.next_field();
+            editor.set_debug_message("Tab: next field".to_string());
+        }
+        (_, KeyCode::BackTab, _) => {
+            editor.prev_field();
+            editor.set_debug_message("Shift+Tab: previous field".to_string());
+        }
+
+        // === CHARACTER INPUT ===
         (AppMode::Edit, KeyCode::Char(c), m) if !m.contains(KeyModifiers::CONTROL) => {
             editor.insert_char(c)?;
         }
 
+        // === DEBUG/INFO COMMANDS ===
+        (AppMode::ReadOnly, KeyCode::Char('?'), _) => {
+            editor.set_debug_message(format!(
+                "Field {}/{}, Pos {}, Mode: {:?}", 
+                editor.current_field() + 1,
+                editor.data_provider().field_count(),
+                editor.cursor_position(),
+                editor.mode()
+            ));
+        }
+
         _ => {
-            editor.set_debug_message(format!("Unhandled: {:?} in {:?} mode", key, mode));
+            editor.set_debug_message(format!(
+                "Unhandled: {:?} + {:?} in {:?} mode", 
+                key, modifiers, mode
+            ));
         }
     }
 
@@ -587,11 +542,11 @@ fn run_app<B: Backend>(
 fn ui(f: &mut Frame, editor: &EnhancedFormEditor<FullDemoData>) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([Constraint::Min(8), Constraint::Length(6)])
+        .constraints([Constraint::Min(8), Constraint::Length(8)])
         .split(f.area());
 
     render_enhanced_canvas(f, chunks[0], editor);
-    render_status_bar(f, chunks[1], editor);
+    render_status_and_help(f, chunks[1], editor);
 }
 
 fn render_enhanced_canvas(
@@ -599,33 +554,61 @@ fn render_enhanced_canvas(
     area: ratatui::layout::Rect,
     editor: &EnhancedFormEditor<FullDemoData>,
 ) {
-    // Uses the library default theme; no theme needed.
     render_canvas_default(f, area, &editor.editor);
 }
 
-fn render_status_bar(
+fn render_status_and_help(
     f: &mut Frame,
     area: ratatui::layout::Rect,
     editor: &EnhancedFormEditor<FullDemoData>,
 ) {
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Length(3), Constraint::Length(5)])
+        .split(area);
+
+    // Status bar
     let mode_text = match editor.mode() {
         AppMode::Edit => "INSERT",
         AppMode::ReadOnly => "NORMAL",
         AppMode::Highlight => match editor.highlight_state() {
             HighlightState::Characterwise { .. } => "VISUAL",
-            HighlightState::Linewise { .. } => "VISUAL",
+            HighlightState::Linewise { .. } => "VISUAL LINE",
             _ => "VISUAL",
         },
         _ => "NORMAL",
     };
 
-    let status = Paragraph::new(Line::from(Span::raw(format!(
-        "-- {} --",
-        mode_text
-    ))))
-    .block(Block::default().borders(Borders::ALL).title("Mode"));
+    let status_text = if editor.has_unsaved_changes() {
+        format!("-- {} -- [Modified] {}", mode_text, editor.debug_message())
+    } else {
+        format!("-- {} -- {}", mode_text, editor.debug_message())
+    };
 
-    f.render_widget(status, area);
+    let status = Paragraph::new(Line::from(Span::raw(status_text)))
+        .block(Block::default().borders(Borders::ALL).title("Status"));
+
+    f.render_widget(status, chunks[0]);
+
+    // Help text
+    let help_text = match editor.mode() {
+        AppMode::ReadOnly => {
+            "Normal: hjkl/arrows=move, w/b/e=words, 0/$=line, gg/G=first/last, i/a/A=insert, v/V=visual, x/X=delete, ?=info"
+        }
+        AppMode::Edit => {
+            "Insert: arrows=move, Ctrl+arrows=words, Backspace/Del=delete, Esc=normal, Tab/Shift+Tab=fields"
+        }
+        AppMode::Highlight => {
+            "Visual: hjkl/arrows=extend selection, w/b/e=word selection, Esc=normal"
+        }
+        _ => "Press ? for help"
+    };
+
+    let help = Paragraph::new(Line::from(Span::raw(help_text)))
+        .block(Block::default().borders(Borders::ALL).title("Commands"))
+        .style(Style::default().fg(Color::Gray));
+
+    f.render_widget(help, chunks[1]);
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {

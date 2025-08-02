@@ -66,6 +66,11 @@ impl EditorState {
     pub fn cursor_position(&self) -> usize {
         self.cursor_pos
     }
+
+    /// Get ideal cursor column (for vim-like behavior)
+    pub fn ideal_cursor_column(&self) -> usize {  // ADD THIS
+        self.ideal_cursor_column
+    }
     
     /// Get current mode (for user's business logic)
     pub fn mode(&self) -> AppMode {
