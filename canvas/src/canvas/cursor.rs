@@ -1,0 +1,45 @@
+// src/canvas/cursor.rs
+//! Cursor style management for different canvas modes
+
+#[cfg(feature = "cursor-style")]
+use crossterm::{cursor::SetCursorStyle, execute};
+#[cfg(feature = "cursor-style")]
+use std::io;
+
+use crate::canvas::modes::AppMode;
+
+/// Manages cursor styles based on canvas modes
+pub struct CursorManager;
+
+impl CursorManager {
+    /// Update cursor style based on current mode
+    #[cfg(feature = "cursor-style")]
+    pub fn update_for_mode(mode: AppMode) -> io::Result<()> {
+        let style = match mode {
+            AppMode::Edit => SetCursorStyle::SteadyBar,           // Thin line for insert
+            AppMode::ReadOnly => SetCursorStyle::SteadyBlock,     // Block for normal
+            AppMode::Highlight => SetCursorStyle::BlinkingBlock,  // Blinking for visual
+            AppMode::General => SetCursorStyle::SteadyBlock,      // Block for general
+            AppMode::Command => SetCursorStyle::SteadyUnderScore, // Underscore for command
+        };
+        
+        execute!(io::stdout(), style)
+    }
+
+    /// No-op when cursor-style feature is disabled
+    #[cfg(not(feature = "cursor-style"))]
+    pub fn update_for_mode(_mode: AppMode) -> io::Result<()> {
+        Ok(())
+    }
+
+    /// Reset cursor to default on cleanup
+    #[cfg(feature = "cursor-style")]
+    pub fn reset() -> io::Result<()> {
+        execute!(io::stdout(), SetCursorStyle::DefaultUserShape)
+    }
+
+    #[cfg(not(feature = "cursor-style"))]
+    pub fn reset() -> io::Result<()> {
+        Ok(())
+    }
+}

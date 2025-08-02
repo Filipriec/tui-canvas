@@ -12,7 +12,7 @@ categories.workspace = true
 [dependencies]
 common = { path = "../common" }
 ratatui = { workspace = true, optional = true }
-crossterm = { workspace = true }
+crossterm = { workspace = true, optional = true }
 anyhow.workspace = true
 tokio = { workspace = true, optional = true }
 toml = { workspace = true }
@@ -31,6 +31,7 @@ tokio-test = "0.4.4"
 default = []
 gui = ["ratatui"]
 autocomplete = ["tokio"]
+cursor-style = ["crossterm"]
 
 [[example]]
 name = "autocomplete"

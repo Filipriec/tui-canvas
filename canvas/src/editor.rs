@@ -1,6 +1,9 @@
 // src/editor.rs
 //! Main API for the canvas library - FormEditor with library-owned state
 
+#[cfg(feature = "cursor-style")]
+use crate::canvas::CursorManager;
+
 use anyhow::Result;
 use crate::canvas::state::EditorState;
 use crate::data_provider::{DataProvider, AutocompleteProvider, SuggestionItem};
@@ -145,11 +148,20 @@ impl<D: DataProvider> FormEditor<D> {
 
     /// Change mode (for vim compatibility)
     pub fn set_mode(&mut self, mode: AppMode) {
+        #[cfg(feature = "cursor-style")]
+        let old_mode = self.ui_state.current_mode;
+
         self.ui_state.current_mode = mode;
 
         // Clear autocomplete when changing modes
         if mode != AppMode::Edit {
             self.ui_state.deactivate_autocomplete();
+        }
+
+        // Update cursor style if mode changed and cursor-style feature is enabled
+        #[cfg(feature = "cursor-style")]
+        if old_mode != mode {
+            let _ = crate::canvas::CursorManager::update_for_mode(mode);
         }
     }
 
@@ -456,5 +468,76 @@ impl<D: DataProvider> FormEditor<D> {
         );
         
         self.ui_state.cursor_pos = safe_pos;
+    }
+
+  
+    /// Set the value of the current field
+    pub fn set_current_field_value(&mut self, value: String) {
+        let field_index = self.ui_state.current_field;
+        self.data_provider.set_field_value(field_index, value);
+        // Reset cursor to start of field
+        self.ui_state.cursor_pos = 0;
+        self.ui_state.ideal_cursor_column = 0;
+    }
+    
+    /// Set the value of a specific field by index
+    pub fn set_field_value(&mut self, field_index: usize, value: String) {
+        if field_index < self.data_provider.field_count() {
+            self.data_provider.set_field_value(field_index, value);
+            // If we're modifying the current field, reset cursor
+            if field_index == self.ui_state.current_field {
+                self.ui_state.cursor_pos = 0;
+                self.ui_state.ideal_cursor_column = 0;
+            }
+        }
+    }
+    
+    /// Clear the current field (set to empty string)
+    pub fn clear_current_field(&mut self) {
+        self.set_current_field_value(String::new());
+    }
+    
+    /// Get mutable access to data provider (for advanced operations)
+    pub fn data_provider_mut(&mut self) -> &mut D {
+        &mut self.data_provider
+    }
+
+    /// Set cursor to exact position (for vim-style movements like f, F, t, T)
+    pub fn set_cursor_position(&mut self, position: usize) {
+        let current_text = self.current_text();
+        let is_edit_mode = self.ui_state.current_mode == AppMode::Edit;
+        
+        // Clamp to valid bounds for current mode
+        let max_pos = if is_edit_mode {
+            current_text.len() // Edit mode: can go past end
+        } else {
+            current_text.len().saturating_sub(1).max(0) // Read-only: stay within text
+        };
+        
+        let clamped_pos = position.min(max_pos);
+        
+        // Update cursor position directly
+        self.ui_state.cursor_pos = clamped_pos;
+        self.ui_state.ideal_cursor_column = clamped_pos;
+    }
+
+    /// Cleanup cursor style (call this when shutting down)
+    pub fn cleanup_cursor(&self) -> std::io::Result<()> {
+        #[cfg(feature = "cursor-style")]
+        {
+            crate::canvas::CursorManager::reset()
+        }
+        #[cfg(not(feature = "cursor-style"))]
+        {
+            Ok(())
+        }
+    }
+}
+
+// Add Drop implementation for automatic cleanup
+impl<D: DataProvider> Drop for FormEditor<D> {
+    fn drop(&mut self) {
+        // Reset cursor to default when FormEditor is dropped
+        let _ = self.cleanup_cursor();
     }
 }

@@ -8,6 +8,9 @@ pub mod data_provider;
 #[cfg(feature = "autocomplete")]
 pub mod autocomplete;
 
+#[cfg(feature = "cursor-style")]
+pub use canvas::CursorManager;
+
 // ===================================================================
 // NEW API: Library-owned state pattern
 // ===================================================================
