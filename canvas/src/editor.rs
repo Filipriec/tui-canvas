@@ -10,6 +10,7 @@ use anyhow::Result;
 use crate::canvas::state::EditorState;
 use crate::data_provider::{DataProvider, AutocompleteProvider, SuggestionItem};
 use crate::canvas::modes::AppMode;
+use crate::canvas::state::SelectionState;
 
 /// Main editor that manages UI state internally and delegates data to user
 pub struct FormEditor<D: DataProvider> {
@@ -150,31 +151,26 @@ impl<D: DataProvider> FormEditor<D> {
 
     /// Change mode (for vim compatibility)
     pub fn set_mode(&mut self, mode: AppMode) {
-        #[cfg(feature = "cursor-style")]
-        let old_mode = self.ui_state.current_mode;
-
-        self.ui_state.current_mode = mode;
-
-        // Clear autocomplete when changing modes
-        if mode != AppMode::Edit {
-            self.ui_state.deactivate_autocomplete();
-        }
-
-        // Update cursor style if mode changed and cursor-style feature is enabled
-        #[cfg(feature = "cursor-style")]
-        if old_mode != mode {
-            let _ = crate::canvas::CursorManager::update_for_mode(mode);
-            
-            // IMMEDIATELY update terminal cursor position for the new mode
-            // This prevents flicker by ensuring position and style change atomically
-            if let Ok((x, y)) = crossterm::cursor::position() {
-                let display_pos = self.display_cursor_position();
-                let current_text = self.current_text();
-                let adjusted_x = x.saturating_sub(current_text.len() as u16) + display_pos as u16;
-                let _ = crossterm::execute!(
-                    std::io::stdout(),
-                    crossterm::cursor::MoveTo(adjusted_x, y)
-                );
+        match (self.ui_state.current_mode, mode) {
+            // Entering highlight mode from read-only
+            (AppMode::ReadOnly, AppMode::Highlight) => {
+                self.enter_highlight_mode();
+            }
+            // Exiting highlight mode
+            (AppMode::Highlight, AppMode::ReadOnly) => {
+                self.exit_highlight_mode();
+            }
+            // Other transitions
+            (_, new_mode) => {
+                self.ui_state.current_mode = new_mode;
+                if new_mode != AppMode::Highlight {
+                    self.ui_state.selection = SelectionState::None;
+                }
+                
+                #[cfg(feature = "cursor-style")]
+                {
+                    let _ = CursorManager::update_for_mode(new_mode);
+                }
             }
         }
     }
@@ -596,6 +592,102 @@ impl<D: DataProvider> FormEditor<D> {
         {
             Ok(())
         }
+    }
+
+
+    // ===================================================================
+    // HIGHLIGHT MODE
+    // ===================================================================
+
+    /// Enter highlight mode (visual mode)
+    pub fn enter_highlight_mode(&mut self) {
+        if self.ui_state.current_mode == AppMode::ReadOnly {
+            self.ui_state.current_mode = AppMode::Highlight;
+            self.ui_state.selection = SelectionState::Characterwise {
+                anchor: (self.ui_state.current_field, self.ui_state.cursor_pos),
+            };
+            
+            #[cfg(feature = "cursor-style")]
+            {
+                let _ = CursorManager::update_for_mode(AppMode::Highlight);
+            }
+        }
+    }
+
+    /// Enter highlight line mode (visual line mode)
+    pub fn enter_highlight_line_mode(&mut self) {
+        if self.ui_state.current_mode == AppMode::ReadOnly {
+            self.ui_state.current_mode = AppMode::Highlight;
+            self.ui_state.selection = SelectionState::Linewise {
+                anchor_field: self.ui_state.current_field,
+            };
+            
+            #[cfg(feature = "cursor-style")]
+            {
+                let _ = CursorManager::update_for_mode(AppMode::Highlight);
+            }
+        }
+    }
+
+    /// Exit highlight mode back to read-only
+    pub fn exit_highlight_mode(&mut self) {
+        if self.ui_state.current_mode == AppMode::Highlight {
+            self.ui_state.current_mode = AppMode::ReadOnly;
+            self.ui_state.selection = SelectionState::None;
+            
+            #[cfg(feature = "cursor-style")]
+            {
+                let _ = CursorManager::update_for_mode(AppMode::ReadOnly);
+            }
+        }
+    }
+
+    /// Check if currently in highlight mode
+    pub fn is_highlight_mode(&self) -> bool {
+        self.ui_state.current_mode == AppMode::Highlight
+    }
+
+    /// Get current selection state
+    pub fn selection_state(&self) -> &SelectionState {
+        &self.ui_state.selection
+    }
+
+    /// Enhanced movement methods that update selection in highlight mode
+    pub fn move_left_with_selection(&mut self) {
+        self.move_left();
+        // Selection anchor stays in place, cursor position updates automatically
+    }
+
+    pub fn move_right_with_selection(&mut self) {
+        self.move_right();
+        // Selection anchor stays in place, cursor position updates automatically
+    }
+
+    pub fn move_up_with_selection(&mut self) {
+        self.move_up();
+        // Selection anchor stays in place, cursor position updates automatically
+    }
+
+    pub fn move_down_with_selection(&mut self) {
+        self.move_down();
+        // Selection anchor stays in place, cursor position updates automatically
+    }
+
+    // Add similar methods for word movement, line movement, etc.
+    pub fn move_word_next_with_selection(&mut self) {
+        self.move_word_next();
+    }
+
+    pub fn move_word_prev_with_selection(&mut self) {
+        self.move_word_prev();
+    }
+
+    pub fn move_line_start_with_selection(&mut self) {
+        self.move_line_start();
+    }
+
+    pub fn move_line_end_with_selection(&mut self) {
+        self.move_line_end();
     }
 }
 

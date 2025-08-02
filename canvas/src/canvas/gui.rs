@@ -28,25 +28,36 @@ pub fn render_canvas<T: CanvasTheme, D: DataProvider>(
     editor: &FormEditor<D>,
     theme: &T,
 ) -> Option<Rect> {
+    // Convert SelectionState to HighlightState
+    let highlight_state = convert_selection_to_highlight(editor.ui_state().selection_state());
+    render_canvas_with_highlight(f, area, editor, theme, &highlight_state)
+}
+
+/// Render canvas with explicit highlight state (for advanced use)
+#[cfg(feature = "gui")]
+pub fn render_canvas_with_highlight<T: CanvasTheme, D: DataProvider>(
+    f: &mut Frame,
+    area: Rect,
+    editor: &FormEditor<D>,
+    theme: &T,
+    highlight_state: &HighlightState,
+) -> Option<Rect> {
     let ui_state = editor.ui_state();
     let data_provider = editor.data_provider();
-    
+
     // Build field information
     let field_count = data_provider.field_count();
     let mut fields: Vec<&str> = Vec::with_capacity(field_count);
     let mut inputs: Vec<String> = Vec::with_capacity(field_count);
-    
+
     for i in 0..field_count {
         fields.push(data_provider.field_name(i));
         inputs.push(data_provider.field_value(i).to_string());
     }
-    
+
     let current_field_idx = ui_state.current_field();
     let is_edit_mode = matches!(ui_state.mode(), crate::canvas::modes::AppMode::Edit);
-    
-    // For now, create a default highlight state (TODO: get from editor state)
-    let highlight_state = HighlightState::Off;
-    
+
     render_canvas_fields(
         f,
         area,
@@ -55,7 +66,7 @@ pub fn render_canvas<T: CanvasTheme, D: DataProvider>(
         &inputs,
         theme,
         is_edit_mode,
-        &highlight_state,
+        highlight_state, // Now using the actual highlight state!
         ui_state.cursor_position(),
         false, // TODO: track unsaved changes in editor
         |i| {
@@ -63,6 +74,18 @@ pub fn render_canvas<T: CanvasTheme, D: DataProvider>(
         },
         |i| data_provider.display_value(i).is_some(),
     )
+}
+
+/// Convert SelectionState to HighlightState for rendering
+#[cfg(feature = "gui")]
+fn convert_selection_to_highlight(selection: &crate::canvas::state::SelectionState) -> HighlightState {
+    use crate::canvas::state::SelectionState;
+
+    match selection {
+        SelectionState::None => HighlightState::Off,
+        SelectionState::Characterwise { anchor } => HighlightState::Characterwise { anchor: *anchor },
+        SelectionState::Linewise { anchor_field } => HighlightState::Linewise { anchor_line: *anchor_field },
+    }
 }
 
 /// Core canvas field rendering
@@ -246,7 +269,7 @@ fn apply_highlighting<'a, T: CanvasTheme>(
     }
 }
 
-/// Apply characterwise highlighting
+/// Apply characterwise highlighting - DIRECTION-AWARE VERSION
 #[cfg(feature = "gui")]
 fn apply_characterwise_highlighting<'a, T: CanvasTheme>(
     text: &'a str,
@@ -271,6 +294,7 @@ fn apply_characterwise_highlighting<'a, T: CanvasTheme>(
 
     if field_index >= start_field && field_index <= end_field {
         if start_field == end_field {
+            // Single field selection - same as before
             let (start_char, end_char) = if anchor_field == *current_field_idx {
                 (min(anchor_char, current_cursor_pos), max(anchor_char, current_cursor_pos))
             } else if anchor_field < *current_field_idx {
@@ -295,8 +319,57 @@ fn apply_characterwise_highlighting<'a, T: CanvasTheme>(
                 Span::styled(after, normal_style_in_highlight),
             ])
         } else {
-            // Multi-field selection
-            Line::from(Span::styled(text, highlight_style))
+            // Multi-field selection - think in terms of anchor→current direction
+            if field_index == anchor_field {
+                // Anchor field: highlight from anchor position toward the selection
+                if anchor_field < *current_field_idx {
+                    // Downward selection: highlight from anchor to end of field
+                    let clamped_start = anchor_char.min(text_len);
+                    let before: String = text.chars().take(clamped_start).collect();
+                    let highlighted: String = text.chars().skip(clamped_start).collect();
+
+                    Line::from(vec![
+                        Span::styled(before, normal_style_in_highlight),
+                        Span::styled(highlighted, highlight_style),
+                    ])
+                } else {
+                    // Upward selection: highlight from start of field to anchor
+                    let clamped_end = anchor_char.min(text_len);
+                    let highlighted: String = text.chars().take(clamped_end + 1).collect();
+                    let after: String = text.chars().skip(clamped_end + 1).collect();
+
+                    Line::from(vec![
+                        Span::styled(highlighted, highlight_style),
+                        Span::styled(after, normal_style_in_highlight),
+                    ])
+                }
+            } else if field_index == *current_field_idx {
+                // Current field: highlight toward the cursor position
+                if anchor_field < *current_field_idx {
+                    // Downward selection: highlight from start of field to cursor
+                    let clamped_end = current_cursor_pos.min(text_len);
+                    let highlighted: String = text.chars().take(clamped_end + 1).collect();
+                    let after: String = text.chars().skip(clamped_end + 1).collect();
+
+                    Line::from(vec![
+                        Span::styled(highlighted, highlight_style),
+                        Span::styled(after, normal_style_in_highlight),
+                    ])
+                } else {
+                    // Upward selection: highlight from cursor to end of field
+                    let clamped_start = current_cursor_pos.min(text_len);
+                    let before: String = text.chars().take(clamped_start).collect();
+                    let highlighted: String = text.chars().skip(clamped_start).collect();
+
+                    Line::from(vec![
+                        Span::styled(before, normal_style_in_highlight),
+                        Span::styled(highlighted, highlight_style),
+                    ])
+                }
+            } else {
+                // Middle field between anchor and current: highlight entire field
+                Line::from(Span::styled(text, highlight_style))
+            }
         }
     } else {
         Line::from(Span::styled(
@@ -306,7 +379,7 @@ fn apply_characterwise_highlighting<'a, T: CanvasTheme>(
     }
 }
 
-/// Apply linewise highlighting
+/// Apply linewise highlighting - VISUALLY DISTINCT VERSION
 #[cfg(feature = "gui")]
 fn apply_linewise_highlighting<'a, T: CanvasTheme>(
     text: &'a str,
@@ -319,14 +392,17 @@ fn apply_linewise_highlighting<'a, T: CanvasTheme>(
     let start_field = min(*anchor_line, *current_field_idx);
     let end_field = max(*anchor_line, *current_field_idx);
 
+    // Use the SAME style as characterwise highlighting
     let highlight_style = Style::default()
         .fg(theme.highlight())
         .bg(theme.highlight_bg())
         .add_modifier(Modifier::BOLD);
+
     let normal_style_in_highlight = Style::default().fg(theme.highlight());
     let normal_style_outside = Style::default().fg(theme.fg());
 
     if field_index >= start_field && field_index <= end_field {
+        // ALWAYS highlight entire line - no markers, just full line highlighting
         Line::from(Span::styled(text, highlight_style))
     } else {
         Line::from(Span::styled(

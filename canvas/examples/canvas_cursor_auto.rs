@@ -47,7 +47,6 @@ use canvas::{
 // Enhanced FormEditor that demonstrates automatic cursor management
 struct AutoCursorFormEditor<D: DataProvider> {
     editor: FormEditor<D>,
-    highlight_state: HighlightState,
     has_unsaved_changes: bool,
     debug_message: String,
     command_buffer: String, // For multi-key vim commands like "gg"
@@ -57,7 +56,6 @@ impl<D: DataProvider> AutoCursorFormEditor<D> {
     fn new(data_provider: D) -> Self {
         Self {
             editor: FormEditor::new(data_provider),
-            highlight_state: HighlightState::Off,
             has_unsaved_changes: false,
             debug_message: "🎯 Automatic Cursor Demo - cursor-style feature enabled!".to_string(),
             command_buffer: String::new(),
@@ -84,49 +82,41 @@ impl<D: DataProvider> AutoCursorFormEditor<D> {
 
     // === VISUAL/HIGHLIGHT MODE SUPPORT ===
 
+
     fn enter_visual_mode(&mut self) {
-        if ModeManager::can_enter_highlight_mode(self.editor.mode()) {
-            self.editor.set_mode(AppMode::Highlight);
-            self.highlight_state = HighlightState::Characterwise {
-                anchor: (
-                    self.editor.current_field(),
-                    self.editor.cursor_position(),
-                ),
-            };
-            self.debug_message = "🔥 VISUAL MODE - Cursor: Blinking Block █".to_string();
-        }
+        // Use the library method instead of manual state setting
+        self.editor.enter_highlight_mode();
+        self.debug_message = "🔥 VISUAL MODE - Cursor: Blinking Block █".to_string();
     }
 
     fn enter_visual_line_mode(&mut self) {
-        if ModeManager::can_enter_highlight_mode(self.editor.mode()) {
-            self.editor.set_mode(AppMode::Highlight);
-            self.highlight_state =
-                HighlightState::Linewise { anchor_line: self.editor.current_field() };
-            self.debug_message = "🔥 VISUAL LINE MODE - Cursor: Blinking Block █".to_string();
-        }
+        // Use the library method instead of manual state setting  
+        self.editor.enter_highlight_line_mode();
+        self.debug_message = "🔥 VISUAL LINE MODE - Cursor: Blinking Block █".to_string();
     }
 
     fn exit_visual_mode(&mut self) {
-        self.highlight_state = HighlightState::Off;
-        if self.editor.mode() == AppMode::Highlight {
-            self.editor.set_mode(AppMode::ReadOnly);
-            self.debug_message = "🔒 NORMAL MODE - Cursor: Steady Block █".to_string();
-        }
+        // Use the library method
+        self.editor.exit_highlight_mode();
+        self.debug_message = "🔒 NORMAL MODE - Cursor: Steady Block █".to_string();
     }
 
     fn update_visual_selection(&mut self) {
-        if self.editor.mode() == AppMode::Highlight {
-            match &self.highlight_state {
-                HighlightState::Characterwise { anchor: _ } => {
+        if self.editor.is_highlight_mode() {
+            use canvas::canvas::state::SelectionState;
+            match self.editor.selection_state() {
+                SelectionState::Characterwise { anchor } => {
                     self.debug_message = format!(
-                        "🎯 Visual selection: char {} in field {} - Cursor: Blinking Block █",
-                        self.editor.cursor_position(),
-                        self.editor.current_field()
+                        "🎯 Visual selection: anchor=({},{}) current=({},{}) - Cursor: Blinking Block █",
+                        anchor.0, anchor.1,
+                        self.editor.current_field(),
+                        self.editor.cursor_position()
                     );
                 }
-                HighlightState::Linewise { anchor_line: _ } => {
+                SelectionState::Linewise { anchor_field } => {
                     self.debug_message = format!(
-                        "🎯 Visual line selection: field {} - Cursor: Blinking Block █",
+                        "🎯 Visual LINE selection: anchor={} current={} - Cursor: Blinking Block █",
+                        anchor_field,
                         self.editor.current_field()
                     );
                 }
@@ -311,10 +301,6 @@ impl<D: DataProvider> AutoCursorFormEditor<D> {
 
     fn debug_message(&self) -> &str {
         &self.debug_message
-    }
-
-    fn highlight_state(&self) -> &HighlightState {
-        &self.highlight_state
     }
 
     fn has_unsaved_changes(&self) -> bool {
@@ -645,14 +631,18 @@ fn render_status_and_help(
         .constraints([Constraint::Length(3), Constraint::Length(7)])
         .split(area);
 
-    // Status bar with cursor information
+    // Status bar with cursor information - FIXED VERSION
     let mode_text = match editor.mode() {
         AppMode::Edit => "INSERT | (bar cursor)",
         AppMode::ReadOnly => "NORMAL █ (block cursor)",
-        AppMode::Highlight => match editor.highlight_state() {
-            HighlightState::Characterwise { .. } => "VISUAL █ (blinking block)",
-            HighlightState::Linewise { .. } => "VISUAL LINE █ (blinking block)",
-            _ => "VISUAL █ (blinking block)",
+        AppMode::Highlight => {
+            // Use library selection state instead of editor.highlight_state()
+            use canvas::canvas::state::SelectionState;
+            match editor.editor.selection_state() {
+                SelectionState::Characterwise { .. } => "VISUAL █ (blinking block)",
+                SelectionState::Linewise { .. } => "VISUAL LINE █ (blinking block)",
+                _ => "VISUAL █ (blinking block)",
+            }
         },
         _ => "NORMAL █ (block cursor)",
     };
@@ -670,7 +660,7 @@ fn render_status_and_help(
 
     f.render_widget(status, chunks[0]);
 
-    // Enhanced help text
+    // Enhanced help text (no changes needed here)
     let help_text = match editor.mode() {
         AppMode::ReadOnly => {
             if editor.has_pending_command() {
@@ -681,7 +671,7 @@ fn render_status_and_help(
             } else {
                 "🎯 CURSOR-STYLE DEMO: Normal █ | Insert | | Visual blinking█\n\
                  Normal: hjkl/arrows=move, w/b/e=words, 0/$=line, gg/G=first/last\n\
-                 i/a/A=insert, v/V=visual, x/X=delete, ?=info\n\
+                 i/a/A=insert, v/b=visual, x/X=delete, ?=info\n\
                  F1=demo manual cursor, F2=restore automatic"
             }
         }
