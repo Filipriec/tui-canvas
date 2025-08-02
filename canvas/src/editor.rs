@@ -3,6 +3,8 @@
 
 #[cfg(feature = "cursor-style")]
 use crate::canvas::CursorManager;
+#[cfg(feature = "cursor-style")]
+use crossterm;
 
 use anyhow::Result;
 use crate::canvas::state::EditorState;
@@ -162,6 +164,18 @@ impl<D: DataProvider> FormEditor<D> {
         #[cfg(feature = "cursor-style")]
         if old_mode != mode {
             let _ = crate::canvas::CursorManager::update_for_mode(mode);
+            
+            // IMMEDIATELY update terminal cursor position for the new mode
+            // This prevents flicker by ensuring position and style change atomically
+            if let Ok((x, y)) = crossterm::cursor::position() {
+                let display_pos = self.display_cursor_position();
+                let current_text = self.current_text();
+                let adjusted_x = x.saturating_sub(current_text.len() as u16) + display_pos as u16;
+                let _ = crossterm::execute!(
+                    std::io::stdout(),
+                    crossterm::cursor::MoveTo(adjusted_x, y)
+                );
+            }
         }
     }
 
@@ -459,7 +473,19 @@ impl<D: DataProvider> FormEditor<D> {
     }
 
     /// Exit edit mode to read-only mode (vim Escape)
+    // TODO this is still flickering, I have no clue how to fix it
     pub fn exit_edit_mode(&mut self) {
+        // Adjust cursor position when transitioning from edit to normal mode
+        let current_text = self.current_text();
+        if !current_text.is_empty() {
+            // In normal mode, cursor must be ON a character, not after the last one
+            let max_normal_pos = current_text.len().saturating_sub(1);
+            if self.ui_state.cursor_pos > max_normal_pos {
+                self.ui_state.cursor_pos = max_normal_pos;
+                self.ui_state.ideal_cursor_column = self.ui_state.cursor_pos;
+            }
+        }
+
         self.set_mode(AppMode::ReadOnly);
         // Deactivate autocomplete when exiting edit mode
         self.ui_state.deactivate_autocomplete();
@@ -538,6 +564,26 @@ impl<D: DataProvider> FormEditor<D> {
         // Update cursor position directly
         self.ui_state.cursor_pos = clamped_pos;
         self.ui_state.ideal_cursor_column = clamped_pos;
+    }
+
+    /// Get cursor position for display (respects mode-specific positioning rules)
+    pub fn display_cursor_position(&self) -> usize {
+        let current_text = self.current_text();
+        
+        match self.ui_state.current_mode {
+            AppMode::Edit => {
+                // Edit mode: cursor can be past end of text
+                self.ui_state.cursor_pos.min(current_text.len())
+            }
+            _ => {
+                // Normal/other modes: cursor must be on a character
+                if current_text.is_empty() {
+                    0
+                } else {
+                    self.ui_state.cursor_pos.min(current_text.len().saturating_sub(1))
+                }
+            }
+        }
     }
 
     /// Cleanup cursor style (call this when shutting down)
