@@ -265,7 +265,7 @@ fn apply_highlighting<'a, T: CanvasTheme>(
     }
 }
 
-/// Apply characterwise highlighting - DIRECTION-AWARE VERSION
+/// Apply characterwise highlighting - PROPER VIM-LIKE VERSION
 #[cfg(feature = "gui")]
 fn apply_characterwise_highlighting<'a, T: CanvasTheme>(
     text: &'a str,
@@ -281,16 +281,19 @@ fn apply_characterwise_highlighting<'a, T: CanvasTheme>(
     let start_field = min(anchor_field, *current_field_idx);
     let end_field = max(anchor_field, *current_field_idx);
 
+    // Vim-like styling:
+    // - Selected text: contrasting color + background (like vim visual selection)
+    // - All other text: normal color (no special colors for active fields, etc.)
     let highlight_style = Style::default()
-        .fg(theme.highlight())
-        .bg(theme.highlight_bg())
+        .fg(theme.highlight())          // ✅ Contrasting text color for selected text
+        .bg(theme.highlight_bg())       // ✅ Background for selected text
         .add_modifier(Modifier::BOLD);
-    let normal_style_in_highlight = Style::default().fg(theme.highlight());
-    let normal_style_outside = Style::default().fg(theme.fg());
+
+    let normal_style = Style::default().fg(theme.fg()); // ✅ Normal text color everywhere else
 
     if field_index >= start_field && field_index <= end_field {
         if start_field == end_field {
-            // Single field selection - same as before
+            // Single field selection
             let (start_char, end_char) = if anchor_field == *current_field_idx {
                 (min(anchor_char, current_cursor_pos), max(anchor_char, current_cursor_pos))
             } else if anchor_field < *current_field_idx {
@@ -310,72 +313,64 @@ fn apply_characterwise_highlighting<'a, T: CanvasTheme>(
             let after: String = text.chars().skip(clamped_end + 1).collect();
 
             Line::from(vec![
-                Span::styled(before, normal_style_in_highlight),
-                Span::styled(highlighted, highlight_style),
-                Span::styled(after, normal_style_in_highlight),
+                Span::styled(before, normal_style),         // Normal text color
+                Span::styled(highlighted, highlight_style), // Contrasting color + background
+                Span::styled(after, normal_style),          // Normal text color
             ])
         } else {
-            // Multi-field selection - think in terms of anchor→current direction
+            // Multi-field selection
             if field_index == anchor_field {
-                // Anchor field: highlight from anchor position toward the selection
                 if anchor_field < *current_field_idx {
-                    // Downward selection: highlight from anchor to end of field
                     let clamped_start = anchor_char.min(text_len);
                     let before: String = text.chars().take(clamped_start).collect();
                     let highlighted: String = text.chars().skip(clamped_start).collect();
 
                     Line::from(vec![
-                        Span::styled(before, normal_style_in_highlight),
+                        Span::styled(before, normal_style),
                         Span::styled(highlighted, highlight_style),
                     ])
                 } else {
-                    // Upward selection: highlight from start of field to anchor
                     let clamped_end = anchor_char.min(text_len);
                     let highlighted: String = text.chars().take(clamped_end + 1).collect();
                     let after: String = text.chars().skip(clamped_end + 1).collect();
 
                     Line::from(vec![
                         Span::styled(highlighted, highlight_style),
-                        Span::styled(after, normal_style_in_highlight),
+                        Span::styled(after, normal_style),
                     ])
                 }
             } else if field_index == *current_field_idx {
-                // Current field: highlight toward the cursor position
                 if anchor_field < *current_field_idx {
-                    // Downward selection: highlight from start of field to cursor
                     let clamped_end = current_cursor_pos.min(text_len);
                     let highlighted: String = text.chars().take(clamped_end + 1).collect();
                     let after: String = text.chars().skip(clamped_end + 1).collect();
 
                     Line::from(vec![
                         Span::styled(highlighted, highlight_style),
-                        Span::styled(after, normal_style_in_highlight),
+                        Span::styled(after, normal_style),
                     ])
                 } else {
-                    // Upward selection: highlight from cursor to end of field
                     let clamped_start = current_cursor_pos.min(text_len);
                     let before: String = text.chars().take(clamped_start).collect();
                     let highlighted: String = text.chars().skip(clamped_start).collect();
 
                     Line::from(vec![
-                        Span::styled(before, normal_style_in_highlight),
+                        Span::styled(before, normal_style),
                         Span::styled(highlighted, highlight_style),
                     ])
                 }
             } else {
-                // Middle field between anchor and current: highlight entire field
+                // Middle field: highlight entire field
                 Line::from(Span::styled(text, highlight_style))
             }
         }
     } else {
-        Line::from(Span::styled(
-            text,
-            if is_active { normal_style_in_highlight } else { normal_style_outside }
-        ))
+        // Outside selection: always normal text color (no special active field color)
+        Line::from(Span::styled(text, normal_style))
     }
 }
 
-/// Apply linewise highlighting - VISUALLY DISTINCT VERSION
+/// Apply linewise highlighting - PROPER VIM-LIKE VERSION
 #[cfg(feature = "gui")]
 fn apply_linewise_highlighting<'a, T: CanvasTheme>(
     text: &'a str,
@@ -388,23 +383,22 @@ fn apply_linewise_highlighting<'a, T: CanvasTheme>(
     let start_field = min(*anchor_line, *current_field_idx);
     let end_field = max(*anchor_line, *current_field_idx);
 
-    // Use the SAME style as characterwise highlighting
+    // Vim-like styling:
+    // - Selected lines: contrasting text color + background
+    // - All other lines: normal text color (no special active field color)
     let highlight_style = Style::default()
-        .fg(theme.highlight())
-        .bg(theme.highlight_bg())
+        .fg(theme.highlight())          // ✅ Contrasting text color for selected text
+        .bg(theme.highlight_bg())       // ✅ Background for selected text
         .add_modifier(Modifier::BOLD);
 
-    let normal_style_in_highlight = Style::default().fg(theme.highlight());
-    let normal_style_outside = Style::default().fg(theme.fg());
+    let normal_style = Style::default().fg(theme.fg()); // ✅ Normal text color everywhere else
 
     if field_index >= start_field && field_index <= end_field {
-        // ALWAYS highlight entire line - no markers, just full line highlighting
+        // Selected line: contrasting text color + background
         Line::from(Span::styled(text, highlight_style))
     } else {
-        Line::from(Span::styled(
-            text,
-            if is_active { normal_style_in_highlight } else { normal_style_outside }
-        ))
+        // Normal line: normal text color (no special active field color)
+        Line::from(Span::styled(text, normal_style))
     }
 }
 
