@@ -395,17 +395,68 @@ fn handle_key_press(
             editor.set_debug_message("✏️  INSERT (open line) - Cursor: Steady Bar |".to_string());
             editor.clear_command_buffer();
         }
+
+        // From Normal Mode: Enter visual modes
         (AppMode::ReadOnly, KeyCode::Char('v'), _) => {
-            editor.enter_visual_mode(); // 🎯 Automatic: cursor becomes blinking block
+            editor.enter_visual_mode();
             editor.clear_command_buffer();
         }
         (AppMode::ReadOnly, KeyCode::Char('V'), _) => {
-            editor.enter_visual_line_mode(); // 🎯 Automatic: cursor becomes blinking block
+            editor.enter_visual_line_mode();
             editor.clear_command_buffer();
         }
-        (_, KeyCode::Esc, _) => {
-            editor.exit_edit_mode(); // 🎯 Automatic: cursor becomes steady block
+        
+        // From Visual Mode: Switch between visual modes or exit
+        (AppMode::Highlight, KeyCode::Char('v'), _) => {
+            use canvas::canvas::state::SelectionState;
+            match editor.editor.selection_state() {
+                SelectionState::Characterwise { .. } => {
+                    // Already in characterwise mode, exit visual mode (vim behavior)
+                    editor.exit_visual_mode();
+                    editor.set_debug_message("🔒 Exited visual mode".to_string());
+                }
+                _ => {
+                    // Switch from linewise to characterwise mode
+                    editor.editor.enter_highlight_mode();
+                    editor.update_visual_selection();
+                    editor.set_debug_message("🔥 Switched to VISUAL mode".to_string());
+                }
+            }
             editor.clear_command_buffer();
+        }
+        
+        (AppMode::Highlight, KeyCode::Char('V'), _) => {
+            use canvas::canvas::state::SelectionState;
+            match editor.editor.selection_state() {
+                SelectionState::Linewise { .. } => {
+                    // Already in linewise mode, exit visual mode (vim behavior)
+                    editor.exit_visual_mode();
+                    editor.set_debug_message("🔒 Exited visual mode".to_string());
+                }
+                _ => {
+                    // Switch from characterwise to linewise mode
+                    editor.editor.enter_highlight_line_mode();
+                    editor.update_visual_selection();
+                    editor.set_debug_message("🔥 Switched to VISUAL LINE mode".to_string());
+                }
+            }
+            editor.clear_command_buffer();
+        }
+        
+        // Escape: Exit any mode back to normal
+        (_, KeyCode::Esc, _) => {
+            match mode {
+                AppMode::Edit => {
+                    editor.exit_edit_mode(); // Exit insert mode
+                }
+                AppMode::Highlight => {
+                    editor.exit_visual_mode(); // Exit visual mode
+                }
+                _ => {
+                    // Already in normal mode, just clear command buffer
+                    editor.clear_command_buffer();
+                }
+            }
         }
 
         // === CURSOR MANAGEMENT DEMONSTRATION ===

@@ -253,11 +253,7 @@ fn apply_highlighting<'a, T: CanvasTheme>(
         HighlightState::Off => {
             Line::from(Span::styled(
                 text,
-                if is_active {
-                    Style::default().fg(theme.highlight())
-                } else {
-                    Style::default().fg(theme.fg())
-                },
+                Style::default().fg(theme.fg())
             ))
         }
         HighlightState::Characterwise { anchor } => {
