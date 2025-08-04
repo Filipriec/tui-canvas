@@ -26,10 +26,29 @@ pub struct FormEditor<D: DataProvider> {
 
 impl<D: DataProvider> FormEditor<D> {
     pub fn new(data_provider: D) -> Self {
-        Self {
+        let mut editor = Self {
             ui_state: EditorState::new(),
             data_provider,
             suggestions: Vec::new(),
+        };
+        
+        // Initialize validation configurations if validation feature is enabled
+        #[cfg(feature = "validation")]
+        {
+            editor.initialize_validation();
+        }
+        
+        editor
+    }
+    
+    /// Initialize validation configurations from data provider
+    #[cfg(feature = "validation")]
+    fn initialize_validation(&mut self) {
+        let field_count = self.data_provider.field_count();
+        for field_index in 0..field_count {
+            if let Some(config) = self.data_provider.validation_config(field_index) {
+                self.ui_state.validation.set_field_config(field_index, config);
+            }
         }
     }
 
@@ -81,6 +100,25 @@ impl<D: DataProvider> FormEditor<D> {
     pub fn suggestions(&self) -> &[SuggestionItem] {
         &self.suggestions
     }
+    
+    /// Get validation state (for user's business logic)
+    /// Only available when the 'validation' feature is enabled
+    #[cfg(feature = "validation")]
+    pub fn validation_state(&self) -> &crate::validation::ValidationState {
+        self.ui_state.validation_state()
+    }
+    
+    /// Get validation result for current field
+    #[cfg(feature = "validation")]
+    pub fn current_field_validation(&self) -> Option<&crate::validation::ValidationResult> {
+        self.ui_state.validation.get_field_result(self.ui_state.current_field)
+    }
+    
+    /// Get validation result for specific field
+    #[cfg(feature = "validation")]
+    pub fn field_validation(&self, field_index: usize) -> Option<&crate::validation::ValidationResult> {
+        self.ui_state.validation.get_field_result(field_index)
+    }
 
     // ===================================================================
     // SYNC OPERATIONS: No async needed for basic editing
@@ -96,13 +134,36 @@ impl<D: DataProvider> FormEditor<D> {
         let cursor_pos = self.ui_state.cursor_pos;
 
         // Get current text from user
-        let mut current_text = self.data_provider.field_value(field_index).to_string();
+        let current_text = self.data_provider.field_value(field_index);
+
+        // Validate character insertion if validation is enabled
+        #[cfg(feature = "validation")]
+        {
+            let validation_result = self.ui_state.validation.validate_char_insertion(
+                field_index,
+                current_text,
+                cursor_pos,
+                ch,
+            );
+            
+            // Reject input if validation failed with error
+            if !validation_result.is_acceptable() {
+                // Log validation failure for debugging
+                tracing::debug!(
+                    "Character insertion rejected for field {}: {:?}",
+                    field_index,
+                    validation_result
+                );
+                return Ok(()); // Silently reject invalid input
+            }
+        }
 
         // Insert character
-        current_text.insert(cursor_pos, ch);
+        let mut new_text = current_text.to_string();
+        new_text.insert(cursor_pos, ch);
 
         // Update user's data
-        self.data_provider.set_field_value(field_index, current_text);
+        self.data_provider.set_field_value(field_index, new_text);
 
         // Update library's UI state
         self.ui_state.cursor_pos += 1;
@@ -137,6 +198,19 @@ impl<D: DataProvider> FormEditor<D> {
     pub fn move_to_next_field(&mut self) {
         let field_count = self.data_provider.field_count();
         let next_field = (self.ui_state.current_field + 1) % field_count;
+        
+        // Validate current field content before moving if validation is enabled
+        #[cfg(feature = "validation")]
+        {
+            let current_text = self.current_text().to_string(); // Convert to String to avoid borrow conflicts
+            let _validation_result = self.ui_state.validation.validate_field_content(
+                self.ui_state.current_field,
+                &current_text,
+            );
+            // Note: We don't prevent field switching on validation failure,
+            // just record the validation state
+        }
+        
         self.ui_state.move_to_field(next_field, field_count);
 
         // Clamp cursor to new field
@@ -166,7 +240,7 @@ impl<D: DataProvider> FormEditor<D> {
                 if new_mode != AppMode::Highlight {
                     self.ui_state.selection = SelectionState::None;
                 }
-                
+
                 #[cfg(feature = "cursor-style")]
                 {
                     let _ = CursorManager::update_for_mode(new_mode);
@@ -178,20 +252,79 @@ impl<D: DataProvider> FormEditor<D> {
     /// Enter edit mode with cursor positioned for append (vim 'a' command)
     pub fn enter_append_mode(&mut self) {
         let current_text = self.current_text();
-        
+
         // Calculate append position: always move right, even at line end
         let append_pos = if current_text.is_empty() {
             0
         } else {
             (self.ui_state.cursor_pos + 1).min(current_text.len())
         };
-        
+
         // Set cursor position for append
         self.ui_state.cursor_pos = append_pos;
         self.ui_state.ideal_cursor_column = append_pos;
-        
+
         // Enter edit mode (which will update cursor style)
         self.set_mode(AppMode::Edit);
+    }
+
+    // ===================================================================
+    // VALIDATION METHODS (only available with validation feature)
+    // ===================================================================
+    
+    /// Enable or disable validation
+    #[cfg(feature = "validation")]
+    pub fn set_validation_enabled(&mut self, enabled: bool) {
+        self.ui_state.validation.set_enabled(enabled);
+    }
+    
+    /// Check if validation is enabled
+    #[cfg(feature = "validation")]
+    pub fn is_validation_enabled(&self) -> bool {
+        self.ui_state.validation.is_enabled()
+    }
+    
+    /// Set validation configuration for a specific field
+    #[cfg(feature = "validation")]
+    pub fn set_field_validation(&mut self, field_index: usize, config: crate::validation::ValidationConfig) {
+        self.ui_state.validation.set_field_config(field_index, config);
+    }
+    
+    /// Remove validation configuration for a specific field
+    #[cfg(feature = "validation")]
+    pub fn remove_field_validation(&mut self, field_index: usize) {
+        self.ui_state.validation.remove_field_config(field_index);
+    }
+    
+    /// Manually validate current field content
+    #[cfg(feature = "validation")]
+    pub fn validate_current_field(&mut self) -> crate::validation::ValidationResult {
+        let field_index = self.ui_state.current_field;
+        let current_text = self.current_text().to_string();
+        self.ui_state.validation.validate_field_content(field_index, &current_text)
+    }
+    
+    /// Manually validate specific field content
+    #[cfg(feature = "validation")]
+    pub fn validate_field(&mut self, field_index: usize) -> Option<crate::validation::ValidationResult> {
+        if field_index < self.data_provider.field_count() {
+            let text = self.data_provider.field_value(field_index).to_string();
+            Some(self.ui_state.validation.validate_field_content(field_index, &text))
+        } else {
+            None
+        }
+    }
+    
+    /// Clear validation results for all fields
+    #[cfg(feature = "validation")]
+    pub fn clear_validation_results(&mut self) {
+        self.ui_state.validation.clear_all_results();
+    }
+    
+    /// Get validation summary for all fields
+    #[cfg(feature = "validation")]
+    pub fn validation_summary(&self) -> crate::validation::ValidationSummary {
+        self.ui_state.validation.summary()
     }
 
     // ===================================================================
@@ -255,6 +388,15 @@ impl<D: DataProvider> FormEditor<D> {
                 // Close autocomplete
                 self.ui_state.deactivate_autocomplete();
                 self.suggestions.clear();
+                
+                // Validate the new content if validation is enabled
+                #[cfg(feature = "validation")]
+                {
+                    let _validation_result = self.ui_state.validation.validate_field_content(
+                        field_index,
+                        &suggestion.value_to_store,
+                    );
+                }
 
                 return Some(suggestion.display_text);
             }
@@ -263,7 +405,7 @@ impl<D: DataProvider> FormEditor<D> {
     }
 
     // ===================================================================
-    // ADD THESE MISSING MOVEMENT METHODS
+    // MOVEMENT METHODS (keeping existing implementations)
     // ===================================================================
 
     /// Move to previous field (vim k / up arrow)
@@ -272,24 +414,44 @@ impl<D: DataProvider> FormEditor<D> {
         if field_count == 0 {
             return;
         }
-        
+
+        // Validate current field before moving
+        #[cfg(feature = "validation")]
+        {
+            let current_text = self.current_text().to_string(); // Convert to String to avoid borrow conflicts
+            let _validation_result = self.ui_state.validation.validate_field_content(
+                self.ui_state.current_field,
+                &current_text,
+            );
+        }
+
         let current_field = self.ui_state.current_field;
         let new_field = current_field.saturating_sub(1);
-        
+
         self.ui_state.move_to_field(new_field, field_count);
         self.clamp_cursor_to_current_field();
     }
 
-    /// Move to next field (vim j / down arrow) 
+    /// Move to next field (vim j / down arrow)
     pub fn move_down(&mut self) {
         let field_count = self.data_provider.field_count();
         if field_count == 0 {
             return;
         }
-        
+
+        // Validate current field before moving
+        #[cfg(feature = "validation")]
+        {
+            let current_text = self.current_text().to_string(); // Convert to String to avoid borrow conflicts
+            let _validation_result = self.ui_state.validation.validate_field_content(
+                self.ui_state.current_field,
+                &current_text,
+            );
+        }
+
         let current_field = self.ui_state.current_field;
         let new_field = (current_field + 1).min(field_count - 1);
-        
+
         self.ui_state.move_to_field(new_field, field_count);
         self.clamp_cursor_to_current_field();
     }
@@ -300,7 +462,7 @@ impl<D: DataProvider> FormEditor<D> {
         if field_count == 0 {
             return;
         }
-        
+
         self.ui_state.move_to_field(0, field_count);
         self.clamp_cursor_to_current_field();
     }
@@ -311,7 +473,7 @@ impl<D: DataProvider> FormEditor<D> {
         if field_count == 0 {
             return;
         }
-        
+
         let last_field = field_count - 1;
         self.ui_state.move_to_field(last_field, field_count);
         self.clamp_cursor_to_current_field();
@@ -322,7 +484,7 @@ impl<D: DataProvider> FormEditor<D> {
         self.move_up();
     }
 
-    /// Move to next field (alternative to move_down) 
+    /// Move to next field (alternative to move_down)
     pub fn next_field(&mut self) {
         self.move_down();
     }
@@ -340,7 +502,7 @@ impl<D: DataProvider> FormEditor<D> {
         use crate::canvas::actions::movement::line::line_end_position;
         let current_text = self.current_text();
         let is_edit_mode = self.ui_state.current_mode == AppMode::Edit;
-        
+
         let new_pos = line_end_position(current_text, is_edit_mode);
         self.ui_state.cursor_pos = new_pos;
         self.ui_state.ideal_cursor_column = new_pos;
@@ -350,21 +512,21 @@ impl<D: DataProvider> FormEditor<D> {
     pub fn move_word_next(&mut self) {
         use crate::canvas::actions::movement::word::find_next_word_start;
         let current_text = self.current_text();
-        
+
         if current_text.is_empty() {
             return;
         }
-        
+
         let new_pos = find_next_word_start(current_text, self.ui_state.cursor_pos);
         let is_edit_mode = self.ui_state.current_mode == AppMode::Edit;
-        
+
         // Clamp to valid bounds for current mode
         let final_pos = if is_edit_mode {
             new_pos.min(current_text.len())
         } else {
             new_pos.min(current_text.len().saturating_sub(1))
         };
-        
+
         self.ui_state.cursor_pos = final_pos;
         self.ui_state.ideal_cursor_column = final_pos;
     }
@@ -373,11 +535,11 @@ impl<D: DataProvider> FormEditor<D> {
     pub fn move_word_prev(&mut self) {
         use crate::canvas::actions::movement::word::find_prev_word_start;
         let current_text = self.current_text();
-        
+
         if current_text.is_empty() {
             return;
         }
-        
+
         let new_pos = find_prev_word_start(current_text, self.ui_state.cursor_pos);
         self.ui_state.cursor_pos = new_pos;
         self.ui_state.ideal_cursor_column = new_pos;
@@ -387,21 +549,21 @@ impl<D: DataProvider> FormEditor<D> {
     pub fn move_word_end(&mut self) {
         use crate::canvas::actions::movement::word::find_word_end;
         let current_text = self.current_text();
-        
+
         if current_text.is_empty() {
             return;
         }
-        
+
         let current_pos = self.ui_state.cursor_pos;
         let new_pos = find_word_end(current_text, current_pos);
-        
+
         // If we didn't move, try next word
         let final_pos = if new_pos == current_pos && current_pos + 1 < current_text.len() {
             find_word_end(current_text, current_pos + 1)
         } else {
             new_pos
         };
-        
+
         // Clamp for read-only mode
         let is_edit_mode = self.ui_state.current_mode == AppMode::Edit;
         let clamped_pos = if is_edit_mode {
@@ -409,7 +571,7 @@ impl<D: DataProvider> FormEditor<D> {
         } else {
             final_pos.min(current_text.len().saturating_sub(1))
         };
-        
+
         self.ui_state.cursor_pos = clamped_pos;
         self.ui_state.ideal_cursor_column = clamped_pos;
     }
@@ -418,11 +580,11 @@ impl<D: DataProvider> FormEditor<D> {
     pub fn move_word_end_prev(&mut self) {
         use crate::canvas::actions::movement::word::find_prev_word_end;
         let current_text = self.current_text();
-        
+
         if current_text.is_empty() {
             return;
         }
-        
+
         let new_pos = find_prev_word_end(current_text, self.ui_state.cursor_pos);
         self.ui_state.cursor_pos = new_pos;
         self.ui_state.ideal_cursor_column = new_pos;
@@ -433,21 +595,30 @@ impl<D: DataProvider> FormEditor<D> {
         if self.ui_state.current_mode != AppMode::Edit {
             return Ok(()); // Silently ignore in non-edit modes
         }
-        
+
         if self.ui_state.cursor_pos == 0 {
             return Ok(()); // Nothing to delete
         }
-        
+
         let field_index = self.ui_state.current_field;
         let mut current_text = self.data_provider.field_value(field_index).to_string();
-        
+
         if self.ui_state.cursor_pos <= current_text.len() {
             current_text.remove(self.ui_state.cursor_pos - 1);
-            self.data_provider.set_field_value(field_index, current_text);
+            self.data_provider.set_field_value(field_index, current_text.clone());
             self.ui_state.cursor_pos -= 1;
             self.ui_state.ideal_cursor_column = self.ui_state.cursor_pos;
+            
+            // Validate the new content if validation is enabled
+            #[cfg(feature = "validation")]
+            {
+                let _validation_result = self.ui_state.validation.validate_field_content(
+                    field_index,
+                    &current_text,
+                );
+            }
         }
-        
+
         Ok(())
     }
 
@@ -456,21 +627,39 @@ impl<D: DataProvider> FormEditor<D> {
         if self.ui_state.current_mode != AppMode::Edit {
             return Ok(()); // Silently ignore in non-edit modes
         }
-        
+
         let field_index = self.ui_state.current_field;
         let mut current_text = self.data_provider.field_value(field_index).to_string();
-        
+
         if self.ui_state.cursor_pos < current_text.len() {
             current_text.remove(self.ui_state.cursor_pos);
-            self.data_provider.set_field_value(field_index, current_text);
+            self.data_provider.set_field_value(field_index, current_text.clone());
+            
+            // Validate the new content if validation is enabled
+            #[cfg(feature = "validation")]
+            {
+                let _validation_result = self.ui_state.validation.validate_field_content(
+                    field_index,
+                    &current_text,
+                );
+            }
         }
-        
+
         Ok(())
     }
 
     /// Exit edit mode to read-only mode (vim Escape)
-    // TODO this is still flickering, I have no clue how to fix it
     pub fn exit_edit_mode(&mut self) {
+        // Validate current field content when exiting edit mode
+        #[cfg(feature = "validation")]
+        {
+            let current_text = self.current_text().to_string(); // Convert to String to avoid borrow conflicts
+            let _validation_result = self.ui_state.validation.validate_field_content(
+                self.ui_state.current_field,
+                &current_text,
+            );
+        }
+        
         // Adjust cursor position when transitioning from edit to normal mode
         let current_text = self.current_text();
         if !current_text.is_empty() {
@@ -500,44 +689,62 @@ impl<D: DataProvider> FormEditor<D> {
     fn clamp_cursor_to_current_field(&mut self) {
         let current_text = self.current_text();
         let is_edit_mode = self.ui_state.current_mode == AppMode::Edit;
-        
+
         use crate::canvas::actions::movement::line::safe_cursor_position;
         let safe_pos = safe_cursor_position(
-            current_text, 
-            self.ui_state.ideal_cursor_column, 
+            current_text,
+            self.ui_state.ideal_cursor_column,
             is_edit_mode
         );
-        
+
         self.ui_state.cursor_pos = safe_pos;
     }
 
-  
+
     /// Set the value of the current field
     pub fn set_current_field_value(&mut self, value: String) {
         let field_index = self.ui_state.current_field;
-        self.data_provider.set_field_value(field_index, value);
+        self.data_provider.set_field_value(field_index, value.clone());
         // Reset cursor to start of field
         self.ui_state.cursor_pos = 0;
         self.ui_state.ideal_cursor_column = 0;
+        
+        // Validate the new content if validation is enabled
+        #[cfg(feature = "validation")]
+        {
+            let _validation_result = self.ui_state.validation.validate_field_content(
+                field_index,
+                &value,
+            );
+        }
     }
-    
+
     /// Set the value of a specific field by index
     pub fn set_field_value(&mut self, field_index: usize, value: String) {
         if field_index < self.data_provider.field_count() {
-            self.data_provider.set_field_value(field_index, value);
+            self.data_provider.set_field_value(field_index, value.clone());
             // If we're modifying the current field, reset cursor
             if field_index == self.ui_state.current_field {
                 self.ui_state.cursor_pos = 0;
                 self.ui_state.ideal_cursor_column = 0;
             }
+            
+            // Validate the new content if validation is enabled
+            #[cfg(feature = "validation")]
+            {
+                let _validation_result = self.ui_state.validation.validate_field_content(
+                    field_index,
+                    &value,
+                );
+            }
         }
     }
-    
+
     /// Clear the current field (set to empty string)
     pub fn clear_current_field(&mut self) {
         self.set_current_field_value(String::new());
     }
-    
+
     /// Get mutable access to data provider (for advanced operations)
     pub fn data_provider_mut(&mut self) -> &mut D {
         &mut self.data_provider
@@ -547,16 +754,16 @@ impl<D: DataProvider> FormEditor<D> {
     pub fn set_cursor_position(&mut self, position: usize) {
         let current_text = self.current_text();
         let is_edit_mode = self.ui_state.current_mode == AppMode::Edit;
-        
+
         // Clamp to valid bounds for current mode
         let max_pos = if is_edit_mode {
             current_text.len() // Edit mode: can go past end
         } else {
             current_text.len().saturating_sub(1).max(0) // Read-only: stay within text
         };
-        
+
         let clamped_pos = position.min(max_pos);
-        
+
         // Update cursor position directly
         self.ui_state.cursor_pos = clamped_pos;
         self.ui_state.ideal_cursor_column = clamped_pos;
@@ -565,7 +772,7 @@ impl<D: DataProvider> FormEditor<D> {
     /// Get cursor position for display (respects mode-specific positioning rules)
     pub fn display_cursor_position(&self) -> usize {
         let current_text = self.current_text();
-        
+
         match self.ui_state.current_mode {
             AppMode::Edit => {
                 // Edit mode: cursor can be past end of text
@@ -606,7 +813,7 @@ impl<D: DataProvider> FormEditor<D> {
             self.ui_state.selection = SelectionState::Characterwise {
                 anchor: (self.ui_state.current_field, self.ui_state.cursor_pos),
             };
-            
+
             #[cfg(feature = "cursor-style")]
             {
                 let _ = CursorManager::update_for_mode(AppMode::Highlight);
@@ -621,7 +828,7 @@ impl<D: DataProvider> FormEditor<D> {
             self.ui_state.selection = SelectionState::Linewise {
                 anchor_field: self.ui_state.current_field,
             };
-            
+
             #[cfg(feature = "cursor-style")]
             {
                 let _ = CursorManager::update_for_mode(AppMode::Highlight);
@@ -634,7 +841,7 @@ impl<D: DataProvider> FormEditor<D> {
         if self.ui_state.current_mode == AppMode::Highlight {
             self.ui_state.current_mode = AppMode::ReadOnly;
             self.ui_state.selection = SelectionState::None;
-            
+
             #[cfg(feature = "cursor-style")]
             {
                 let _ = CursorManager::update_for_mode(AppMode::ReadOnly);

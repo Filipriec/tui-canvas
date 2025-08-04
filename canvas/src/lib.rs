@@ -8,6 +8,10 @@ pub mod data_provider;
 #[cfg(feature = "autocomplete")]
 pub mod autocomplete;
 
+// Only include validation module if feature is enabled
+#[cfg(feature = "validation")]
+pub mod validation;
+
 #[cfg(feature = "cursor-style")]
 pub use canvas::CursorManager;
 
@@ -25,6 +29,14 @@ pub use canvas::modes::AppMode;
 
 // Actions and results (for users who want to handle actions manually)
 pub use canvas::actions::{CanvasAction, ActionResult};
+
+// Validation exports (only when validation feature is enabled)
+#[cfg(feature = "validation")]
+pub use validation::{
+    ValidationConfig, ValidationResult, ValidationError,
+    CharacterLimits, ValidationConfigBuilder, ValidationState,
+    ValidationSummary,
+};
 
 // Theming and GUI
 #[cfg(feature = "gui")]

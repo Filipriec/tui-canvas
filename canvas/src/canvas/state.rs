@@ -10,15 +10,19 @@ pub struct EditorState {
     pub(crate) current_field: usize,
     pub(crate) cursor_pos: usize,
     pub(crate) ideal_cursor_column: usize,
-    
-    // Mode state  
+
+    // Mode state
     pub(crate) current_mode: AppMode,
-    
+
     // Autocomplete state
     pub(crate) autocomplete: AutocompleteUIState,
-    
+
     // Selection state (for vim visual mode)
     pub(crate) selection: SelectionState,
+    
+    // Validation state (only available with validation feature)
+    #[cfg(feature = "validation")]
+    pub(crate) validation: crate::validation::ValidationState,
 }
 
 #[derive(Debug, Clone)]
@@ -50,52 +54,61 @@ impl EditorState {
                 active_field: None,
             },
             selection: SelectionState::None,
+            #[cfg(feature = "validation")]
+            validation: crate::validation::ValidationState::new(),
         }
     }
-    
+
     // ===================================================================
     // READ-ONLY ACCESS: User can fetch UI state for compatibility
     // ===================================================================
-    
+
     /// Get current field index (for user's business logic)
     pub fn current_field(&self) -> usize {
         self.current_field
     }
-    
-    /// Get current cursor position (for user's business logic)  
+
+    /// Get current cursor position (for user's business logic)
     pub fn cursor_position(&self) -> usize {
         self.cursor_pos
     }
 
     /// Get ideal cursor column (for vim-like behavior)
-    pub fn ideal_cursor_column(&self) -> usize {  // ADD THIS
+    pub fn ideal_cursor_column(&self) -> usize {
         self.ideal_cursor_column
     }
-    
+
     /// Get current mode (for user's business logic)
     pub fn mode(&self) -> AppMode {
         self.current_mode
     }
-    
+
     /// Check if autocomplete is active (for user's business logic)
     pub fn is_autocomplete_active(&self) -> bool {
         self.autocomplete.is_active
     }
-    
+
     /// Check if autocomplete is loading (for user's business logic)
     pub fn is_autocomplete_loading(&self) -> bool {
         self.autocomplete.is_loading
     }
-    
+
     /// Get selection state (for user's business logic)
     pub fn selection_state(&self) -> &SelectionState {
         &self.selection
     }
     
+    /// Get validation state (for user's business logic)
+    /// Only available when the 'validation' feature is enabled
+    #[cfg(feature = "validation")]
+    pub fn validation_state(&self) -> &crate::validation::ValidationState {
+        &self.validation
+    }
+
     // ===================================================================
     // INTERNAL MUTATIONS: Only library modifies these
     // ===================================================================
-    
+
     pub(crate) fn move_to_field(&mut self, field_index: usize, field_count: usize) {
         if field_index < field_count {
             self.current_field = field_index;
@@ -103,7 +116,7 @@ impl EditorState {
             self.cursor_pos = 0;
         }
     }
-    
+
     pub(crate) fn set_cursor(&mut self, position: usize, max_position: usize, for_edit_mode: bool) {
         if for_edit_mode {
             // Edit mode: can go past end for insertion
@@ -114,14 +127,14 @@ impl EditorState {
         }
         self.ideal_cursor_column = self.cursor_pos;
     }
-    
+
     pub(crate) fn activate_autocomplete(&mut self, field_index: usize) {
         self.autocomplete.is_active = true;
         self.autocomplete.is_loading = true;
         self.autocomplete.active_field = Some(field_index);
         self.autocomplete.selected_index = None;
     }
-    
+
     pub(crate) fn deactivate_autocomplete(&mut self) {
         self.autocomplete.is_active = false;
         self.autocomplete.is_loading = false;

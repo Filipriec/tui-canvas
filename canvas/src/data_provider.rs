@@ -27,6 +27,13 @@ pub trait DataProvider {
     fn display_value(&self, _index: usize) -> Option<&str> {
         None // Default: use actual value
     }
+    
+    /// Get validation configuration for a field (optional)
+    /// Only available when the 'validation' feature is enabled
+    #[cfg(feature = "validation")]
+    fn validation_config(&self, _field_index: usize) -> Option<crate::validation::ValidationConfig> {
+        None
+    }
 }
 
 /// Optional: User implements this for autocomplete data
