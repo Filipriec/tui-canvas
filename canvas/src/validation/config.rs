@@ -1,29 +1,24 @@
 // src/validation/config.rs
 //! Validation configuration types and builders
 
-use crate::validation::CharacterLimits;
-use serde::{Deserialize, Serialize};
+use crate::validation::{CharacterLimits, PatternFilters};
 
 /// Main validation configuration for a field
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default)]
 pub struct ValidationConfig {
     /// Character limit configuration
     pub character_limits: Option<CharacterLimits>,
     
-    /// Future: Predefined patterns
-    #[serde(skip)]
-    pub patterns: Option<()>, // Placeholder for future implementation
+    /// Pattern filtering configuration
+    pub pattern_filters: Option<PatternFilters>,
     
     /// Future: Reserved characters
-    #[serde(skip)]
     pub reserved_chars: Option<()>, // Placeholder for future implementation
     
     /// Future: Custom formatting
-    #[serde(skip)]
     pub custom_formatting: Option<()>, // Placeholder for future implementation
     
     /// Future: External validation
-    #[serde(skip)]
     pub external_validation: Option<()>, // Placeholder for future implementation
 }
 
@@ -42,6 +37,12 @@ impl ValidationConfigBuilder {
     /// Set character limits for the field
     pub fn with_character_limits(mut self, limits: CharacterLimits) -> Self {
         self.config.character_limits = Some(limits);
+        self
+    }
+    
+    /// Set pattern filters for the field
+    pub fn with_pattern_filters(mut self, filters: PatternFilters) -> Self {
+        self.config.pattern_filters = Some(filters);
         self
     }
     
@@ -114,6 +115,13 @@ impl ValidationConfig {
             .build()
     }
     
+    /// Create a configuration with pattern filters
+    pub fn with_patterns(patterns: PatternFilters) -> Self {
+        ValidationConfigBuilder::new()
+            .with_pattern_filters(patterns)
+            .build()
+    }
+    
     /// Validate a character insertion at a specific position
     pub fn validate_char_insertion(
         &self,
@@ -127,6 +135,13 @@ impl ValidationConfig {
                 if !result.is_acceptable() {
                     return result;
                 }
+            }
+        }
+        
+        // Pattern filters validation
+        if let Some(ref patterns) = self.pattern_filters {
+            if let Err(message) = patterns.validate_char_at_position(position, character) {
+                return ValidationResult::error(message);
             }
         }
         
@@ -146,6 +161,13 @@ impl ValidationConfig {
             }
         }
         
+        // Pattern filters validation
+        if let Some(ref patterns) = self.pattern_filters {
+            if let Err(message) = patterns.validate_text(text) {
+                return ValidationResult::error(message);
+            }
+        }
+        
         // Future: Add other validation types here
         
         ValidationResult::Valid
@@ -153,8 +175,7 @@ impl ValidationConfig {
     
     /// Check if any validation rules are configured
     pub fn has_validation(&self) -> bool {
-        self.character_limits.is_some()
-        // || self.patterns.is_some()
+        self.character_limits.is_some() || self.pattern_filters.is_some()
         // || self.reserved_chars.is_some()
         // || self.custom_formatting.is_some()
         // || self.external_validation.is_some()
@@ -230,6 +251,50 @@ mod tests {
         
         // Test invalid insertion (would exceed limit)
         let result = config.validate_char_insertion("tests", 5, 'x');
+        assert!(!result.is_acceptable());
+    }
+    
+    #[test]
+    fn test_config_with_patterns() {
+        use crate::validation::{PatternFilters, PositionFilter, PositionRange, CharacterFilter};
+        
+        let patterns = PatternFilters::new()
+            .add_filter(PositionFilter::new(
+                PositionRange::Range(0, 1),
+                CharacterFilter::Alphabetic,
+            ));
+        
+        let config = ValidationConfig::with_patterns(patterns);
+        assert!(config.has_validation());
+        
+        // Test valid pattern insertion
+        let result = config.validate_char_insertion("", 0, 'A');
+        assert!(result.is_acceptable());
+        
+        // Test invalid pattern insertion  
+        let result = config.validate_char_insertion("", 0, '1');
+        assert!(!result.is_acceptable());
+    }
+    
+    #[test]
+    fn test_config_builder_with_patterns() {
+        use crate::validation::{PatternFilters, PositionFilter, PositionRange, CharacterFilter};
+        
+        let patterns = PatternFilters::license_plate();
+        let config = ValidationConfigBuilder::new()
+            .with_pattern_filters(patterns)
+            .with_max_length(5)
+            .build();
+        
+        assert!(config.has_validation());
+        assert!(config.character_limits.is_some());
+        assert!(config.pattern_filters.is_some());
+        
+        // Test pattern validation
+        let result = config.validate_content("AB123");
+        assert!(result.is_acceptable());
+        
+        let result = config.validate_content("A1123");
         assert!(!result.is_acceptable());
     }
 }

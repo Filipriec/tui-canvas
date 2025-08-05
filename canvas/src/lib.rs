@@ -35,7 +35,7 @@ pub use canvas::actions::{CanvasAction, ActionResult};
 pub use validation::{
     ValidationConfig, ValidationResult, ValidationError,
     CharacterLimits, ValidationConfigBuilder, ValidationState,
-    ValidationSummary,
+    ValidationSummary, PatternFilters, PositionFilter, PositionRange, CharacterFilter,
 };
 
 // Theming and GUI
