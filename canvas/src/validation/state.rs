@@ -1,3 +1,4 @@
+// src/validation/state.rs
 //! Validation state management
 
 use crate::validation::{ValidationConfig, ValidationResult};
@@ -174,7 +175,31 @@ impl ValidationState {
         self.field_configs.len()
     }
     
-    /// Get validation summary
+    /// Check if field switching is allowed for a specific field
+    pub fn allows_field_switch(&self, field_index: usize, text: &str) -> bool {
+        if !self.enabled {
+            return true;
+        }
+        
+        if let Some(config) = self.field_configs.get(&field_index) {
+            config.allows_field_switch(text)
+        } else {
+            true // No validation configured, allow switching
+        }
+    }
+    
+    /// Get reason why field switching is blocked (if any)
+    pub fn field_switch_block_reason(&self, field_index: usize, text: &str) -> Option<String> {
+        if !self.enabled {
+            return None;
+        }
+        
+        if let Some(config) = self.field_configs.get(&field_index) {
+            config.field_switch_block_reason(text)
+        } else {
+            None // No validation configured
+        }
+    }
     pub fn summary(&self) -> ValidationSummary {
         let total_validated = self.validated_fields.len();
         let errors = self.fields_with_errors().count();

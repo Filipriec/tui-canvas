@@ -33,7 +33,6 @@ default = []
 gui = ["ratatui"]
 autocomplete = ["tokio"]
 cursor-style = ["crossterm"]
-regex = ["dep:regex"]
 validation = ["regex"]
 
 [[example]]
@@ -45,3 +44,7 @@ path = "examples/autocomplete.rs"
 name = "canvas_gui_demo"
 required-features = ["gui"]
 path = "examples/canvas_gui_demo.rs"
+
+[[example]]
+name = "validation_1"
+required-features = ["gui", "validation"]

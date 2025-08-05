@@ -326,6 +326,20 @@ impl<D: DataProvider> FormEditor<D> {
     pub fn validation_summary(&self) -> crate::validation::ValidationSummary {
         self.ui_state.validation.summary()
     }
+    
+    /// Check if field switching is allowed from current field
+    #[cfg(feature = "validation")]
+    pub fn can_switch_fields(&self) -> bool {
+        let current_text = self.current_text();
+        self.ui_state.validation.allows_field_switch(self.ui_state.current_field, current_text)
+    }
+    
+    /// Get reason why field switching is blocked (if any)
+    #[cfg(feature = "validation")]
+    pub fn field_switch_block_reason(&self) -> Option<String> {
+        let current_text = self.current_text();
+        self.ui_state.validation.field_switch_block_reason(self.ui_state.current_field, current_text)
+    }
 
     // ===================================================================
     // ASYNC OPERATIONS: Only autocomplete needs async
@@ -409,10 +423,22 @@ impl<D: DataProvider> FormEditor<D> {
     // ===================================================================
 
     /// Move to previous field (vim k / up arrow)
-    pub fn move_up(&mut self) {
+    pub fn move_up(&mut self) -> Result<()> {
         let field_count = self.data_provider.field_count();
         if field_count == 0 {
-            return;
+            return Ok(());
+        }
+
+        // Check if field switching is allowed (minimum character enforcement)
+        #[cfg(feature = "validation")]
+        {
+            let current_text = self.current_text();
+            if !self.ui_state.validation.allows_field_switch(self.ui_state.current_field, current_text) {
+                if let Some(reason) = self.ui_state.validation.field_switch_block_reason(self.ui_state.current_field, current_text) {
+                    tracing::debug!("Field switch blocked: {}", reason);
+                    return Err(anyhow::anyhow!("Cannot switch fields: {}", reason));
+                }
+            }
         }
 
         // Validate current field before moving
@@ -430,13 +456,26 @@ impl<D: DataProvider> FormEditor<D> {
 
         self.ui_state.move_to_field(new_field, field_count);
         self.clamp_cursor_to_current_field();
+        Ok(())
     }
 
     /// Move to next field (vim j / down arrow)
-    pub fn move_down(&mut self) {
+    pub fn move_down(&mut self) -> Result<()> {
         let field_count = self.data_provider.field_count();
         if field_count == 0 {
-            return;
+            return Ok(());
+        }
+
+        // Check if field switching is allowed (minimum character enforcement)
+        #[cfg(feature = "validation")]
+        {
+            let current_text = self.current_text();
+            if !self.ui_state.validation.allows_field_switch(self.ui_state.current_field, current_text) {
+                if let Some(reason) = self.ui_state.validation.field_switch_block_reason(self.ui_state.current_field, current_text) {
+                    tracing::debug!("Field switch blocked: {}", reason);
+                    return Err(anyhow::anyhow!("Cannot switch fields: {}", reason));
+                }
+            }
         }
 
         // Validate current field before moving
@@ -454,6 +493,7 @@ impl<D: DataProvider> FormEditor<D> {
 
         self.ui_state.move_to_field(new_field, field_count);
         self.clamp_cursor_to_current_field();
+        Ok(())
     }
 
     /// Move to first field (vim gg)
@@ -480,13 +520,13 @@ impl<D: DataProvider> FormEditor<D> {
     }
 
     /// Move to previous field (alternative to move_up)
-    pub fn prev_field(&mut self) {
-        self.move_up();
+    pub fn prev_field(&mut self) -> Result<()> {
+        self.move_up()
     }
 
     /// Move to next field (alternative to move_down)
-    pub fn next_field(&mut self) {
-        self.move_down();
+    pub fn next_field(&mut self) -> Result<()> {
+        self.move_down()
     }
 
     /// Move to start of current field (vim 0)
@@ -649,15 +689,16 @@ impl<D: DataProvider> FormEditor<D> {
     }
 
     /// Exit edit mode to read-only mode (vim Escape)
-    pub fn exit_edit_mode(&mut self) {
+    pub fn exit_edit_mode(&mut self) -> Result<()> {
         // Validate current field content when exiting edit mode
         #[cfg(feature = "validation")]
         {
-            let current_text = self.current_text().to_string(); // Convert to String to avoid borrow conflicts
-            let _validation_result = self.ui_state.validation.validate_field_content(
-                self.ui_state.current_field,
-                &current_text,
-            );
+            let current_text = self.current_text();
+            if !self.ui_state.validation.allows_field_switch(self.ui_state.current_field, current_text) {
+                if let Some(reason) = self.ui_state.validation.field_switch_block_reason(self.ui_state.current_field, current_text) {
+                    return Err(anyhow::anyhow!("Cannot exit edit mode: {}", reason));
+                }
+            }
         }
         
         // Adjust cursor position when transitioning from edit to normal mode
@@ -674,6 +715,8 @@ impl<D: DataProvider> FormEditor<D> {
         self.set_mode(AppMode::ReadOnly);
         // Deactivate autocomplete when exiting edit mode
         self.ui_state.deactivate_autocomplete();
+
+        Ok(())
     }
 
     /// Enter edit mode from read-only mode (vim i/a/o)

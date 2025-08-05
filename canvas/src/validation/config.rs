@@ -1,3 +1,4 @@
+// src/validation/config.rs
 //! Validation configuration types and builders
 
 use crate::validation::CharacterLimits;
@@ -157,6 +158,32 @@ impl ValidationConfig {
         // || self.reserved_chars.is_some()
         // || self.custom_formatting.is_some()
         // || self.external_validation.is_some()
+    }
+    pub fn allows_field_switch(&self, text: &str) -> bool {
+        // Character limits validation
+        if let Some(ref limits) = self.character_limits {
+            if !limits.allows_field_switch(text) {
+                return false;
+            }
+        }
+        
+        // Future: Add other validation types here
+        
+        true
+    }
+    
+    /// Get reason why field switching is blocked (if any)
+    pub fn field_switch_block_reason(&self, text: &str) -> Option<String> {
+        // Character limits validation
+        if let Some(ref limits) = self.character_limits {
+            if let Some(reason) = limits.field_switch_block_reason(text) {
+                return Some(reason);
+            }
+        }
+        
+        // Future: Add other validation types here
+        
+        None
     }
 }
 

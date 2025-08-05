@@ -1,3 +1,4 @@
+// src/validation/limits.rs
 //! Character limits validation implementation
 
 use crate::validation::ValidationResult;
@@ -250,6 +251,29 @@ impl CharacterLimits {
             },
         }
     }
+    pub fn allows_field_switch(&self, text: &str) -> bool {
+        if let Some(min) = self.min_length {
+            let count = self.count(text);
+            // Allow switching if field is empty OR meets minimum requirement
+            count == 0 || count >= min
+        } else {
+            true // No minimum requirement, always allow switching
+        }
+    }
+    
+    /// Get reason why field switching is not allowed (if any)
+    pub fn field_switch_block_reason(&self, text: &str) -> Option<String> {
+        if let Some(min) = self.min_length {
+            let count = self.count(text);
+            if count > 0 && count < min {
+                return Some(format!(
+                    "Field must be empty or have at least {} characters (currently: {})",
+                    min, count
+                ));
+            }
+        }
+        None
+    }
 }
 
 impl Default for CharacterLimits {
@@ -361,5 +385,40 @@ mod tests {
         let limits = limits.with_warning_threshold(8);
         assert_eq!(limits.status_text("12345678"), Some("8/10 (approaching limit)".to_string()));
         assert_eq!(limits.status_text("1234567890x"), Some("11/10 (exceeded)".to_string()));
+    }
+    
+    #[test]
+    fn test_field_switch_blocking() {
+        let limits = CharacterLimits::new_range(3, 10);
+        
+        // Empty field: should allow switching
+        assert!(limits.allows_field_switch(""));
+        assert!(limits.field_switch_block_reason("").is_none());
+        
+        // Field with content below minimum: should block switching
+        assert!(!limits.allows_field_switch("hi"));
+        assert!(limits.field_switch_block_reason("hi").is_some());
+        assert!(limits.field_switch_block_reason("hi").unwrap().contains("at least 3 characters"));
+        
+        // Field meeting minimum: should allow switching
+        assert!(limits.allows_field_switch("hello"));
+        assert!(limits.field_switch_block_reason("hello").is_none());
+        
+        // Field exceeding maximum: should still allow switching (validation shows error but doesn't block)
+        assert!(limits.allows_field_switch("this is way too long"));
+        assert!(limits.field_switch_block_reason("this is way too long").is_none());
+    }
+    
+    #[test]
+    fn test_field_switch_no_minimum() {
+        let limits = CharacterLimits::new(10); // Only max, no minimum
+        
+        // Should always allow switching when there's no minimum
+        assert!(limits.allows_field_switch(""));
+        assert!(limits.allows_field_switch("a"));
+        assert!(limits.allows_field_switch("hello"));
+        
+        assert!(limits.field_switch_block_reason("").is_none());
+        assert!(limits.field_switch_block_reason("a").is_none());
     }
 }
