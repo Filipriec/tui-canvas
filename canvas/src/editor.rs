@@ -85,7 +85,14 @@ impl<D: DataProvider> FormEditor<D> {
         }
     }
 
-    /// Get current field text for display, applying mask if configured
+    /// Get current field text for display.
+    ///
+    /// Policies:
+    /// - Feature 4 (custom formatter):
+    ///   - While editing the focused field: ALWAYS show raw (no custom formatting).
+    ///   - When not editing the field: show formatted (fallback to raw on error).
+    /// - Mask-only fields: mask applies even in Edit mode (preserve legacy behavior).
+    /// - Otherwise: raw.
     #[cfg(feature = "validation")]
     pub fn current_display_text(&self) -> String {
         let field_index = self.ui_state.current_field;
@@ -96,16 +103,82 @@ impl<D: DataProvider> FormEditor<D> {
         };
 
         if let Some(cfg) = self.ui_state.validation.get_field_config(field_index) {
+            // 1) Mask-only fields: mask applies even in Edit (legacy behavior)
+            if cfg.custom_formatter.is_none() {
+                if let Some(mask) = &cfg.display_mask {
+                    return mask.apply_to_display(raw);
+                }
+            }
+
+            // 2) Feature 4 fields: raw while editing, formatted otherwise
+            if cfg.custom_formatter.is_some() {
+                if matches!(self.ui_state.current_mode, AppMode::Edit) {
+                    return raw.to_string();
+                }
+                if let Some((formatted, _mapper, _warning)) = cfg.run_custom_formatter(raw) {
+                    return formatted;
+                }
+            }
+
+            // 3) Fallback to mask if present (when formatter didn't produce output)
             if let Some(mask) = &cfg.display_mask {
                 return mask.apply_to_display(raw);
             }
         }
+
         raw.to_string()
     }
 
     /// Get reference to UI state for rendering
     pub fn ui_state(&self) -> &EditorState {
         &self.ui_state
+    }
+
+    /// Get effective display text for any field index.
+    ///
+    /// Policies:
+    /// - Feature 4 fields (with custom formatter):
+    ///   - If the field is currently focused AND in Edit mode: return raw (no formatting).
+    ///   - Otherwise: return formatted (fallback to raw on error).
+    /// - Mask-only fields: mask applies regardless of mode (legacy behavior).
+    /// - Otherwise: raw.
+    #[cfg(feature = "validation")]
+    pub fn display_text_for_field(&self, field_index: usize) -> String {
+        let raw = if field_index < self.data_provider.field_count() {
+            self.data_provider.field_value(field_index)
+        } else {
+            ""
+        };
+
+        if let Some(cfg) = self.ui_state.validation.get_field_config(field_index) {
+            // Mask-only fields: mask applies even in Edit mode
+            if cfg.custom_formatter.is_none() {
+                if let Some(mask) = &cfg.display_mask {
+                    return mask.apply_to_display(raw);
+                }
+            }
+
+            // Feature 4 fields:
+            if cfg.custom_formatter.is_some() {
+                // Focused + Edit -> raw
+                if field_index == self.ui_state.current_field
+                    && matches!(self.ui_state.current_mode, AppMode::Edit)
+                {
+                    return raw.to_string();
+                }
+                // Not editing -> formatted
+                if let Some((formatted, _mapper, _warning)) = cfg.run_custom_formatter(raw) {
+                    return formatted;
+                }
+            }
+
+            // Fallback to mask if present (in case formatter didn't return output)
+            if let Some(mask) = &cfg.display_mask {
+                return mask.apply_to_display(raw);
+            }
+        }
+
+        raw.to_string()
     }
 
     /// Get reference to data provider for rendering
@@ -959,7 +1032,7 @@ impl<D: DataProvider> FormEditor<D> {
         self.ui_state.ideal_cursor_column = clamped_pos;
     }
 
-    /// Get cursor position for display (maps raw cursor to display position with mask)
+    /// Get cursor position for display (maps raw cursor to display position with formatter/mask)
     pub fn display_cursor_position(&self) -> usize {
         let current_text = self.current_text();
         let raw_pos = match self.ui_state.current_mode {
@@ -977,6 +1050,13 @@ impl<D: DataProvider> FormEditor<D> {
         {
             let field_index = self.ui_state.current_field;
             if let Some(cfg) = self.ui_state.validation.get_field_config(field_index) {
+                // Only apply custom formatter cursor mapping when NOT editing
+                if !matches!(self.ui_state.current_mode, AppMode::Edit) {
+                    if let Some((formatted, mapper, _warning)) = cfg.run_custom_formatter(current_text) {
+                        return mapper.raw_to_formatted(current_text, &formatted, raw_pos);
+                    }
+                }
+                // Fallback to display mask
                 if let Some(mask) = &cfg.display_mask {
                     return mask.raw_pos_to_display_pos(self.ui_state.cursor_pos);
                 }

@@ -6,6 +6,7 @@ pub mod limits;
 pub mod state;
 pub mod patterns;
 pub mod mask;  // Simple display mask instead of complex reserved chars
+pub mod formatting; // Custom formatter and position mapping (feature 4)
 
 // Re-export main types
 pub use config::{ValidationConfig, ValidationResult, ValidationConfigBuilder};
@@ -13,6 +14,7 @@ pub use limits::{CharacterLimits, LimitCheckResult};
 pub use state::{ValidationState, ValidationSummary};
 pub use patterns::{PatternFilters, PositionFilter, PositionRange, CharacterFilter};
 pub use mask::DisplayMask;  // Simple mask instead of ReservedCharacters
+pub use formatting::{CustomFormatter, FormattingResult, PositionMapper, DefaultPositionMapper};
 
 /// Validation error types
 #[derive(Debug, Clone, thiserror::Error)]

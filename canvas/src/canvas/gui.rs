@@ -53,24 +53,10 @@ pub fn render_canvas_with_highlight<T: CanvasTheme, D: DataProvider>(
     for i in 0..field_count {
         fields.push(data_provider.field_name(i));
 
-        // Use display text that applies masks if configured
+        // Use editor-provided effective display text per field (Feature 4/mask aware)
         #[cfg(feature = "validation")]
         {
-            if i == editor.current_field() {
-                inputs.push(editor.current_display_text());
-            } else {
-                // For non-current fields, we need to apply mask manually
-                let raw = data_provider.field_value(i);
-                if let Some(cfg) = editor.ui_state().validation_state().get_field_config(i) {
-                    if let Some(mask) = &cfg.display_mask {
-                        inputs.push(mask.apply_to_display(raw));
-                    } else {
-                        inputs.push(raw.to_string());
-                    }
-                } else {
-                    inputs.push(raw.to_string());
-                }
-            }
+            inputs.push(editor.display_text_for_field(i));
         }
         #[cfg(not(feature = "validation"))]
         {
@@ -93,23 +79,10 @@ pub fn render_canvas_with_highlight<T: CanvasTheme, D: DataProvider>(
         editor.display_cursor_position(), // Use display cursor position for masks
         false, // TODO: track unsaved changes in editor
         |i| {
-            // Get display value for field i
+            // Get display value for field i using editor logic (Feature 4 + masks)
             #[cfg(feature = "validation")]
             {
-                if i == editor.current_field() {
-                    editor.current_display_text()
-                } else {
-                    let raw = data_provider.field_value(i);
-                    if let Some(cfg) = editor.ui_state().validation_state().get_field_config(i) {
-                        if let Some(mask) = &cfg.display_mask {
-                            mask.apply_to_display(raw)
-                        } else {
-                            raw.to_string()
-                        }
-                    } else {
-                        raw.to_string()
-                    }
-                }
+                editor.display_text_for_field(i)
             }
             #[cfg(not(feature = "validation"))]
             {
@@ -117,12 +90,21 @@ pub fn render_canvas_with_highlight<T: CanvasTheme, D: DataProvider>(
             }
         },
         |i| {
-            // Check if field has display override (mask)
+            // Check if field has display override (custom formatter or mask)
             #[cfg(feature = "validation")]
             {
                 editor.ui_state().validation_state().get_field_config(i)
-                    .and_then(|cfg| cfg.display_mask.as_ref())
-                    .is_some()
+                    .map(|cfg| {
+                        // Formatter takes precedence; if present, it's a display override
+                        #[allow(unused_mut)]
+                        let mut has_override = false;
+                        #[cfg(feature = "validation")]
+                        {
+                            has_override = cfg.custom_formatter.is_some();
+                        }
+                        has_override || cfg.display_mask.is_some()
+                    })
+                    .unwrap_or(false)
             }
             #[cfg(not(feature = "validation"))]
             {

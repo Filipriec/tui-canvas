@@ -37,6 +37,8 @@ pub use validation::{
     CharacterLimits, ValidationConfigBuilder, ValidationState,
     ValidationSummary, PatternFilters, PositionFilter, PositionRange, CharacterFilter, 
     DisplayMask,  // Simple display mask instead of complex ReservedCharacters
+    // Feature 4: custom formatting exports
+    CustomFormatter, FormattingResult, PositionMapper, DefaultPositionMapper,
 };
 
 // Theming and GUI

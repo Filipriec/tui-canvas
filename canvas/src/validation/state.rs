@@ -2,6 +2,8 @@
 //! Validation state management
 
 use crate::validation::{ValidationConfig, ValidationResult};
+#[cfg(feature = "validation")]
+use crate::validation::{PositionMapper};
 use std::collections::HashMap;
 
 /// Validation state for all fields in a form
@@ -120,6 +122,18 @@ impl ValidationState {
     /// Get current validation result for a field
     pub fn get_field_result(&self, field_index: usize) -> Option<&ValidationResult> {
         self.field_results.get(&field_index)
+    }
+
+    /// Get formatted display for a field if a custom formatter is configured.
+    /// Returns (formatted_text, position_mapper, optional_warning_message).
+    #[cfg(feature = "validation")]
+    pub fn formatted_for(
+        &self,
+        field_index: usize,
+        raw: &str,
+    ) -> Option<(String, std::sync::Arc<dyn PositionMapper>, Option<String>)> {
+        let config = self.field_configs.get(&field_index)?;
+        config.run_custom_formatter(raw)
     }
     
     /// Check if a field has been validated
