@@ -467,13 +467,15 @@ fn set_cursor_position(
     current_cursor_pos: usize,
     has_display_override: bool,
 ) {
-    let cursor_x = if has_display_override {
-        field_rect.x + text.chars().count() as u16
-    } else {
-        field_rect.x + current_cursor_pos as u16
-    };
+    // BUG FIX: Use the correct display cursor position, not end of text
+    let cursor_x = field_rect.x + current_cursor_pos as u16;
     let cursor_y = field_rect.y;
-    f.set_cursor_position((cursor_x, cursor_y));
+    
+    // SAFETY: Ensure cursor doesn't go beyond field bounds
+    let max_cursor_x = field_rect.x + field_rect.width.saturating_sub(1);
+    let safe_cursor_x = cursor_x.min(max_cursor_x);
+    
+    f.set_cursor_position((safe_cursor_x, cursor_y));
 }
 
 /// Set default theme if custom not specified
