@@ -1,16 +1,14 @@
 /* examples/validation_4.rs
-   Demonstrates Feature 4: Custom parsing/formatting provided by the app,
-   displayed by the library while keeping raw input authoritative.
+   Enhanced Feature 4 Demo: Multiple custom formatters with comprehensive edge cases
+   
+   Demonstrates:
+   - Multiple formatter types: PSC, Phone, Credit Card, Date
+   - Edge case handling: incomplete input, invalid chars, overflow
+   - Real-time validation feedback and format preview
+   - Advanced cursor position mapping
+   - Raw vs formatted data separation
+   - Error handling and fallback behavior
 
-   Use-case: PSC (postal code) typed as "01001" should display as "010 01".
-   - Raw input: "01001"
-   - Display:   "010 01"
-   - Cursor mapping is handled by the library via PositionMapper
-   - Validation still applies to raw text (if configured)
-   - Formatting is optional and only active when feature "validation" is enabled
-
-   Run with:
-     cargo run --example validation_4 --features "gui,validation"
 */
 
 #![allow(clippy::needless_return)]
@@ -40,564 +38,502 @@ use ratatui::{
     Frame, Terminal,
 };
 
-// Bring library types
 use canvas::{
     canvas::{gui::render_canvas_default, modes::AppMode},
     DataProvider, FormEditor,
     ValidationConfig, ValidationConfigBuilder,
-    // Feature 4 exports
     CustomFormatter, FormattingResult,
 };
 
-/// PSC custom formatter
-///
-/// Formats a raw 5-digit PSC as "XXX XX".
-/// Examples:
-/// - ""        -> ""
-/// - "0"       -> "0"
-/// - "01"      -> "01"
-/// - "010"     -> "010"
-/// - "0100"    -> "010 0"
-/// - "01001"   -> "010 01"
-/// Any extra chars are appended after the space (simple behavior).
+/// PSC (Postal Code) Formatter: "01001" -> "010 01"
 struct PSCFormatter;
 
 impl CustomFormatter for PSCFormatter {
     fn format(&self, raw: &str) -> FormattingResult {
-        let mut out = String::new();
-
-        for (i, ch) in raw.chars().enumerate() {
-            // Insert space after 3rd character for PSC visual grouping
-            if i == 3 {
-                out.push(' ');
-            }
-            out.push(ch);
+        if raw.is_empty() {
+            return FormattingResult::success("");
         }
-
-        // Use default position mapper which treats non-alphanumeric as separators
-        FormattingResult::success(out)
+        
+        // Validate: only digits allowed
+        if !raw.chars().all(|c| c.is_ascii_digit()) {
+            return FormattingResult::error("PSC must contain only digits");
+        }
+        
+        let len = raw.chars().count();
+        match len {
+            0 => FormattingResult::success(""),
+            1..=3 => FormattingResult::success(raw),
+            4 => FormattingResult::warning(
+                format!("{} ", &raw[..3]), 
+                "PSC incomplete (4/5 digits)"
+            ),
+            5 => {
+                let formatted = format!("{} {}", &raw[..3], &raw[3..]);
+                if raw == "00000" {
+                    FormattingResult::warning(formatted, "Invalid PSC: 00000")
+                } else {
+                    FormattingResult::success(formatted)
+                }
+            },
+            _ => FormattingResult::error("PSC too long (max 5 digits)"),
+        }
     }
 }
 
-// Demo editor wrapper for custom formatter demonstration (mirror UX from validation_3)
-struct PscDemoFormEditor<D: DataProvider> {
-    editor: FormEditor<D>,
-    debug_message: String,
-    command_buffer: String,
-    validation_enabled: bool,
-    show_raw_data: bool,
+/// Phone Number Formatter: "1234567890" -> "(123) 456-7890"
+struct PhoneFormatter;
+
+impl CustomFormatter for PhoneFormatter {
+    fn format(&self, raw: &str) -> FormattingResult {
+        if raw.is_empty() {
+            return FormattingResult::success("");
+        }
+        
+        // Only digits allowed
+        if !raw.chars().all(|c| c.is_ascii_digit()) {
+            return FormattingResult::error("Phone must contain only digits");
+        }
+        
+        let len = raw.chars().count();
+        match len {
+            0 => FormattingResult::success(""),
+            1..=3 => FormattingResult::success(format!("({})", raw)),
+            4..=6 => FormattingResult::success(format!("({}) {}", &raw[..3], &raw[3..])),
+            7..=10 => FormattingResult::success(format!("({}) {}-{}", &raw[..3], &raw[3..6], &raw[6..])),
+            10 => {
+                let formatted = format!("({}) {}-{}", &raw[..3], &raw[3..6], &raw[6..]);
+                FormattingResult::success(formatted)
+            },
+            _ => FormattingResult::warning(
+                format!("({}) {}-{}", &raw[..3], &raw[3..6], &raw[6..10]),
+                "Phone too long (extra digits ignored)"
+            ),
+        }
+    }
 }
 
-impl<D: DataProvider> PscDemoFormEditor<D> {
+/// Credit Card Formatter: "1234567890123456" -> "1234 5678 9012 3456"
+struct CreditCardFormatter;
+
+impl CustomFormatter for CreditCardFormatter {
+    fn format(&self, raw: &str) -> FormattingResult {
+        if raw.is_empty() {
+            return FormattingResult::success("");
+        }
+        
+        if !raw.chars().all(|c| c.is_ascii_digit()) {
+            return FormattingResult::error("Card number must contain only digits");
+        }
+        
+        let mut formatted = String::new();
+        for (i, ch) in raw.chars().enumerate() {
+            if i > 0 && i % 4 == 0 {
+                formatted.push(' ');
+            }
+            formatted.push(ch);
+        }
+        
+        let len = raw.chars().count();
+        match len {
+            0..=15 => FormattingResult::warning(formatted, format!("Card incomplete ({}/16 digits)", len)),
+            16 => FormattingResult::success(formatted),
+            _ => FormattingResult::warning(formatted, "Card too long (extra digits shown)"),
+        }
+    }
+}
+
+
+
+
+
+
+/// Date Formatter: "12012024" -> "12/01/2024"
+struct DateFormatter;
+
+impl CustomFormatter for DateFormatter {
+    fn format(&self, raw: &str) -> FormattingResult {
+        if raw.is_empty() {
+            return FormattingResult::success("");
+        }
+        
+        if !raw.chars().all(|c| c.is_ascii_digit()) {
+            return FormattingResult::error("Date must contain only digits");
+        }
+        
+        let len = raw.len();
+        match len {
+            0 => FormattingResult::success(""),
+            1..=2 => FormattingResult::success(raw.to_string()),
+            3..=4 => FormattingResult::success(format!("{}/{}", &raw[..2], &raw[2..])),
+            5..=8 => FormattingResult::success(format!("{}/{}/{}", &raw[..2], &raw[2..4], &raw[4..])),
+            8 => {
+                let month = &raw[..2];
+                let day = &raw[2..4];
+                let year = &raw[4..];
+                
+                // Basic validation
+                let m: u32 = month.parse().unwrap_or(0);
+                let d: u32 = day.parse().unwrap_or(0);
+                
+                if m == 0 || m > 12 {
+                    FormattingResult::warning(
+                        format!("{}/{}/{}", month, day, year),
+                        "Invalid month (01-12)"
+                    )
+                } else if d == 0 || d > 31 {
+                    FormattingResult::warning(
+                        format!("{}/{}/{}", month, day, year),
+                        "Invalid day (01-31)"
+                    )
+                } else {
+                    FormattingResult::success(format!("{}/{}/{}", month, day, year))
+                }
+            },
+            _ => FormattingResult::error("Date too long (MMDDYYYY format)"),
+        }
+    }
+}
+
+// Enhanced demo data with multiple formatter types
+struct MultiFormatterDemoData {
+    fields: Vec<(String, String)>,
+}
+
+impl MultiFormatterDemoData {
+    fn new() -> Self {
+        Self {
+            fields: vec![
+                ("🏁 PSC (01001)".to_string(), "".to_string()),
+                ("📞 Phone (1234567890)".to_string(), "".to_string()),
+                ("💳 Credit Card (16 digits)".to_string(), "".to_string()),
+                ("📅 Date (12012024)".to_string(), "".to_string()),
+                ("📝 Plain Text".to_string(), "".to_string()),
+            ],
+        }
+    }
+}
+
+impl DataProvider for MultiFormatterDemoData {
+    fn field_count(&self) -> usize {
+        self.fields.len()
+    }
+    
+    fn field_name(&self, index: usize) -> &str {
+        &self.fields[index].0
+    }
+    
+    fn field_value(&self, index: usize) -> &str {
+        &self.fields[index].1
+    }
+    
+    fn set_field_value(&mut self, index: usize, value: String) {
+        self.fields[index].1 = value;
+    }
+
+    #[cfg(feature = "validation")]
+    fn validation_config(&self, field_index: usize) -> Option<ValidationConfig> {
+        match field_index {
+            0 => Some(ValidationConfigBuilder::new()
+                .with_custom_formatter(Arc::new(PSCFormatter))
+                .with_max_length(5)
+                .build()),
+            1 => Some(ValidationConfigBuilder::new()
+                .with_custom_formatter(Arc::new(PhoneFormatter))
+                .with_max_length(12)
+                .build()),
+            2 => Some(ValidationConfigBuilder::new()
+                .with_custom_formatter(Arc::new(CreditCardFormatter))
+                .with_max_length(20)
+                .build()),
+            3 => Some(ValidationConfigBuilder::new()
+                .with_custom_formatter(Arc::new(DateFormatter))
+                .with_max_length(8)
+                .build()),
+            4 => Some(ValidationConfigBuilder::new()
+                .with_custom_formatter(Arc::new(DateFormatter))
+                .with_max_length(8)
+                .build()),
+            _ => None, // Plain text field - no formatter
+        }
+    }
+}
+
+// Enhanced demo editor with comprehensive status tracking
+struct EnhancedDemoEditor<D: DataProvider> {
+    editor: FormEditor<D>,
+    debug_message: String,
+    validation_enabled: bool,
+    show_raw_data: bool,
+    show_cursor_details: bool,
+    example_mode: usize,
+}
+
+impl<D: DataProvider> EnhancedDemoEditor<D> {
     fn new(data_provider: D) -> Self {
         let mut editor = FormEditor::new(data_provider);
         editor.set_validation_enabled(true);
 
         Self {
             editor,
-            debug_message:
-                "🧩 Custom Formatter Demo - App-defined parsing with library-managed display!".to_string(),
-            command_buffer: String::new(),
+            debug_message: "🧩 Enhanced Custom Formatter Demo - Multiple formatters with rich edge cases!".to_string(),
             validation_enabled: true,
             show_raw_data: false,
+            show_cursor_details: false,
+            example_mode: 0,
         }
     }
 
-    // === PSC HELPERS (conditional formatting policy) ===
-    fn is_psc_field(&self) -> bool {
-        self.editor.current_field() == 0
-    }
-    fn psc_raw(&self) -> &str {
-        if self.is_psc_field() { self.editor.current_text() } else { "" }
-    }
-    fn psc_is_valid(&self) -> bool {
-        let raw = self.psc_raw();
-        raw.chars().count() == 5 && raw.chars().all(|c| c.is_ascii_digit())
-    }
-    fn psc_should_format_for_display(&self) -> bool {
-        // Apply formatting only when NOT editing, on PSC field, and valid 5 digits
-        self.mode() != AppMode::Edit && self.is_psc_field() && self.psc_is_valid()
-    }
-    fn psc_filter_input(&self, ch: char) -> bool {
-        if !self.is_psc_field() {
-            return true;
+    // Field type detection
+    fn current_field_type(&self) -> &'static str {
+        match self.editor.current_field() {
+            0 => "PSC",
+            1 => "Phone",
+            2 => "Credit Card", 
+            3 => "Date",
+            _ => "Plain Text",
         }
-        // Only allow digits, enforce max 5
-        if !ch.is_ascii_digit() {
-            return false;
-        }
-        self.psc_raw().chars().count() < 5
     }
 
-    // === COMMAND BUFFER HANDLING ===
-    fn clear_command_buffer(&mut self) {
-        self.command_buffer.clear();
-    }
-    fn add_to_command_buffer(&mut self, ch: char) {
-        self.command_buffer.push(ch);
-    }
-    fn get_command_buffer(&self) -> &str {
-        &self.command_buffer
-    }
-    fn has_pending_command(&self) -> bool {
-        !self.command_buffer.is_empty()
+    fn has_formatter(&self) -> bool {
+        self.editor.current_field() < 5 // First 5 fields have formatters
     }
 
-    // === FORMATTER CONTROL ===
+    fn get_input_rules(&self) -> &'static str {
+        match self.editor.current_field() {
+            0 => "5 digits only (PSC format)",
+            1 => "10+ digits (US phone format)",
+            2 => "16+ digits (credit card)",
+            3 => "Digits as cents (12345 = $123.45)",
+            4 => "8 digits MMDDYYYY (date format)",
+            _ => "Any text (no formatting)",
+        }
+    }
+
+    fn cycle_example_data(&mut self) {
+        let examples = [
+            // PSC examples
+            vec!["01001", "1234567890", "1234567890123456", "12345", "12012024", "Plain text here"],
+            // Incomplete examples
+            vec!["010", "123", "1234", "123", "1201", "More text"],
+            // Invalid examples (will show error handling)
+            vec!["0abc1", "12a45", "123abc", "abc", "ab01cd", "Special chars!"],
+            // Edge cases
+            vec!["00000", "0000000000", "0000000000000000", "99", "13012024", ""],
+        ];
+        
+        self.example_mode = (self.example_mode + 1) % examples.len();
+        let current_examples = &examples[self.example_mode];
+        
+        for (i, example) in current_examples.iter().enumerate() {
+            if i < self.editor.data_provider().field_count() {
+                self.editor.data_provider_mut().set_field_value(i, example.to_string());
+            }
+        }
+        
+        let mode_names = ["Valid Examples", "Incomplete Input", "Invalid Characters", "Edge Cases"];
+        self.debug_message = format!("📋 Loaded: {}", mode_names[self.example_mode]);
+    }
+
+    // Enhanced status methods
     fn toggle_validation(&mut self) {
         self.validation_enabled = !self.validation_enabled;
         self.editor.set_validation_enabled(self.validation_enabled);
-        if self.validation_enabled {
-            self.debug_message = "✅ Custom Formatter ENABLED - Library displays app-formatted output!".to_string();
+        self.debug_message = if self.validation_enabled {
+            "✅ Custom Formatters ENABLED".to_string()
         } else {
-            self.debug_message = "❌ Custom Formatter DISABLED - Raw text only".to_string();
-        }
+            "❌ Custom Formatters DISABLED".to_string()
+        };
     }
 
     fn toggle_raw_data_view(&mut self) {
         self.show_raw_data = !self.show_raw_data;
-        if self.show_raw_data {
-            self.debug_message =
-                "👁️ Showing RAW business data (what's actually stored)".to_string();
+        self.debug_message = if self.show_raw_data {
+            "👁️ Showing RAW data focus".to_string()
         } else {
-            self.debug_message =
-                "✨ Showing FORMATTED display (provided by your app, rendered by library)".to_string();
-        }
+            "✨ Showing FORMATTED display focus".to_string()
+        };
     }
 
-    fn get_current_field_info(&self) -> (String, String, String) {
-        let field_index = self.editor.current_field();
-        let raw_data = self.editor.current_text();
+    fn toggle_cursor_details(&mut self) {
+        self.show_cursor_details = !self.show_cursor_details;
+        self.debug_message = if self.show_cursor_details {
+            "📍 Detailed cursor mapping info ON".to_string()
+        } else {
+            "📍 Detailed cursor mapping info OFF".to_string()
+        };
+    }
 
-        // Conditional display policy:
-        // - If editing PSC: show raw (no formatting)
-        // - Else if PSC valid and PSC field: show formatted
-        // - Else: show raw
-        let display_data = if self.is_psc_field() {
-            if self.mode() == AppMode::Edit {
-                raw_data.to_string()
-            } else if self.psc_is_valid() {
-                self.editor.current_display_text()
+    fn get_current_field_analysis(&self) -> (String, String, String, Option<String>) {
+        let raw = self.editor.current_text();
+        let display = self.editor.current_display_text();
+        
+        let status = if raw == display {
+            if self.has_formatter() {
+                if self.mode() == AppMode::Edit {
+                    "Raw (editing)".to_string()
+                } else {
+                    "No formatting needed".to_string()
+                }
             } else {
-                raw_data.to_string()
+                "No formatter".to_string()
             }
         } else {
-            // Non-PSC field: show raw in this demo
-            raw_data.to_string()
+            "Custom formatted".to_string()
         };
 
-        let fmt_info = if self.is_psc_field() {
-            if self.psc_is_valid() {
-                "CustomFormatter: PSC ‘XXX XX’ (active)".to_string()
+        let warning = if self.validation_enabled && self.has_formatter() {
+            // Check if there are any formatting warnings
+            if raw.len() > 0 {
+                match self.editor.current_field() {
+                    0 if raw.len() < 5 => Some(format!("PSC incomplete: {}/5", raw.len())),
+                    1 if raw.len() < 10 => Some(format!("Phone incomplete: {}/10", raw.len())),
+                    2 if raw.len() < 16 => Some(format!("Card incomplete: {}/16", raw.len())),
+                    4 if raw.len() < 8 => Some(format!("Date incomplete: {}/8", raw.len())),
+                    _ => None,
+                }
             } else {
-                "CustomFormatter: PSC ‘XXX XX’ (waiting for 5 digits)".to_string()
+                None
             }
         } else {
-            "No formatter".to_string()
+            None
         };
 
-        (raw_data.to_string(), display_data, fmt_info)
+        (raw.to_string(), display, status, warning)
     }
 
-    // === ENHANCED MOVEMENT ===
-    fn move_left(&mut self) {
-        self.editor.move_left();
-        self.update_cursor_info();
-    }
-
-    fn move_right(&mut self) {
-        self.editor.move_right();
-        self.update_cursor_info();
-    }
-
-    fn move_up(&mut self) {
-        match self.editor.move_up() {
-            Ok(()) => {
-                self.update_field_info();
-            }
-            Err(e) => {
-                self.debug_message = format!("🚫 Field switch blocked: {}", e);
-            }
-        }
-    }
-
-    fn move_down(&mut self) {
-        match self.editor.move_down() {
-            Ok(()) => {
-                self.update_field_info();
-            }
-            Err(e) => {
-                self.debug_message = format!("🚫 Field switch blocked: {}", e);
-            }
-        }
-    }
-
-    fn move_line_start(&mut self) {
-        self.editor.move_line_start();
-        self.update_cursor_info();
-    }
-
-    fn move_line_end(&mut self) {
-        self.editor.move_line_end();
-        self.update_cursor_info();
-    }
-
-    fn update_cursor_info(&mut self) {
-        if self.validation_enabled {
-            let raw_pos = self.editor.cursor_position();
-            let display_pos = self.editor.display_cursor_position();
-            if raw_pos != display_pos {
-                self.debug_message = format!(
-                    "📍 Cursor: Raw pos {} → Display pos {} (custom formatting active)",
-                    raw_pos, display_pos
-                );
-            } else {
-                self.debug_message = format!("📍 Cursor at position {} (no display offset)", raw_pos);
-            }
-        }
-    }
-
-    fn update_field_info(&mut self) {
-        let field_name = self
-            .editor
-            .data_provider()
-            .field_name(self.editor.current_field());
-        self.debug_message = format!("📝 Switched to: {}", field_name);
-    }
-
-    // === MODE TRANSITIONS ===
+    // Delegate methods with enhanced feedback
     fn enter_edit_mode(&mut self) {
         self.editor.enter_edit_mode();
-        self.debug_message =
-            "✏️ INSERT MODE - Type to see custom formatting applied in real-time".to_string();
-    }
-
-    fn enter_append_mode(&mut self) {
-        self.editor.enter_append_mode();
-        self.debug_message = "✏️ INSERT (append) - Custom formatting active".to_string();
+        let field_type = self.current_field_type();
+        let rules = self.get_input_rules();
+        self.debug_message = format!("✏️ EDITING {} - {}", field_type, rules);
     }
 
     fn exit_edit_mode(&mut self) {
         self.editor.exit_edit_mode();
-        self.debug_message = "🔒 NORMAL MODE - Press 'r' to see raw data".to_string();
+        let (raw, display, _, warning) = self.get_current_field_analysis();
+        if let Some(warn) = warning {
+            self.debug_message = format!("🔒 NORMAL - {} | ⚠️ {}", self.current_field_type(), warn);
+        } else if raw != display {
+            self.debug_message = format!("🔒 NORMAL - {} formatted successfully", self.current_field_type());
+        } else {
+            self.debug_message = "🔒 NORMAL MODE".to_string();
+        }
     }
 
     fn insert_char(&mut self, ch: char) -> anyhow::Result<()> {
-        // Enforce PSC typing rules on PSC field:
-        // - Only digits
-        // - Max 5 characters
-        if self.is_psc_field() && !self.psc_filter_input(ch) {
-            self.debug_message = "🚦 PSC: only digits, max 5".to_string();
-            return Ok(());
-        }
-
         let result = self.editor.insert_char(ch);
         if result.is_ok() {
-            // In edit mode we always show raw
-            let raw = self.editor.current_text().to_string();
-            let display = if self.psc_should_format_for_display() {
-                self.editor.current_display_text()
+            let (raw, display, _, _) = self.get_current_field_analysis();
+            if raw != display && self.validation_enabled {
+                self.debug_message = format!("✏️ '{}' added - Real-time formatting active", ch);
             } else {
-                raw.clone()
-            };
-            if raw != display {
-                self.debug_message =
-                    format!("✏️ Added '{}': Raw='{}' Display='{}'", ch, raw, display);
-            } else {
-                self.debug_message = format!("✏️ Added '{}': '{}'", ch, raw);
+                self.debug_message = format!("✏️ '{}' added", ch);
             }
         }
-        Ok(result?)
+        result
     }
 
-    // === DELETE OPERATIONS ===
-    fn delete_backward(&mut self) -> anyhow::Result<()> {
-        let result = self.editor.delete_backward();
-        if result.is_ok() {
-            // In edit mode, we revert to raw view; debug info reflects that
-            self.debug_message = "⌫ Character deleted".to_string();
-            self.update_cursor_info();
+    // Position mapping demo
+    fn show_position_mapping(&mut self) {
+        if !self.has_formatter() {
+            self.debug_message = "📍 No position mapping (plain text field)".to_string();
+            return;
         }
-        Ok(result?)
-    }
 
-    fn delete_forward(&mut self) -> anyhow::Result<()> {
-        let result = self.editor.delete_forward();
-        if result.is_ok() {
-            // In edit mode, we revert to raw view; debug info reflects that
-            self.debug_message = "⌦ Character deleted".to_string();
-            self.update_cursor_info();
-        }
-        Ok(result?)
-    }
-
-    // === DELEGATE TO ORIGINAL EDITOR ===
-    fn current_field(&self) -> usize {
-        self.editor.current_field()
-    }
-    fn cursor_position(&self) -> usize {
-        self.editor.cursor_position()
-    }
-    fn mode(&self) -> AppMode {
-        self.editor.mode()
-    }
-    fn current_text(&self) -> &str {
-        self.editor.current_text()
-    }
-    fn data_provider(&self) -> &D {
-        self.editor.data_provider()
-    }
-    fn ui_state(&self) -> &canvas::EditorState {
-        self.editor.ui_state()
-    }
-    fn set_mode(&mut self, mode: AppMode) {
-        self.editor.set_mode(mode);
-    }
-
-    fn next_field(&mut self) {
-        match self.editor.next_field() {
-            Ok(()) => {
-                self.update_field_info();
-            }
-            Err(e) => {
-                self.debug_message = format!("🚫 Cannot move to next field: {}", e);
-            }
+        let raw_pos = self.editor.cursor_position();
+        let display_pos = self.editor.display_cursor_position();
+        let raw = self.editor.current_text();
+        let display = self.editor.current_display_text();
+        
+        if raw_pos != display_pos {
+            self.debug_message = format!(
+                "🗺️ Position mapping: Raw[{}]='{}' ↔ Display[{}]='{}'",
+                raw_pos,
+                raw.chars().nth(raw_pos).unwrap_or('∅'),
+                display_pos,
+                display.chars().nth(display_pos).unwrap_or('∅')
+            );
+        } else {
+            self.debug_message = format!("📍 Cursor at position {} (no mapping needed)", raw_pos);
         }
     }
 
-    fn prev_field(&mut self) {
-        match self.editor.prev_field() {
-            Ok(()) => {
-                self.update_field_info();
-            }
-            Err(e) => {
-                self.debug_message = format!("🚫 Cannot move to previous field: {}", e);
-            }
-        }
-    }
-
-    // === STATUS AND DEBUG ===
-    fn set_debug_message(&mut self, msg: String) {
-        self.debug_message = msg;
-    }
-    fn debug_message(&self) -> &str {
-        &self.debug_message
-    }
-
-    fn show_formatter_details(&mut self) {
-        let (raw, display, fmt_info) = self.get_current_field_info();
-        self.debug_message = format!(
-            "🔍 Field {}: {} | Raw: '{}' Display: '{}'",
-            self.current_field() + 1,
-            fmt_info,
-            raw,
-            display
-        );
-    }
-
-    fn get_formatter_status(&self) -> String {
-        if !self.validation_enabled {
-            return "❌ DISABLED".to_string();
-        }
-
-        // Count fields with validation config (for demo parity)
-        let field_count = self.editor.data_provider().field_count();
-        let mut cfg_count = 0;
-        for i in 0..field_count {
-            if self.editor.validation_state().get_field_config(i).is_some() {
-                cfg_count += 1;
-            }
-        }
-
-        format!("🧩 {} FORMATTERS", cfg_count)
-    }
+    // Delegate remaining methods
+    fn mode(&self) -> AppMode { self.editor.mode() }
+    fn current_field(&self) -> usize { self.editor.current_field() }
+    fn cursor_position(&self) -> usize { self.editor.cursor_position() }
+    fn data_provider(&self) -> &D { self.editor.data_provider() }
+    fn data_provider_mut(&mut self) -> &mut D { self.editor.data_provider_mut() }
+    fn ui_state(&self) -> &canvas::EditorState { self.editor.ui_state() }
+    
+    fn move_up(&mut self) { let _ = self.editor.move_up(); }
+    fn move_down(&mut self) { let _ = self.editor.move_down(); }
+    fn move_left(&mut self) { let _ = self.editor.move_left(); }
+    fn move_right(&mut self) { let _ = self.editor.move_right(); }
+    fn delete_backward(&mut self) -> anyhow::Result<()> { self.editor.delete_backward() }
+    fn delete_forward(&mut self) -> anyhow::Result<()> { self.editor.delete_forward() }
+    fn next_field(&mut self) { let _ = self.editor.next_field(); }
+    fn prev_field(&mut self) { let _ = self.editor.prev_field(); }
 }
 
-// Demo data with a PSC field configured with a custom formatter
-struct PscDemoData {
-    fields: Vec<(String, String)>,
-}
-
-impl PscDemoData {
-    fn new() -> Self {
-        Self {
-            fields: vec![
-                ("🏁 PSC (type 01001)".to_string(), "".to_string()),
-                ("📝 Notes (raw)".to_string(), "".to_string()),
-            ],
-        }
-    }
-}
-
-impl DataProvider for PscDemoData {
-    fn field_count(&self) -> usize {
-        self.fields.len()
-    }
-    fn field_name(&self, index: usize) -> &str {
-        &self.fields[index].0
-    }
-    fn field_value(&self, index: usize) -> &str {
-        &self.fields[index].1
-    }
-    fn set_field_value(&mut self, index: usize, value: String) {
-        self.fields[index].1 = value;
-    }
-
-    // Provide validation config with custom formatter for field 0
-    #[cfg(feature = "validation")]
-    fn validation_config(&self, field_index: usize) -> Option<ValidationConfig> {
-        match field_index {
-            0 => {
-                // PSC 5 digits displayed as "XXX XX". Raw value remains unmodified.
-                let cfg = ValidationConfigBuilder::new()
-                    .with_custom_formatter(Arc::new(PSCFormatter))
-                    // Optional: add character limits or patterns for raw value
-                    // .with_max_length(5)
-                    .build();
-                Some(cfg)
-            }
-            _ => None,
-        }
-    }
-}
-
-// Enhanced key handling with custom formatter specific commands
+// Enhanced key handling
 fn handle_key_press(
     key: KeyCode,
     modifiers: KeyModifiers,
-    editor: &mut PscDemoFormEditor<PscDemoData>,
+    editor: &mut EnhancedDemoEditor<MultiFormatterDemoData>,
 ) -> anyhow::Result<bool> {
     let mode = editor.mode();
 
-    // Quit handling
-    if (key == KeyCode::Char('q') && modifiers.contains(KeyModifiers::CONTROL))
-        || (key == KeyCode::Char('c') && modifiers.contains(KeyModifiers::CONTROL))
-        || key == KeyCode::F(10)
-    {
+    // Quit
+    if matches!(key, KeyCode::F(10)) || 
+       (key == KeyCode::Char('q') && modifiers.contains(KeyModifiers::CONTROL)) ||
+       (key == KeyCode::Char('c') && modifiers.contains(KeyModifiers::CONTROL)) {
         return Ok(false);
     }
 
     match (mode, key, modifiers) {
-        // === MODE TRANSITIONS ===
-        (AppMode::ReadOnly, KeyCode::Char('i'), _) => {
-            editor.enter_edit_mode();
-            editor.clear_command_buffer();
-        }
+        // Mode transitions
+        (AppMode::ReadOnly, KeyCode::Char('i'), _) => editor.enter_edit_mode(),
         (AppMode::ReadOnly, KeyCode::Char('a'), _) => {
-            editor.enter_append_mode();
-            editor.clear_command_buffer();
-        }
-        (AppMode::ReadOnly, KeyCode::Char('A'), _) => {
-            editor.move_line_end();
-            editor.enter_edit_mode();
-            editor.clear_command_buffer();
-        }
+            editor.editor.enter_append_mode();
+            editor.debug_message = format!("✏️ APPEND {} - {}", editor.current_field_type(), editor.get_input_rules());
+        },
+        (_, KeyCode::Esc, _) => editor.exit_edit_mode(),
 
-        // Escape: Exit edit mode
-        (_, KeyCode::Esc, _) => {
-            if mode == AppMode::Edit {
-                editor.exit_edit_mode();
-            } else {
-                editor.clear_command_buffer();
-            }
-        }
+        // Enhanced demo features
+        (AppMode::ReadOnly, KeyCode::Char('e'), _) => editor.cycle_example_data(),
+        (AppMode::ReadOnly, KeyCode::Char('r'), _) => editor.toggle_raw_data_view(),
+        (AppMode::ReadOnly, KeyCode::Char('c'), _) => editor.toggle_cursor_details(),
+        (AppMode::ReadOnly, KeyCode::Char('m'), _) => editor.show_position_mapping(),
+        (AppMode::ReadOnly, KeyCode::F(1), _) => editor.toggle_validation(),
 
-        // === FORMATTER-SPECIFIC COMMANDS ===
-        (AppMode::ReadOnly, KeyCode::Char('m'), _) => {
-            editor.show_formatter_details();
-            editor.clear_command_buffer();
-        }
-        (AppMode::ReadOnly, KeyCode::Char('r'), _) => {
-            editor.toggle_raw_data_view();
-            editor.clear_command_buffer();
-        }
-        (AppMode::ReadOnly, KeyCode::F(1), _) => {
-            editor.toggle_validation();
-        }
+        // Movement
+        (_, KeyCode::Up, _) | (AppMode::ReadOnly, KeyCode::Char('k'), _) => editor.move_up(),
+        (_, KeyCode::Down, _) | (AppMode::ReadOnly, KeyCode::Char('j'), _) => editor.move_down(),
+        (_, KeyCode::Left, _) | (AppMode::ReadOnly, KeyCode::Char('h'), _) => editor.move_left(),
+        (_, KeyCode::Right, _) | (AppMode::ReadOnly, KeyCode::Char('l'), _) => editor.move_right(),
+        (_, KeyCode::Tab, _) => editor.next_field(),
+        (_, KeyCode::BackTab, _) => editor.prev_field(),
 
-        // === MOVEMENT ===
-        (AppMode::ReadOnly, KeyCode::Char('h'), _) | (AppMode::ReadOnly, KeyCode::Left, _) => {
-            editor.move_left();
-            editor.clear_command_buffer();
-        }
-        (AppMode::ReadOnly, KeyCode::Char('l'), _) | (AppMode::ReadOnly, KeyCode::Right, _) => {
-            editor.move_right();
-            editor.clear_command_buffer();
-        }
-        (AppMode::ReadOnly, KeyCode::Char('j'), _) | (AppMode::ReadOnly, KeyCode::Down, _) => {
-            editor.move_down();
-            editor.clear_command_buffer();
-        }
-        (AppMode::ReadOnly, KeyCode::Char('k'), _) | (AppMode::ReadOnly, KeyCode::Up, _) => {
-            editor.move_up();
-            editor.clear_command_buffer();
-        }
-
-        // Line movement
-        (AppMode::ReadOnly, KeyCode::Char('0'), _) => {
-            editor.move_line_start();
-            editor.clear_command_buffer();
-        }
-        (AppMode::ReadOnly, KeyCode::Char('$'), _) => {
-            editor.move_line_end();
-            editor.clear_command_buffer();
-        }
-
-        // === EDIT MODE MOVEMENT ===
-        (AppMode::Edit, KeyCode::Left, _) => {
-            editor.move_left();
-        }
-        (AppMode::Edit, KeyCode::Right, _) => {
-            editor.move_right();
-        }
-        (AppMode::Edit, KeyCode::Up, _) => {
-            editor.move_up();
-        }
-        (AppMode::Edit, KeyCode::Down, _) => {
-            editor.move_down();
-        }
-
-        // === DELETE OPERATIONS ===
-        (AppMode::Edit, KeyCode::Backspace, _) => {
-            editor.delete_backward()?;
-        }
-        (AppMode::Edit, KeyCode::Delete, _) => {
-            editor.delete_forward()?;
-        }
-
-        // === TAB NAVIGATION ===
-        (_, KeyCode::Tab, _) => {
-            editor.next_field();
-        }
-        (_, KeyCode::BackTab, _) => {
-            editor.prev_field();
-        }
-
-        // === CHARACTER INPUT ===
+        // Editing
         (AppMode::Edit, KeyCode::Char(c), m) if !m.contains(KeyModifiers::CONTROL) => {
             editor.insert_char(c)?;
-        }
+        },
+        (AppMode::Edit, KeyCode::Backspace, _) => { editor.delete_backward()?; },
+        (AppMode::Edit, KeyCode::Delete, _) => { editor.delete_forward()?; },
 
-        // === DEBUG/INFO COMMANDS ===
+        // Field analysis
         (AppMode::ReadOnly, KeyCode::Char('?'), _) => {
-            let (raw, display, fmt_info) = editor.get_current_field_info();
-            editor.set_debug_message(format!(
-                "Field {}/{}, Cursor {}, {}, Raw: '{}', Display: '{}'",
-                editor.current_field() + 1,
-                editor.data_provider().field_count(),
-                editor.cursor_position(),
-                fmt_info,
-                raw,
-                display
-            ));
-        }
+            let (raw, display, status, warning) = editor.get_current_field_analysis();
+            let warning_text = warning.map(|w| format!(" ⚠️ {}", w)).unwrap_or_default();
+            editor.debug_message = format!(
+                "🔍 Field {}: {} | Raw: '{}' | Display: '{}'{}", 
+                editor.current_field() + 1, status, raw, display, warning_text
+            );
+        },
 
-        _ => {
-            if editor.has_pending_command() {
-                editor.clear_command_buffer();
-                editor.set_debug_message("Invalid command sequence".to_string());
-            }
-        }
+        _ => {}
     }
 
     Ok(true)
@@ -605,7 +541,7 @@ fn handle_key_press(
 
 fn run_app<B: Backend>(
     terminal: &mut Terminal<B>,
-    mut editor: PscDemoFormEditor<PscDemoData>,
+    mut editor: EnhancedDemoEditor<MultiFormatterDemoData>,
 ) -> io::Result<()> {
     loop {
         terminal.draw(|f| ui(f, &editor))?;
@@ -618,132 +554,143 @@ fn run_app<B: Backend>(
                     }
                 }
                 Err(e) => {
-                    editor.set_debug_message(format!("Error: {}", e));
+                    editor.debug_message = format!("❌ Error: {}", e);
                 }
             }
         }
     }
-
     Ok(())
 }
 
-fn ui(f: &mut Frame, editor: &PscDemoFormEditor<PscDemoData>) {
+fn ui(f: &mut Frame, editor: &EnhancedDemoEditor<MultiFormatterDemoData>) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([Constraint::Min(8), Constraint::Length(16)])
+        .constraints([Constraint::Min(8), Constraint::Length(18)])
         .split(f.area());
 
-    render_enhanced_canvas(f, chunks[0], editor);
-    render_formatter_status(f, chunks[1], editor);
+    render_canvas_default(f, chunks[0], &editor.editor);
+    render_enhanced_status(f, chunks[1], editor);
 }
 
-fn render_enhanced_canvas(f: &mut Frame, area: Rect, editor: &PscDemoFormEditor<PscDemoData>) {
-    render_canvas_default(f, area, &editor.editor);
-}
-
-fn render_formatter_status(
+fn render_enhanced_status(
     f: &mut Frame,
     area: Rect,
-    editor: &PscDemoFormEditor<PscDemoData>,
+    editor: &EnhancedDemoEditor<MultiFormatterDemoData>,
 ) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(3), // Status bar
-            Constraint::Length(6), // Data comparison
-            Constraint::Length(7), // Help
+            Constraint::Length(3),  // Status bar
+            Constraint::Length(6),  // Current field analysis
+            Constraint::Length(9),  // Help
         ])
         .split(area);
 
-    // Status bar with formatter information
+    // Status bar
     let mode_text = match editor.mode() {
         AppMode::Edit => "INSERT",
         AppMode::ReadOnly => "NORMAL",
         _ => "OTHER",
     };
 
-    let fmt_status = editor.get_formatter_status();
+    let formatter_count = (0..editor.data_provider().field_count())
+        .filter(|&i| editor.data_provider().validation_config(i).is_some())
+        .count();
+
     let status_text = format!(
-        "-- {} -- {} | Formatters: {} | View: {}",
+        "-- {} -- {} | Formatters: {}/{} active | View: {}{}",
         mode_text,
-        editor.debug_message(),
-        fmt_status,
-        if editor.show_raw_data { "RAW" } else { "FORMATTED" }
+        editor.debug_message,
+        formatter_count,
+        editor.data_provider().field_count(),
+        if editor.show_raw_data { "RAW" } else { "DISPLAY" },
+        if editor.show_cursor_details { " | CURSOR+" } else { "" }
     );
 
-    let status =
-        Paragraph::new(Line::from(Span::raw(status_text)))
-            .block(Block::default().borders(Borders::ALL).title("🧩 Custom Formatter Demo"));
+    let status = Paragraph::new(Line::from(Span::raw(status_text)))
+        .block(Block::default().borders(Borders::ALL).title("🧩 Enhanced Custom Formatter Demo"));
 
     f.render_widget(status, chunks[0]);
 
-    // Data comparison showing raw vs display
-    let (raw_data, display_data, fmt_info) = editor.get_current_field_info();
+    // Current field analysis
+    let (raw, display, status, warning) = editor.get_current_field_analysis();
     let field_name = editor.data_provider().field_name(editor.current_field());
+    let field_type = editor.current_field_type();
+    
+    let mut analysis_lines = vec![
+        format!("📝 Current: {} ({})", field_name, field_type),
+        format!("🔧 Status: {}", status),
+    ];
 
-    let comparison_text = format!(
-        "📝 Current Field: {}\n\
-         🔧 Formatter Config: {}\n\
-         \n\
-         💾 Raw Business Data: '{}' ← What's actually stored in your database\n\
-         ✨ Formatted Display: '{}' ← What users see in the interface\n\
-         📍 Cursor: Raw pos {} → Display pos {}",
-        field_name,
-        fmt_info,
-        raw_data,
-        display_data,
-        editor.cursor_position(),
-        editor.editor.display_cursor_position()
-    );
-
-    let comparison_style = if raw_data != display_data {
-        Style::default().fg(Color::Green) // Green when formatting is active
+    if editor.show_raw_data || editor.mode() == AppMode::Edit {
+        analysis_lines.push(format!("💾 Raw Data: '{}'", raw));
+        analysis_lines.push(format!("✨ Display: '{}'", display));
     } else {
-        Style::default().fg(Color::Gray) // Gray when no formatting
+        analysis_lines.push(format!("✨ User Sees: '{}'", display));
+        analysis_lines.push(format!("💾 Stored As: '{}'", raw));
+    }
+
+    if editor.show_cursor_details {
+        analysis_lines.push(format!(
+            "📍 Cursor: Raw[{}] → Display[{}]",
+            editor.cursor_position(),
+            editor.editor.display_cursor_position()
+        ));
+    }
+
+    if let Some(ref warn) = warning {
+        analysis_lines.push(format!("⚠️ Warning: {}", warn));
+    }
+
+    let analysis_color = if warning.is_some() {
+        Color::Yellow
+    } else if raw != display && editor.validation_enabled {
+        Color::Green
+    } else {
+        Color::Gray
     };
 
-    let data_comparison = Paragraph::new(comparison_text)
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .title("📊 Raw Data vs App-Provided Formatting"),
-        )
-        .style(comparison_style)
+    let analysis = Paragraph::new(analysis_lines.join("\n"))
+        .block(Block::default().borders(Borders::ALL).title("🔍 Field Analysis"))
+        .style(Style::default().fg(analysis_color))
         .wrap(Wrap { trim: true });
 
-    f.render_widget(data_comparison, chunks[1]);
+    f.render_widget(analysis, chunks[1]);
 
-    // Help text
+    // Enhanced help
     let help_text = match editor.mode() {
         AppMode::ReadOnly => {
-            "🧩 CUSTOM FORMATTER DEMO: App provides parsing/formatting; library displays and maps cursor!\n\
+            "🧩 ENHANCED CUSTOM FORMATTER DEMO\n\
              \n\
-             Try the PSC field:\n\
-             • Type: 01001  → Display: 010 01\n\
-             • Raw data stays unmodified: '01001'\n\
+             Try these formatters:
+             • PSC: 01001 → 010 01 | Phone: 1234567890 → (123) 456-7890 | Card: 1234567890123456 → 1234 5678 9012 3456
+             • Date: 12012024 → 12/01/2024 | Plain: no formatting
              \n\
-             Commands: i/a=insert, m=formatter details, r=toggle raw/display view\n\
-             Movement: hjkl/arrows=move, 0/$ line start/end, Tab=next field, F1=toggle formatting\n\
-             ?=detailed info, Ctrl+C=quit"
+             Commands: i=insert, e=cycle examples, r=toggle raw/display, c=cursor details, m=position mapping\n\
+             Movement: hjkl/arrows, Tab=next field, ?=analyze current field, F1=toggle formatters\n\
+             Ctrl+C/F10=quit"
         }
         AppMode::Edit => {
-            "✏️ INSERT MODE - Type to see real-time custom formatter output!\n\
+            "✏️ INSERT MODE - Real-time formatting as you type!\n\
              \n\
-             Key Points:\n\
-             • Your app formats; library displays and maps cursor\n\
-             • Raw input is authoritative for validation and storage\n\
+             Current field rules: {}\n\
+             • Raw input is authoritative (what gets stored)\n\
+             • Display formatting updates in real-time (what users see)\n\
+             • Cursor position is mapped between raw and display\n\
              \n\
-             arrows=move, Backspace/Del=delete, Esc=normal, Tab=next field"
+             Esc=normal mode, arrows=navigate, Backspace/Del=delete"
         }
-        _ => "🧩 Custom Formatter Demo Active!"
+        _ => "🧩 Enhanced Custom Formatter Demo"
     };
 
-    let help = Paragraph::new(help_text)
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .title("🚀 Formatter Features & Commands"),
-        )
+    let formatted_help = if editor.mode() == AppMode::Edit {
+        help_text.replace("{}", editor.get_input_rules())
+    } else {
+        help_text.to_string()
+    };
+
+    let help = Paragraph::new(formatted_help)
+        .block(Block::default().borders(Borders::ALL).title("🚀 Enhanced Features & Commands"))
         .style(Style::default().fg(Color::Gray))
         .wrap(Wrap { trim: true });
 
@@ -751,15 +698,15 @@ fn render_formatter_status(
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Print feature status
-    println!("🧩 Canvas Custom Formatter Demo (Feature 4)");
+    println!("🧩 Enhanced Canvas Custom Formatter Demo (Feature 4)");
     println!("✅ validation feature: ENABLED");
     println!("✅ gui feature: ENABLED");
-    println!("🧩 Custom formatting: ACTIVE");
-    println!("🔥 Key Benefits Demonstrated:");
-    println!("   • App decides how to display values (e.g., PSC '01001' → '010 01')");
-    println!("   • Library handles display + cursor mapping automatically");
-    println!("   • Raw input remains authoritative for validation/storage");
+    println!("🧩 Enhanced features:");
+    println!("   • 5 different custom formatters with edge cases");
+    println!("   • Real-time format preview and validation");
+    println!("   • Advanced cursor position mapping");
+    println!("   • Comprehensive error handling and warnings");
+    println!("   • Raw vs formatted data separation demos");
     println!();
 
     enable_raw_mode()?;
@@ -768,8 +715,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
-    let data = PscDemoData::new();
-    let editor = PscDemoFormEditor::new(data);
+    let data = MultiFormatterDemoData::new();
+    let editor = EnhancedDemoEditor::new(data);
 
     let res = run_app(&mut terminal, editor);
 
@@ -781,7 +728,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("{:?}", err);
     }
 
-    println!("🧩 Custom formatter demo completed!");
-    println!("🏆 You saw how app-defined formatting integrates seamlessly with the library!");
+    println!("🧩 Enhanced custom formatter demo completed!");
+    println!("🏆 You experienced comprehensive custom formatting with:");
+    println!("   • Multiple formatter types (PSC, Phone, Credit Card, Date)");
+    println!("   • Edge case handling (incomplete, invalid, overflow)");
+    println!("   • Real-time format preview and cursor mapping");
+    println!("   • Clear separation between raw business data and display formatting");
     Ok(())
 }
