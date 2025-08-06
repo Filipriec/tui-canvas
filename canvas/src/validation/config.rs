@@ -22,6 +22,9 @@ pub struct ValidationConfig {
     #[cfg(feature = "validation")]
     pub custom_formatter: Option<Arc<dyn CustomFormatter + Send + Sync>>,
 
+    /// Enable external validation indicator UI (feature 5)
+    pub external_validation_enabled: bool,
+
     /// Future: External validation
     pub external_validation: Option<()>, // Placeholder for future implementation
 }
@@ -47,6 +50,7 @@ impl std::fmt::Debug for ValidationConfig {
                   }
               },
           )
+          .field("external_validation_enabled", &self.external_validation_enabled)
           .field("external_validation", &self.external_validation)
           .finish()
     }
@@ -282,6 +286,12 @@ impl ValidationConfigBuilder {
     /// Set maximum number of characters (convenience method)
     pub fn with_max_length(mut self, max_length: usize) -> Self {
         self.config.character_limits = Some(CharacterLimits::new(max_length));
+        self
+    }
+
+    /// Enable or disable external validation indicator UI (feature 5)
+    pub fn with_external_validation_enabled(mut self, enabled: bool) -> Self {
+        self.config.external_validation_enabled = enabled;
         self
     }
 

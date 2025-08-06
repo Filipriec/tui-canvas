@@ -1,9 +1,7 @@
 // src/validation/state.rs
 //! Validation state management
 
-use crate::validation::{ValidationConfig, ValidationResult};
-#[cfg(feature = "validation")]
-use crate::validation::{PositionMapper};
+use crate::validation::{ValidationConfig, ValidationResult, ExternalValidationState};
 use std::collections::HashMap;
 
 /// Validation state for all fields in a form
@@ -20,6 +18,9 @@ pub struct ValidationState {
     
     /// Global validation enabled/disabled
     enabled: bool,
+
+    /// External validation results per field (Feature 5)
+    external_results: HashMap<usize, ExternalValidationState>,
 }
 
 impl ValidationState {
@@ -30,6 +31,7 @@ impl ValidationState {
             field_results: HashMap::new(),
             validated_fields: std::collections::HashSet::new(),
             enabled: true,
+            external_results: HashMap::new(),
         }
     }
     
@@ -40,6 +42,7 @@ impl ValidationState {
             // Clear all validation results when disabled
             self.field_results.clear();
             self.validated_fields.clear();
+            self.external_results.clear(); // Also clear external results
         }
     }
     
@@ -50,12 +53,13 @@ impl ValidationState {
     
     /// Set validation configuration for a field
     pub fn set_field_config(&mut self, field_index: usize, config: ValidationConfig) {
-        if config.has_validation() {
+        if config.has_validation() || config.external_validation_enabled {
             self.field_configs.insert(field_index, config);
         } else {
             self.field_configs.remove(&field_index);
             self.field_results.remove(&field_index);
             self.validated_fields.remove(&field_index);
+            self.external_results.remove(&field_index);
         }
     }
     
@@ -69,6 +73,30 @@ impl ValidationState {
         self.field_configs.remove(&field_index);
         self.field_results.remove(&field_index);
         self.validated_fields.remove(&field_index);
+        self.external_results.remove(&field_index);
+    }
+    
+    /// Set external validation state for a field (Feature 5)
+    pub fn set_external_validation(&mut self, field_index: usize, state: ExternalValidationState) {
+        self.external_results.insert(field_index, state);
+    }
+    
+    /// Get current external validation state for a field
+    pub fn get_external_validation(&self, field_index: usize) -> ExternalValidationState {
+        self.external_results
+            .get(&field_index)
+            .cloned()
+            .unwrap_or(ExternalValidationState::NotValidated)
+    }
+    
+    /// Clear external validation state for a field
+    pub fn clear_external_validation(&mut self, field_index: usize) {
+        self.external_results.remove(&field_index);
+    }
+    
+    /// Clear all external validation states
+    pub fn clear_all_external_validation(&mut self) {
+        self.external_results.clear();
     }
     
     /// Validate character insertion for a field
@@ -123,7 +151,7 @@ impl ValidationState {
     pub fn get_field_result(&self, field_index: usize) -> Option<&ValidationResult> {
         self.field_results.get(&field_index)
     }
-
+    
     /// Get formatted display for a field if a custom formatter is configured.
     /// Returns (formatted_text, position_mapper, optional_warning_message).
     #[cfg(feature = "validation")]
@@ -131,7 +159,7 @@ impl ValidationState {
         &self,
         field_index: usize,
         raw: &str,
-    ) -> Option<(String, std::sync::Arc<dyn PositionMapper>, Option<String>)> {
+    ) -> Option<(String, std::sync::Arc<dyn crate::validation::PositionMapper>, Option<String>)> {
         let config = self.field_configs.get(&field_index)?;
         config.run_custom_formatter(raw)
     }

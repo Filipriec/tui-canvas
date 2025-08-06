@@ -134,6 +134,24 @@ impl<D: DataProvider> FormEditor<D> {
         &self.ui_state
     }
 
+    /// Set external validation state for a field (Feature 5)
+    #[cfg(feature = "validation")]
+    pub fn set_external_validation(
+        &mut self,
+        field_index: usize,
+        state: crate::validation::ExternalValidationState,
+    ) {
+        self.ui_state
+            .validation
+            .set_external_validation(field_index, state);
+    }
+
+    /// Clear external validation state for a field (Feature 5)
+    #[cfg(feature = "validation")]
+    pub fn clear_external_validation(&mut self, field_index: usize) {
+        self.ui_state.validation.clear_external_validation(field_index);
+    }
+
     /// Get effective display text for any field index.
     ///
     /// Policies:
