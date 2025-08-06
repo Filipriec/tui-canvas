@@ -1,32 +1,28 @@
 // src/validation/mod.rs
-//! Validation module for canvas form fields
 
+// Core validation modules
 pub mod config;
 pub mod limits;
 pub mod state;
 pub mod patterns;
+pub mod mask;  // Simple display mask instead of complex reserved chars
 
 // Re-export main types
 pub use config::{ValidationConfig, ValidationResult, ValidationConfigBuilder};
 pub use limits::{CharacterLimits, LimitCheckResult};
 pub use state::{ValidationState, ValidationSummary};
 pub use patterns::{PatternFilters, PositionFilter, PositionRange, CharacterFilter};
+pub use mask::DisplayMask;  // Simple mask instead of ReservedCharacters
 
 /// Validation error types
 #[derive(Debug, Clone, thiserror::Error)]
 pub enum ValidationError {
-    #[error("Character limit exceeded: {current}/{max}")]
-    CharacterLimitExceeded { current: usize, max: usize },
-    
-    #[error("Invalid character '{char}' at position {position}")]
-    InvalidCharacter { char: char, position: usize },
+    #[error("Character limit exceeded: {message}")]
+    LimitExceeded { message: String },
     
     #[error("Pattern validation failed: {message}")]
-    PatternValidationFailed { message: String },
+    PatternFailed { message: String },
     
-    #[error("Validation configuration error: {message}")]
-    ConfigurationError { message: String },
+    #[error("Custom validation failed: {message}")]
+    CustomFailed { message: String },
 }
-
-/// Result type for validation operations
-pub type Result<T> = std::result::Result<T, ValidationError>;

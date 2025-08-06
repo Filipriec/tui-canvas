@@ -52,7 +52,30 @@ pub fn render_canvas_with_highlight<T: CanvasTheme, D: DataProvider>(
 
     for i in 0..field_count {
         fields.push(data_provider.field_name(i));
-        inputs.push(data_provider.field_value(i).to_string());
+
+        // Use display text that applies masks if configured
+        #[cfg(feature = "validation")]
+        {
+            if i == editor.current_field() {
+                inputs.push(editor.current_display_text());
+            } else {
+                // For non-current fields, we need to apply mask manually
+                let raw = data_provider.field_value(i);
+                if let Some(cfg) = editor.ui_state().validation_state().get_field_config(i) {
+                    if let Some(mask) = &cfg.display_mask {
+                        inputs.push(mask.apply_to_display(raw));
+                    } else {
+                        inputs.push(raw.to_string());
+                    }
+                } else {
+                    inputs.push(raw.to_string());
+                }
+            }
+        }
+        #[cfg(not(feature = "validation"))]
+        {
+            inputs.push(data_provider.field_value(i).to_string());
+        }
     }
 
     let current_field_idx = ui_state.current_field();
@@ -66,13 +89,46 @@ pub fn render_canvas_with_highlight<T: CanvasTheme, D: DataProvider>(
         &inputs,
         theme,
         is_edit_mode,
-        highlight_state, // Now using the actual highlight state!
-        ui_state.cursor_position(),
+        highlight_state,
+        editor.display_cursor_position(), // Use display cursor position for masks
         false, // TODO: track unsaved changes in editor
         |i| {
-            data_provider.display_value(i).unwrap_or(data_provider.field_value(i)).to_string()
+            // Get display value for field i
+            #[cfg(feature = "validation")]
+            {
+                if i == editor.current_field() {
+                    editor.current_display_text()
+                } else {
+                    let raw = data_provider.field_value(i);
+                    if let Some(cfg) = editor.ui_state().validation_state().get_field_config(i) {
+                        if let Some(mask) = &cfg.display_mask {
+                            mask.apply_to_display(raw)
+                        } else {
+                            raw.to_string()
+                        }
+                    } else {
+                        raw.to_string()
+                    }
+                }
+            }
+            #[cfg(not(feature = "validation"))]
+            {
+                data_provider.field_value(i).to_string()
+            }
         },
-        |i| data_provider.display_value(i).is_some(),
+        |i| {
+            // Check if field has display override (mask)
+            #[cfg(feature = "validation")]
+            {
+                editor.ui_state().validation_state().get_field_config(i)
+                    .and_then(|cfg| cfg.display_mask.as_ref())
+                    .is_some()
+            }
+            #[cfg(not(feature = "validation"))]
+            {
+                false
+            }
+        },
     )
 }
 
@@ -245,7 +301,7 @@ fn apply_highlighting<'a, T: CanvasTheme>(
     current_cursor_pos: usize,
     highlight_state: &HighlightState,
     theme: &T,
-    is_active: bool,
+    _is_active: bool,
 ) -> Line<'a> {
     let text_len = text.chars().count();
 
@@ -257,10 +313,10 @@ fn apply_highlighting<'a, T: CanvasTheme>(
             ))
         }
         HighlightState::Characterwise { anchor } => {
-            apply_characterwise_highlighting(text, text_len, field_index, current_field_idx, current_cursor_pos, anchor, theme, is_active)
+            apply_characterwise_highlighting(text, text_len, field_index, current_field_idx, current_cursor_pos, anchor, theme, _is_active)
         }
         HighlightState::Linewise { anchor_line } => {
-            apply_linewise_highlighting(text, field_index, current_field_idx, anchor_line, theme, is_active)
+            apply_linewise_highlighting(text, field_index, current_field_idx, anchor_line, theme, _is_active)
         }
     }
 }
@@ -275,7 +331,7 @@ fn apply_characterwise_highlighting<'a, T: CanvasTheme>(
     current_cursor_pos: usize,
     anchor: &(usize, usize),
     theme: &T,
-    is_active: bool,
+    _is_active: bool,
 ) -> Line<'a> {
     let (anchor_field, anchor_char) = *anchor;
     let start_field = min(anchor_field, *current_field_idx);
@@ -378,7 +434,7 @@ fn apply_linewise_highlighting<'a, T: CanvasTheme>(
     current_field_idx: &usize,
     anchor_line: &usize,
     theme: &T,
-    is_active: bool,
+    _is_active: bool,
 ) -> Line<'a> {
     let start_field = min(*anchor_line, *current_field_idx);
     let end_field = max(*anchor_line, *current_field_idx);

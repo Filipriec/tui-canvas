@@ -3,8 +3,7 @@
 
 #[cfg(feature = "cursor-style")]
 use crate::canvas::CursorManager;
-#[cfg(feature = "cursor-style")]
-use crossterm;
+
 
 use anyhow::Result;
 use crate::canvas::state::EditorState;
@@ -31,16 +30,16 @@ impl<D: DataProvider> FormEditor<D> {
             data_provider,
             suggestions: Vec::new(),
         };
-        
+
         // Initialize validation configurations if validation feature is enabled
         #[cfg(feature = "validation")]
         {
             editor.initialize_validation();
         }
-        
+
         editor
     }
-    
+
     /// Initialize validation configurations from data provider
     #[cfg(feature = "validation")]
     fn initialize_validation(&mut self) {
@@ -86,6 +85,24 @@ impl<D: DataProvider> FormEditor<D> {
         }
     }
 
+    /// Get current field text for display, applying mask if configured
+    #[cfg(feature = "validation")]
+    pub fn current_display_text(&self) -> String {
+        let field_index = self.ui_state.current_field;
+        let raw = if field_index < self.data_provider.field_count() {
+            self.data_provider.field_value(field_index)
+        } else {
+            ""
+        };
+
+        if let Some(cfg) = self.ui_state.validation.get_field_config(field_index) {
+            if let Some(mask) = &cfg.display_mask {
+                return mask.apply_to_display(raw);
+            }
+        }
+        raw.to_string()
+    }
+
     /// Get reference to UI state for rendering
     pub fn ui_state(&self) -> &EditorState {
         &self.ui_state
@@ -100,20 +117,20 @@ impl<D: DataProvider> FormEditor<D> {
     pub fn suggestions(&self) -> &[SuggestionItem] {
         &self.suggestions
     }
-    
+
     /// Get validation state (for user's business logic)
     /// Only available when the 'validation' feature is enabled
     #[cfg(feature = "validation")]
     pub fn validation_state(&self) -> &crate::validation::ValidationState {
         self.ui_state.validation_state()
     }
-    
+
     /// Get validation result for current field
     #[cfg(feature = "validation")]
     pub fn current_field_validation(&self) -> Option<&crate::validation::ValidationResult> {
         self.ui_state.validation.get_field_result(self.ui_state.current_field)
     }
-    
+
     /// Get validation result for specific field
     #[cfg(feature = "validation")]
     pub fn field_validation(&self, field_index: usize) -> Option<&crate::validation::ValidationResult> {
@@ -124,31 +141,69 @@ impl<D: DataProvider> FormEditor<D> {
     // SYNC OPERATIONS: No async needed for basic editing
     // ===================================================================
 
-    /// Handle character insertion
+    /// Handle character insertion with proper mask/limit coordination
     pub fn insert_char(&mut self, ch: char) -> Result<()> {
         if self.ui_state.current_mode != AppMode::Edit {
             return Ok(()); // Ignore in non-edit modes
         }
 
         let field_index = self.ui_state.current_field;
-        let cursor_pos = self.ui_state.cursor_pos;
+        let raw_cursor_pos = self.ui_state.cursor_pos;
+        let current_raw_text = self.data_provider.field_value(field_index);
 
-        // Get current text from user
-        let current_text = self.data_provider.field_value(field_index);
+        // 🔥 CRITICAL FIX 1: Check mask constraints FIRST
+        #[cfg(feature = "validation")]
+        {
+            if let Some(cfg) = self.ui_state.validation.get_field_config(field_index) {
+                if let Some(mask) = &cfg.display_mask {
+                    // Get display cursor position
+                    let display_cursor_pos = mask.raw_pos_to_display_pos(raw_cursor_pos);
+                    
+                    // ❌ PREVENT BUG: Reject input if cursor is beyond mask pattern
+                    if display_cursor_pos >= mask.pattern().len() {
+                        tracing::debug!(
+                            "Character insertion rejected: cursor beyond mask pattern length"
+                        );
+                        return Ok(()); // Silently reject - user can't type beyond mask
+                    }
+                    
+                    // ❌ PREVENT BUG: Reject input if cursor is on a separator position
+                    if !mask.is_input_position(display_cursor_pos) {
+                        tracing::debug!(
+                            "Character insertion rejected: cursor on separator position {}", 
+                            display_cursor_pos
+                        );
+                        return Ok(()); // Silently reject - can't type on separators
+                    }
+                    
+                    // ❌ PREVENT BUG: Check if we're at max input positions for this mask
+                    let input_char_count = (0..mask.pattern().len())
+                        .filter(|&pos| mask.is_input_position(pos))
+                        .count();
+                    
+                    if current_raw_text.len() >= input_char_count {
+                        tracing::debug!(
+                            "Character insertion rejected: mask pattern full ({} input positions)", 
+                            input_char_count
+                        );
+                        return Ok(()); // Silently reject - mask is full
+                    }
+                }
+            }
+        }
 
-        // Validate character insertion if validation is enabled
+        // 🔥 CRITICAL FIX 2: Validate character insertion with mask awareness
         #[cfg(feature = "validation")]
         {
             let validation_result = self.ui_state.validation.validate_char_insertion(
                 field_index,
-                current_text,
-                cursor_pos,
+                current_raw_text,
+                raw_cursor_pos,
                 ch,
             );
-            
+
             // Reject input if validation failed with error
             if !validation_result.is_acceptable() {
-                // Log validation failure for debugging
                 tracing::debug!(
                     "Character insertion rejected for field {}: {:?}",
                     field_index,
@@ -158,38 +213,130 @@ impl<D: DataProvider> FormEditor<D> {
             }
         }
 
-        // Insert character
-        let mut new_text = current_text.to_string();
-        new_text.insert(cursor_pos, ch);
+        // 🔥 CRITICAL FIX 3: Validate the insertion won't break display/limit coordination
+        let new_raw_text = {
+            let mut temp = current_raw_text.to_string();
+            temp.insert(raw_cursor_pos, ch);
+            temp
+        };
 
-        // Update user's data
-        self.data_provider.set_field_value(field_index, new_text);
+        #[cfg(feature = "validation")]
+        {
+            if let Some(cfg) = self.ui_state.validation.get_field_config(field_index) {
+                // Check character limits on the new raw text
+                if let Some(limits) = &cfg.character_limits {
+                    if let Some(result) = limits.validate_content(&new_raw_text) {
+                        if !result.is_acceptable() {
+                            tracing::debug!(
+                                "Character insertion rejected: would exceed character limits"
+                            );
+                            return Ok(()); // Silently reject - would exceed limits
+                        }
+                    }
+                }
+                
+                // Check that mask can handle the new raw text length
+                if let Some(mask) = &cfg.display_mask {
+                    let input_positions = (0..mask.pattern().len())
+                        .filter(|&pos| mask.is_input_position(pos))
+                        .count();
+                    
+                    if new_raw_text.len() > input_positions {
+                        tracing::debug!(
+                            "Character insertion rejected: raw text length {} exceeds mask input positions {}", 
+                            new_raw_text.len(), 
+                            input_positions
+                        );
+                        return Ok(()); // Silently reject - mask can't handle this length
+                    }
+                }
+            }
+        }
 
-        // Update library's UI state
-        self.ui_state.cursor_pos += 1;
+        // ✅ ALL CHECKS PASSED: Safe to insert character
+        self.data_provider.set_field_value(field_index, new_raw_text);
+
+        // 🔥 CRITICAL FIX 4: Update cursor position correctly for mask context
+        #[cfg(feature = "validation")]
+        {
+            if let Some(cfg) = self.ui_state.validation.get_field_config(field_index) {
+                if let Some(mask) = &cfg.display_mask {
+                    // Move to next input position, skipping separators
+                    let new_raw_pos = raw_cursor_pos + 1;
+                    let display_pos = mask.raw_pos_to_display_pos(new_raw_pos);
+                    let next_input_pos = mask.next_input_position(display_pos);
+                    let next_raw_pos = mask.display_pos_to_raw_pos(next_input_pos);
+                    
+                    self.ui_state.cursor_pos = next_raw_pos;
+                    self.ui_state.ideal_cursor_column = next_raw_pos;
+                    return Ok(());
+                }
+            }
+        }
+
+        // No mask: simple increment
+        self.ui_state.cursor_pos = raw_cursor_pos + 1;
         self.ui_state.ideal_cursor_column = self.ui_state.cursor_pos;
 
         Ok(())
     }
 
-    /// Handle cursor movement
+    /// Handle cursor movement left - skips mask separator positions
     pub fn move_left(&mut self) {
-        if self.ui_state.cursor_pos > 0 {
-            self.ui_state.cursor_pos -= 1;
-            self.ui_state.ideal_cursor_column = self.ui_state.cursor_pos;
+        if self.ui_state.cursor_pos == 0 {
+            return;
         }
+
+        let field_index = self.ui_state.current_field;
+        let mut new_pos = self.ui_state.cursor_pos - 1;
+
+        // Skip mask separator positions if configured
+        #[cfg(feature = "validation")]
+        if let Some(cfg) = self.ui_state.validation.get_field_config(field_index) {
+            if let Some(mask) = &cfg.display_mask {
+                // Convert to display position, find previous input position, convert back
+                let display_pos = mask.raw_pos_to_display_pos(new_pos);
+                if let Some(prev_input_display_pos) = mask.prev_input_position(display_pos) {
+                    new_pos = mask.display_pos_to_raw_pos(prev_input_display_pos);
+                }
+            }
+        }
+
+        self.ui_state.cursor_pos = new_pos;
+        self.ui_state.ideal_cursor_column = self.ui_state.cursor_pos;
     }
 
+    /// Handle cursor movement right - skips mask separator positions  
     pub fn move_right(&mut self) {
         let current_text = self.current_text();
-        let max_pos = if self.ui_state.current_mode == AppMode::Edit {
-            current_text.len() // Edit mode: can go past end
+        let is_edit_mode = self.ui_state.current_mode == AppMode::Edit;
+        let max_pos = if is_edit_mode {
+            current_text.len()
         } else {
-            current_text.len().saturating_sub(1) // ReadOnly: stay in bounds
+            current_text.len().saturating_sub(1)
         };
 
-        if self.ui_state.cursor_pos < max_pos {
-            self.ui_state.cursor_pos += 1;
+        if self.ui_state.cursor_pos >= max_pos {
+            return;
+        }
+
+        let field_index = self.ui_state.current_field;
+        let mut new_pos = self.ui_state.cursor_pos + 1;
+
+        // Skip mask separator positions if configured
+        #[cfg(feature = "validation")]
+        if let Some(cfg) = self.ui_state.validation.get_field_config(field_index) {
+            if let Some(mask) = &cfg.display_mask {
+                // Convert to display position, find next input position, convert back
+                let display_pos = mask.raw_pos_to_display_pos(new_pos);
+                let next_input_display_pos = mask.next_input_position(display_pos);
+                new_pos = mask.display_pos_to_raw_pos(next_input_display_pos);
+                new_pos = new_pos.min(max_pos);
+            }
+        }
+
+        if new_pos <= max_pos {
+            self.ui_state.cursor_pos = new_pos;
             self.ui_state.ideal_cursor_column = self.ui_state.cursor_pos;
         }
     }
@@ -198,7 +345,7 @@ impl<D: DataProvider> FormEditor<D> {
     pub fn move_to_next_field(&mut self) {
         let field_count = self.data_provider.field_count();
         let next_field = (self.ui_state.current_field + 1) % field_count;
-        
+
         // Validate current field content before moving if validation is enabled
         #[cfg(feature = "validation")]
         {
@@ -210,7 +357,7 @@ impl<D: DataProvider> FormEditor<D> {
             // Note: We don't prevent field switching on validation failure,
             // just record the validation state
         }
-        
+
         self.ui_state.move_to_field(next_field, field_count);
 
         // Clamp cursor to new field
@@ -271,31 +418,31 @@ impl<D: DataProvider> FormEditor<D> {
     // ===================================================================
     // VALIDATION METHODS (only available with validation feature)
     // ===================================================================
-    
+
     /// Enable or disable validation
     #[cfg(feature = "validation")]
     pub fn set_validation_enabled(&mut self, enabled: bool) {
         self.ui_state.validation.set_enabled(enabled);
     }
-    
+
     /// Check if validation is enabled
     #[cfg(feature = "validation")]
     pub fn is_validation_enabled(&self) -> bool {
         self.ui_state.validation.is_enabled()
     }
-    
+
     /// Set validation configuration for a specific field
     #[cfg(feature = "validation")]
     pub fn set_field_validation(&mut self, field_index: usize, config: crate::validation::ValidationConfig) {
         self.ui_state.validation.set_field_config(field_index, config);
     }
-    
+
     /// Remove validation configuration for a specific field
     #[cfg(feature = "validation")]
     pub fn remove_field_validation(&mut self, field_index: usize) {
         self.ui_state.validation.remove_field_config(field_index);
     }
-    
+
     /// Manually validate current field content
     #[cfg(feature = "validation")]
     pub fn validate_current_field(&mut self) -> crate::validation::ValidationResult {
@@ -303,7 +450,7 @@ impl<D: DataProvider> FormEditor<D> {
         let current_text = self.current_text().to_string();
         self.ui_state.validation.validate_field_content(field_index, &current_text)
     }
-    
+
     /// Manually validate specific field content
     #[cfg(feature = "validation")]
     pub fn validate_field(&mut self, field_index: usize) -> Option<crate::validation::ValidationResult> {
@@ -314,26 +461,26 @@ impl<D: DataProvider> FormEditor<D> {
             None
         }
     }
-    
+
     /// Clear validation results for all fields
     #[cfg(feature = "validation")]
     pub fn clear_validation_results(&mut self) {
         self.ui_state.validation.clear_all_results();
     }
-    
+
     /// Get validation summary for all fields
     #[cfg(feature = "validation")]
     pub fn validation_summary(&self) -> crate::validation::ValidationSummary {
         self.ui_state.validation.summary()
     }
-    
+
     /// Check if field switching is allowed from current field
     #[cfg(feature = "validation")]
     pub fn can_switch_fields(&self) -> bool {
         let current_text = self.current_text();
         self.ui_state.validation.allows_field_switch(self.ui_state.current_field, current_text)
     }
-    
+
     /// Get reason why field switching is blocked (if any)
     #[cfg(feature = "validation")]
     pub fn field_switch_block_reason(&self) -> Option<String> {
@@ -402,7 +549,7 @@ impl<D: DataProvider> FormEditor<D> {
                 // Close autocomplete
                 self.ui_state.deactivate_autocomplete();
                 self.suggestions.clear();
-                
+
                 // Validate the new content if validation is enabled
                 #[cfg(feature = "validation")]
                 {
@@ -648,7 +795,7 @@ impl<D: DataProvider> FormEditor<D> {
             self.data_provider.set_field_value(field_index, current_text.clone());
             self.ui_state.cursor_pos -= 1;
             self.ui_state.ideal_cursor_column = self.ui_state.cursor_pos;
-            
+
             // Validate the new content if validation is enabled
             #[cfg(feature = "validation")]
             {
@@ -674,7 +821,7 @@ impl<D: DataProvider> FormEditor<D> {
         if self.ui_state.cursor_pos < current_text.len() {
             current_text.remove(self.ui_state.cursor_pos);
             self.data_provider.set_field_value(field_index, current_text.clone());
-            
+
             // Validate the new content if validation is enabled
             #[cfg(feature = "validation")]
             {
@@ -700,7 +847,7 @@ impl<D: DataProvider> FormEditor<D> {
                 }
             }
         }
-        
+
         // Adjust cursor position when transitioning from edit to normal mode
         let current_text = self.current_text();
         if !current_text.is_empty() {
@@ -751,7 +898,7 @@ impl<D: DataProvider> FormEditor<D> {
         // Reset cursor to start of field
         self.ui_state.cursor_pos = 0;
         self.ui_state.ideal_cursor_column = 0;
-        
+
         // Validate the new content if validation is enabled
         #[cfg(feature = "validation")]
         {
@@ -771,7 +918,7 @@ impl<D: DataProvider> FormEditor<D> {
                 self.ui_state.cursor_pos = 0;
                 self.ui_state.ideal_cursor_column = 0;
             }
-            
+
             // Validate the new content if validation is enabled
             #[cfg(feature = "validation")]
             {
@@ -812,24 +959,31 @@ impl<D: DataProvider> FormEditor<D> {
         self.ui_state.ideal_cursor_column = clamped_pos;
     }
 
-    /// Get cursor position for display (respects mode-specific positioning rules)
+    /// Get cursor position for display (maps raw cursor to display position with mask)
     pub fn display_cursor_position(&self) -> usize {
         let current_text = self.current_text();
-
-        match self.ui_state.current_mode {
-            AppMode::Edit => {
-                // Edit mode: cursor can be past end of text
-                self.ui_state.cursor_pos.min(current_text.len())
-            }
+        let raw_pos = match self.ui_state.current_mode {
+            AppMode::Edit => self.ui_state.cursor_pos.min(current_text.len()),
             _ => {
-                // Normal/other modes: cursor must be on a character
                 if current_text.is_empty() {
                     0
                 } else {
                     self.ui_state.cursor_pos.min(current_text.len().saturating_sub(1))
                 }
             }
+        };
+
+        #[cfg(feature = "validation")]
+        {
+            let field_index = self.ui_state.current_field;
+            if let Some(cfg) = self.ui_state.validation.get_field_config(field_index) {
+                if let Some(mask) = &cfg.display_mask {
+                    return mask.raw_pos_to_display_pos(self.ui_state.cursor_pos);
+                }
+            }
         }
+
+        self.ui_state.cursor_pos
     }
 
     /// Cleanup cursor style (call this when shutting down)
@@ -914,12 +1068,12 @@ impl<D: DataProvider> FormEditor<D> {
     }
 
     pub fn move_up_with_selection(&mut self) {
-        self.move_up();
+        let _ = self.move_up();
         // Selection anchor stays in place, cursor position updates automatically
     }
 
     pub fn move_down_with_selection(&mut self) {
-        self.move_down();
+        let _ = self.move_down();
         // Selection anchor stays in place, cursor position updates automatically
     }
 
