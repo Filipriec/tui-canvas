@@ -14,6 +14,7 @@ pub trait CanvasTheme {
     fn highlight(&self) -> Color;
     fn highlight_bg(&self) -> Color;
     fn warning(&self) -> Color;
+    fn suggestion_gray(&self) -> Color;
 }
 
 
@@ -46,5 +47,8 @@ impl CanvasTheme for DefaultCanvasTheme {
     }
     fn warning(&self) -> Color {
         Color::Red
+    }
+    fn suggestion_gray(&self) -> Color {
+        Color::DarkGray
     }
 }

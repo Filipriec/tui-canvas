@@ -67,6 +67,15 @@ pub fn render_canvas_with_highlight<T: CanvasTheme, D: DataProvider>(
     let current_field_idx = ui_state.current_field();
     let is_edit_mode = matches!(ui_state.mode(), crate::canvas::modes::AppMode::Edit);
 
+    // Precompute completion for active field
+    let active_completion = if ui_state.is_suggestions_active()
+        && ui_state.suggestions.active_field == Some(current_field_idx)
+    {
+        ui_state.suggestions.completion_text.clone()
+    } else {
+        None
+    };
+
     render_canvas_fields(
         f,
         area,
@@ -111,6 +120,14 @@ pub fn render_canvas_with_highlight<T: CanvasTheme, D: DataProvider>(
                 false
             }
         },
+        // NEW: provide completion for the active field
+        |i| {
+            if i == current_field_idx {
+                active_completion.clone()
+            } else {
+                None
+            }
+        },
     )
 }
 
@@ -128,7 +145,7 @@ fn convert_selection_to_highlight(selection: &crate::canvas::state::SelectionSta
 
 /// Core canvas field rendering
 #[cfg(feature = "gui")]
-fn render_canvas_fields<T: CanvasTheme, F1, F2>(
+fn render_canvas_fields<T: CanvasTheme, F1, F2, F3>(
     f: &mut Frame,
     area: Rect,
     fields: &[&str],
@@ -141,10 +158,12 @@ fn render_canvas_fields<T: CanvasTheme, F1, F2>(
     has_unsaved_changes: bool,
     get_display_value: F1,
     has_display_override: F2,
+    get_completion: F3,
 ) -> Option<Rect>
 where
     F1: Fn(usize) -> String,
     F2: Fn(usize) -> bool,
+    F3: Fn(usize) -> Option<String>,
 {
     // Create layout
     let columns = Layout::default()
@@ -198,6 +217,7 @@ where
         current_cursor_pos,
         get_display_value,
         has_display_override,
+        get_completion,
     )
 }
 
@@ -229,7 +249,7 @@ fn render_field_labels<T: CanvasTheme>(
 
 /// Render field values with highlighting
 #[cfg(feature = "gui")]
-fn render_field_values<T: CanvasTheme, F1, F2>(
+fn render_field_values<T: CanvasTheme, F1, F2, F3>(
     f: &mut Frame,
     input_rows: Vec<Rect>,
     inputs: &[String],
@@ -239,35 +259,54 @@ fn render_field_values<T: CanvasTheme, F1, F2>(
     current_cursor_pos: usize,
     get_display_value: F1,
     has_display_override: F2,
+    get_completion: F3,
 ) -> Option<Rect>
 where
     F1: Fn(usize) -> String,
     F2: Fn(usize) -> bool,
+    F3: Fn(usize) -> Option<String>,
 {
     let mut active_field_input_rect = None;
 
     for (i, _input) in inputs.iter().enumerate() {
         let is_active = i == *current_field_idx;
-        let text = get_display_value(i);
+        let typed_text = get_display_value(i);
 
-        // Apply highlighting
-        let line = apply_highlighting(
-            &text,
-            i,
-            current_field_idx,
-            current_cursor_pos,
-            highlight_state,
-            theme,
-            is_active,
-        );
+        let line = if is_active {
+            // Compose typed + gray completion for the active field
+            let normal_style = Style::default().fg(theme.fg());
+            let gray_style = Style::default().fg(theme.suggestion_gray());
+
+            let mut spans: Vec<Span> = Vec::new();
+            spans.push(Span::styled(typed_text.clone(), normal_style));
+
+            if let Some(completion) = get_completion(i) {
+                if !completion.is_empty() {
+                    spans.push(Span::styled(completion, gray_style));
+                }
+            }
+
+            Line::from(spans)
+        } else {
+            // Non-active fields: keep existing highlighting logic
+            apply_highlighting(
+                &typed_text,
+                i,
+                current_field_idx,
+                current_cursor_pos,
+                highlight_state,
+                theme,
+                is_active,
+            )
+        };
 
         let input_display = Paragraph::new(line).alignment(Alignment::Left);
         f.render_widget(input_display, input_rows[i]);
 
-        // Set cursor for active field
+        // Set cursor for active field at end of typed text (not after completion)
         if is_active {
             active_field_input_rect = Some(input_rows[i]);
-            set_cursor_position(f, input_rows[i], &text, current_cursor_pos, has_display_override(i));
+            set_cursor_position(f, input_rows[i], &typed_text, current_cursor_pos, has_display_override(i));
         }
     }
 

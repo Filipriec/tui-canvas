@@ -40,6 +40,24 @@ impl<D: DataProvider> FormEditor<D> {
         editor
     }
 
+    /// Compute inline completion for current selection and current text.
+    fn compute_current_completion(&self) -> Option<String> {
+        let typed = self.current_text();
+        let idx = self.ui_state.suggestions.selected_index?;
+        let sugg = self.suggestions.get(idx)?;
+        if let Some(rest) = sugg.value_to_store.strip_prefix(typed) {
+            if !rest.is_empty() {
+                return Some(rest.to_string());
+            }
+        }
+        None
+    }
+
+    /// Update UI state's completion text from current selection
+    fn update_inline_completion(&mut self) {
+        self.ui_state.suggestions.completion_text = self.compute_current_completion();
+    }
+
     /// Initialize validation configurations from data provider
     #[cfg(feature = "validation")]
     fn initialize_validation(&mut self) {
@@ -605,6 +623,8 @@ impl<D: DataProvider> FormEditor<D> {
         self.ui_state.suggestions.is_loading = false;
         if !self.suggestions.is_empty() {
             self.ui_state.suggestions.selected_index = Some(0);
+            // Compute initial inline completion from first suggestion
+            self.update_inline_completion();
         }
 
         Ok(())
@@ -619,6 +639,9 @@ impl<D: DataProvider> FormEditor<D> {
         let current = self.ui_state.suggestions.selected_index.unwrap_or(0);
         let next = (current + 1) % self.suggestions.len();
         self.ui_state.suggestions.selected_index = Some(next);
+
+        // Update inline completion to reflect new highlighted item
+        self.update_inline_completion();
     }
 
     /// Apply selected suggestion

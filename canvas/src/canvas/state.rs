@@ -35,6 +35,7 @@ pub struct SuggestionsUIState {
     pub(crate) is_loading: bool,
     pub(crate) selected_index: Option<usize>,
     pub(crate) active_field: Option<usize>,
+    pub(crate) completion_text: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -56,6 +57,7 @@ impl EditorState {
                 is_loading: false,
                 selected_index: None,
                 active_field: None,
+                completion_text: None,
             },
             selection: SelectionState::None,
             #[cfg(feature = "validation")]
@@ -148,6 +150,7 @@ impl EditorState {
         self.suggestions.is_loading = true;
         self.suggestions.active_field = Some(field_index);
         self.suggestions.selected_index = None;
+        self.suggestions.completion_text = None;
     }
 
     pub(crate) fn deactivate_suggestions(&mut self) {
@@ -155,6 +158,7 @@ impl EditorState {
         self.suggestions.is_loading = false;
         self.suggestions.active_field = None;
         self.suggestions.selected_index = None;
+        self.suggestions.completion_text = None;
     }
 }
 
