@@ -19,7 +19,7 @@ pub struct EditorState {
 
     // Selection state (for vim visual mode)
     pub(crate) selection: SelectionState,
-    
+
     // Validation state (only available with validation feature)
     #[cfg(feature = "validation")]
     pub(crate) validation: crate::validation::ValidationState,
@@ -114,7 +114,7 @@ impl EditorState {
     pub fn selection_state(&self) -> &SelectionState {
         &self.selection
     }
-    
+
     /// Get validation state (for user's business logic)
     /// Only available when the 'validation' feature is enabled
     #[cfg(feature = "validation")]
@@ -134,7 +134,12 @@ impl EditorState {
         }
     }
 
-    pub(crate) fn set_cursor(&mut self, position: usize, max_position: usize, for_edit_mode: bool) {
+    pub(crate) fn set_cursor(
+        &mut self,
+        position: usize,
+        max_position: usize,
+        for_edit_mode: bool,
+    ) {
         if for_edit_mode {
             // Edit mode: can go past end for insertion
             self.cursor_pos = position.min(max_position);
@@ -145,6 +150,7 @@ impl EditorState {
         self.ideal_cursor_column = self.cursor_pos;
     }
 
+    /// Legacy internal activation (still used internally if needed)
     pub(crate) fn activate_suggestions(&mut self, field_index: usize) {
         self.suggestions.is_active = true;
         self.suggestions.is_loading = true;
@@ -153,7 +159,26 @@ impl EditorState {
         self.suggestions.completion_text = None;
     }
 
+    /// Legacy internal deactivation
     pub(crate) fn deactivate_suggestions(&mut self) {
+        self.suggestions.is_active = false;
+        self.suggestions.is_loading = false;
+        self.suggestions.active_field = None;
+        self.suggestions.selected_index = None;
+        self.suggestions.completion_text = None;
+    }
+
+    /// Explicitly open suggestions — should only be called on Tab
+    pub(crate) fn open_suggestions(&mut self, field_index: usize) {
+        self.suggestions.is_active = true;
+        self.suggestions.is_loading = true;
+        self.suggestions.active_field = Some(field_index);
+        self.suggestions.selected_index = None;
+        self.suggestions.completion_text = None;
+    }
+
+    /// Explicitly close suggestions — should be called on Esc or field change
+    pub(crate) fn close_suggestions(&mut self) {
         self.suggestions.is_active = false;
         self.suggestions.is_loading = false;
         self.suggestions.active_field = None;

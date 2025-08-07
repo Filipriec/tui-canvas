@@ -152,6 +152,22 @@ impl<D: DataProvider> FormEditor<D> {
         &self.ui_state
     }
 
+    /// Mutable access to UI state for internal crate use only.
+    pub(crate) fn ui_state_mut(&mut self) -> &mut EditorState {
+        &mut self.ui_state
+    }
+
+    /// Open the suggestions UI for `field_index` (UI-only; does not fetch).
+    pub fn open_suggestions(&mut self, field_index: usize) {
+        self.ui_state.open_suggestions(field_index);
+    }
+
+    /// Close suggestions UI and clear the current suggestion results.
+    pub fn close_suggestions(&mut self) {
+        self.ui_state.close_suggestions();
+        self.suggestions.clear();
+    }
+
     /// Set external validation state for a field (Feature 5)
     #[cfg(feature = "validation")]
     pub fn set_external_validation(

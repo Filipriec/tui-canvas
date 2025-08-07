@@ -217,6 +217,16 @@ impl<D: DataProvider> AutoCursorFormEditor<D> {
         Ok(result?)
     }
 
+    // === SUGGESTIONS CONTROL WRAPPERS ===
+
+    fn open_suggestions(&mut self, field_index: usize) {
+        self.editor.open_suggestions(field_index);
+    }
+
+    fn close_suggestions(&mut self) {
+        self.editor.close_suggestions();
+    }
+
     // === MODE TRANSITIONS WITH AUTOMATIC CURSOR MANAGEMENT ===
 
     fn enter_edit_mode(&mut self) {
@@ -541,33 +551,21 @@ async fn handle_key_press(
 
     match (mode, key, modifiers) {
         // === SUGGESTIONS HANDLING ===
-
-        // Tab: Trigger or navigate suggestions
         (_, KeyCode::Tab, _) => {
             if editor.is_suggestions_active() {
+                // Cycle through suggestions
                 editor.suggestions_next();
                 editor.set_debug_message("📍 Next suggestion".to_string());
             } else if editor.data_provider().supports_suggestions(editor.current_field()) {
-                let field_names = ["Fruit", "Job", "Language", "Country", "Color"];
-                let field_name = field_names.get(editor.current_field()).unwrap_or(&"Unknown");
-
+                // Open suggestions explicitly
+                editor.open_suggestions(editor.current_field());
                 match editor.trigger_suggestions(suggestions_provider).await {
                     Ok(_) => {
-                        let current_text = editor.current_text();
-                        if editor.suggestions().is_empty() {
-                            if current_text.is_empty() {
-                                editor.set_debug_message(format!("🔍 No {} suggestions available", field_name.to_lowercase()));
-                            } else {
-                                editor.set_debug_message(format!("🔍 No {} matches for '{}'", field_name.to_lowercase(), current_text));
-                            }
-                        } else {
-                            if current_text.is_empty() {
-                                editor.set_debug_message(format!("✨ {} {} suggestions!", editor.suggestions().len(), field_name.to_lowercase()));
-                            } else {
-                                editor.set_debug_message(format!("✨ {} {} matches for '{}'!", editor.suggestions().len(), field_name.to_lowercase(), current_text));
-                            }
-                        }
                         editor.update_inline_completion();
+                        editor.set_debug_message(format!(
+                            "✨ {} suggestions loaded",
+                            editor.suggestions().len()
+                        ));
                     }
                     Err(e) => {
                         editor.set_debug_message(format!("❌ Suggestion error: {}", e));
@@ -592,6 +590,26 @@ async fn handle_key_press(
                 let field_names = ["Fruit", "Job", "Language", "Country", "Color"];
                 let field_name = field_names.get(editor.current_field()).unwrap_or(&"Field");
                 editor.set_debug_message(format!("Enter: moved to {} field", field_name));
+            }
+        }
+
+        // Escape: Close suggestions or exit mode
+        (_, KeyCode::Esc, _) => {
+            if editor.is_suggestions_active() {
+                editor.close_suggestions();
+                editor.set_debug_message("❌ Suggestions closed".to_string());
+            } else {
+                match mode {
+                    AppMode::Edit => {
+                        editor.exit_edit_mode();
+                    }
+                    AppMode::Highlight => {
+                        editor.exit_visual_mode();
+                    }
+                    _ => {
+                        editor.clear_command_buffer();
+                    }
+                }
             }
         }
 
@@ -628,22 +646,6 @@ async fn handle_key_press(
             editor.clear_command_buffer();
         }
 
-        // Escape: Exit any mode back to normal (and cancel suggestions)
-        (_, KeyCode::Esc, _) => {
-            match mode {
-                AppMode::Edit => {
-                    editor.exit_edit_mode(); // Exit insert mode (suggestions auto-cancelled)
-                }
-                AppMode::Highlight => {
-                    editor.exit_visual_mode(); // Exit visual mode
-                }
-                _ => {
-                    // Already in normal mode, just clear command buffer
-                    editor.clear_command_buffer();
-                }
-            }
-        }
-
         // === CURSOR MANAGEMENT DEMONSTRATION ===
         (AppMode::ReadOnly, KeyCode::F(1), _) => {
             editor.demo_manual_cursor_control()?;
@@ -669,37 +671,21 @@ async fn handle_key_press(
         }
         (AppMode::ReadOnly | AppMode::Highlight, KeyCode::Char('j'), _)
         | (AppMode::ReadOnly | AppMode::Highlight, KeyCode::Down, _) => {
+            editor.close_suggestions(); // ⬅ close dropdown
             editor.move_down();
             let field_names = ["Fruit", "Job", "Language", "Country", "Color"];
             let field_name = field_names.get(editor.current_field()).unwrap_or(&"Field");
             editor.set_debug_message(format!("↓ moved to {} field", field_name));
             editor.clear_command_buffer();
-
-            // Auto-show suggestions when entering a suggestion-enabled field with existing text
-            if editor.data_provider().supports_suggestions(editor.current_field()) {
-                let current_text = editor.current_text();
-                if !current_text.is_empty() {
-                    let _ = editor.trigger_suggestions(suggestions_provider).await;
-                    editor.update_inline_completion();
-                }
-            }
         }
         (AppMode::ReadOnly | AppMode::Highlight, KeyCode::Char('k'), _)
         | (AppMode::ReadOnly | AppMode::Highlight, KeyCode::Up, _) => {
+            editor.close_suggestions(); // ⬅ close dropdown
             editor.move_up();
             let field_names = ["Fruit", "Job", "Language", "Country", "Color"];
             let field_name = field_names.get(editor.current_field()).unwrap_or(&"Field");
             editor.set_debug_message(format!("↑ moved to {} field", field_name));
             editor.clear_command_buffer();
-
-            // Auto-show suggestions when entering a suggestion-enabled field with existing text
-            if editor.data_provider().supports_suggestions(editor.current_field()) {
-                let current_text = editor.current_text();
-                if !current_text.is_empty() {
-                    let _ = editor.trigger_suggestions(suggestions_provider).await;
-                    editor.update_inline_completion();
-                }
-            }
         }
 
         // Word movement
@@ -765,9 +751,11 @@ async fn handle_key_press(
             editor.move_right();
         }
         (AppMode::Edit, KeyCode::Up, _) => {
+            editor.close_suggestions();
             editor.move_up();
         }
         (AppMode::Edit, KeyCode::Down, _) => {
+            editor.close_suggestions();
             editor.move_down();
         }
         (AppMode::Edit, KeyCode::Home, _) => {
