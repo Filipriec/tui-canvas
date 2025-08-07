@@ -12,6 +12,10 @@ pub mod suggestions;
 #[cfg(feature = "validation")]
 pub mod validation;
 
+// Only include computed module if feature is enabled
+#[cfg(feature = "computed")]
+pub mod computed;
+
 #[cfg(feature = "cursor-style")]
 pub use canvas::CursorManager;
 
@@ -40,6 +44,10 @@ pub use validation::{
     // Feature 4: custom formatting exports
     CustomFormatter, FormattingResult, PositionMapper, DefaultPositionMapper,
 };
+
+// Computed exports (only when computed feature is enabled)
+#[cfg(feature = "computed")]
+pub use computed::{ComputedProvider, ComputedContext, ComputedState};
 
 // Theming and GUI
 #[cfg(feature = "gui")]

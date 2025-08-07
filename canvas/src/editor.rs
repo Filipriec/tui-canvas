@@ -668,6 +668,45 @@ impl<D: DataProvider> FormEditor<D> {
             return Ok(());
         }
 
+        // Skip computed fields during navigation when feature enabled
+        #[cfg(feature = "computed")]
+        {
+            if let Some(computed_state) = &self.ui_state.computed {
+                // Find previous non-computed field
+                let mut candidate = self.ui_state.current_field;
+                for _ in 0..field_count {
+                    candidate = candidate.saturating_sub(1);
+                    if !computed_state.is_computed_field(candidate) {
+                        // Validate and move as usual
+                        #[cfg(feature = "validation")]
+                        {
+                            let current_text = self.current_text();
+                            if !self.ui_state.validation.allows_field_switch(self.ui_state.current_field, current_text) {
+                                if let Some(reason) = self.ui_state.validation.field_switch_block_reason(self.ui_state.current_field, current_text) {
+                                    tracing::debug!("Field switch blocked: {}", reason);
+                                    return Err(anyhow::anyhow!("Cannot switch fields: {}", reason));
+                                }
+                            }
+                        }
+                        #[cfg(feature = "validation")]
+                        {
+                            let current_text = self.current_text().to_string();
+                            let _validation_result = self.ui_state.validation.validate_field_content(
+                                self.ui_state.current_field,
+                                &current_text,
+                            );
+                        }
+                        self.ui_state.move_to_field(candidate, field_count);
+                        self.clamp_cursor_to_current_field();
+                        return Ok(());
+                    }
+                    if candidate == 0 {
+                        break;
+                    }
+                }
+            }
+        }
+
         // Check if field switching is allowed (minimum character enforcement)
         #[cfg(feature = "validation")]
         {
@@ -703,6 +742,45 @@ impl<D: DataProvider> FormEditor<D> {
         let field_count = self.data_provider.field_count();
         if field_count == 0 {
             return Ok(());
+        }
+
+        // Skip computed fields during navigation when feature enabled
+        #[cfg(feature = "computed")]
+        {
+            if let Some(computed_state) = &self.ui_state.computed {
+                // Find next non-computed field
+                let mut candidate = self.ui_state.current_field;
+                for _ in 0..field_count {
+                    candidate = (candidate + 1).min(field_count - 1);
+                    if !computed_state.is_computed_field(candidate) {
+                        // Validate and move as usual
+                        #[cfg(feature = "validation")]
+                        {
+                            let current_text = self.current_text();
+                            if !self.ui_state.validation.allows_field_switch(self.ui_state.current_field, current_text) {
+                                if let Some(reason) = self.ui_state.validation.field_switch_block_reason(self.ui_state.current_field, current_text) {
+                                    tracing::debug!("Field switch blocked: {}", reason);
+                                    return Err(anyhow::anyhow!("Cannot switch fields: {}", reason));
+                                }
+                            }
+                        }
+                        #[cfg(feature = "validation")]
+                        {
+                            let current_text = self.current_text().to_string();
+                            let _validation_result = self.ui_state.validation.validate_field_content(
+                                self.ui_state.current_field,
+                                &current_text,
+                            );
+                        }
+                        self.ui_state.move_to_field(candidate, field_count);
+                        self.clamp_cursor_to_current_field();
+                        return Ok(());
+                    }
+                    if candidate == field_count - 1 {
+                        break;
+                    }
+                }
+            }
         }
 
         // Check if field switching is allowed (minimum character enforcement)
@@ -761,6 +839,112 @@ impl<D: DataProvider> FormEditor<D> {
     /// Move to previous field (alternative to move_up)
     pub fn prev_field(&mut self) -> Result<()> {
         self.move_up()
+    }
+
+    // ================================================================================================
+    // COMPUTED FIELDS (behind 'computed' feature)
+    // ================================================================================================
+
+    /// Initialize computed fields from provider and computed provider
+    #[cfg(feature = "computed")]
+    pub fn set_computed_provider<C>(&mut self, mut provider: C)
+    where
+        C: crate::computed::ComputedProvider,
+    {
+        // Initialize computed state
+        self.ui_state.computed = Some(crate::computed::ComputedState::new());
+
+        // Register computed fields and their dependencies
+        let field_count = self.data_provider.field_count();
+        for field_index in 0..field_count {
+            if provider.handles_field(field_index) {
+                let deps = provider.field_dependencies(field_index);
+                if let Some(computed_state) = &mut self.ui_state.computed {
+                    computed_state.register_computed_field(field_index, deps);
+                }
+            }
+        }
+
+        // Initial computation of all computed fields
+        self.recompute_all_fields(&mut provider);
+    }
+
+    /// Recompute specific computed fields
+    #[cfg(feature = "computed")]
+    pub fn recompute_fields<C>(&mut self, provider: &mut C, field_indices: &[usize])
+    where
+        C: crate::computed::ComputedProvider,
+    {
+        if let Some(computed_state) = &mut self.ui_state.computed {
+            // Collect all field values for context
+            let field_values: Vec<String> = (0..self.data_provider.field_count())
+                .map(|i| {
+                    if computed_state.is_computed_field(i) {
+                        // Use cached computed value
+                        computed_state
+                            .get_computed_value(i)
+                            .cloned()
+                            .unwrap_or_default()
+                    } else {
+                        // Use regular field value
+                        self.data_provider.field_value(i).to_string()
+                    }
+                })
+                .collect();
+
+            let field_refs: Vec<&str> = field_values.iter().map(|s| s.as_str()).collect();
+
+            // Recompute specified fields
+            for &field_index in field_indices {
+                if provider.handles_field(field_index) {
+                    let context = crate::computed::ComputedContext {
+                        field_values: &field_refs,
+                        target_field: field_index,
+                        current_field: Some(self.ui_state.current_field),
+                    };
+
+                    let computed_value = provider.compute_field(context);
+                    computed_state.set_computed_value(field_index, computed_value);
+                }
+            }
+        }
+    }
+
+    /// Recompute all computed fields
+    #[cfg(feature = "computed")]
+    pub fn recompute_all_fields<C>(&mut self, provider: &mut C)
+    where
+        C: crate::computed::ComputedProvider,
+    {
+        if let Some(computed_state) = &self.ui_state.computed {
+            let computed_fields: Vec<usize> = computed_state.computed_fields().collect();
+            self.recompute_fields(provider, &computed_fields);
+        }
+    }
+
+    /// Trigger recomputation when field changes (call this after set_field_value)
+    #[cfg(feature = "computed")]
+    pub fn on_field_changed<C>(&mut self, provider: &mut C, changed_field: usize)
+    where
+        C: crate::computed::ComputedProvider,
+    {
+        if let Some(computed_state) = &self.ui_state.computed {
+            let fields_to_update = computed_state.fields_to_recompute(changed_field);
+            if !fields_to_update.is_empty() {
+                self.recompute_fields(provider, &fields_to_update);
+            }
+        }
+    }
+
+    /// Enhanced getter that returns computed values for computed fields when available
+    #[cfg(feature = "computed")]
+    pub fn effective_field_value(&self, field_index: usize) -> String {
+        if let Some(computed_state) = &self.ui_state.computed {
+            if let Some(computed_value) = computed_state.get_computed_value(field_index) {
+                return computed_value.clone();
+            }
+        }
+        self.data_provider.field_value(field_index).to_string()
     }
 
     /// Move to next field (alternative to move_down)
@@ -960,6 +1144,15 @@ impl<D: DataProvider> FormEditor<D> {
 
     /// Enter edit mode from read-only mode (vim i/a/o)
     pub fn enter_edit_mode(&mut self) {
+        #[cfg(feature = "computed")]
+        {
+            if let Some(computed_state) = &self.ui_state.computed {
+                if computed_state.is_computed_field(self.ui_state.current_field) {
+                    // Can't edit computed fields - silently ignore
+                    return;
+                }
+            }
+        }
         self.set_mode(AppMode::Edit);
     }
 

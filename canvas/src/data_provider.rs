@@ -34,6 +34,20 @@ pub trait DataProvider {
     fn validation_config(&self, _field_index: usize) -> Option<crate::validation::ValidationConfig> {
         None
     }
+
+    /// Check if field is computed (display-only, skip in navigation)
+    /// Default: not computed
+    #[cfg(feature = "computed")]
+    fn is_computed_field(&self, _field_index: usize) -> bool {
+        false
+    }
+
+    /// Get computed field value if this is a computed field.
+    /// Returns None for regular fields. Default: not computed.
+    #[cfg(feature = "computed")]
+    fn computed_field_value(&self, _field_index: usize) -> Option<String> {
+        None
+    }
 }
 
 /// Optional: User implements this for suggestions data

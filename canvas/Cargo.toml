@@ -34,6 +34,7 @@ gui = ["ratatui", "crossterm"]
 suggestions = ["tokio"]
 cursor-style = ["crossterm"]
 validation = ["regex"]
+computed = []
 
 [[example]]
 name = "suggestions"
@@ -64,3 +65,7 @@ required-features = ["gui", "validation"]
 [[example]]
 name = "validation_5"
 required-features = ["gui", "validation"]
+
+[[example]]
+name = "computed_fields"
+required-features = ["gui", "computed"]

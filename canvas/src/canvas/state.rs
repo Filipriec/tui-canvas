@@ -23,6 +23,10 @@ pub struct EditorState {
     // Validation state (only available with validation feature)
     #[cfg(feature = "validation")]
     pub(crate) validation: crate::validation::ValidationState,
+
+    /// Computed fields state (only when computed feature is enabled)
+    #[cfg(feature = "computed")]
+    pub(crate) computed: Option<crate::computed::ComputedState>,
 }
 
 #[derive(Debug, Clone)]
@@ -56,6 +60,8 @@ impl EditorState {
             selection: SelectionState::None,
             #[cfg(feature = "validation")]
             validation: crate::validation::ValidationState::new(),
+            #[cfg(feature = "computed")]
+            computed: None,
         }
     }
 
@@ -66,6 +72,15 @@ impl EditorState {
     /// Get current field index (for user's business logic)
     pub fn current_field(&self) -> usize {
         self.current_field
+    }
+
+    /// Check if field is computed
+    #[cfg(feature = "computed")]
+    pub fn is_computed_field(&self, field_index: usize) -> bool {
+        self.computed
+            .as_ref()
+            .map(|state| state.is_computed_field(field_index))
+            .unwrap_or(false)
     }
 
     /// Get current cursor position (for user's business logic)
