@@ -1,5 +1,5 @@
 // examples/suggestions2.rs
-//! Demonstrates automatic cursor management + INTELLIGENT SUGGESTIONS
+//! Demonstrates automatic cursor management + MULTIPLE SUGGESTION FIELDS
 //!
 //! This example REQUIRES the `cursor-style` feature to compile.
 //!
@@ -14,7 +14,6 @@ compile_error!(
 );
 
 use std::io;
-use std::collections::HashMap;
 use crossterm::{
     event::{
         self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyModifiers,
@@ -59,7 +58,7 @@ impl<D: DataProvider> AutoCursorFormEditor<D> {
         Self {
             editor: FormEditor::new(data_provider),
             has_unsaved_changes: false,
-            debug_message: "🎯 Automatic Cursor + Suggestions Demo - cursor-style feature enabled!".to_string(),
+            debug_message: "🎯 Multi-Field Suggestions Demo - 5 fields with different suggestions!".to_string(),
             command_buffer: String::new(),
         }
     }
@@ -334,29 +333,29 @@ impl<D: DataProvider> AutoCursorFormEditor<D> {
     }
 }
 
-// Demo form data with interesting text for cursor demonstration + SUGGESTIONS
-struct CursorDemoData {
+// ===================================================================
+// MULTI-FIELD DEMO DATA - 5 different types of suggestion fields
+// ===================================================================
+
+struct MultiFieldDemoData {
     fields: Vec<(String, String)>,
 }
 
-impl CursorDemoData {
+impl MultiFieldDemoData {
     fn new() -> Self {
         Self {
             fields: vec![
-                ("👤 Name".to_string(), "John-Paul McDonald".to_string()),
-                ("📧 Email".to_string(), "user@exa".to_string()), // Partial for suggestions demo
-                ("📱 Phone".to_string(), "+1 (555) 123-4567".to_string()),
-                ("🏢 Company".to_string(), "tech".to_string()), // Partial for suggestions demo  
-                ("🏠 Address".to_string(), "123 Main St, Apt 4B".to_string()),
-                ("💻 Skills".to_string(), "rust,py".to_string()), // Multi-tag demo
-                ("📝 Notes".to_string(), "Watch the cursor change! Normal=█ Insert=| Visual=blinking█".to_string()),
-                ("🎯 Cursor + Suggestions".to_string(), "Try: Email (user@exa), Company (tech), Skills (rust,py) + Tab for smart suggestions!".to_string()),
+                ("🍎 Favorite Fruit".to_string(), "".to_string()),           // Field 0: Fruits
+                ("💼 Job Role".to_string(), "".to_string()),                 // Field 1: Jobs
+                ("💻 Programming Language".to_string(), "".to_string()),     // Field 2: Languages
+                ("🌍 Country".to_string(), "".to_string()),                  // Field 3: Countries
+                ("🎨 Favorite Color".to_string(), "".to_string()),           // Field 4: Colors
             ],
         }
     }
 }
 
-impl DataProvider for CursorDemoData {
+impl DataProvider for MultiFieldDemoData {
     fn field_count(&self) -> usize {
         self.fields.len()
     }
@@ -374,8 +373,8 @@ impl DataProvider for CursorDemoData {
     }
 
     fn supports_suggestions(&self, field_index: usize) -> bool {
-        // Enable suggestions for email, company, and skills fields
-        matches!(field_index, 1 | 3 | 5)
+        // All 5 fields support suggestions - perfect for testing!
+        field_index < 5
     }
 
     fn display_value(&self, _index: usize) -> Option<&str> {
@@ -384,358 +383,145 @@ impl DataProvider for CursorDemoData {
 }
 
 // ===================================================================
-// INTELLIGENT SUGGESTIONS PROVIDER - More logical behavior
+// COMPREHENSIVE SUGGESTIONS PROVIDER - 5 different suggestion types!
 // ===================================================================
 
-struct PowerfulSuggestionsProvider {
-    // Cache for performance (realistic behavior)
-    email_cache: HashMap<String, Vec<SuggestionItem>>,
-    company_cache: HashMap<String, Vec<SuggestionItem>>,
-}
+struct ComprehensiveSuggestionsProvider;
 
-impl PowerfulSuggestionsProvider {
+impl ComprehensiveSuggestionsProvider {
     fn new() -> Self {
-        Self {
-            email_cache: HashMap::new(),
-            company_cache: HashMap::new(),
-        }
+        Self
+    }
+
+    /// Get fruit suggestions (field 0)
+    fn get_fruit_suggestions(&self, query: &str) -> Vec<SuggestionItem> {
+        let fruits = vec![
+            ("Apple", "🍎 Crisp and sweet"),
+            ("Banana", "🍌 Rich in potassium"),
+            ("Cherry", "🍒 Small and tart"),
+            ("Date", "📅 Sweet and chewy"),
+            ("Elderberry", "🫐 Dark purple berry"),
+            ("Fig", "🍇 Sweet Mediterranean fruit"),
+            ("Grape", "🍇 Perfect for wine"),
+            ("Honeydew", "🍈 Sweet melon"),
+        ];
+
+        self.filter_suggestions(fruits, query, "fruit")
+    }
+
+    /// Get job role suggestions (field 1)
+    fn get_job_suggestions(&self, query: &str) -> Vec<SuggestionItem> {
+        let jobs = vec![
+            ("Software Engineer", "👨‍💻 Build applications"),
+            ("Product Manager", "📋 Manage product roadmap"),
+            ("Data Scientist", "📊 Analyze data patterns"),
+            ("UX Designer", "🎨 Design user experiences"),
+            ("DevOps Engineer", "⚙️ Manage infrastructure"),
+            ("Marketing Manager", "📢 Drive growth"),
+            ("Sales Representative", "💰 Generate revenue"),
+            ("Accountant", "💼 Manage finances"),
+        ];
+
+        self.filter_suggestions(jobs, query, "role")
+    }
+
+    /// Get programming language suggestions (field 2)
+    fn get_language_suggestions(&self, query: &str) -> Vec<SuggestionItem> {
+        let languages = vec![
+            ("Rust", "🦀 Systems programming"),
+            ("Python", "🐍 Versatile and popular"),
+            ("JavaScript", "⚡ Web development"),
+            ("TypeScript", "🔷 Typed JavaScript"),
+            ("Go", "🏃 Fast and simple"),
+            ("Java", "☕ Enterprise favorite"),
+            ("C++", "⚡ High performance"),
+            ("Swift", "🍎 iOS development"),
+        ];
+
+        self.filter_suggestions(languages, query, "language")
+    }
+
+    /// Get country suggestions (field 3)
+    fn get_country_suggestions(&self, query: &str) -> Vec<SuggestionItem> {
+        let countries = vec![
+            ("United States", "🇺🇸 North America"),
+            ("Canada", "🇨🇦 Great neighbors"),
+            ("United Kingdom", "🇬🇧 Tea and crumpets"),
+            ("Germany", "🇩🇪 Engineering excellence"),
+            ("France", "🇫🇷 Art and cuisine"),
+            ("Japan", "🇯🇵 Technology hub"),
+            ("Australia", "🇦🇺 Down under"),
+            ("Brazil", "🇧🇷 Carnival country"),
+        ];
+
+        self.filter_suggestions(countries, query, "country")
+    }
+
+    /// Get color suggestions (field 4)
+    fn get_color_suggestions(&self, query: &str) -> Vec<SuggestionItem> {
+        let colors = vec![
+            ("Red", "🔴 Bold and energetic"),
+            ("Blue", "🔵 Calm and trustworthy"),
+            ("Green", "🟢 Natural and fresh"),
+            ("Yellow", "🟡 Bright and cheerful"),
+            ("Purple", "🟣 Royal and mysterious"),
+            ("Orange", "🟠 Warm and vibrant"),
+            ("Pink", "🩷 Soft and gentle"),
+            ("Black", "⚫ Classic and elegant"),
+        ];
+
+        self.filter_suggestions(colors, query, "color")
+    }
+
+    /// Generic filtering helper
+    fn filter_suggestions(&self, items: Vec<(&str, &str)>, query: &str, category: &str) -> Vec<SuggestionItem> {
+        let query_lower = query.to_lowercase();
+
+        items.iter()
+            .filter(|(item, _)| {
+                query.is_empty() || item.to_lowercase().starts_with(&query_lower)
+            })
+            .map(|(item, description)| SuggestionItem {
+                display_text: format!("{} - {}", item, description),
+                value_to_store: item.to_string(),
+            })
+            .collect()
     }
 }
 
 #[async_trait]
-impl SuggestionsProvider for PowerfulSuggestionsProvider {
+impl SuggestionsProvider for ComprehensiveSuggestionsProvider {
     async fn fetch_suggestions(&mut self, field_index: usize, query: &str) -> Result<Vec<SuggestionItem>> {
-        // Minimum query length check (realistic behavior)
-        if query.trim().is_empty() {
-            return Ok(Vec::new());
-        }
-
-        // Simulate realistic network delay based on field type
+        // Simulate different network delays for different fields (realistic!)
         let delay_ms = match field_index {
-            1 => 150, // Email: fast local lookup
-            3 => 300, // Company: API call
-            5 => 100, // Skills: local data
-            _ => 50,
+            0 => 100, // Fruits: local data
+            1 => 200, // Jobs: medium API call
+            2 => 150, // Languages: cached data
+            3 => 300, // Countries: slow geographic API
+            4 => 80,  // Colors: instant local
+            _ => 100,
         };
         tokio::time::sleep(std::time::Duration::from_millis(delay_ms)).await;
 
-        // Route to appropriate suggestion logic
-        match field_index {
-            1 => self.get_email_suggestions(query).await,
-            3 => self.get_company_suggestions(query).await, 
-            5 => self.get_skills_suggestions(query).await,
-            _ => Ok(Vec::new()),
-        }
-    }
-}
-
-impl PowerfulSuggestionsProvider {
-    /// Smart email suggestions with domain completion and validation
-    async fn get_email_suggestions(&mut self, query: &str) -> Result<Vec<SuggestionItem>> {
-        // Check cache first (realistic performance optimization)
-        if let Some(cached) = self.email_cache.get(query) {
-            return Ok(cached.clone());
-        }
-
-        let suggestions = if let Some(at_pos) = query.find('@') {
-            // Domain completion mode: "user@exa" → complete domains
-            let username = &query[..at_pos];
-            let domain_part = &query[at_pos + 1..];
-            
-            // Validate username (basic email validation)
-            if username.is_empty() || username.len() > 64 {
-                return Ok(Vec::new());
-            }
-            
-            let domains = vec![
-                ("example.com", "Example Domain - For testing"),
-                ("gmail.com", "Gmail - Google's email service"),
-                ("outlook.com", "Outlook - Microsoft email"),
-                ("yahoo.com", "Yahoo Mail - Classic email"),
-                ("hotmail.com", "Hotmail - Microsoft legacy"),
-                ("company.com", "Company Email - Corporate"),
-                ("university.edu", "University - Educational"),
-                ("protonmail.com", "ProtonMail - Secure email"),
-                ("icloud.com", "iCloud - Apple's email service"),
-                ("fastmail.com", "FastMail - Premium email"),
-            ];
-
-            // Smart filtering: exact prefix match first, then contains
-            let mut exact_matches = Vec::new();
-            let mut fuzzy_matches = Vec::new();
-            
-            for (domain, desc) in domains {
-                if domain.starts_with(domain_part) {
-                    exact_matches.push((domain, desc));
-                } else if domain.contains(domain_part) && !domain_part.is_empty() {
-                    fuzzy_matches.push((domain, desc));
-                }
-            }
-            
-            // Combine results: exact matches first, then fuzzy
-            let mut all_matches = exact_matches;
-            all_matches.extend(fuzzy_matches);
-            
-            all_matches.into_iter()
-                .take(8) // Limit results (realistic UX)
-                .map(|(domain, desc)| {
-                    let full_email = format!("{}@{}", username, domain);
-                    SuggestionItem {
-                        display_text: format!("{} - {}", full_email, desc),
-                        value_to_store: full_email,
-                    }
-                })
-                .collect()
-        } else {
-            // Username mode: "user" → suggest common email formats
-            if query.len() >= 2 && query.len() <= 32 {
-                vec![
-                    SuggestionItem {
-                        display_text: format!("{}@gmail.com - Most popular email", query),
-                        value_to_store: format!("{}@gmail.com", query),
-                    },
-                    SuggestionItem {
-                        display_text: format!("{}@outlook.com - Microsoft email", query),
-                        value_to_store: format!("{}@outlook.com", query),
-                    },
-                    SuggestionItem {
-                        display_text: format!("{}@company.com - Work email", query),
-                        value_to_store: format!("{}@company.com", query),
-                    },
-                ]
-            } else {
-                Vec::new()
-            }
+        let suggestions = match field_index {
+            0 => self.get_fruit_suggestions(query),
+            1 => self.get_job_suggestions(query),
+            2 => self.get_language_suggestions(query),
+            3 => self.get_country_suggestions(query),
+            4 => self.get_color_suggestions(query),
+            _ => Vec::new(),
         };
 
-        // Cache the result (realistic performance)
-        self.email_cache.insert(query.to_string(), suggestions.clone());
-        Ok(suggestions)
-    }
-
-    /// Intelligent company suggestions with fuzzy matching and scoring
-    async fn get_company_suggestions(&mut self, query: &str) -> Result<Vec<SuggestionItem>> {
-        // Check cache first
-        if let Some(cached) = self.company_cache.get(query) {
-            return Ok(cached.clone());
-        }
-
-        let companies = vec![
-            ("Google", "Technology", "Search, Cloud, AI", 10),
-            ("Microsoft", "Technology", "Software, Cloud, Gaming", 10),
-            ("Apple", "Technology", "Consumer Electronics", 10),
-            ("Amazon", "E-commerce", "Cloud, Retail, Logistics", 10),
-            ("Meta", "Social Media", "Facebook, Instagram, WhatsApp", 9),
-            ("Tesla", "Automotive", "Electric Vehicles, Energy", 8),
-            ("Netflix", "Entertainment", "Streaming, Content", 8),
-            ("SpaceX", "Aerospace", "Space Exploration", 7),
-            ("Uber", "Transportation", "Ride-sharing, Delivery", 7),
-            ("Airbnb", "Hospitality", "Home Sharing", 7),
-            ("Stripe", "Fintech", "Payment Processing", 8),
-            ("Shopify", "E-commerce", "Online Store Platform", 7),
-            ("Slack", "Productivity", "Team Communication", 6),
-            ("Zoom", "Communication", "Video Conferencing", 6),
-            ("Figma", "Design", "Collaborative Design Tools", 5),
-            ("Tech Startup", "Technology", "Early Stage Company", 3),
-            ("Tech Corporation", "Technology", "Large Enterprise", 4),
-            ("Technology Solutions", "Technology", "Custom Software", 3),
-        ];
-
-        let query_lower = query.to_lowercase();
-        
-        // Smart scoring algorithm
-        let mut scored_companies: Vec<_> = companies.iter()
-            .filter_map(|(name, category, desc, popularity)| {
-                let name_lower = name.to_lowercase();
-                let category_lower = category.to_lowercase();
-                let desc_lower = desc.to_lowercase();
-                
-                let mut score = 0;
-                
-                // Exact name prefix (highest score)
-                if name_lower.starts_with(&query_lower) {
-                    score += 100;
-                }
-                // Name contains query
-                else if name_lower.contains(&query_lower) {
-                    score += 50;
-                }
-                // Category match
-                else if category_lower.contains(&query_lower) {
-                    score += 30;
-                }
-                // Description match
-                else if desc_lower.contains(&query_lower) {
-                    score += 20;
-                }
-                // Fuzzy match (simple version)
-                else if fuzzy_match_simple(&name_lower, &query_lower) {
-                    score += 10;
-                }
-                
-                if score > 0 {
-                    score += popularity; // Add popularity bonus
-                    Some((name, category, desc, score))
-                } else {
-                    None
-                }
-            })
-            .collect();
-        
-        // Sort by score (highest first)
-        scored_companies.sort_by(|a, b| b.3.cmp(&a.3));
-        
-        let suggestions: Vec<SuggestionItem> = scored_companies.into_iter()
-            .take(10) // Limit results
-            .map(|(name, category, desc, _score)| SuggestionItem {
-                display_text: format!("{} - {} • {}", name, category, desc),
-                value_to_store: name.to_string(),
-            })
-            .collect();
-
-        // Cache the result
-        self.company_cache.insert(query.to_string(), suggestions.clone());
-        Ok(suggestions)
-    }
-
-    /// Smart multi-tag skills suggestions with context awareness
-    async fn get_skills_suggestions(&mut self, query: &str) -> Result<Vec<SuggestionItem>> {
-        let skills_db = vec![
-            // Programming Languages
-            ("Rust", "Language", "Systems programming"),
-            ("Python", "Language", "Versatile, data science"),
-            ("JavaScript", "Language", "Web development"),
-            ("TypeScript", "Language", "Typed JavaScript"),
-            ("Go", "Language", "Cloud, microservices"),
-            ("Java", "Language", "Enterprise, Android"),
-            ("C++", "Language", "Performance critical"),
-            ("C#", "Language", "Microsoft ecosystem"),
-            ("Swift", "Language", "iOS development"),
-            ("Kotlin", "Language", "Android, JVM"),
-            
-            // Frontend Frameworks
-            ("React", "Frontend", "Popular UI library"),
-            ("Vue", "Frontend", "Progressive framework"),
-            ("Angular", "Frontend", "Full framework"),
-            ("Svelte", "Frontend", "Compile-time framework"),
-            
-            // Backend Technologies
-            ("Node.js", "Backend", "JavaScript runtime"),
-            ("Express", "Backend", "Web framework"),
-            ("Django", "Backend", "Python web framework"),
-            ("Flask", "Backend", "Micro web framework"),
-            ("Rails", "Backend", "Ruby web framework"),
-            
-            // Databases
-            ("PostgreSQL", "Database", "Advanced SQL database"),
-            ("MongoDB", "Database", "Document database"),
-            ("Redis", "Database", "In-memory cache"),
-            ("MySQL", "Database", "Popular SQL database"),
-            
-            // DevOps & Cloud
-            ("Docker", "DevOps", "Containerization"),
-            ("Kubernetes", "DevOps", "Container orchestration"),
-            ("AWS", "Cloud", "Amazon Web Services"),
-            ("GCP", "Cloud", "Google Cloud Platform"),
-            ("Azure", "Cloud", "Microsoft cloud"),
-            
-            // Tools & Methodologies
-            ("Git", "Tool", "Version control"),
-            ("Linux", "Tool", "Operating system"),
-            ("DevOps", "Methodology", "Development operations"),
-            ("CI/CD", "Methodology", "Continuous integration"),
-            ("TDD", "Methodology", "Test-driven development"),
-            ("Agile", "Methodology", "Project management"),
-            ("Scrum", "Methodology", "Agile framework"),
-            
-            // Emerging Tech
-            ("Machine Learning", "AI", "Predictive models"),
-            ("Data Science", "Analytics", "Data analysis"),
-            ("Blockchain", "Distributed", "Decentralized systems"),
-            ("WebAssembly", "Performance", "High-performance web"),
-        ];
-
-        // Parse existing tags to avoid duplicates
-        let current_tags: Vec<&str> = query.split(',').map(|s| s.trim()).collect();
-        let last_tag = current_tags.last().unwrap_or(&"").to_lowercase();
-        
-        // Don't suggest if last tag is empty
-        if last_tag.is_empty() {
-            return Ok(Vec::new());
-        }
-
-        // Find matching skills
-        let mut matching_skills: Vec<_> = skills_db.iter()
-            .filter(|(skill, _, _)| {
-                let skill_lower = skill.to_lowercase();
-                // Check if skill matches and isn't already selected
-                skill_lower.contains(&last_tag) && 
-                !current_tags[..current_tags.len()-1].iter().any(|&existing| 
-                    existing.eq_ignore_ascii_case(skill)
-                )
-            })
-            .collect();
-
-        // Sort by relevance (exact prefix first)
-        matching_skills.sort_by(|a, b| {
-            let a_exact = a.0.to_lowercase().starts_with(&last_tag);
-            let b_exact = b.0.to_lowercase().starts_with(&last_tag);
-            
-            match (a_exact, b_exact) {
-                (true, false) => std::cmp::Ordering::Less,
-                (false, true) => std::cmp::Ordering::Greater,
-                _ => a.0.cmp(b.0),
-            }
-        });
-
-        let suggestions = matching_skills.into_iter()
-            .take(8) // Limit results
-            .map(|(skill, category, desc)| {
-                let mut new_tags = current_tags[..current_tags.len()-1].to_vec();
-                new_tags.push(skill);
-                let new_value = new_tags.join(", ");
-                
-                SuggestionItem {
-                    display_text: format!("+ {} ({} • {})", skill, category, desc),
-                    value_to_store: new_value,
-                }
-            })
-            .collect();
-
         Ok(suggestions)
     }
 }
 
-/// Simple fuzzy matching: check if all characters of pattern appear in text in order
-fn fuzzy_match_simple(text: &str, pattern: &str) -> bool {
-    if pattern.is_empty() {
-        return true;
-    }
-    
-    let mut pattern_chars = pattern.chars();
-    let mut current_char = pattern_chars.next();
-    
-    for text_char in text.chars() {
-        if let Some(pattern_char) = current_char {
-            if text_char == pattern_char {
-                current_char = pattern_chars.next();
-                if current_char.is_none() {
-                    return true; // All pattern characters matched
-                }
-            }
-        }
-    }
-    
-    false
-}
-
-/// Automatic cursor management demonstration + SUGGESTIONS
-/// Features the CursorManager directly to show it's working
+/// Multi-field suggestions demonstration + automatic cursor management
 async fn handle_key_press(
     key: KeyCode,
     modifiers: KeyModifiers,
-    editor: &mut AutoCursorFormEditor<CursorDemoData>,
-    suggestions_provider: &mut PowerfulSuggestionsProvider,
+    editor: &mut AutoCursorFormEditor<MultiFieldDemoData>,
+    suggestions_provider: &mut ComprehensiveSuggestionsProvider,
 ) -> anyhow::Result<bool> {
     let mode = editor.mode();
 
@@ -748,20 +534,23 @@ async fn handle_key_press(
     }
 
     match (mode, key, modifiers) {
-        // === SUGGESTIONS HANDLING (NEW!) ===
-        
+        // === SUGGESTIONS HANDLING ===
+
         // Tab: Trigger or navigate suggestions
         (_, KeyCode::Tab, _) => {
             if editor.is_suggestions_active() {
                 editor.suggestions_next();
                 editor.set_debug_message("📍 Next suggestion".to_string());
             } else if editor.data_provider().supports_suggestions(editor.current_field()) {
+                let field_names = ["Fruit", "Job", "Language", "Country", "Color"];
+                let field_name = field_names.get(editor.current_field()).unwrap_or(&"Unknown");
+
                 match editor.trigger_suggestions(suggestions_provider).await {
                     Ok(_) => {
                         if editor.suggestions().is_empty() {
-                            editor.set_debug_message("🔍 No suggestions found".to_string());
+                            editor.set_debug_message(format!("🔍 No {} suggestions found", field_name.to_lowercase()));
                         } else {
-                            editor.set_debug_message(format!("✨ {} suggestions found", editor.suggestions().len()));
+                            editor.set_debug_message(format!("✨ {} {} suggestions found!", editor.suggestions().len(), field_name.to_lowercase()));
                         }
                     }
                     Err(e) => {
@@ -778,13 +567,15 @@ async fn handle_key_press(
         (_, KeyCode::Enter, _) => {
             if editor.is_suggestions_active() {
                 if let Some(applied) = editor.apply_suggestion() {
-                    editor.set_debug_message(format!("✅ Applied: {}", applied));
+                    editor.set_debug_message(format!("✅ Selected: {}", applied));
                 } else {
                     editor.set_debug_message("❌ No suggestion selected".to_string());
                 }
             } else {
                 editor.next_field();
-                editor.set_debug_message("Enter: next field".to_string());
+                let field_names = ["Fruit", "Job", "Language", "Country", "Color"];
+                let field_name = field_names.get(editor.current_field()).unwrap_or(&"Field");
+                editor.set_debug_message(format!("Enter: moved to {} field", field_name));
             }
         }
 
@@ -804,12 +595,6 @@ async fn handle_key_press(
             editor.set_debug_message("✏️  INSERT (end of line) - Cursor: Steady Bar |".to_string());
             editor.clear_command_buffer();
         }
-        (AppMode::ReadOnly, KeyCode::Char('o'), _) => {
-            editor.move_line_end();
-            editor.enter_edit_mode(); // 🎯 Automatic: cursor becomes bar |
-            editor.set_debug_message("✏️  INSERT (open line) - Cursor: Steady Bar |".to_string());
-            editor.clear_command_buffer();
-        }
 
         // From Normal Mode: Enter visual modes
         (AppMode::ReadOnly, KeyCode::Char('v'), _) => {
@@ -818,43 +603,6 @@ async fn handle_key_press(
         }
         (AppMode::ReadOnly, KeyCode::Char('V'), _) => {
             editor.enter_visual_line_mode();
-            editor.clear_command_buffer();
-        }
-
-        // From Visual Mode: Switch between visual modes or exit
-        (AppMode::Highlight, KeyCode::Char('v'), _) => {
-            use canvas::canvas::state::SelectionState;
-            match editor.editor.selection_state() {
-                SelectionState::Characterwise { .. } => {
-                    // Already in characterwise mode, exit visual mode (vim behavior)
-                    editor.exit_visual_mode();
-                    editor.set_debug_message("🔒 Exited visual mode".to_string());
-                }
-                _ => {
-                    // Switch from linewise to characterwise mode
-                    editor.editor.enter_highlight_mode();
-                    editor.update_visual_selection();
-                    editor.set_debug_message("🔥 Switched to VISUAL mode".to_string());
-                }
-            }
-            editor.clear_command_buffer();
-        }
-
-        (AppMode::Highlight, KeyCode::Char('V'), _) => {
-            use canvas::canvas::state::SelectionState;
-            match editor.editor.selection_state() {
-                SelectionState::Linewise { .. } => {
-                    // Already in linewise mode, exit visual mode (vim behavior)
-                    editor.exit_visual_mode();
-                    editor.set_debug_message("🔒 Exited visual mode".to_string());
-                }
-                _ => {
-                    // Switch from characterwise to linewise mode
-                    editor.editor.enter_highlight_line_mode();
-                    editor.update_visual_selection();
-                    editor.set_debug_message("🔥 Switched to VISUAL LINE mode".to_string());
-                }
-            }
             editor.clear_command_buffer();
         }
 
@@ -900,13 +648,17 @@ async fn handle_key_press(
         (AppMode::ReadOnly | AppMode::Highlight, KeyCode::Char('j'), _)
         | (AppMode::ReadOnly | AppMode::Highlight, KeyCode::Down, _) => {
             editor.move_down();
-            editor.set_debug_message("↓ next field".to_string());
+            let field_names = ["Fruit", "Job", "Language", "Country", "Color"];
+            let field_name = field_names.get(editor.current_field()).unwrap_or(&"Field");
+            editor.set_debug_message(format!("↓ moved to {} field", field_name));
             editor.clear_command_buffer();
         }
         (AppMode::ReadOnly | AppMode::Highlight, KeyCode::Char('k'), _)
         | (AppMode::ReadOnly | AppMode::Highlight, KeyCode::Up, _) => {
             editor.move_up();
-            editor.set_debug_message("↑ previous field".to_string());
+            let field_names = ["Fruit", "Job", "Language", "Country", "Color"];
+            let field_name = field_names.get(editor.current_field()).unwrap_or(&"Field");
+            editor.set_debug_message(format!("↑ moved to {} field", field_name));
             editor.clear_command_buffer();
         }
 
@@ -939,11 +691,11 @@ async fn handle_key_press(
             editor.set_debug_message("$: line end".to_string());
         }
 
-        // Field/document movement
+        // Document movement
         (AppMode::ReadOnly | AppMode::Highlight, KeyCode::Char('g'), _) => {
             if editor.get_command_buffer() == "g" {
                 editor.move_first_line();
-                editor.set_debug_message("gg: first field".to_string());
+                editor.set_debug_message("gg: first field (Fruit)".to_string());
                 editor.clear_command_buffer();
             } else {
                 editor.clear_command_buffer();
@@ -953,7 +705,7 @@ async fn handle_key_press(
         }
         (AppMode::ReadOnly | AppMode::Highlight, KeyCode::Char('G'), _) => {
             editor.move_last_line();
-            editor.set_debug_message("G: last field".to_string());
+            editor.set_debug_message("G: last field (Color)".to_string());
             editor.clear_command_buffer();
         }
 
@@ -1010,8 +762,11 @@ async fn handle_key_press(
 
         // === DEBUG/INFO COMMANDS ===
         (AppMode::ReadOnly, KeyCode::Char('?'), _) => {
+            let field_names = ["Fruit🍎", "Job💼", "Language💻", "Country🌍", "Color🎨"];
+            let current_field_name = field_names.get(editor.current_field()).unwrap_or(&"Unknown");
             editor.set_debug_message(format!(
-                "Field {}/{}, Pos {}, Mode: {:?} - Smart suggestions: Email domains, Company scoring, Skills multi-tag",
+                "Field: {} ({}/{}), Pos: {}, Mode: {:?}",
+                current_field_name,
                 editor.current_field() + 1,
                 editor.data_provider().field_count(),
                 editor.cursor_position(),
@@ -1024,9 +779,11 @@ async fn handle_key_press(
                 editor.clear_command_buffer();
                 editor.set_debug_message("Invalid command sequence".to_string());
             } else {
+                let field_names = ["Fruit", "Job", "Language", "Country", "Color"];
+                let current_field = field_names.get(editor.current_field()).unwrap_or(&"Field");
                 editor.set_debug_message(format!(
-                    "Unhandled: {:?} + {:?} in {:?} mode",
-                    key, modifiers, mode
+                    "{} field - Try: i=insert, Tab=suggestions, j/k=move. Key: {:?}",
+                    current_field, key
                 ));
             }
         }
@@ -1037,9 +794,9 @@ async fn handle_key_press(
 
 async fn run_app<B: Backend>(
     terminal: &mut Terminal<B>,
-    mut editor: AutoCursorFormEditor<CursorDemoData>,
+    mut editor: AutoCursorFormEditor<MultiFieldDemoData>,
 ) -> io::Result<()> {
-    let mut suggestions_provider = PowerfulSuggestionsProvider::new();
+    let mut suggestions_provider = ComprehensiveSuggestionsProvider::new();
 
     loop {
         terminal.draw(|f| ui(f, &editor))?;
@@ -1061,14 +818,14 @@ async fn run_app<B: Backend>(
     Ok(())
 }
 
-fn ui(f: &mut Frame, editor: &AutoCursorFormEditor<CursorDemoData>) {
+fn ui(f: &mut Frame, editor: &AutoCursorFormEditor<MultiFieldDemoData>) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([Constraint::Min(8), Constraint::Length(10)])
+        .constraints([Constraint::Min(8), Constraint::Length(12)])
         .split(f.area());
 
     let active_field_rect = render_enhanced_canvas(f, chunks[0], editor);
-    
+
     // Render suggestions dropdown if active
     if let Some(input_rect) = active_field_rect {
         render_suggestions_dropdown(
@@ -1079,14 +836,14 @@ fn ui(f: &mut Frame, editor: &AutoCursorFormEditor<CursorDemoData>) {
             &editor.editor,
         );
     }
-    
+
     render_status_and_help(f, chunks[1], editor);
 }
 
 fn render_enhanced_canvas(
     f: &mut Frame,
     area: ratatui::layout::Rect,
-    editor: &AutoCursorFormEditor<CursorDemoData>,
+    editor: &AutoCursorFormEditor<MultiFieldDemoData>,
 ) -> Option<ratatui::layout::Rect> {
     render_canvas_default(f, area, &editor.editor)
 }
@@ -1094,86 +851,77 @@ fn render_enhanced_canvas(
 fn render_status_and_help(
     f: &mut Frame,
     area: ratatui::layout::Rect,
-    editor: &AutoCursorFormEditor<CursorDemoData>,
+    editor: &AutoCursorFormEditor<MultiFieldDemoData>,
 ) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([Constraint::Length(3), Constraint::Length(7)])
+        .constraints([Constraint::Length(3), Constraint::Length(9)])
         .split(area);
 
-    // Status bar with cursor information + suggestions
+    // Status bar with current field and cursor information
+    let field_names = ["Fruit🍎", "Job💼", "Language💻", "Country🌍", "Color🎨"];
+    let current_field_name = field_names.get(editor.current_field()).unwrap_or(&"Unknown");
+
     let mode_text = match editor.mode() {
         AppMode::Edit => "INSERT | (bar cursor)",
         AppMode::ReadOnly => "NORMAL █ (block cursor)",
-        AppMode::Highlight => {
-            // Use library selection state instead of editor.highlight_state()
-            use canvas::canvas::state::SelectionState;
-            match editor.editor.selection_state() {
-                SelectionState::Characterwise { .. } => "VISUAL █ (blinking block)",
-                SelectionState::Linewise { .. } => "VISUAL LINE █ (blinking block)",
-                _ => "VISUAL █ (blinking block)",
-            }
-        },
+        AppMode::Highlight => "VISUAL █ (blinking block)",
         _ => "NORMAL █ (block cursor)",
     };
 
     let suggestions_info = if editor.is_suggestions_active() {
         if editor.editor.ui_state().is_suggestions_loading() {
-            " | ⏳ Loading suggestions..."
+            " | ⏳ Loading suggestions...".to_string()
         } else if !editor.suggestions().is_empty() {
-            " | ✨ Suggestions available"
+            format!(" | ✨ {} suggestions", editor.suggestions().len())
         } else {
-            " | 🔍 No suggestions"
+            " | 🔍 No matches".to_string()
         }
     } else {
-        ""
+        "".to_string()
     };
 
-    let status_text = if editor.has_pending_command() {
-        format!("-- {} -- {} [{}]{}", mode_text, editor.debug_message(), editor.get_command_buffer(), suggestions_info)
-    } else if editor.has_unsaved_changes() {
-        format!("-- {} -- [Modified] {}{}", mode_text, editor.debug_message(), suggestions_info)
-    } else {
-        format!("-- {} -- {}{}", mode_text, editor.debug_message(), suggestions_info)
-    };
+    let status_text = format!(
+        "-- {} -- {} | Field: {}{}",
+        mode_text,
+        editor.debug_message(),
+        current_field_name,
+        suggestions_info
+    );
 
     let status = Paragraph::new(Line::from(Span::raw(status_text)))
-        .block(Block::default().borders(Borders::ALL).title("🎯 Smart Cursor + Intelligent Suggestions"));
+        .block(Block::default().borders(Borders::ALL).title("🎯 Multi-Field Suggestions Demo"));
 
     f.render_widget(status, chunks[0]);
 
-    // Enhanced help text with suggestions info
+    // Comprehensive help text
     let help_text = match editor.mode() {
         AppMode::ReadOnly => {
-            if editor.has_pending_command() {
-                match editor.get_command_buffer() {
-                    "g" => "Press 'g' again for first field, or any other key to cancel",
-                    _ => "Pending command... (Esc to cancel)"
-                }
-            } else {
-                "🎯 SMART SUGGESTIONS DEMO: Normal █ | Insert | | Visual blinking█\n\
-                 Normal: hjkl/arrows=move, w/b/e=words, 0/$=line, gg/G=first/last\n\
-                 i/a/A=insert, v/V=visual, x/X=delete, ?=info\n\
-                 Tab=smart suggestions: Email domains, Company scoring, Multi-tag skills\n\
-                 Features: caching, fuzzy matching, validation, scoring | F1/F2=cursor demo"
-            }
+            "🎯 MULTI-FIELD SUGGESTIONS DEMO: Normal █ | Insert | | Visual █\n\
+             Movement: j/k or ↑↓=fields, h/l or ←→=chars, gg/G=first/last, w/b/e=words\n\
+             Actions: i/a/A=insert, v/V=visual, x/X=delete, ?=info, Enter=next field\n\
+             🍎 Fruits: Apple, Banana, Cherry... | 💼 Jobs: Engineer, Manager, Designer...\n\
+             💻 Languages: Rust, Python, JS... | 🌍 Countries: USA, Canada, UK...\n\
+             🎨 Colors: Red, Blue, Green... | Tab=suggestions, Enter=select\n\
+             Edge cases to test: empty→suggestions, partial matches, field navigation!"
         }
         AppMode::Edit => {
             "🎯 INSERT MODE - Cursor: | (bar)\n\
-             arrows=move, Ctrl+arrows=words, Backspace/Del=delete\n\
-             Tab=smart suggestions: domains, companies, skills with fuzzy matching\n\
-             Enter=apply suggestion, Esc=normal mode"
+             Type to filter suggestions! Tab=show/cycle, Enter=select, Esc=normal\n\
+             Test cases: 'r'→Red/Rust, 's'→Software Engineer/Swift, 'c'→Canada/Cherry...\n\
+             Navigation: arrows=move, Ctrl+arrows=words, Home/End=line edges\n\
+             Try different fields for different suggestion behaviors and timing!"
         }
         AppMode::Highlight => {
             "🎯 VISUAL MODE - Cursor: █ (blinking block)\n\
-             hjkl/arrows=extend selection, w/b/e=word selection\n\
-             Esc=normal"
+             Selection: hjkl/arrows=extend, w/b/e=word selection, Esc=normal\n\
+             Test multi-character selections across different suggestion field types!"
         }
-        _ => "🎯 Watch the cursor change automatically! Tab for intelligent suggestions on certain fields!"
+        _ => "🎯 Multi-field suggestions! 5 fields × 8 suggestions each = lots of testing!"
     };
 
     let help = Paragraph::new(help_text)
-        .block(Block::default().borders(Borders::ALL).title("🚀 Smart Cursor + Intelligent Suggestions"))
+        .block(Block::default().borders(Borders::ALL).title("🚀 Comprehensive Testing Guide"))
         .style(Style::default().fg(Color::Gray));
 
     f.render_widget(help, chunks[1]);
@@ -1181,19 +929,27 @@ fn render_status_and_help(
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Print feature status
-    println!("🎯 Smart Cursor + Intelligent Suggestions Demo");
+    // Print comprehensive demo information
+    println!("🎯 Multi-Field Suggestions Demo - Perfect for Testing Edge Cases!");
     println!("✅ cursor-style feature: ENABLED");
     println!("✅ suggestions feature: ENABLED");
     println!("🚀 Automatic cursor management: ACTIVE");
-    println!("✨ Intelligent suggestions: ACTIVE");
-    println!("📖 Watch your terminal cursor change based on mode!");
+    println!("✨ 5 different suggestion types: ACTIVE");
     println!();
-    println!("🎯 Try these logical suggestions:");
-    println!("   📧 Email field: 'user@exa' + Tab → smart domain completion");
-    println!("   🏢 Company field: 'tech' + Tab → scored company matches");
-    println!("   💻 Skills field: 'rust,py' + Tab → intelligent multi-tag skills");
-    println!("   🧠 Features: caching, fuzzy matching, scoring, validation");
+    println!("📋 Test These 5 Fields:");
+    println!("   🍎 Fruits: Apple, Banana, Cherry, Date, Elderberry, Fig, Grape, Honeydew");
+    println!("   💼 Jobs: Software Engineer, Product Manager, Data Scientist, UX Designer...");
+    println!("   💻 Languages: Rust, Python, JavaScript, TypeScript, Go, Java, C++, Swift");
+    println!("   🌍 Countries: USA, Canada, UK, Germany, France, Japan, Australia, Brazil");
+    println!("   🎨 Colors: Red, Blue, Green, Yellow, Purple, Orange, Pink, Black");
+    println!();
+    println!("🧪 Edge Cases to Test:");
+    println!("   • Navigation between suggestion/non-suggestion fields");
+    println!("   • Empty field → Tab → see all suggestions");
+    println!("   • Partial typing → Tab → filtered suggestions");
+    println!("   • Different loading times per field (100-300ms)");
+    println!("   • Field switching while suggestions active");
+    println!("   • Visual mode selections across suggestion fields");
     println!();
 
     enable_raw_mode()?;
@@ -1202,7 +958,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
-    let data = CursorDemoData::new();
+    let data = MultiFieldDemoData::new();
     let mut editor = AutoCursorFormEditor::new(data);
 
     // Initialize with normal mode - library automatically sets block cursor
@@ -1229,6 +985,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("{:?}", err);
     }
 
-    println!("🎯 Cursor automatically reset to default! Smart suggestions cache cleared!");
+    println!("🎯 Multi-field testing complete! Great for finding edge cases!");
     Ok(())
 }
