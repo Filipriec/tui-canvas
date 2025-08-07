@@ -4,13 +4,13 @@
 //! This example showcases the full potential of the pattern validation system
 //! with creative real-world scenarios and edge cases.
 //!
-//! Run with: cargo run --example validation_advanced_patterns --features "validation,gui"
+//! Run with: cargo run --example validation_advanced_patterns --features "validation,gui,cursor-style"
 
-// REQUIRE validation and gui features
-#[cfg(not(all(feature = "validation", feature = "gui")))]
+// REQUIRE validation, gui and cursor-style features
+#[cfg(not(all(feature = "validation", feature = "gui", feature = "cursor-style")))]
 compile_error!(
-    "This example requires the 'validation' and 'gui' features. \
-     Run with: cargo run --example validation_advanced_patterns --features \"validation,gui\""
+    "This example requires the 'validation', 'gui' and 'cursor-style' features. \
+     Run with: cargo run --example validation_advanced_patterns --features \"validation,gui,cursor-style\""
 );
 
 use std::io;
@@ -38,6 +38,7 @@ use canvas::{
     canvas::{
         gui::render_canvas_default,
         modes::AppMode,
+        CursorManager,
     },
     DataProvider, FormEditor,
     ValidationConfig, ValidationConfigBuilder, PatternFilters, PositionFilter, PositionRange, CharacterFilter,
@@ -107,18 +108,21 @@ impl<D: DataProvider> AdvancedPatternFormEditor<D> {
     fn move_line_end(&mut self) { self.editor.move_line_end(); }
     
     fn enter_edit_mode(&mut self) {
+        // Library will automatically update cursor to bar | in insert mode
         self.editor.enter_edit_mode();
-        self.debug_message = "✏️  INSERT MODE - Testing advanced pattern validation".to_string();
+        self.debug_message = "✏️  INSERT MODE - Cursor: Steady Bar | - Testing advanced pattern validation".to_string();
     }
     
     fn enter_append_mode(&mut self) {
+        // Library will automatically update cursor to bar | in insert mode
         self.editor.enter_append_mode();
-        self.debug_message = "✏️  INSERT (append) - Advanced patterns active".to_string();
+        self.debug_message = "✏️  INSERT (append) - Cursor: Steady Bar | - Advanced patterns active".to_string();
     }
     
     fn exit_edit_mode(&mut self) {
+        // Library will automatically update cursor to block █ in normal mode
         self.editor.exit_edit_mode();
-        self.debug_message = "🔒 NORMAL MODE".to_string();
+        self.debug_message = "🔒 NORMAL MODE - Cursor: Steady Block █".to_string();
         self.update_field_validation_status();
     }
 
@@ -522,9 +526,9 @@ fn render_advanced_validation_status(
 
     // Status bar
     let mode_text = match editor.mode() {
-        AppMode::Edit => "INSERT",
-        AppMode::ReadOnly => "NORMAL",
-        _ => "OTHER",
+        AppMode::Edit => "INSERT | (bar cursor)",
+        AppMode::ReadOnly => "NORMAL █ (block cursor)",
+        _ => "NORMAL █ (block cursor)",
     };
 
     let validation_status = editor.get_validation_status();
@@ -613,6 +617,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("🚀 Canvas Advanced Pattern Validation Demo");
     println!("✅ validation feature: ENABLED");
     println!("✅ gui feature: ENABLED");
+    println!("✅ cursor-style feature: ENABLED");
     println!("🎯 Advanced pattern filtering: ACTIVE");
     println!("🧪 Edge cases and complex patterns: READY");
     println!("💡 Each field showcases different validation capabilities!");
@@ -625,9 +630,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut terminal = Terminal::new(backend)?;
 
     let data = AdvancedPatternData::new();
-    let editor = AdvancedPatternFormEditor::new(data);
+    let mut editor = AdvancedPatternFormEditor::new(data);
+
+    // Initialize with normal mode - library automatically sets block cursor
+    editor.set_mode(AppMode::ReadOnly);
+
+    // Demonstrate that CursorManager is available and working
+    CursorManager::update_for_mode(AppMode::ReadOnly)?;
 
     let res = run_app(&mut terminal, editor);
+
+    // Library automatically resets cursor on FormEditor::drop()
+    // But we can also manually reset if needed
+    CursorManager::reset()?;
 
     disable_raw_mode()?;
     execute!(

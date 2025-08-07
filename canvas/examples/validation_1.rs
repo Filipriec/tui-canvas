@@ -1,7 +1,7 @@
 // examples/validation_1.rs
 //! Demonstrates field validation with the canvas library
 //!
-//! This example REQUIRES the `validation` feature to compile.
+//! This example REQUIRES the `validation` and `cursor-style` features to compile.
 //!
 //! Run with:
 //! cargo run --example validation_1 --features "gui,validation"
@@ -10,10 +10,10 @@
 //! cargo run --example validation_1 --features "gui"
 
 // REQUIRE validation feature - example won't compile without it
-#[cfg(not(feature = "validation"))]
+#[cfg(not(all(feature = "validation", feature = "cursor-style")))]
 compile_error!(
-    "This example requires the 'validation' feature. \
-     Run with: cargo run --example validation_1 --features \"gui,validation\""
+    "This example requires the 'validation' and 'cursor-style' features. \
+     Run with: cargo run --example validation_1 --features \"gui,validation,cursor-style\""
 );
 
 use std::io;
@@ -39,6 +39,7 @@ use canvas::{
     canvas::{
         gui::render_canvas_default,
         modes::AppMode,
+        CursorManager,
     },
     DataProvider, FormEditor,
     ValidationConfig, ValidationConfigBuilder, CharacterLimits, ValidationResult,
@@ -269,18 +270,21 @@ impl<D: DataProvider> ValidationFormEditor<D> {
 
     // === MODE TRANSITIONS ===
     fn enter_edit_mode(&mut self) {
+        // Library will automatically update cursor to bar | in insert mode
         self.editor.enter_edit_mode();
-        self.debug_message = "✏️  INSERT MODE - Type to test validation".to_string();
+        self.debug_message = "✏️  INSERT MODE - Cursor: Steady Bar | - Type to test validation".to_string();
     }
 
     fn enter_append_mode(&mut self) {
+        // Library will automatically update cursor to bar | in insert mode
         self.editor.enter_append_mode();
-        self.debug_message = "✏️  INSERT (append) - Validation active".to_string();
+        self.debug_message = "✏️  INSERT (append) - Cursor: Steady Bar | - Validation active".to_string();
     }
 
     fn exit_edit_mode(&mut self) {
+        // Library will automatically update cursor to block █ in normal mode
         self.editor.exit_edit_mode();
-        self.debug_message = "🔒 NORMAL MODE - Press 'v' to validate current field".to_string();
+        self.debug_message = "🔒 NORMAL MODE - Cursor: Steady Block █ - Press 'v' to validate current field".to_string();
         self.update_field_validation_status();
     }
 
@@ -362,6 +366,7 @@ impl<D: DataProvider> ValidationFormEditor<D> {
     }
 
     fn set_mode(&mut self, mode: AppMode) {
+        // Library automatically updates cursor for the mode
         self.editor.set_mode(mode);
     }
 
@@ -694,9 +699,9 @@ fn render_validation_status(
 
     // Status bar with validation information
     let mode_text = match editor.mode() {
-        AppMode::Edit => "INSERT",
-        AppMode::ReadOnly => "NORMAL",
-        _ => "OTHER",
+        AppMode::Edit => "INSERT | (bar cursor)",
+        AppMode::ReadOnly => "NORMAL █ (block cursor)",
+        _ => "NORMAL █ (block cursor)",
     };
 
     let validation_status = editor.get_validation_status();
@@ -765,21 +770,21 @@ fn render_validation_status(
     // Enhanced help text
     let help_text = match editor.mode() {
         AppMode::ReadOnly => {
-            "🔍 VALIDATION DEMO: Different fields have different limits!\n\
-             Fields with MINIMUM requirements will block field switching if too short!\n\
+            "🎯 CURSOR-STYLE: Normal █ | Insert |\n\
+             🔍 VALIDATION: Different fields have different limits (some block field switching)!\n\
              Movement: hjkl/arrows=move, Tab/Shift+Tab=fields\n\
              Edit: i/a/A=insert modes, Esc=normal\n\
              Validation: v=validate current, V=validate all, c=clear results, F1=toggle\n\
              ?=info, Ctrl+C/Ctrl+Q=quit"
         }
         AppMode::Edit => {
-            "✏️  INSERT MODE - Type to test validation limits!\n\
-             Some fields have MINIMUM character requirements!\n\
+            "🎯 INSERT MODE - Cursor: | (bar)\n\
+             🔍 Type to test validation limits (some fields have MIN requirements)!\n\
              Try typing 1-2 chars in Password/ID/Comment fields, then try to switch!\n\
              arrows=move, Backspace/Del=delete, Esc=normal, Tab=next field\n\
              Field switching may be BLOCKED if minimum requirements not met!"
         }
-        _ => "🔍 Validation Demo Active!"
+        _ => "🎯 Watch the cursor change automatically while validating!"
     };
 
     let help = Paragraph::new(help_text)
@@ -810,9 +815,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut terminal = Terminal::new(backend)?;
 
     let data = ValidationDemoData::new();
-    let editor = ValidationFormEditor::new(data);
+    let mut editor = ValidationFormEditor::new(data);
+
+    // Initialize with normal mode - library automatically sets block cursor
+    editor.set_mode(AppMode::ReadOnly);
+
+    // Demonstrate that CursorManager is available and working
+    CursorManager::update_for_mode(AppMode::ReadOnly)?;
 
     let res = run_app(&mut terminal, editor);
+
+    // Library automatically resets cursor on FormEditor::drop()
+    // But we can also manually reset if needed
+    CursorManager::reset()?;
 
     disable_raw_mode()?;
     execute!(

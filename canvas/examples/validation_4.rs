@@ -13,10 +13,10 @@
 
 #![allow(clippy::needless_return)]
 
-#[cfg(not(all(feature = "validation", feature = "gui")))]
+#[cfg(not(all(feature = "validation", feature = "gui", feature = "cursor-style")))]
 compile_error!(
-    "This example requires the 'validation' and 'gui' features. \
-     Run with: cargo run --example validation_4 --features \"gui,validation\""
+    "This example requires the 'validation', 'gui' and 'cursor-style' features. \
+     Run with: cargo run --example validation_4 --features \"gui,validation,cursor-style\""
 );
 
 use std::io;
@@ -39,7 +39,7 @@ use ratatui::{
 };
 
 use canvas::{
-    canvas::{gui::render_canvas_default, modes::AppMode},
+    canvas::{gui::render_canvas_default, modes::AppMode, CursorManager},
     DataProvider, FormEditor,
     ValidationConfig, ValidationConfigBuilder,
     CustomFormatter, FormattingResult,
@@ -403,21 +403,23 @@ impl<D: DataProvider> EnhancedDemoEditor<D> {
 
     // Delegate methods with enhanced feedback
     fn enter_edit_mode(&mut self) {
+        // Library will automatically update cursor to bar | in insert mode
         self.editor.enter_edit_mode();
         let field_type = self.current_field_type();
         let rules = self.get_input_rules();
-        self.debug_message = format!("✏️ EDITING {} - {}", field_type, rules);
+        self.debug_message = format!("✏️ INSERT MODE - Cursor: Steady Bar | - {} - {}", field_type, rules);
     }
 
     fn exit_edit_mode(&mut self) {
+        // Library will automatically update cursor to block █ in normal mode
         self.editor.exit_edit_mode();
         let (raw, display, _, warning) = self.get_current_field_analysis();
         if let Some(warn) = warning {
-            self.debug_message = format!("🔒 NORMAL - {} | ⚠️ {}", self.current_field_type(), warn);
+            self.debug_message = format!("🔒 NORMAL - Cursor: Steady Block █ - {} | ⚠️ {}", self.current_field_type(), warn);
         } else if raw != display {
-            self.debug_message = format!("🔒 NORMAL - {} formatted successfully", self.current_field_type());
+            self.debug_message = format!("🔒 NORMAL - Cursor: Steady Block █ - {} formatted successfully", self.current_field_type());
         } else {
-            self.debug_message = "🔒 NORMAL MODE".to_string();
+            self.debug_message = "🔒 NORMAL MODE - Cursor: Steady Block █".to_string();
         }
     }
 
@@ -588,9 +590,9 @@ fn render_enhanced_status(
 
     // Status bar
     let mode_text = match editor.mode() {
-        AppMode::Edit => "INSERT",
-        AppMode::ReadOnly => "NORMAL",
-        _ => "OTHER",
+        AppMode::Edit => "INSERT | (bar cursor)",
+        AppMode::ReadOnly => "NORMAL █ (block cursor)",
+        _ => "NORMAL █ (block cursor)",
     };
 
     let formatter_count = (0..editor.data_provider().field_count())
@@ -660,7 +662,8 @@ fn render_enhanced_status(
     // Enhanced help
     let help_text = match editor.mode() {
         AppMode::ReadOnly => {
-            "🧩 ENHANCED CUSTOM FORMATTER DEMO\n\
+            "🎯 CURSOR-STYLE: Normal █ | Insert |\n\
+             🧩 ENHANCED CUSTOM FORMATTER DEMO\n\
              \n\
              Try these formatters:
              • PSC: 01001 → 010 01 | Phone: 1234567890 → (123) 456-7890 | Card: 1234567890123456 → 1234 5678 9012 3456
@@ -671,7 +674,8 @@ fn render_enhanced_status(
              Ctrl+C/F10=quit"
         }
         AppMode::Edit => {
-            "✏️ INSERT MODE - Real-time formatting as you type!\n\
+            "🎯 INSERT MODE - Cursor: | (bar)\n\
+             ✏️ Real-time formatting as you type!\n\
              \n\
              Current field rules: {}\n\
              • Raw input is authoritative (what gets stored)\n\
@@ -701,6 +705,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("🧩 Enhanced Canvas Custom Formatter Demo (Feature 4)");
     println!("✅ validation feature: ENABLED");
     println!("✅ gui feature: ENABLED");
+    println!("✅ cursor-style feature: ENABLED");
     println!("🧩 Enhanced features:");
     println!("   • 5 different custom formatters with edge cases");
     println!("   • Real-time format preview and validation");
@@ -716,13 +721,23 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut terminal = Terminal::new(backend)?;
 
     let data = MultiFormatterDemoData::new();
-    let editor = EnhancedDemoEditor::new(data);
+    let mut editor = EnhancedDemoEditor::new(data);
+
+    // Initialize with normal mode - library automatically sets block cursor
+    editor.editor.set_mode(AppMode::ReadOnly);
+
+    // Demonstrate that CursorManager is available and working
+    CursorManager::update_for_mode(AppMode::ReadOnly)?;
 
     let res = run_app(&mut terminal, editor);
 
     disable_raw_mode()?;
     execute!(terminal.backend_mut(), LeaveAlternateScreen, DisableMouseCapture)?;
     terminal.show_cursor()?;
+
+    // Library automatically resets cursor on FormEditor::drop()
+    // But we can also manually reset if needed
+    CursorManager::reset()?;
 
     if let Err(err) = res {
         println!("{:?}", err);

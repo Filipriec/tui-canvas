@@ -43,7 +43,7 @@ path = "examples/suggestions.rs"
 
 [[example]]
 name = "canvas_gui_demo"
-required-features = ["gui"]
+required-features = ["gui", "cursor-style"]
 path = "examples/canvas_gui_demo.rs"
 
 [[example]]

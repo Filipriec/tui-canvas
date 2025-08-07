@@ -26,14 +26,14 @@
 //! - F1: toggle external validation globally
 //! - F10/Ctrl+C: quit
 //!
-//! Run: cargo run --example validation_5 --features "gui,validation"
+//! Run: cargo run --example validation_5 --features "gui,validation,cursor-style"
 
 #![allow(clippy::needless_return)]
 
-#[cfg(not(all(feature = "validation", feature = "gui")))]
+#[cfg(not(all(feature = "validation", feature = "gui", feature = "cursor-style")))]
 compile_error!(
-    "This example requires the 'validation' and 'gui' features. \
-     Run with: cargo run --example validation_5 --features \"gui,validation\""
+    "This example requires the 'validation', 'gui' and 'cursor-style' features. \
+     Run with: cargo run --example validation_5 --features \"gui,validation,cursor-style\""
 );
 
 use std::io;
@@ -59,7 +59,7 @@ use ratatui::{
 };
 
 use canvas::{
-    canvas::{gui::render_canvas_default, modes::AppMode},
+    canvas::{gui::render_canvas_default, modes::AppMode, CursorManager},
     DataProvider, FormEditor,
     ValidationConfigBuilder, CustomFormatter, FormattingResult,
     validation::ExternalValidationState,
@@ -762,7 +762,7 @@ impl<D: DataProvider> ValidationDemoEditor<D> {
     fn enter_edit_mode(&mut self) {
         self.editor.enter_edit_mode();
         let rules = self.field_validation_rules();
-        self.debug_message = format!("✏️ EDITING {} - {}", self.field_type(), rules);
+        self.debug_message = format!("✏️ INSERT MODE - Cursor: Steady Bar | - {} - {}", self.field_type(), rules);
     }
 
     fn exit_edit_mode(&mut self) {
@@ -774,7 +774,7 @@ impl<D: DataProvider> ValidationDemoEditor<D> {
             self.validate_field(current_field);
         }
         
-        self.debug_message = format!("🔒 NORMAL - {}", self.field_type());
+        self.debug_message = format!("🔒 NORMAL - Cursor: Steady Block █ - {}", self.field_type());
     }
 
     fn next_field(&mut self) {
@@ -915,9 +915,9 @@ fn render_validation_panel(
 
     // Status bar
     let mode_text = match editor.mode() {
-        AppMode::Edit => "INSERT",
-        AppMode::ReadOnly => "NORMAL", 
-        _ => "OTHER",
+        AppMode::Edit => "INSERT | (bar cursor)",
+        AppMode::ReadOnly => "NORMAL █ (block cursor)", 
+        _ => "NORMAL █ (block cursor)",
     };
 
     let summary = editor.get_validation_summary();
@@ -1019,7 +1019,8 @@ fn render_validation_panel(
     } else {
         let help_text = match editor.mode() {
             AppMode::ReadOnly => {
-                "🧪 EXTERNAL VALIDATION DEMO - Multiple validation types with async simulation\n\
+                "🎯 CURSOR-STYLE: Normal █ | Insert |\n\
+                 🧪 EXTERNAL VALIDATION DEMO - Multiple validation types with async simulation\n\
                  \n\
                  Commands: v=validate current, V=validate all, c=clear current, C=clear all\n\
                  e=cycle examples, r=toggle history, h=field help, F1=toggle validation\n\
@@ -1028,7 +1029,8 @@ fn render_validation_panel(
                  Try different values to see validation in action!"
             }
             AppMode::Edit => {
-                "✏️ EDITING MODE - Type to see validation on field blur\n\
+                "🎯 INSERT MODE - Cursor: | (bar)\n\
+                 ✏️ Type to see validation on field blur\n\
                  \n\
                  Current field validation will trigger when you:\n\
                  • Press Esc (exit edit mode)\n\
@@ -1052,6 +1054,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("🧪 Enhanced External Validation Demo (Feature 5)");
     println!("✅ validation feature: ENABLED");
     println!("✅ gui feature: ENABLED"); 
+    println!("✅ cursor-style feature: ENABLED");
     println!("🧪 Enhanced features:");
     println!("   • 5 different external validation types with realistic scenarios");
     println!("   • Validation caching and performance metrics");
@@ -1067,13 +1070,23 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut terminal = Terminal::new(backend)?;
 
     let data = ValidationDemoData::new();
-    let editor = ValidationDemoEditor::new(data);
+    let mut editor = ValidationDemoEditor::new(data);
+
+    // Initialize with normal mode - library automatically sets block cursor
+    editor.editor.set_mode(AppMode::ReadOnly);
+
+    // Demonstrate that CursorManager is available and working
+    CursorManager::update_for_mode(AppMode::ReadOnly)?;
 
     let res = run_app(&mut terminal, editor);
 
     disable_raw_mode()?;
     execute!(terminal.backend_mut(), LeaveAlternateScreen, DisableMouseCapture)?;
     terminal.show_cursor()?;
+
+    // Library automatically resets cursor on FormEditor::drop()
+    // But we can also manually reset if needed
+    CursorManager::reset()?;
 
     if let Err(err) = res {
         println!("{:?}", err);

@@ -18,13 +18,13 @@
 //! Each mask's input position count EXACTLY matches its character limit to prevent
 //! the critical bug where users can type more characters than they can see.
 //!
-//! Run with: cargo run --example validation_3 --features "gui,validation"
+//! Run with: cargo run --example validation_3 --features "gui,validation,cursor-style"
 
-// REQUIRE validation and gui features for mask functionality
-#[cfg(not(all(feature = "validation", feature = "gui")))]
+// REQUIRE validation, gui and cursor-style features for mask functionality
+#[cfg(not(all(feature = "validation", feature = "gui", feature = "cursor-style")))]
 compile_error!(
-    "This example requires the 'validation' and 'gui' features. \
-     Run with: cargo run --example validation_3 --features \"gui,validation\""
+    "This example requires the 'validation', 'gui' and 'cursor-style' features. \
+     Run with: cargo run --example validation_3 --features \"gui,validation,cursor-style\""
 );
 
 use std::io;
@@ -50,6 +50,7 @@ use canvas::{
     canvas::{
         gui::render_canvas_default,
         modes::AppMode,
+        CursorManager,
     },
     DataProvider, FormEditor,
     ValidationConfig, ValidationConfigBuilder, DisplayMask,
@@ -183,18 +184,21 @@ impl<D: DataProvider> MaskDemoFormEditor<D> {
 
     // === MODE TRANSITIONS ===
     fn enter_edit_mode(&mut self) {
+        // Library will automatically update cursor to bar | in insert mode
         self.editor.enter_edit_mode();
-        self.debug_message = "✏️ INSERT MODE - Type to see mask formatting in real-time".to_string();
+        self.debug_message = "✏️ INSERT MODE - Cursor: Steady Bar | - Type to see mask formatting in real-time".to_string();
     }
 
     fn enter_append_mode(&mut self) {
+        // Library will automatically update cursor to bar | in insert mode
         self.editor.enter_append_mode();
-        self.debug_message = "✏️ INSERT (append) - Mask formatting active".to_string();
+        self.debug_message = "✏️ INSERT (append) - Cursor: Steady Bar | - Mask formatting active".to_string();
     }
 
     fn exit_edit_mode(&mut self) {
+        // Library will automatically update cursor to block █ in normal mode
         self.editor.exit_edit_mode();
-        self.debug_message = "🔒 NORMAL MODE - Press 'r' to see raw data, 'm' for mask info".to_string();
+        self.debug_message = "🔒 NORMAL MODE - Cursor: Steady Block █ - Press 'r' to see raw data, 'm' for mask info".to_string();
     }
 
     fn insert_char(&mut self, ch: char) -> anyhow::Result<()> {
@@ -236,7 +240,10 @@ impl<D: DataProvider> MaskDemoFormEditor<D> {
     fn current_text(&self) -> &str { self.editor.current_text() }
     fn data_provider(&self) -> &D { self.editor.data_provider() }
     fn ui_state(&self) -> &canvas::EditorState { self.editor.ui_state() }
-    fn set_mode(&mut self, mode: AppMode) { self.editor.set_mode(mode); }
+    fn set_mode(&mut self, mode: AppMode) { 
+        // Library automatically updates cursor for the mode
+        self.editor.set_mode(mode); 
+    }
 
     fn next_field(&mut self) {
         match self.editor.next_field() {
@@ -582,9 +589,9 @@ fn render_mask_status(
 
     // Status bar with mask information
     let mode_text = match editor.mode() {
-        AppMode::Edit => "INSERT",
-        AppMode::ReadOnly => "NORMAL",
-        _ => "OTHER",
+        AppMode::Edit => "INSERT | (bar cursor)",
+        AppMode::ReadOnly => "NORMAL █ (block cursor)",
+        _ => "NORMAL █ (block cursor)",
     };
 
     let mask_status = editor.get_mask_status();
@@ -634,7 +641,8 @@ fn render_mask_status(
     // Enhanced help text
     let help_text = match editor.mode() {
         AppMode::ReadOnly => {
-            "🎭 MASK DEMO: See how visual formatting keeps business logic clean!\n\
+            "🎯 CURSOR-STYLE: Normal █ | Insert |\n\
+             🎭 MASK DEMO: Visual formatting keeps business logic clean!\n\
              \n\
              📱 Try different fields to see various mask patterns:\n\
              • Dynamic vs Template modes  • Custom separators  • Different input chars\n\
@@ -644,7 +652,8 @@ fn render_mask_status(
              ?=detailed info, Ctrl+C=quit"
         }
         AppMode::Edit => {
-            "✏️ INSERT MODE - Type to see real-time mask formatting!\n\
+            "🎯 INSERT MODE - Cursor: | (bar)\n\
+             ✏️ Type to see real-time mask formatting!\n\
              \n\
              🔥 Key Features in Action:\n\
              • Separators auto-appear as you type  • Cursor skips over separators\n\
@@ -670,6 +679,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("✅ validation feature: ENABLED");
     println!("✅ gui feature: ENABLED");
     println!("🎭 Display masks: ACTIVE");
+    println!("✅ cursor-style feature: ENABLED");
     println!("🔥 Key Benefits Demonstrated:");
     println!("   • Clean separation: Visual formatting ≠ Business logic");
     println!("   • User-friendly: Pretty displays with automatic cursor handling");
@@ -690,7 +700,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut terminal = Terminal::new(backend)?;
 
     let data = MaskDemoData::new();
-    let editor = MaskDemoFormEditor::new(data);
+    let mut editor = MaskDemoFormEditor::new(data);
+
+    // Initialize with normal mode - library automatically sets block cursor
+    editor.set_mode(AppMode::ReadOnly);
+
+    // Demonstrate that CursorManager is available and working
+    CursorManager::update_for_mode(AppMode::ReadOnly)?;
 
     let res = run_app(&mut terminal, editor);
 
@@ -701,6 +717,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         DisableMouseCapture
     )?;
     terminal.show_cursor()?;
+
+    // Library automatically resets cursor on FormEditor::drop()
+    // But we can also manually reset if needed
+    CursorManager::reset()?;
 
     if let Err(err) = res {
         println!("{:?}", err);
