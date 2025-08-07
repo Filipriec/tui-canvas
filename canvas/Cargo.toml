@@ -30,15 +30,15 @@ tokio-test = "0.4.4"
 
 [features]
 default = []
-gui = ["ratatui"]
-autocomplete = ["tokio"]
+gui = ["ratatui", "crossterm"]
+suggestions = ["tokio"]
 cursor-style = ["crossterm"]
 validation = ["regex"]
 
 [[example]]
-name = "autocomplete"
-required-features = ["autocomplete", "gui"]
-path = "examples/autocomplete.rs"
+name = "suggestions"
+required-features = ["suggestions", "gui", "cursor-style"]
+path = "examples/suggestions.rs"
 
 [[example]]
 name = "canvas_gui_demo"
@@ -47,4 +47,20 @@ path = "examples/canvas_gui_demo.rs"
 
 [[example]]
 name = "validation_1"
+required-features = ["gui", "validation"]
+
+[[example]]
+name = "validation_2"
+required-features = ["gui", "validation"]
+
+[[example]]
+name = "validation_3"
+required-features = ["gui", "validation"]
+
+[[example]]
+name = "validation_4"
+required-features = ["gui", "validation"]
+
+[[example]]
+name = "validation_5"
 required-features = ["gui", "validation"]

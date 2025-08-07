@@ -19,7 +19,7 @@ use crate::editor::FormEditor;
 #[cfg(feature = "gui")]
 use std::cmp::{max, min};
 
-/// Render ONLY the canvas form fields - no autocomplete
+/// Render ONLY the canvas form fields - no suggestions rendering here
 /// Updated to work with FormEditor instead of CanvasState trait
 #[cfg(feature = "gui")]
 pub fn render_canvas<T: CanvasTheme, D: DataProvider>(

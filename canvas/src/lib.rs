@@ -4,9 +4,9 @@ pub mod canvas;
 pub mod editor;
 pub mod data_provider;
 
-// Only include autocomplete module if feature is enabled
-#[cfg(feature = "autocomplete")]
-pub mod autocomplete;
+// Only include suggestions module if feature is enabled
+#[cfg(feature = "suggestions")]
+pub mod suggestions;
 
 // Only include validation module if feature is enabled
 #[cfg(feature = "validation")]
@@ -21,7 +21,7 @@ pub use canvas::CursorManager;
 
 // Main API exports
 pub use editor::FormEditor;
-pub use data_provider::{DataProvider, AutocompleteProvider, SuggestionItem};
+pub use data_provider::{DataProvider, SuggestionsProvider, SuggestionItem};
 
 // UI state (read-only access for users)
 pub use canvas::state::EditorState;
@@ -51,5 +51,5 @@ pub use canvas::gui::render_canvas;
 #[cfg(feature = "gui")]
 pub use canvas::gui::render_canvas_default;
 
-#[cfg(all(feature = "gui", feature = "autocomplete"))]
-pub use autocomplete::gui::render_autocomplete_dropdown;
+#[cfg(all(feature = "gui", feature = "suggestions"))]
+pub use suggestions::gui::render_suggestions_dropdown;

@@ -30,12 +30,12 @@ pub enum CanvasAction {
     DeleteBackward,
     DeleteForward,
 
-    // Autocomplete actions
-    TriggerAutocomplete,
-    SuggestionUp,
-    SuggestionDown,
-    SelectSuggestion,
-    ExitSuggestions,
+    // Suggestions actions
+        TriggerSuggestions,
+        SuggestionUp,
+        SuggestionDown,
+        SelectSuggestion,
+        ExitSuggestions,
 
     // Custom actions
     Custom(String),
@@ -101,7 +101,7 @@ impl CanvasAction {
             Self::InsertChar(_c) => "insert character",
             Self::DeleteBackward => "delete backward",
             Self::DeleteForward => "delete forward",
-            Self::TriggerAutocomplete => "trigger autocomplete",
+            Self::TriggerSuggestions => "trigger suggestions",
             Self::SuggestionUp => "suggestion up",
             Self::SuggestionDown => "suggestion down",
             Self::SelectSuggestion => "select suggestion",
@@ -139,10 +139,10 @@ impl CanvasAction {
         ]
     }
 
-    /// Get all autocomplete-related actions
-    pub fn autocomplete_actions() -> Vec<CanvasAction> {
+    /// Get all suggestions-related actions
+    pub fn suggestions_actions() -> Vec<CanvasAction> {
         vec![
-            Self::TriggerAutocomplete,
+            Self::TriggerSuggestions,
             Self::SuggestionUp,
             Self::SuggestionDown,
             Self::SelectSuggestion,

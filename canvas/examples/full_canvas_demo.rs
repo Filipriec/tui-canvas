@@ -345,7 +345,7 @@ impl DataProvider for FullDemoData {
         self.fields[index].1 = value;
     }
 
-    fn supports_autocomplete(&self, _field_index: usize) -> bool {
+    fn supports_suggestions(&self, _field_index: usize) -> bool {
         false
     }
 

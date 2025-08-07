@@ -2,7 +2,7 @@
 
 ## Overview
 
-This guide covers the migration from the legacy canvas library structure to the new clean, modular architecture. The new design separates core canvas functionality from autocomplete features, providing better type safety and maintainability.
+This guide covers the migration from the legacy canvas library structure to the new clean, modular architecture. The new design separates core canvas functionality from suggestions features, providing better type safety and maintainability.
 
 ## Key Changes
 
@@ -10,7 +10,7 @@ This guide covers the migration from the legacy canvas library structure to the 
 ```
 # Old Structure (LEGACY)
 src/
-├── state.rs              # Mixed canvas + autocomplete
+├── state.rs              # Mixed canvas + suggestions
 ├── actions/edit.rs       # Mixed concerns
 ├── gui/render.rs         # Everything together
 └── suggestions.rs        # Legacy file
@@ -21,9 +21,9 @@ src/
 │   ├── state.rs         # CanvasState trait only
 │   ├── actions/edit.rs  # Canvas actions only
 │   └── gui.rs           # Canvas rendering
-├── autocomplete/         # Rich autocomplete features
-│   ├── state.rs         # AutocompleteCanvasState trait
-│   ├── types.rs         # SuggestionItem, AutocompleteState
+├── suggestions/         # Suggestions dropdown features (not inline autocomplete)
+│   ├── state.rs         # Suggestion provider types
+│   ├── gui.rs           # Suggestions dropdown rendering
 │   ├── actions.rs       # Autocomplete actions
 │   └── gui.rs           # Autocomplete dropdown rendering
 └── dispatcher.rs         # Action routing
@@ -31,7 +31,7 @@ src/
 
 ### 2. **Trait Separation**
 - **CanvasState**: Core form functionality (navigation, input, validation)
-- **AutocompleteCanvasState**: Optional rich autocomplete features
+- Suggestions module: Optional dropdown suggestions support
 
 ### 3. **Rich Suggestions**
 Replaced simple string suggestions with typed, rich suggestion objects.
@@ -93,34 +93,29 @@ impl CanvasState for YourFormState {
 
 ### Step 3: Implement Rich Autocomplete (Optional)
 
-**If you want rich autocomplete features:**
+**If you want suggestions dropdown features:**
 
 ```rust
-use canvas::autocomplete::{AutocompleteCanvasState, SuggestionItem, AutocompleteState};
+use canvas::{SuggestionItem};
 
-impl AutocompleteCanvasState for YourFormState {
-    type SuggestionData = YourDataType; // e.g., Hit, CustomRecord, etc.
-
-    fn supports_autocomplete(&self, field_index: usize) -> bool {
-        // Define which fields support autocomplete
+impl YourFormState {
+    fn supports_suggestions(&self, field_index: usize) -> bool {
+        // Define which fields support suggestions
         matches!(field_index, 2 | 3 | 5) // Example: only certain fields
     }
 
-    fn autocomplete_state(&self) -> Option<&AutocompleteState<Self::SuggestionData>> {
-        Some(&self.autocomplete)
-    }
+    // Manage your own suggestion state or rely on FormEditor APIs
 
-    fn autocomplete_state_mut(&mut self) -> Option<&mut AutocompleteState<Self::SuggestionData>> {
-        Some(&mut self.autocomplete)
-    }
+    // Manage your own suggestion state or rely on FormEditor APIs
 }
 ```
 
-**Add autocomplete field to your state:**
+**Add suggestions storage to your state (optional, if you need to persist outside the editor):**
 ```rust
 pub struct YourFormState {
     // ... existing fields
-    pub autocomplete: AutocompleteState<YourDataType>,
+    // Optional: your own suggestions cache if needed
+    // pub suggestion_cache: Vec<SuggestionItem>,
 }
 ```
 
@@ -149,9 +144,9 @@ form_state.set_autocomplete_suggestions(suggestions);
 
 **Old rendering:**
 ```rust
-// Manual autocomplete rendering
-if form_state.autocomplete_active {
-    render_autocomplete_dropdown(/* ... */);
+// Manual suggestions rendering
+if editor.is_suggestions_active() {
+    suggestions::gui::render_suggestions_dropdown(/* ... */);
 }
 ```
 
@@ -162,13 +157,12 @@ use canvas::canvas::render_canvas;
 
 let active_field_rect = render_canvas(f, area, form_state, theme, edit_mode, highlight_state);
 
-// Optional: Rich autocomplete (if implementing AutocompleteCanvasState)
-if form_state.is_autocomplete_active() {
-    if let Some(autocomplete_state) = form_state.autocomplete_state() {
-        canvas::autocomplete::render_autocomplete_dropdown(
-            f, f.area(), active_field_rect.unwrap(), theme, autocomplete_state
-        );
-    }
+// Suggestions dropdown (if active)
+if editor.is_suggestions_active() {
+    canvas::suggestions::render_suggestions_dropdown(
+        f, f.area(), active_field_rect.unwrap(), theme, &editor
+    );
+}
 }
 ```
 
@@ -181,16 +175,16 @@ form_state.deactivate_suggestions();
 
 # NEW - Option A: Add your own method
 impl YourFormState {
-    pub fn deactivate_autocomplete(&mut self) {
+    pub fn deactivate_suggestions(&mut self) {
         self.autocomplete_active = false;
         self.autocomplete_suggestions.clear();
         self.selected_suggestion_index = None;
     }
 }
-form_state.deactivate_autocomplete();
+editor.ui_state_mut().deactivate_suggestions();
 
-# NEW - Option B: Use rich autocomplete trait
-form_state.deactivate_autocomplete(); // If implementing AutocompleteCanvasState
+# NEW - Option B: Suggestions via editor APIs
+editor.ui_state_mut().deactivate_suggestions();
 ```
 
 ## Benefits of New Architecture
@@ -217,8 +211,8 @@ let suggestions: Vec<SuggestionItem<UserRecord>> = vec![
 - **Display Overrides**: Show friendly text while storing normalized data
 
 ### 4. **Future-Proof**
-- Easy to add new autocomplete features
-- Canvas features don't interfere with autocomplete
+- Easy to add new suggestion features
+- Canvas features don't interfere with suggestions
 - Modular: Use only what you need
 
 ## Advanced Features
@@ -262,7 +256,7 @@ SuggestionItem::new(user, "John Doe (Manager)".to_string(), "123".to_string());
 ## Breaking Changes Summary
 
 1. **Import paths changed**: Add `canvas::` or `dispatcher::` prefixes
-2. **Legacy suggestion methods removed**: Replace with rich autocomplete or custom methods
+2. **Legacy suggestion methods removed**: Replace with SuggestionItem-based dropdown or custom methods
 3. **No more simple suggestions**: Use `SuggestionItem` for typed suggestions
 4. **Trait split**: `AutocompleteCanvasState` is now separate and optional
 
@@ -283,11 +277,11 @@ SuggestionItem::new(user, "John Doe (Manager)".to_string(), "123".to_string());
 
 - [ ] Updated all import paths
 - [ ] Removed legacy methods from CanvasState implementation
-- [ ] Added custom autocomplete methods if needed
-- [ ] Updated suggestion usage to SuggestionItem
+- [ ] Added custom suggestion methods if needed
+- [ ] Updated usage to SuggestionItem
 - [ ] Updated rendering calls
 - [ ] Tested form functionality
-- [ ] Tested autocomplete functionality (if using)
+- [ ] Tested suggestions functionality (if using)
 
 ## Example: Complete Migration
 
@@ -305,29 +299,25 @@ impl CanvasState for FormState {
 **After:**
 ```rust
 use canvas::canvas::{CanvasState, CanvasAction};
-use canvas::autocomplete::{AutocompleteCanvasState, SuggestionItem};
+use canvas::SuggestionItem;
 
 impl CanvasState for FormState {
-    // Only core canvas methods, no suggestion methods
+    // Only core canvas methods
     fn current_field(&self) -> usize { /* ... */ }
     fn get_current_input(&self) -> &str { /* ... */ }
     // ... other core methods only
 }
 
-impl AutocompleteCanvasState for FormState {
+// Use FormEditor + SuggestionsProvider for suggestions dropdown
     type SuggestionData = Hit;
     
-    fn supports_autocomplete(&self, field_index: usize) -> bool {
+    fn supports_suggestions(&self, field_index: usize) -> bool {
         self.fields[field_index].is_link
     }
     
-    fn autocomplete_state(&self) -> Option<&AutocompleteState<Self::SuggestionData>> {
-        Some(&self.autocomplete)
-    }
+    // Maintain suggestion state through FormEditor and DataProvider
     
-    fn autocomplete_state_mut(&mut self) -> Option<&mut AutocompleteState<Self::SuggestionData>> {
-        Some(&mut self.autocomplete)
-    }
+    // Maintain suggestion state through FormEditor and DataProvider
 }
 ```
 

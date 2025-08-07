@@ -18,8 +18,8 @@ pub trait DataProvider {
     /// Set field value (library calls this when text changes)
     fn set_field_value(&mut self, index: usize, value: String);
 
-    /// Check if field supports autocomplete (optional)
-    fn supports_autocomplete(&self, _field_index: usize) -> bool {
+    /// Check if field supports suggestions (optional)
+    fn supports_suggestions(&self, _field_index: usize) -> bool {
         false
     }
 
@@ -36,10 +36,10 @@ pub trait DataProvider {
     }
 }
 
-/// Optional: User implements this for autocomplete data
+/// Optional: User implements this for suggestions data
 #[async_trait]
-pub trait AutocompleteProvider {
-    /// Fetch autocomplete suggestions (user's business logic)
+pub trait SuggestionsProvider {
+    /// Fetch suggestions (user's business logic)
     async fn fetch_suggestions(&mut self, field_index: usize, query: &str)
         -> Result<Vec<SuggestionItem>>;
 }

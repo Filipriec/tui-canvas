@@ -848,21 +848,21 @@ fn run_app<B: Backend>(
                 (_, KeyCode::Tab, _) => editor.next_field(),
                 (_, KeyCode::BackTab, _) => editor.prev_field(),
 
-                // Validation commands
-                (_, KeyCode::Char('v'), _) => {
+                // Validation commands (ONLY in ReadOnly mode)
+                (AppMode::ReadOnly, KeyCode::Char('v'), _) => {
                     let field = editor.current_field();
                     editor.validate_field(field);
                 },
-                (_, KeyCode::Char('V'), _) => editor.validate_all_fields(),
-                (_, KeyCode::Char('c'), _) => {
+                (AppMode::ReadOnly, KeyCode::Char('V'), _) => editor.validate_all_fields(),
+                (AppMode::ReadOnly, KeyCode::Char('c'), _) => {
                     let field = editor.current_field();
                     editor.clear_validation_state(Some(field));
                 },
-                (_, KeyCode::Char('C'), _) => editor.clear_validation_state(None),
+                (AppMode::ReadOnly, KeyCode::Char('C'), _) => editor.clear_validation_state(None),
 
-                // UI toggles
-                (_, KeyCode::Char('r'), _) => editor.toggle_history_view(),
-                (_, KeyCode::Char('e'), _) => editor.cycle_examples(),
+                // UI toggles (ONLY in ReadOnly mode for alpha keys to avoid blocking text input)
+                (AppMode::ReadOnly, KeyCode::Char('r'), _) => editor.toggle_history_view(),
+                (AppMode::ReadOnly, KeyCode::Char('e'), _) => editor.cycle_examples(),
                 (_, KeyCode::F(1), _) => editor.toggle_validation(),
 
                 // Editing

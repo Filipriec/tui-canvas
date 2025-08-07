@@ -1,5 +1,5 @@
-// examples/autocomplete.rs
-// Run with: cargo run --example autocomplete --features "autocomplete,gui"
+// examples/suggestions.rs
+// Run with: cargo run --example suggestions --features "suggestions,gui"
 
 use std::io;
 use crossterm::{
@@ -22,8 +22,8 @@ use canvas::{
         modes::AppMode,
         theme::CanvasTheme,
     },
-    autocomplete::gui::render_autocomplete_dropdown,
-    FormEditor, DataProvider, AutocompleteProvider, SuggestionItem,
+    suggestions::gui::render_suggestions_dropdown,
+    FormEditor, DataProvider, SuggestionsProvider, SuggestionItem,
 };
 
 use async_trait::async_trait;
@@ -108,7 +108,7 @@ impl DataProvider for ContactForm {
         }
     }
     
-    fn supports_autocomplete(&self, field_index: usize) -> bool {
+    fn supports_suggestions(&self, field_index: usize) -> bool {
         field_index == 1 // Only email field
     }
 }
@@ -120,11 +120,9 @@ impl DataProvider for ContactForm {
 struct EmailAutocomplete;
 
 #[async_trait]
-impl AutocompleteProvider for EmailAutocomplete {
-    type SuggestionData = EmailSuggestion;
-    
+impl SuggestionsProvider for EmailAutocomplete {
     async fn fetch_suggestions(&mut self, _field_index: usize, query: &str) 
-        -> Result<Vec<SuggestionItem<Self::SuggestionData>>> 
+        -> Result<Vec<SuggestionItem>> 
     {
         // Extract domain part from email
         let (email_prefix, domain_part) = if let Some(at_pos) = query.find('@') {
@@ -153,10 +151,6 @@ impl AutocompleteProvider for EmailAutocomplete {
                 if domain.starts_with(&domain_part) || domain_part.is_empty() {
                     let full_email = format!("{}@{}", email_prefix, domain);
                     results.push(SuggestionItem {
-                        data: EmailSuggestion {
-                            email: full_email.clone(),
-                            provider: provider.to_string(),
-                        },
                         display_text: format!("{} ({})", full_email, provider),
                         value_to_store: full_email,
                     });
@@ -175,7 +169,7 @@ impl AutocompleteProvider for EmailAutocomplete {
 
 struct AppState {
     editor: FormEditor<ContactForm>,
-    autocomplete: EmailAutocomplete,
+    suggestions_provider: EmailAutocomplete,
     debug_message: String,
 }
 
@@ -190,8 +184,8 @@ impl AppState {
         
         Self {
             editor,
-            autocomplete: EmailAutocomplete,
-            debug_message: "Type in email field, Tab to trigger autocomplete, Enter to select, Esc to cancel".to_string(),
+            suggestions_provider: EmailAutocomplete,
+            debug_message: "Type in email field, Tab to trigger suggestions, Enter to select, Esc to cancel".to_string(),
         }
     }
 }
@@ -207,14 +201,14 @@ async fn handle_key_press(key: KeyCode, modifiers: KeyModifiers, state: &mut App
 
     // Handle input based on key
     let result = match key {
-        // === AUTOCOMPLETE KEYS ===
+        // === SUGGESTIONS KEYS ===
         KeyCode::Tab => {
-            if state.editor.is_autocomplete_active() {
-                state.editor.autocomplete_next();
+            if state.editor.is_suggestions_active() {
+                state.editor.suggestions_next();
                 Ok("Navigated to next suggestion".to_string())
-            } else if state.editor.data_provider().supports_autocomplete(state.editor.current_field()) {
-                state.editor.trigger_autocomplete(&mut state.autocomplete).await
-                    .map(|_| "Triggered autocomplete".to_string())
+            } else if state.editor.data_provider().supports_suggestions(state.editor.current_field()) {
+                state.editor.trigger_suggestions(&mut state.suggestions_provider).await
+                    .map(|_| "Triggered suggestions".to_string())
             } else {
                 state.editor.move_to_next_field();
                 Ok("Moved to next field".to_string())
@@ -222,8 +216,8 @@ async fn handle_key_press(key: KeyCode, modifiers: KeyModifiers, state: &mut App
         }
 
         KeyCode::Enter => {
-            if state.editor.is_autocomplete_active() {
-                if let Some(applied) = state.editor.apply_autocomplete() {
+            if state.editor.is_suggestions_active() {
+                if let Some(applied) = state.editor.apply_suggestion() {
                     Ok(format!("Applied: {}", applied))
                 } else {
                     Ok("No suggestion to apply".to_string())
@@ -235,9 +229,9 @@ async fn handle_key_press(key: KeyCode, modifiers: KeyModifiers, state: &mut App
         }
 
         KeyCode::Esc => {
-            if state.editor.is_autocomplete_active() {
-                // Autocomplete will be cleared automatically by mode change
-                Ok("Cancelled autocomplete".to_string())
+            if state.editor.is_suggestions_active() {
+                // Suggestions will be cleared automatically by mode change
+                Ok("Cancelled suggestions".to_string())
             } else {
                 // Toggle between edit and readonly mode
                 let new_mode = match state.editor.mode() {
@@ -324,9 +318,9 @@ fn ui(f: &mut Frame, state: &AppState, theme: &DemoTheme) {
         theme,
     );
 
-    // Render autocomplete dropdown if active
+    // Render suggestions dropdown if active
     if let Some(input_rect) = active_field_rect {
-        render_autocomplete_dropdown(
+        render_suggestions_dropdown(
             f,
             chunks[0],
             input_rect,
@@ -336,8 +330,8 @@ fn ui(f: &mut Frame, state: &AppState, theme: &DemoTheme) {
     }
 
     // Status info
-    let autocomplete_status = if state.editor.is_autocomplete_active() {
-        if state.editor.ui_state().is_autocomplete_loading() {
+    let autocomplete_status = if state.editor.is_suggestions_active() {
+        if state.editor.ui_state().is_suggestions_loading() {
             "Loading suggestions..."
         } else if !state.editor.suggestions().is_empty() {
             "Use Tab to navigate, Enter to select, Esc to cancel"
@@ -345,7 +339,7 @@ fn ui(f: &mut Frame, state: &AppState, theme: &DemoTheme) {
             "No suggestions found"
         }
     } else {
-        "Tab to trigger autocomplete"
+        "Tab to trigger suggestions"
     };
 
     let status_lines = vec![
@@ -354,9 +348,9 @@ fn ui(f: &mut Frame, state: &AppState, theme: &DemoTheme) {
             state.editor.current_field() + 1, 
             state.editor.data_provider().field_count(), 
             state.editor.cursor_position()))),
-        Line::from(Span::raw(format!("Autocomplete: {}", autocomplete_status))),
+        Line::from(Span::raw(format!("Suggestions: {}", autocomplete_status))),
         Line::from(Span::raw(state.debug_message.clone())),
-        Line::from(Span::raw("F10: Quit | Tab: Trigger/Navigate autocomplete | Enter: Select | Esc: Cancel/Toggle mode")),
+        Line::from(Span::raw("F10: Quit | Tab: Trigger/Navigate suggestions | Enter: Select | Esc: Cancel/Toggle mode")),
     ];
 
     let status = Paragraph::new(status_lines)

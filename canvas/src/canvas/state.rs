@@ -14,8 +14,8 @@ pub struct EditorState {
     // Mode state
     pub(crate) current_mode: AppMode,
 
-    // Autocomplete state
-    pub(crate) autocomplete: AutocompleteUIState,
+    // Suggestions dropdown state
+    pub(crate) suggestions: SuggestionsUIState,
 
     // Selection state (for vim visual mode)
     pub(crate) selection: SelectionState,
@@ -26,7 +26,7 @@ pub struct EditorState {
 }
 
 #[derive(Debug, Clone)]
-pub struct AutocompleteUIState {
+pub struct SuggestionsUIState {
     pub(crate) is_active: bool,
     pub(crate) is_loading: bool,
     pub(crate) selected_index: Option<usize>,
@@ -47,7 +47,7 @@ impl EditorState {
             cursor_pos: 0,
             ideal_cursor_column: 0,
             current_mode: AppMode::Edit,
-            autocomplete: AutocompleteUIState {
+            suggestions: SuggestionsUIState {
                 is_active: false,
                 is_loading: false,
                 selected_index: None,
@@ -83,14 +83,14 @@ impl EditorState {
         self.current_mode
     }
 
-    /// Check if autocomplete is active (for user's business logic)
-    pub fn is_autocomplete_active(&self) -> bool {
-        self.autocomplete.is_active
+    /// Check if suggestions dropdown is active (for user's business logic)
+    pub fn is_suggestions_active(&self) -> bool {
+        self.suggestions.is_active
     }
 
-    /// Check if autocomplete is loading (for user's business logic)
-    pub fn is_autocomplete_loading(&self) -> bool {
-        self.autocomplete.is_loading
+    /// Check if suggestions dropdown is loading (for user's business logic)
+    pub fn is_suggestions_loading(&self) -> bool {
+        self.suggestions.is_loading
     }
 
     /// Get selection state (for user's business logic)
@@ -128,18 +128,18 @@ impl EditorState {
         self.ideal_cursor_column = self.cursor_pos;
     }
 
-    pub(crate) fn activate_autocomplete(&mut self, field_index: usize) {
-        self.autocomplete.is_active = true;
-        self.autocomplete.is_loading = true;
-        self.autocomplete.active_field = Some(field_index);
-        self.autocomplete.selected_index = None;
+    pub(crate) fn activate_suggestions(&mut self, field_index: usize) {
+        self.suggestions.is_active = true;
+        self.suggestions.is_loading = true;
+        self.suggestions.active_field = Some(field_index);
+        self.suggestions.selected_index = None;
     }
 
-    pub(crate) fn deactivate_autocomplete(&mut self) {
-        self.autocomplete.is_active = false;
-        self.autocomplete.is_loading = false;
-        self.autocomplete.active_field = None;
-        self.autocomplete.selected_index = None;
+    pub(crate) fn deactivate_suggestions(&mut self) {
+        self.suggestions.is_active = false;
+        self.suggestions.is_loading = false;
+        self.suggestions.active_field = None;
+        self.suggestions.selected_index = None;
     }
 }
 

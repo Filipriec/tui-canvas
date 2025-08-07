@@ -7,7 +7,7 @@ A reusable, type-safe canvas system for building form-based TUI applications wit
 - **Type-Safe Actions**: No more string-based action names - everything is compile-time checked
 - **Generic Design**: Implement `CanvasState` once, get navigation, editing, and suggestions for free
 - **Vim-Like Experience**: Modal editing with familiar keybindings
-- **Suggestion System**: Built-in autocomplete and suggestions support
+- **Suggestion System**: Built-in suggestions dropdown support
 - **Framework Agnostic**: Works with any TUI framework or raw terminal handling
 - **Async Ready**: Full async/await support for modern Rust applications
 - **Batch Operations**: Execute multiple actions atomically
@@ -144,7 +144,7 @@ pub enum CanvasAction {
 
 ## 🔧 Advanced Features
 
-### Suggestions and Autocomplete
+### Suggestions Dropdown (not inline autocomplete)
 
 ```rust
 impl CanvasState for MyForm {
@@ -170,7 +170,7 @@ impl CanvasState for MyForm {
             CanvasAction::SelectSuggestion => {
                 if let Some(suggestion) = self.suggestions.get_selected() {
                     *self.get_current_input_mut() = suggestion.clone();
-                    self.deactivate_autocomplete();
+                    self.deactivate_suggestions();
                     Some("Applied suggestion".to_string())
                 }
                 None

@@ -1,5 +1,5 @@
-// src/autocomplete/gui.rs
-//! Autocomplete GUI updated to work with FormEditor
+// src/suggestions/gui.rs
+//! Suggestions dropdown GUI (not inline autocomplete) updated to work with FormEditor
 
 #[cfg(feature = "gui")]
 use ratatui::{
@@ -17,9 +17,9 @@ use crate::editor::FormEditor;
 #[cfg(feature = "gui")]
 use unicode_width::UnicodeWidthStr;
 
-/// Render autocomplete dropdown for FormEditor - call this AFTER rendering canvas
+/// Render suggestions dropdown for FormEditor - call this AFTER rendering canvas
 #[cfg(feature = "gui")]
-pub fn render_autocomplete_dropdown<T: CanvasTheme, D: DataProvider>(
+pub fn render_suggestions_dropdown<T: CanvasTheme, D: DataProvider>(
     f: &mut Frame,
     frame_area: Rect,
     input_rect: Rect,
@@ -28,14 +28,14 @@ pub fn render_autocomplete_dropdown<T: CanvasTheme, D: DataProvider>(
 ) {
     let ui_state = editor.ui_state();
 
-    if !ui_state.is_autocomplete_active() {
+    if !ui_state.is_suggestions_active() {
         return;
     }
 
-    if ui_state.autocomplete.is_loading {
+    if ui_state.suggestions.is_loading {
         render_loading_indicator(f, frame_area, input_rect, theme);
     } else if !editor.suggestions().is_empty() {
-        render_suggestions_dropdown(f, frame_area, input_rect, theme, editor.suggestions(), ui_state.autocomplete.selected_index);
+        render_suggestions_dropdown_list(f, frame_area, input_rect, theme, editor.suggestions(), ui_state.suggestions.selected_index);
     }
 }
 
@@ -71,7 +71,7 @@ fn render_loading_indicator<T: CanvasTheme>(
 
 /// Show actual suggestions list
 #[cfg(feature = "gui")]
-fn render_suggestions_dropdown<T: CanvasTheme>(
+fn render_suggestions_dropdown_list<T: CanvasTheme>(
     f: &mut Frame,
     frame_area: Rect,
     input_rect: Rect,

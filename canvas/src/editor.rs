@@ -7,7 +7,7 @@ use crate::canvas::CursorManager;
 
 use anyhow::Result;
 use crate::canvas::state::EditorState;
-use crate::data_provider::{DataProvider, AutocompleteProvider, SuggestionItem};
+use crate::data_provider::{DataProvider, SuggestionsProvider, SuggestionItem};
 use crate::canvas::modes::AppMode;
 use crate::canvas::state::SelectionState;
 
@@ -70,9 +70,9 @@ impl<D: DataProvider> FormEditor<D> {
         self.ui_state.mode()
     }
 
-    /// Check if autocomplete is active (for user's logic)
-    pub fn is_autocomplete_active(&self) -> bool {
-        self.ui_state.is_autocomplete_active()
+    /// Check if suggestions dropdown is active (for user's logic)
+    pub fn is_suggestions_active(&self) -> bool {
+        self.ui_state.is_suggestions_active()
     }
 
     /// Get current field text (convenience method)
@@ -580,50 +580,51 @@ impl<D: DataProvider> FormEditor<D> {
     }
 
     // ===================================================================
-    // ASYNC OPERATIONS: Only autocomplete needs async
+    // ASYNC OPERATIONS: Only suggestions need async
     // ===================================================================
 
-    /// Trigger autocomplete (async because it fetches data)
-    pub async fn trigger_autocomplete<A>(&mut self, provider: &mut A) -> Result<()>
+    /// Trigger suggestions (async because it fetches data)
+    pub async fn trigger_suggestions<A>(&mut self, provider: &mut A) -> Result<()>
     where
-        A: AutocompleteProvider,
+        A: SuggestionsProvider,
     {
         let field_index = self.ui_state.current_field;
 
-        if !self.data_provider.supports_autocomplete(field_index) {
+        if !self.data_provider.supports_suggestions(field_index) {
             return Ok(());
         }
 
-        // Activate autocomplete UI
-        self.ui_state.activate_autocomplete(field_index);
+        // Activate suggestions UI
+        self.ui_state.activate_suggestions(field_index);
 
         // Fetch suggestions from user (no conversion needed!)
         let query = self.current_text();
         self.suggestions = provider.fetch_suggestions(field_index, query).await?;
 
         // Update UI state
-        self.ui_state.autocomplete.is_loading = false;
+        self.ui_state.suggestions.is_loading = false;
         if !self.suggestions.is_empty() {
-            self.ui_state.autocomplete.selected_index = Some(0);
+            self.ui_state.suggestions.selected_index = Some(0);
         }
 
         Ok(())
     }
 
-    /// Navigate autocomplete suggestions
-    pub fn autocomplete_next(&mut self) {
-        if !self.ui_state.autocomplete.is_active || self.suggestions.is_empty() {
+    /// Navigate suggestions
+    pub fn suggestions_next(&mut self) {
+        if !self.ui_state.suggestions.is_active || self.suggestions.is_empty() {
             return;
         }
 
-        let current = self.ui_state.autocomplete.selected_index.unwrap_or(0);
+        let current = self.ui_state.suggestions.selected_index.unwrap_or(0);
         let next = (current + 1) % self.suggestions.len();
-        self.ui_state.autocomplete.selected_index = Some(next);
+        self.ui_state.suggestions.selected_index = Some(next);
     }
 
-    /// Apply selected autocomplete suggestion
-    pub fn apply_autocomplete(&mut self) -> Option<String> {
-        if let Some(selected_index) = self.ui_state.autocomplete.selected_index {
+    /// Apply selected suggestion
+    /// Apply selected suggestion
+    pub fn apply_suggestion(&mut self) -> Option<String> {
+        if let Some(selected_index) = self.ui_state.suggestions.selected_index {
             if let Some(suggestion) = self.suggestions.get(selected_index).cloned() {
                 let field_index = self.ui_state.current_field;
 
@@ -637,8 +638,8 @@ impl<D: DataProvider> FormEditor<D> {
                 self.ui_state.cursor_pos = suggestion.value_to_store.len();
                 self.ui_state.ideal_cursor_column = self.ui_state.cursor_pos;
 
-                // Close autocomplete
-                self.ui_state.deactivate_autocomplete();
+                // Close suggestions
+                self.ui_state.deactivate_suggestions();
                 self.suggestions.clear();
 
                 // Validate the new content if validation is enabled
@@ -951,8 +952,8 @@ impl<D: DataProvider> FormEditor<D> {
         }
 
         self.set_mode(AppMode::ReadOnly);
-        // Deactivate autocomplete when exiting edit mode
-        self.ui_state.deactivate_autocomplete();
+        // Deactivate suggestions when exiting edit mode
+        self.ui_state.deactivate_suggestions();
 
         Ok(())
     }

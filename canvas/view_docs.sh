@@ -27,7 +27,7 @@ show_module() {
 
 # Main modules
 show_module "canvas" "CANVAS SYSTEM"
-show_module "autocomplete" "AUTOCOMPLETE SYSTEM" 
+show_module "suggestions" "SUGGESTIONS SYSTEM" 
 show_module "config" "CONFIGURATION SYSTEM"
 
 # Show lib.rs and other root files
@@ -45,7 +45,7 @@ fi
 echo -e "\n\033[1;36m=========================================="
 echo "To view specific module documentation:"
 echo "  ./view_canvas_docs.sh canvas"
-echo "  ./view_canvas_docs.sh autocomplete" 
+echo "  ./view_canvas_docs.sh suggestions" 
 echo "  ./view_canvas_docs.sh config"
 echo "==========================================\033[0m"
 
