@@ -54,7 +54,7 @@ impl<D: DataProvider> FormEditor<D> {
     }
 
     /// Update UI state's completion text from current selection
-    fn update_inline_completion(&mut self) {
+    pub fn update_inline_completion(&mut self) {
         self.ui_state.suggestions.completion_text = self.compute_current_completion();
     }
 

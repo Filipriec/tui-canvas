@@ -268,6 +268,10 @@ impl<D: DataProvider> AutoCursorFormEditor<D> {
         self.editor.suggestions()
     }
 
+    pub fn update_inline_completion(&mut self) {
+        self.editor.update_inline_completion();
+    }
+
     // === MANUAL CURSOR OVERRIDE DEMONSTRATION ===
 
     /// Demonstrate manual cursor control (for advanced users)
@@ -404,6 +408,8 @@ impl ComprehensiveSuggestionsProvider {
             ("Fig", "🍇 Sweet Mediterranean fruit"),
             ("Grape", "🍇 Perfect for wine"),
             ("Honeydew", "🍈 Sweet melon"),
+            ("Ananas", "🍎 Crisp and sweet"),
+            ("Avocado", "🍈 Sweet melon"),
         ];
 
         self.filter_suggestions(fruits, query, "fruit")
@@ -474,7 +480,7 @@ impl ComprehensiveSuggestionsProvider {
     }
 
     /// Generic filtering helper
-    fn filter_suggestions(&self, items: Vec<(&str, &str)>, query: &str, category: &str) -> Vec<SuggestionItem> {
+    fn filter_suggestions(&self, items: Vec<(&str, &str)>, query: &str, _category: &str) -> Vec<SuggestionItem> {
         let query_lower = query.to_lowercase();
 
         items.iter()
@@ -547,11 +553,21 @@ async fn handle_key_press(
 
                 match editor.trigger_suggestions(suggestions_provider).await {
                     Ok(_) => {
+                        let current_text = editor.current_text();
                         if editor.suggestions().is_empty() {
-                            editor.set_debug_message(format!("🔍 No {} suggestions found", field_name.to_lowercase()));
+                            if current_text.is_empty() {
+                                editor.set_debug_message(format!("🔍 No {} suggestions available", field_name.to_lowercase()));
+                            } else {
+                                editor.set_debug_message(format!("🔍 No {} matches for '{}'", field_name.to_lowercase(), current_text));
+                            }
                         } else {
-                            editor.set_debug_message(format!("✨ {} {} suggestions found!", editor.suggestions().len(), field_name.to_lowercase()));
+                            if current_text.is_empty() {
+                                editor.set_debug_message(format!("✨ {} {} suggestions!", editor.suggestions().len(), field_name.to_lowercase()));
+                            } else {
+                                editor.set_debug_message(format!("✨ {} {} matches for '{}'!", editor.suggestions().len(), field_name.to_lowercase(), current_text));
+                            }
                         }
+                        editor.update_inline_completion();
                     }
                     Err(e) => {
                         editor.set_debug_message(format!("❌ Suggestion error: {}", e));
@@ -583,6 +599,12 @@ async fn handle_key_press(
         (AppMode::ReadOnly, KeyCode::Char('i'), _) => {
             editor.enter_edit_mode(); // 🎯 Automatic: cursor becomes bar |
             editor.clear_command_buffer();
+
+            // Auto-show suggestions on entering insert mode
+            if editor.data_provider().supports_suggestions(editor.current_field()) {
+                let _ = editor.trigger_suggestions(suggestions_provider).await;
+                editor.update_inline_completion();
+            }
         }
         (AppMode::ReadOnly, KeyCode::Char('a'), _) => {
             editor.enter_append_mode();
@@ -652,6 +674,15 @@ async fn handle_key_press(
             let field_name = field_names.get(editor.current_field()).unwrap_or(&"Field");
             editor.set_debug_message(format!("↓ moved to {} field", field_name));
             editor.clear_command_buffer();
+
+            // Auto-show suggestions when entering a suggestion-enabled field with existing text
+            if editor.data_provider().supports_suggestions(editor.current_field()) {
+                let current_text = editor.current_text();
+                if !current_text.is_empty() {
+                    let _ = editor.trigger_suggestions(suggestions_provider).await;
+                    editor.update_inline_completion();
+                }
+            }
         }
         (AppMode::ReadOnly | AppMode::Highlight, KeyCode::Char('k'), _)
         | (AppMode::ReadOnly | AppMode::Highlight, KeyCode::Up, _) => {
@@ -660,6 +691,15 @@ async fn handle_key_press(
             let field_name = field_names.get(editor.current_field()).unwrap_or(&"Field");
             editor.set_debug_message(format!("↑ moved to {} field", field_name));
             editor.clear_command_buffer();
+
+            // Auto-show suggestions when entering a suggestion-enabled field with existing text
+            if editor.data_provider().supports_suggestions(editor.current_field()) {
+                let current_text = editor.current_text();
+                if !current_text.is_empty() {
+                    let _ = editor.trigger_suggestions(suggestions_provider).await;
+                    editor.update_inline_completion();
+                }
+            }
         }
 
         // Word movement
@@ -740,9 +780,57 @@ async fn handle_key_press(
         // === DELETE OPERATIONS ===
         (AppMode::Edit, KeyCode::Backspace, _) => {
             editor.delete_backward()?;
+
+            // Update suggestions after deletion
+            if editor.data_provider().supports_suggestions(editor.current_field()) {
+                let current_text = editor.current_text().to_string();
+                if current_text.is_empty() {
+                    let _ = editor.trigger_suggestions(suggestions_provider).await;
+                    editor.set_debug_message(format!("✨ {} total suggestions", editor.suggestions().len()));
+                    editor.update_inline_completion();
+                } else {
+                    match editor.trigger_suggestions(suggestions_provider).await {
+                        Ok(_) => {
+                            if editor.suggestions().is_empty() {
+                                editor.set_debug_message(format!("🔍 No matches for '{}'", current_text));
+                            } else {
+                                editor.set_debug_message(format!("✨ {} matches for '{}'", editor.suggestions().len(), current_text));
+                            }
+                        }
+                        Err(e) => {
+                            editor.set_debug_message(format!("❌ Suggestion error: {}", e));
+                        }
+                    }
+                    editor.update_inline_completion();
+                }
+            }
         }
         (AppMode::Edit, KeyCode::Delete, _) => {
             editor.delete_forward()?;
+
+            // Update suggestions after deletion
+            if editor.data_provider().supports_suggestions(editor.current_field()) {
+                let current_text = editor.current_text().to_string();
+                if current_text.is_empty() {
+                    let _ = editor.trigger_suggestions(suggestions_provider).await;
+                    editor.set_debug_message(format!("✨ {} total suggestions", editor.suggestions().len()));
+                    editor.update_inline_completion();
+                } else {
+                    match editor.trigger_suggestions(suggestions_provider).await {
+                        Ok(_) => {
+                            if editor.suggestions().is_empty() {
+                                editor.set_debug_message(format!("🔍 No matches for '{}'", current_text));
+                            } else {
+                                editor.set_debug_message(format!("✨ {} matches for '{}'", editor.suggestions().len(), current_text));
+                            }
+                        }
+                        Err(e) => {
+                            editor.set_debug_message(format!("❌ Suggestion error: {}", e));
+                        }
+                    }
+                    editor.update_inline_completion();
+                }
+            }
         }
 
         // Delete operations in normal mode (vim x)
@@ -755,9 +843,27 @@ async fn handle_key_press(
             editor.set_debug_message("X: deleted character backward".to_string());
         }
 
-        // === CHARACTER INPUT ===
+        // === CHARACTER INPUT WITH REAL-TIME SUGGESTIONS ===
         (AppMode::Edit, KeyCode::Char(c), m) if !m.contains(KeyModifiers::CONTROL) => {
             editor.insert_char(c)?;
+
+            // Auto-trigger suggestions after typing
+            if editor.data_provider().supports_suggestions(editor.current_field()) {
+                match editor.trigger_suggestions(suggestions_provider).await {
+                    Ok(_) => {
+                        let current_text = editor.current_text().to_string();
+                        if editor.suggestions().is_empty() {
+                            editor.set_debug_message(format!("🔍 No matches for '{}'", current_text));
+                        } else {
+                            editor.set_debug_message(format!("✨ {} matches for '{}'", editor.suggestions().len(), current_text));
+                        }
+                        editor.update_inline_completion();
+                    }
+                    Err(e) => {
+                        editor.set_debug_message(format!("❌ Suggestion error: {}", e));
+                    }
+                }
+            }
         }
 
         // === DEBUG/INFO COMMANDS ===
