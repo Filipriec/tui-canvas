@@ -15,6 +15,7 @@ use crate::canvas::theme::{CanvasTheme, DefaultCanvasTheme};
 use crate::canvas::modes::HighlightState;
 use crate::data_provider::DataProvider;
 use crate::editor::FormEditor;
+use unicode_width::UnicodeWidthChar;
 
 #[cfg(feature = "gui")]
 use std::cmp::{max, min};
@@ -486,16 +487,24 @@ fn set_cursor_position(
     field_rect: Rect,
     text: &str,
     current_cursor_pos: usize,
-    has_display_override: bool,
+    _has_display_override: bool,
 ) {
-    // BUG FIX: Use the correct display cursor position, not end of text
-    let cursor_x = field_rect.x + current_cursor_pos as u16;
+    // Sum display widths of the first current_cursor_pos characters
+    let mut cols: u16 = 0;
+    for (i, ch) in text.chars().enumerate() {
+        if i >= current_cursor_pos {
+            break;
+        }
+        cols = cols.saturating_add(UnicodeWidthChar::width(ch).unwrap_or(0) as u16);
+    }
+
+    let cursor_x = field_rect.x.saturating_add(cols);
     let cursor_y = field_rect.y;
-    
-    // SAFETY: Ensure cursor doesn't go beyond field bounds
+
+    // Clamp to field bounds
     let max_cursor_x = field_rect.x + field_rect.width.saturating_sub(1);
     let safe_cursor_x = cursor_x.min(max_cursor_x);
-    
+
     f.set_cursor_position((safe_cursor_x, cursor_y));
 }
 

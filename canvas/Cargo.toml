@@ -42,9 +42,9 @@ required-features = ["suggestions", "gui", "cursor-style"]
 path = "examples/suggestions.rs"
 
 [[example]]
-name = "canvas_gui_demo"
+name = "canvas_cursor_auto"
 required-features = ["gui", "cursor-style"]
-path = "examples/canvas_gui_demo.rs"
+path = "examples/canvas_cursor_auto.rs"
 
 [[example]]
 name = "validation_1"

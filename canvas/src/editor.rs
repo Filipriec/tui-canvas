@@ -24,6 +24,19 @@ pub struct FormEditor<D: DataProvider> {
 }
 
 impl<D: DataProvider> FormEditor<D> {
+    /// Convert a char index to a byte index in a string
+    fn char_to_byte_index(s: &str, char_idx: usize) -> usize {
+        s.char_indices()
+            .nth(char_idx)
+            .map(|(byte_idx, _)| byte_idx)
+            .unwrap_or_else(|| s.len())
+    }
+
+    /// Convert a byte index to a char index in a string
+    #[allow(dead_code)]
+    fn byte_to_char_index(s: &str, byte_idx: usize) -> usize {
+        s[..byte_idx].chars().count()
+    }
     pub fn new(data_provider: D) -> Self {
         let mut editor = Self {
             ui_state: EditorState::new(),
@@ -341,7 +354,8 @@ impl<D: DataProvider> FormEditor<D> {
         // 🔥 CRITICAL FIX 3: Validate the insertion won't break display/limit coordination
         let new_raw_text = {
             let mut temp = current_raw_text.to_string();
-            temp.insert(raw_cursor_pos, ch);
+            let byte_pos = Self::char_to_byte_index(current_raw_text, raw_cursor_pos);
+            temp.insert(byte_pos, ch);
             temp
         };
 
@@ -467,22 +481,38 @@ impl<D: DataProvider> FormEditor<D> {
     }
 
     /// Handle field navigation
-    pub fn move_to_next_field(&mut self) {
+    pub fn move_to_next_field(&mut self) -> Result<()> {
         let field_count = self.data_provider.field_count();
-        let next_field = (self.ui_state.current_field + 1) % field_count;
+        if field_count == 0 {
+            return Ok(());
+        }
 
-        // Validate current field content before moving if validation is enabled
+        // Check if field switching is allowed (minimum character enforcement)
         #[cfg(feature = "validation")]
         {
-            let current_text = self.current_text().to_string(); // Convert to String to avoid borrow conflicts
+            let current_text = self.current_text();
+            if !self.ui_state.validation.allows_field_switch(self.ui_state.current_field, current_text) {
+                if let Some(reason) = self.ui_state.validation.field_switch_block_reason(
+                    self.ui_state.current_field,
+                    current_text
+                ) {
+                    tracing::debug!("Field switch blocked: {}", reason);
+                    return Err(anyhow::anyhow!("Cannot switch fields: {}", reason));
+                }
+            }
+        }
+
+        // Validate current field before moving
+        #[cfg(feature = "validation")]
+        {
+            let current_text = self.current_text().to_string();
             let _validation_result = self.ui_state.validation.validate_field_content(
                 self.ui_state.current_field,
                 &current_text,
             );
-            // Note: We don't prevent field switching on validation failure,
-            // just record the validation state
         }
 
+        let next_field = (self.ui_state.current_field + 1) % field_count;
         self.ui_state.move_to_field(next_field, field_count);
 
         // Clamp cursor to new field
@@ -493,6 +523,8 @@ impl<D: DataProvider> FormEditor<D> {
             max_pos,
             self.ui_state.current_mode == AppMode::Edit
         );
+
+        Ok(())
     }
 
     /// Change mode (for vim compatibility)
@@ -1095,30 +1127,45 @@ impl<D: DataProvider> FormEditor<D> {
     /// Delete character before cursor (vim x in insert mode / backspace)
     pub fn delete_backward(&mut self) -> Result<()> {
         if self.ui_state.current_mode != AppMode::Edit {
-            return Ok(()); // Silently ignore in non-edit modes
+            return Ok(());
         }
-
         if self.ui_state.cursor_pos == 0 {
-            return Ok(()); // Nothing to delete
+            return Ok(());
         }
 
         let field_index = self.ui_state.current_field;
         let mut current_text = self.data_provider.field_value(field_index).to_string();
 
-        if self.ui_state.cursor_pos <= current_text.len() {
-            current_text.remove(self.ui_state.cursor_pos - 1);
-            self.data_provider.set_field_value(field_index, current_text.clone());
-            self.ui_state.cursor_pos -= 1;
-            self.ui_state.ideal_cursor_column = self.ui_state.cursor_pos;
+        let new_cursor = self.ui_state.cursor_pos.saturating_sub(1);
 
-            // Validate the new content if validation is enabled
-            #[cfg(feature = "validation")]
-            {
-                let _validation_result = self.ui_state.validation.validate_field_content(
-                    field_index,
-                    &current_text,
-                );
+        let start = Self::char_to_byte_index(&current_text, self.ui_state.cursor_pos - 1);
+        let end = Self::char_to_byte_index(&current_text, self.ui_state.cursor_pos);
+        current_text.replace_range(start..end, "");
+        self.data_provider.set_field_value(field_index, current_text.clone());
+
+        // Always run reposition logic
+        let mut target_cursor = new_cursor;
+        #[cfg(feature = "validation")]
+        {
+            if let Some(cfg) = self.ui_state.validation.get_field_config(field_index) {
+                if let Some(mask) = &cfg.display_mask {
+                    let display_pos = mask.raw_pos_to_display_pos(new_cursor);
+                    if let Some(prev_input) = mask.prev_input_position(display_pos) {
+                        target_cursor = mask.display_pos_to_raw_pos(prev_input);
+                    }
+                }
             }
+        }
+
+        self.ui_state.cursor_pos = target_cursor;
+        self.ui_state.ideal_cursor_column = target_cursor;
+
+        #[cfg(feature = "validation")]
+        {
+            let _ = self.ui_state.validation.validate_field_content(
+                field_index,
+                &current_text,
+            );
         }
 
         Ok(())
@@ -1127,20 +1174,37 @@ impl<D: DataProvider> FormEditor<D> {
     /// Delete character under cursor (vim x / delete key)
     pub fn delete_forward(&mut self) -> Result<()> {
         if self.ui_state.current_mode != AppMode::Edit {
-            return Ok(()); // Silently ignore in non-edit modes
+            return Ok(());
         }
 
         let field_index = self.ui_state.current_field;
         let mut current_text = self.data_provider.field_value(field_index).to_string();
 
-        if self.ui_state.cursor_pos < current_text.len() {
-            current_text.remove(self.ui_state.cursor_pos);
+        if self.ui_state.cursor_pos < current_text.chars().count() {
+            let start = Self::char_to_byte_index(&current_text, self.ui_state.cursor_pos);
+            let end = Self::char_to_byte_index(&current_text, self.ui_state.cursor_pos + 1);
+            current_text.replace_range(start..end, "");
             self.data_provider.set_field_value(field_index, current_text.clone());
 
-            // Validate the new content if validation is enabled
+            let mut target_cursor = self.ui_state.cursor_pos;
             #[cfg(feature = "validation")]
             {
-                let _validation_result = self.ui_state.validation.validate_field_content(
+                if let Some(cfg) = self.ui_state.validation.get_field_config(field_index) {
+                    if let Some(mask) = &cfg.display_mask {
+                        let display_pos = mask.raw_pos_to_display_pos(self.ui_state.cursor_pos);
+                        let next_input = mask.next_input_position(display_pos);
+                        target_cursor = mask.display_pos_to_raw_pos(next_input)
+                            .min(current_text.chars().count());
+                    }
+                }
+            }
+
+            self.ui_state.cursor_pos = target_cursor;
+            self.ui_state.ideal_cursor_column = target_cursor;
+
+            #[cfg(feature = "validation")]
+            {
+                let _ = self.ui_state.validation.validate_field_content(
                     field_index,
                     &current_text,
                 );
@@ -1286,13 +1350,18 @@ impl<D: DataProvider> FormEditor<D> {
     /// Get cursor position for display (maps raw cursor to display position with formatter/mask)
     pub fn display_cursor_position(&self) -> usize {
         let current_text = self.current_text();
+
+        // Count characters, not bytes
+        let char_count = current_text.chars().count();
+
+        // Clamp raw_pos based on mode
         let raw_pos = match self.ui_state.current_mode {
-            AppMode::Edit => self.ui_state.cursor_pos.min(current_text.len()),
+            AppMode::Edit => self.ui_state.cursor_pos.min(char_count),
             _ => {
-                if current_text.is_empty() {
+                if char_count == 0 {
                     0
                 } else {
-                    self.ui_state.cursor_pos.min(current_text.len().saturating_sub(1))
+                    self.ui_state.cursor_pos.min(char_count.saturating_sub(1))
                 }
             }
         };
@@ -1301,20 +1370,20 @@ impl<D: DataProvider> FormEditor<D> {
         {
             let field_index = self.ui_state.current_field;
             if let Some(cfg) = self.ui_state.validation.get_field_config(field_index) {
-                // Only apply custom formatter cursor mapping when NOT editing
+                // Apply custom formatter mapping if not editing
                 if !matches!(self.ui_state.current_mode, AppMode::Edit) {
-                    if let Some((formatted, mapper, _warning)) = cfg.run_custom_formatter(current_text) {
+                    if let Some((formatted, mapper, _)) = cfg.run_custom_formatter(current_text) {
                         return mapper.raw_to_formatted(current_text, &formatted, raw_pos);
                     }
                 }
-                // Fallback to display mask
+                // Apply mask mapping using clamped raw_pos
                 if let Some(mask) = &cfg.display_mask {
-                    return mask.raw_pos_to_display_pos(self.ui_state.cursor_pos);
+                    return mask.raw_pos_to_display_pos(raw_pos);
                 }
             }
         }
 
-        self.ui_state.cursor_pos
+        raw_pos
     }
 
     /// Cleanup cursor style (call this when shutting down)
