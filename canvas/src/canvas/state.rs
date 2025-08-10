@@ -35,6 +35,7 @@ pub struct SuggestionsUIState {
     pub(crate) is_loading: bool,
     pub(crate) selected_index: Option<usize>,
     pub(crate) active_field: Option<usize>,
+    pub(crate) active_query: Option<String>,
     pub(crate) completion_text: Option<String>,
 }
 
@@ -57,6 +58,7 @@ impl EditorState {
                 is_loading: false,
                 selected_index: None,
                 active_field: None,
+                active_query: None,
                 completion_text: None,
             },
             selection: SelectionState::None,
@@ -150,29 +152,12 @@ impl EditorState {
         self.ideal_cursor_column = self.cursor_pos;
     }
 
-    /// Legacy internal activation (still used internally if needed)
-    pub(crate) fn activate_suggestions(&mut self, field_index: usize) {
-        self.suggestions.is_active = true;
-        self.suggestions.is_loading = true;
-        self.suggestions.active_field = Some(field_index);
-        self.suggestions.selected_index = None;
-        self.suggestions.completion_text = None;
-    }
-
-    /// Legacy internal deactivation
-    pub(crate) fn deactivate_suggestions(&mut self) {
-        self.suggestions.is_active = false;
-        self.suggestions.is_loading = false;
-        self.suggestions.active_field = None;
-        self.suggestions.selected_index = None;
-        self.suggestions.completion_text = None;
-    }
-
     /// Explicitly open suggestions — should only be called on Tab
     pub(crate) fn open_suggestions(&mut self, field_index: usize) {
         self.suggestions.is_active = true;
         self.suggestions.is_loading = true;
         self.suggestions.active_field = Some(field_index);
+        self.suggestions.active_query = None;
         self.suggestions.selected_index = None;
         self.suggestions.completion_text = None;
     }
@@ -182,6 +167,7 @@ impl EditorState {
         self.suggestions.is_active = false;
         self.suggestions.is_loading = false;
         self.suggestions.active_field = None;
+        self.suggestions.active_query = None;
         self.suggestions.selected_index = None;
         self.suggestions.completion_text = None;
     }

@@ -796,33 +796,99 @@ impl<D: DataProvider> FormEditor<D> {
     // ASYNC OPERATIONS: Only suggestions need async
     // ===================================================================
 
-    /// Trigger suggestions (async because it fetches data)
-    pub async fn trigger_suggestions<A>(&mut self, provider: &mut A) -> Result<()>
-    where
-        A: SuggestionsProvider,
-    {
-        let field_index = self.ui_state.current_field;
+    // NOTE: trigger_suggestions (the async fetch helper) was removed in favor of
+    // the non-blocking start_suggestions / apply_suggestions_result API.
 
+    /// Trigger suggestions (async because it fetches data)
+    /// (Removed - use start_suggestions + apply_suggestions_result instead)
+
+    // ===================================================================
+    // NON-BLOCKING SUGGESTIONS API (ONLY API)
+    // ===================================================================
+
+    /// Begin suggestions loading for a field (UI updates immediately, no fetch)
+    /// This opens the dropdown with "Loading..." state instantly
+    /// 
+    /// The caller is responsible for fetching suggestions and calling 
+    /// `apply_suggestions_result()` when ready.
+    pub fn start_suggestions(&mut self, field_index: usize) -> Option<String> {
         if !self.data_provider.supports_suggestions(field_index) {
-            return Ok(());
+            return None;
         }
 
-        // Activate suggestions UI
-        self.ui_state.activate_suggestions(field_index);
+        let query = self.current_text().to_string();
+        
+        // Open suggestions UI immediately - user sees dropdown right away
+        self.ui_state.open_suggestions(field_index);
+        
+        // ADD THIS LINE - mark as loading so UI shows "Loading..."
+        self.ui_state.suggestions.is_loading = true;
+        
+        // Store the query we're loading for (prevents stale results)
+        self.ui_state.suggestions.active_query = Some(query.clone());
+        
+        // Clear any old suggestions
+        self.suggestions.clear();
+        
+        // Return the query so caller knows what to fetch
+        Some(query)
+    }
 
-        // Fetch suggestions from user (no conversion needed!)
-        let query = self.current_text();
-        self.suggestions = provider.fetch_suggestions(field_index, query).await?;
+    /// Apply fetched suggestions results
+    /// 
+    /// This will ignore stale results if the field or query has changed since
+    /// `start_suggestions()` was called.
+    /// 
+    /// Returns `true` if results were applied, `false` if they were stale/ignored.
+    pub fn apply_suggestions_result(
+        &mut self,
+        field_index: usize,
+        query: &str,
+        results: Vec<SuggestionItem>,
+    ) -> bool {
+        // Ignore stale results: wrong field
+        if self.ui_state.suggestions.active_field != Some(field_index) {
+            return false;
+        }
 
-        // Update UI state
+        // Ignore stale results: query has changed
+        if self.ui_state.suggestions.active_query.as_deref() != Some(query) {
+            return false;
+        }
+
+        // Apply results
         self.ui_state.suggestions.is_loading = false;
+        self.suggestions = results;
+
         if !self.suggestions.is_empty() {
             self.ui_state.suggestions.selected_index = Some(0);
-            // Compute initial inline completion from first suggestion
             self.update_inline_completion();
+        } else {
+            self.ui_state.suggestions.selected_index = None;
+            self.ui_state.suggestions.completion_text = None;
         }
 
-        Ok(())
+        true
+    }
+
+    /// Check if there's an active suggestions query waiting for results
+    /// 
+    /// Returns (field_index, query) if suggestions are loading, None otherwise.
+    pub fn pending_suggestions_query(&self) -> Option<(usize, String)> {
+        if self.ui_state.suggestions.is_loading {
+            if let (Some(field), Some(query)) = (
+                self.ui_state.suggestions.active_field,
+                &self.ui_state.suggestions.active_query
+            ) {
+                return Some((field, query.clone()));
+            }
+        }
+        None
+    }
+
+    /// Cancel any pending suggestions (useful for cleanup)
+    pub fn cancel_suggestions(&mut self) {
+        self.close_suggestions();
     }
 
     /// Navigate suggestions
@@ -857,7 +923,7 @@ impl<D: DataProvider> FormEditor<D> {
                 self.ui_state.ideal_cursor_column = self.ui_state.cursor_pos;
 
                 // Close suggestions
-                self.ui_state.deactivate_suggestions();
+                self.close_suggestions();
                 self.suggestions.clear();
 
                 // Validate the new content if validation is enabled
@@ -1257,7 +1323,7 @@ impl<D: DataProvider> FormEditor<D> {
 
         self.set_mode(AppMode::ReadOnly);
         // Deactivate suggestions when exiting edit mode
-        self.ui_state.deactivate_suggestions();
+        self.close_suggestions();
 
         Ok(())
     }
