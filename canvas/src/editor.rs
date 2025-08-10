@@ -21,6 +21,9 @@ pub struct FormEditor<D: DataProvider> {
 
     // Autocomplete suggestions (library manages UI, user provides data)
     pub(crate) suggestions: Vec<SuggestionItem>,
+
+    #[cfg(feature = "validation")]
+    external_validation_callback: Option<Box<dyn FnMut(usize, &str) + Send + Sync>>,
 }
 
 impl<D: DataProvider> FormEditor<D> {
@@ -33,7 +36,6 @@ impl<D: DataProvider> FormEditor<D> {
     }
 
     /// Convert a byte index to a char index in a string
-    #[allow(dead_code)]
     fn byte_to_char_index(s: &str, byte_idx: usize) -> usize {
         s[..byte_idx].chars().count()
     }
@@ -42,6 +44,8 @@ impl<D: DataProvider> FormEditor<D> {
             ui_state: EditorState::new(),
             data_provider,
             suggestions: Vec::new(),
+            #[cfg(feature = "validation")]
+            external_validation_callback: None,
         };
 
         // Initialize validation configurations if validation feature is enabled
@@ -51,6 +55,17 @@ impl<D: DataProvider> FormEditor<D> {
         }
 
         editor
+    }
+
+    /// Convert a char index to a byte index in a string
+    fn current_text(&self) -> &str {
+        // Convenience wrapper, kept for compatibility with existing code
+        let field_index = self.ui_state.current_field;
+        if field_index < self.data_provider.field_count() {
+            self.data_provider.field_value(field_index)
+        } else {
+            ""
+        }
     }
 
     /// Compute inline completion for current selection and current text.
@@ -106,22 +121,11 @@ impl<D: DataProvider> FormEditor<D> {
         self.ui_state.is_suggestions_active()
     }
 
-    /// Get current field text (convenience method)
-    pub fn current_text(&self) -> &str {
-        let field_index = self.ui_state.current_field;
-        if field_index < self.data_provider.field_count() {
-            self.data_provider.field_value(field_index)
-        } else {
-            ""
-        }
-    }
-
     /// Get current field text for display.
     ///
     /// Policies:
     /// - Feature 4 (custom formatter):
     ///   - While editing the focused field: ALWAYS show raw (no custom formatting).
-    ///   - When not editing the field: show formatted (fallback to raw on error).
     /// - Mask-only fields: mask applies even in Edit mode (preserve legacy behavior).
     /// - Otherwise: raw.
     #[cfg(feature = "validation")]
@@ -193,10 +197,19 @@ impl<D: DataProvider> FormEditor<D> {
             .set_external_validation(field_index, state);
     }
 
-    /// Clear external validation state for a field (Feature 5)
+    /// Clear external validation state for a specific field
     #[cfg(feature = "validation")]
     pub fn clear_external_validation(&mut self, field_index: usize) {
         self.ui_state.validation.clear_external_validation(field_index);
+    }
+
+    /// Set external validation callback (Feature 5)
+    #[cfg(feature = "validation")]
+    pub fn set_external_validation_callback<F>(&mut self, callback: F)
+    where
+        F: FnMut(usize, &str) + Send + Sync + 'static,
+    {
+        self.external_validation_callback = Some(Box::new(callback));
     }
 
     /// Get effective display text for any field index.
@@ -204,7 +217,6 @@ impl<D: DataProvider> FormEditor<D> {
     /// Policies:
     /// - Feature 4 fields (with custom formatter):
     ///   - If the field is currently focused AND in Edit mode: return raw (no formatting).
-    ///   - Otherwise: return formatted (fallback to raw on error).
     /// - Mask-only fields: mask applies regardless of mode (legacy behavior).
     /// - Otherwise: raw.
     #[cfg(feature = "validation")]
@@ -279,251 +291,203 @@ impl<D: DataProvider> FormEditor<D> {
     // SYNC OPERATIONS: No async needed for basic editing
     // ===================================================================
 
-    /// Handle character insertion with proper mask/limit coordination
-    pub fn insert_char(&mut self, ch: char) -> Result<()> {
-        if self.ui_state.current_mode != AppMode::Edit {
-            return Ok(()); // Ignore in non-edit modes
-        }
-
-        let field_index = self.ui_state.current_field;
-        let raw_cursor_pos = self.ui_state.cursor_pos;
-        let current_raw_text = self.data_provider.field_value(field_index);
-
-        // 🔥 CRITICAL FIX 1: Check mask constraints FIRST
-        #[cfg(feature = "validation")]
-        {
-            if let Some(cfg) = self.ui_state.validation.get_field_config(field_index) {
-                if let Some(mask) = &cfg.display_mask {
-                    // Get display cursor position
-                    let display_cursor_pos = mask.raw_pos_to_display_pos(raw_cursor_pos);
-                    
-                    // ❌ PREVENT BUG: Reject input if cursor is beyond mask pattern
-                    if display_cursor_pos >= mask.pattern().len() {
-                        tracing::debug!(
-                            "Character insertion rejected: cursor beyond mask pattern length"
-                        );
-                        return Ok(()); // Silently reject - user can't type beyond mask
-                    }
-                    
-                    // ❌ PREVENT BUG: Reject input if cursor is on a separator position
-                    if !mask.is_input_position(display_cursor_pos) {
-                        tracing::debug!(
-                            "Character insertion rejected: cursor on separator position {}", 
-                            display_cursor_pos
-                        );
-                        return Ok(()); // Silently reject - can't type on separators
-                    }
-                    
-                    // ❌ PREVENT BUG: Check if we're at max input positions for this mask
-                    let input_char_count = (0..mask.pattern().len())
-                        .filter(|&pos| mask.is_input_position(pos))
-                        .count();
-                    
-                    if current_raw_text.len() >= input_char_count {
-                        tracing::debug!(
-                            "Character insertion rejected: mask pattern full ({} input positions)", 
-                            input_char_count
-                        );
-                        return Ok(()); // Silently reject - mask is full
-                    }
-                }
-            }
-        }
-
-        // 🔥 CRITICAL FIX 2: Validate character insertion with mask awareness
-        #[cfg(feature = "validation")]
-        {
-            let validation_result = self.ui_state.validation.validate_char_insertion(
-                field_index,
-                current_raw_text,
-                raw_cursor_pos,
-                ch,
-            );
-
-            // Reject input if validation failed with error
-            if !validation_result.is_acceptable() {
-                tracing::debug!(
-                    "Character insertion rejected for field {}: {:?}",
-                    field_index,
-                    validation_result
-                );
-                return Ok(()); // Silently reject invalid input
-            }
-        }
-
-        // 🔥 CRITICAL FIX 3: Validate the insertion won't break display/limit coordination
-        let new_raw_text = {
-            let mut temp = current_raw_text.to_string();
-            let byte_pos = Self::char_to_byte_index(current_raw_text, raw_cursor_pos);
-            temp.insert(byte_pos, ch);
-            temp
-        };
-
-        #[cfg(feature = "validation")]
-        {
-            if let Some(cfg) = self.ui_state.validation.get_field_config(field_index) {
-                // Check character limits on the new raw text
-                if let Some(limits) = &cfg.character_limits {
-                    if let Some(result) = limits.validate_content(&new_raw_text) {
-                        if !result.is_acceptable() {
-                            tracing::debug!(
-                                "Character insertion rejected: would exceed character limits"
-                            );
-                            return Ok(()); // Silently reject - would exceed limits
-                        }
-                    }
-                }
-                
-                // Check that mask can handle the new raw text length
-                if let Some(mask) = &cfg.display_mask {
-                    let input_positions = (0..mask.pattern().len())
-                        .filter(|&pos| mask.is_input_position(pos))
-                        .count();
-                    
-                    if new_raw_text.len() > input_positions {
-                        tracing::debug!(
-                            "Character insertion rejected: raw text length {} exceeds mask input positions {}", 
-                            new_raw_text.len(), 
-                            input_positions
-                        );
-                        return Ok(()); // Silently reject - mask can't handle this length
-                    }
-                }
-            }
-        }
-
-        // ✅ ALL CHECKS PASSED: Safe to insert character
-        self.data_provider.set_field_value(field_index, new_raw_text);
-
-        // 🔥 CRITICAL FIX 4: Update cursor position correctly for mask context
-        #[cfg(feature = "validation")]
-        {
-            if let Some(cfg) = self.ui_state.validation.get_field_config(field_index) {
-                if let Some(mask) = &cfg.display_mask {
-                    // Move to next input position, skipping separators
-                    let new_raw_pos = raw_cursor_pos + 1;
-                    let display_pos = mask.raw_pos_to_display_pos(new_raw_pos);
-                    let next_input_pos = mask.next_input_position(display_pos);
-                    let next_raw_pos = mask.display_pos_to_raw_pos(next_input_pos);
-                    
-                    self.ui_state.cursor_pos = next_raw_pos;
-                    self.ui_state.ideal_cursor_column = next_raw_pos;
-                    return Ok(());
-                }
-            }
-        }
-
-        // No mask: simple increment
-        self.ui_state.cursor_pos = raw_cursor_pos + 1;
-        self.ui_state.ideal_cursor_column = self.ui_state.cursor_pos;
-
-        Ok(())
-    }
-
-    /// Handle cursor movement left - skips mask separator positions
-    pub fn move_left(&mut self) {
-        if self.ui_state.cursor_pos == 0 {
-            return;
-        }
-
-        let field_index = self.ui_state.current_field;
-        let mut new_pos = self.ui_state.cursor_pos - 1;
-
-        // Skip mask separator positions if configured
-        #[cfg(feature = "validation")]
-        if let Some(cfg) = self.ui_state.validation.get_field_config(field_index) {
-            if let Some(mask) = &cfg.display_mask {
-                // Convert to display position, find previous input position, convert back
-                let display_pos = mask.raw_pos_to_display_pos(new_pos);
-                if let Some(prev_input_display_pos) = mask.prev_input_position(display_pos) {
-                    new_pos = mask.display_pos_to_raw_pos(prev_input_display_pos);
-                }
-            }
-        }
-
-        self.ui_state.cursor_pos = new_pos;
-        self.ui_state.ideal_cursor_column = self.ui_state.cursor_pos;
-    }
-
-    /// Handle cursor movement right - skips mask separator positions  
-    pub fn move_right(&mut self) {
-        let current_text = self.current_text();
-        let is_edit_mode = self.ui_state.current_mode == AppMode::Edit;
-        let max_pos = if is_edit_mode {
-            current_text.len()
-        } else {
-            current_text.len().saturating_sub(1)
-        };
-
-        if self.ui_state.cursor_pos >= max_pos {
-            return;
-        }
-
-        let field_index = self.ui_state.current_field;
-        let mut new_pos = self.ui_state.cursor_pos + 1;
-
-        // Skip mask separator positions if configured
-        #[cfg(feature = "validation")]
-        if let Some(cfg) = self.ui_state.validation.get_field_config(field_index) {
-            if let Some(mask) = &cfg.display_mask {
-                // Convert to display position, find next input position, convert back
-                let display_pos = mask.raw_pos_to_display_pos(new_pos);
-                let next_input_display_pos = mask.next_input_position(display_pos);
-                new_pos = mask.display_pos_to_raw_pos(next_input_display_pos);
-                new_pos = new_pos.min(max_pos);
-            }
-        }
-
-        if new_pos <= max_pos {
-            self.ui_state.cursor_pos = new_pos;
-            self.ui_state.ideal_cursor_column = self.ui_state.cursor_pos;
-        }
-    }
-
-    /// Handle field navigation
-    pub fn move_to_next_field(&mut self) -> Result<()> {
+    /// Centralized field transition logic
+    #[cfg_attr(not(feature = "validation"), allow(unused_variables))]
+    pub fn transition_to_field(&mut self, new_field: usize) -> Result<()> {
         let field_count = self.data_provider.field_count();
         if field_count == 0 {
             return Ok(());
         }
 
-        // Check if field switching is allowed (minimum character enforcement)
+        let prev_field = self.ui_state.current_field;
+
+        // 1. Bounds check
+        let mut target_field = new_field.min(field_count - 1);
+
+        // 2. Computed field skipping
+        #[cfg(feature = "computed")]
+        {
+            if let Some(computed_state) = &self.ui_state.computed {
+                if computed_state.is_computed_field(target_field) {
+                    // Determine direction and search for nearest non-computed field
+                    if target_field >= prev_field {
+                        // Moving down: search forward
+                        for i in (target_field + 1)..field_count {
+                            if !computed_state.is_computed_field(i) {
+                                target_field = i;
+                                break;
+                            }
+                        }
+                    } else {
+                        // Moving up: search backward
+                        let mut i = target_field;
+                        loop {
+                            if !computed_state.is_computed_field(i) {
+                                target_field = i;
+                                break;
+                            }
+                            if i == 0 {
+                                break;
+                            }
+                            i -= 1;
+                        }
+                    }
+                }
+            }
+        }
+
+        // 3. Blocking validation before leaving current field
         #[cfg(feature = "validation")]
         {
             let current_text = self.current_text();
-            if !self.ui_state.validation.allows_field_switch(self.ui_state.current_field, current_text) {
-                if let Some(reason) = self.ui_state.validation.field_switch_block_reason(
-                    self.ui_state.current_field,
-                    current_text
-                ) {
+            if !self.ui_state.validation.allows_field_switch(prev_field, current_text) {
+                if let Some(reason) = self
+                    .ui_state
+                    .validation
+                    .field_switch_block_reason(prev_field, current_text)
+                {
                     tracing::debug!("Field switch blocked: {}", reason);
                     return Err(anyhow::anyhow!("Cannot switch fields: {}", reason));
                 }
             }
         }
 
-        // Validate current field before moving
+        // 4. Exit hook for current field (content validation + external validation trigger)
         #[cfg(feature = "validation")]
         {
-            let current_text = self.current_text().to_string();
-            let _validation_result = self.ui_state.validation.validate_field_content(
-                self.ui_state.current_field,
-                &current_text,
-            );
+            let text = self.data_provider.field_value(prev_field).to_string();
+            let _ = self
+                .ui_state
+                .validation
+                .validate_field_content(prev_field, &text);
+
+            if let Some(cfg) = self.ui_state.validation.get_field_config(prev_field) {
+                // If external validation is enabled for this field and there is content
+                if cfg.external_validation_enabled && !text.is_empty() {
+                    // Trigger external validation state
+                    self.set_external_validation(prev_field, crate::validation::ExternalValidationState::Validating);
+
+                    // Invoke external callback if registered
+                    if let Some(cb) = self.external_validation_callback.as_mut() {
+                        cb(prev_field, &text);
+                    }
+                }
+            }
         }
 
-        let next_field = (self.ui_state.current_field + 1) % field_count;
-        self.ui_state.move_to_field(next_field, field_count);
+        #[cfg(feature = "computed")]
+        {
+            // Placeholder for recompute hook if needed (requires provider)
+            // Could call on_field_changed with a provider when available.
+        }
 
-        // Clamp cursor to new field
+        // 5. Move to new field
+        self.ui_state.move_to_field(target_field, field_count);
+
+        // 6. Clamp cursor to new field
         let current_text = self.current_text();
         let max_pos = current_text.len();
         self.ui_state.set_cursor(
             self.ui_state.ideal_cursor_column,
             max_pos,
-            self.ui_state.current_mode == AppMode::Edit
+            self.ui_state.current_mode == AppMode::Edit,
         );
 
+        Ok(())
+    }
+
+    /// Move to previous field (vim k / up arrow)
+    pub fn move_up(&mut self) -> Result<()> {
+        let new_field = self.ui_state.current_field.saturating_sub(1);
+        self.transition_to_field(new_field)
+    }
+
+    /// Move to next field (vim j / down arrow)
+    pub fn move_down(&mut self) -> Result<()> {
+        let new_field = (self.ui_state.current_field + 1).min(self.data_provider.field_count().saturating_sub(1));
+        self.transition_to_field(new_field)
+    }
+
+    /// Move to next field (vim j / down arrow)
+    pub fn move_to_next_field(&mut self) -> Result<()> {
+        let field_count = self.data_provider.field_count();
+        if field_count == 0 {
+            return Ok(());
+        }
+
+        let new_field = (self.ui_state.current_field + 1) % field_count;
+        self.transition_to_field(new_field)
+    }
+
+    /// Restore left and right movement within the current field
+    /// Move cursor left within current field
+    pub fn move_left(&mut self) -> Result<()> {
+        let mut moved = false;
+        // Try mask-aware movement if validation/mask config exists
+        #[cfg(feature = "validation")]
+        {
+            let field_index = self.ui_state.current_field;
+            if let Some(cfg) = self.ui_state.validation.get_field_config(field_index) {
+                if let Some(mask) = &cfg.display_mask {
+                    let display_pos = mask.raw_pos_to_display_pos(self.ui_state.cursor_pos);
+                    if let Some(prev_display_pos) = mask.prev_input_position(display_pos) {
+                        let raw_pos = mask.display_pos_to_raw_pos(prev_display_pos);
+                        let max_pos = self.current_text().chars().count();
+                        self.ui_state.cursor_pos = raw_pos.min(max_pos);
+                        self.ui_state.ideal_cursor_column = self.ui_state.cursor_pos;
+                        moved = true;
+                    } else {
+                        self.ui_state.cursor_pos = 0;
+                        self.ui_state.ideal_cursor_column = 0;
+                        moved = true;
+                    }
+                }
+            }
+        }
+        if !moved {
+            // Fallback to simple left movement
+            if self.ui_state.cursor_pos > 0 {
+                self.ui_state.cursor_pos -= 1;
+                self.ui_state.ideal_cursor_column = self.ui_state.cursor_pos;
+            }
+        }
+        Ok(())
+    }
+
+    /// Move cursor right within current field
+    pub fn move_right(&mut self) -> Result<()> {
+        let mut moved = false;
+        let field_index = self.ui_state.current_field;
+        // Try mask-aware movement if mask is configured for this field
+        #[cfg(feature = "validation")]
+        {
+            if let Some(cfg) = self.ui_state.validation.get_field_config(field_index) {
+                if let Some(mask) = &cfg.display_mask {
+                    let display_pos = mask.raw_pos_to_display_pos(self.ui_state.cursor_pos);
+                    if let Some(next_display_pos) = mask.next_input_position(display_pos) {
+                        let raw_pos = mask.display_pos_to_raw_pos(next_display_pos);
+                        let max_pos = self.current_text().chars().count();
+                        self.ui_state.cursor_pos = raw_pos.min(max_pos);
+                        self.ui_state.ideal_cursor_column = self.ui_state.cursor_pos;
+                        moved = true;
+                    } else {
+                        // Move to end if there is no next input
+                        let max_pos = self.current_text().chars().count();
+                        self.ui_state.cursor_pos = max_pos;
+                        self.ui_state.ideal_cursor_column = max_pos;
+                        moved = true;
+                    }
+                }
+            }
+        }
+        if !moved {
+            // Fallback to simple right movement
+            let max_pos = self.current_text().chars().count();
+            if self.ui_state.cursor_pos < max_pos {
+                self.ui_state.cursor_pos += 1;
+                self.ui_state.ideal_cursor_column = self.ui_state.cursor_pos;
+            }
+        }
         Ok(())
     }
 
@@ -733,178 +697,24 @@ impl<D: DataProvider> FormEditor<D> {
     // ===================================================================
 
     /// Move to previous field (vim k / up arrow)
-    pub fn move_up(&mut self) -> Result<()> {
-        let field_count = self.data_provider.field_count();
-        if field_count == 0 {
-            return Ok(());
-        }
-
-        // Skip computed fields during navigation when feature enabled
-        #[cfg(feature = "computed")]
-        {
-            if let Some(computed_state) = &self.ui_state.computed {
-                // Find previous non-computed field
-                let mut candidate = self.ui_state.current_field;
-                for _ in 0..field_count {
-                    candidate = candidate.saturating_sub(1);
-                    if !computed_state.is_computed_field(candidate) {
-                        // Validate and move as usual
-                        #[cfg(feature = "validation")]
-                        {
-                            let current_text = self.current_text();
-                            if !self.ui_state.validation.allows_field_switch(self.ui_state.current_field, current_text) {
-                                if let Some(reason) = self.ui_state.validation.field_switch_block_reason(self.ui_state.current_field, current_text) {
-                                    tracing::debug!("Field switch blocked: {}", reason);
-                                    return Err(anyhow::anyhow!("Cannot switch fields: {}", reason));
-                                }
-                            }
-                        }
-                        #[cfg(feature = "validation")]
-                        {
-                            let current_text = self.current_text().to_string();
-                            let _validation_result = self.ui_state.validation.validate_field_content(
-                                self.ui_state.current_field,
-                                &current_text,
-                            );
-                        }
-                        self.ui_state.move_to_field(candidate, field_count);
-                        self.clamp_cursor_to_current_field();
-                        return Ok(());
-                    }
-                    if candidate == 0 {
-                        break;
-                    }
-                }
-            }
-        }
-
-        // Check if field switching is allowed (minimum character enforcement)
-        #[cfg(feature = "validation")]
-        {
-            let current_text = self.current_text();
-            if !self.ui_state.validation.allows_field_switch(self.ui_state.current_field, current_text) {
-                if let Some(reason) = self.ui_state.validation.field_switch_block_reason(self.ui_state.current_field, current_text) {
-                    tracing::debug!("Field switch blocked: {}", reason);
-                    return Err(anyhow::anyhow!("Cannot switch fields: {}", reason));
-                }
-            }
-        }
-
-        // Validate current field before moving
-        #[cfg(feature = "validation")]
-        {
-            let current_text = self.current_text().to_string(); // Convert to String to avoid borrow conflicts
-            let _validation_result = self.ui_state.validation.validate_field_content(
-                self.ui_state.current_field,
-                &current_text,
-            );
-        }
-
-        let current_field = self.ui_state.current_field;
-        let new_field = current_field.saturating_sub(1);
-
-        self.ui_state.move_to_field(new_field, field_count);
-        self.clamp_cursor_to_current_field();
-        Ok(())
+    pub fn move_up_only(&mut self) -> Result<()> {
+        self.move_up()
     }
 
     /// Move to next field (vim j / down arrow)
-    pub fn move_down(&mut self) -> Result<()> {
-        let field_count = self.data_provider.field_count();
-        if field_count == 0 {
-            return Ok(());
-        }
-
-        // Skip computed fields during navigation when feature enabled
-        #[cfg(feature = "computed")]
-        {
-            if let Some(computed_state) = &self.ui_state.computed {
-                // Find next non-computed field
-                let mut candidate = self.ui_state.current_field;
-                for _ in 0..field_count {
-                    candidate = (candidate + 1).min(field_count - 1);
-                    if !computed_state.is_computed_field(candidate) {
-                        // Validate and move as usual
-                        #[cfg(feature = "validation")]
-                        {
-                            let current_text = self.current_text();
-                            if !self.ui_state.validation.allows_field_switch(self.ui_state.current_field, current_text) {
-                                if let Some(reason) = self.ui_state.validation.field_switch_block_reason(self.ui_state.current_field, current_text) {
-                                    tracing::debug!("Field switch blocked: {}", reason);
-                                    return Err(anyhow::anyhow!("Cannot switch fields: {}", reason));
-                                }
-                            }
-                        }
-                        #[cfg(feature = "validation")]
-                        {
-                            let current_text = self.current_text().to_string();
-                            let _validation_result = self.ui_state.validation.validate_field_content(
-                                self.ui_state.current_field,
-                                &current_text,
-                            );
-                        }
-                        self.ui_state.move_to_field(candidate, field_count);
-                        self.clamp_cursor_to_current_field();
-                        return Ok(());
-                    }
-                    if candidate == field_count - 1 {
-                        break;
-                    }
-                }
-            }
-        }
-
-        // Check if field switching is allowed (minimum character enforcement)
-        #[cfg(feature = "validation")]
-        {
-            let current_text = self.current_text();
-            if !self.ui_state.validation.allows_field_switch(self.ui_state.current_field, current_text) {
-                if let Some(reason) = self.ui_state.validation.field_switch_block_reason(self.ui_state.current_field, current_text) {
-                    tracing::debug!("Field switch blocked: {}", reason);
-                    return Err(anyhow::anyhow!("Cannot switch fields: {}", reason));
-                }
-            }
-        }
-
-        // Validate current field before moving
-        #[cfg(feature = "validation")]
-        {
-            let current_text = self.current_text().to_string(); // Convert to String to avoid borrow conflicts
-            let _validation_result = self.ui_state.validation.validate_field_content(
-                self.ui_state.current_field,
-                &current_text,
-            );
-        }
-
-        let current_field = self.ui_state.current_field;
-        let new_field = (current_field + 1).min(field_count - 1);
-
-        self.ui_state.move_to_field(new_field, field_count);
-        self.clamp_cursor_to_current_field();
-        Ok(())
+    pub fn move_down_only(&mut self) -> Result<()> {
+        self.move_down()
     }
 
-    /// Move to first field (vim gg)
-    pub fn move_first_line(&mut self) {
-        let field_count = self.data_provider.field_count();
-        if field_count == 0 {
-            return;
-        }
-
-        self.ui_state.move_to_field(0, field_count);
-        self.clamp_cursor_to_current_field();
+    /// Move to first line (vim gg)
+    pub fn move_first_line(&mut self) -> Result<()> {
+        self.transition_to_field(0)
     }
 
-    /// Move to last field (vim G)
-    pub fn move_last_line(&mut self) {
-        let field_count = self.data_provider.field_count();
-        if field_count == 0 {
-            return;
-        }
-
-        let last_field = field_count - 1;
-        self.ui_state.move_to_field(last_field, field_count);
-        self.clamp_cursor_to_current_field();
+    /// Move to last line (vim G)
+    pub fn move_last_line(&mut self) -> Result<()> {
+        let last_field = self.data_provider.field_count().saturating_sub(1);
+        self.transition_to_field(last_field)
     }
 
     /// Move to previous field (alternative to move_up)
