@@ -21,6 +21,8 @@ pub struct ValidationState {
 
     /// External validation results per field (Feature 5)
     external_results: HashMap<usize, ExternalValidationState>,
+
+    last_switch_block: Option<String>,
 }
 
 impl ValidationState {
@@ -32,6 +34,7 @@ impl ValidationState {
             validated_fields: std::collections::HashSet::new(),
             enabled: true,
             external_results: HashMap::new(),
+            last_switch_block: None,
         }
     }
     
@@ -255,6 +258,22 @@ impl ValidationState {
             warning_fields: warnings,
             error_fields: errors,
         }
+    }
+
+ 
+    /// Set the last switch block reason (for UI convenience)
+    pub fn set_last_switch_block<S: Into<String>>(&mut self, reason: S) {
+        self.last_switch_block = Some(reason.into());
+    }
+    
+    /// Clear the last switch block reason
+    pub fn clear_last_switch_block(&mut self) {
+        self.last_switch_block = None;
+    }
+    
+    /// Get the last switch block reason (if any)
+    pub fn last_switch_block(&self) -> Option<&str> {
+        self.last_switch_block.as_deref()
     }
 }
 

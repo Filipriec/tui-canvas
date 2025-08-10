@@ -65,7 +65,7 @@ impl<D: DataProvider> FormEditor<D> {
     }
 
     /// Get current field text (convenience method)
-    pub fn current_text(&self) -> &str {
+    fn current_text(&self) -> &str {
         // Convenience wrapper, kept for compatibility with existing code
         let field_index = self.ui_state.current_field;
         if field_index < self.data_provider.field_count() {
@@ -351,6 +351,10 @@ impl<D: DataProvider> FormEditor<D> {
             return Ok(());
         }
 
+        // Clear any previous switch block status on successful transition start
+        #[cfg(feature = "validation")]
+        self.ui_state.validation.clear_last_switch_block();
+
         // 3. Blocking validation before leaving current field
         #[cfg(feature = "validation")]
         {
@@ -361,6 +365,10 @@ impl<D: DataProvider> FormEditor<D> {
                     .validation
                     .field_switch_block_reason(prev_field, current_text)
                 {
+                    // Record the block reason for UI
+                    self.ui_state
+                        .validation
+                        .set_last_switch_block(reason.clone());
                     tracing::debug!("Field switch blocked: {}", reason);
                     return Err(anyhow::anyhow!("Cannot switch fields: {}", reason));
                 }
@@ -737,6 +745,53 @@ impl<D: DataProvider> FormEditor<D> {
         self.ui_state.validation.field_switch_block_reason(self.ui_state.current_field, current_text)
     }
 
+    /// Get the last field switch block reason (UI convenience)
+    #[cfg(feature = "validation")]
+    pub fn last_switch_block(&self) -> Option<&str> {
+        self.ui_state.validation.last_switch_block()
+    }
+
+    /// Get character limits status text for current field (UI convenience)
+    #[cfg(feature = "validation")]
+    pub fn current_limits_status_text(&self) -> Option<String> {
+        let idx = self.ui_state.current_field;
+        if let Some(cfg) = self.ui_state.validation.get_field_config(idx) {
+            if let Some(limits) = &cfg.character_limits {
+                return limits.status_text(self.current_text());
+            }
+        }
+        None
+    }
+
+    /// Get current custom formatter warning (UI convenience)
+    #[cfg(feature = "validation")]
+    pub fn current_formatter_warning(&self) -> Option<String> {
+        let idx = self.ui_state.current_field;
+        if let Some(cfg) = self.ui_state.validation.get_field_config(idx) {
+            if let Some((_fmt, _mapper, warn)) = cfg.run_custom_formatter(self.current_text()) {
+                return warn;
+            }
+        }
+        None
+    }
+
+    /// Get external validation state for specific field (UI convenience)
+    #[cfg(feature = "validation")]
+    pub fn external_validation_of(
+        &self,
+        field_index: usize,
+    ) -> crate::validation::ExternalValidationState {
+        self.ui_state
+            .validation
+            .get_external_validation(field_index)
+    }
+
+    /// Clear all external validation states (UI convenience)
+    #[cfg(feature = "validation")]
+    pub fn clear_all_external_validation(&mut self) {
+        self.ui_state.validation.clear_all_external_validation();
+    }
+
     // ===================================================================
     // ASYNC OPERATIONS: Only suggestions need async
     // ===================================================================
@@ -798,9 +853,8 @@ impl<D: DataProvider> FormEditor<D> {
                 );
 
                 // Update cursor position
-                let char_len = suggestion.value_to_store.chars().count();
-                self.ui_state.cursor_pos = char_len;
-                self.ui_state.ideal_cursor_column = char_len;
+                self.ui_state.cursor_pos = suggestion.value_to_store.len();
+                self.ui_state.ideal_cursor_column = self.ui_state.cursor_pos;
 
                 // Close suggestions
                 self.ui_state.deactivate_suggestions();
@@ -1145,6 +1199,13 @@ impl<D: DataProvider> FormEditor<D> {
         Ok(())
     }
 
+    /// Handle Escape key in ReadOnly mode (closes suggestions if active)
+    pub fn handle_escape_readonly(&mut self) {
+        if self.ui_state.suggestions.is_active {
+            self.close_suggestions();
+        }
+    }
+
     /// Exit edit mode to read-only mode (vim Escape)
     pub fn exit_edit_mode(&mut self) -> Result<()> {
         // Validate current field content when exiting edit mode
@@ -1153,6 +1214,10 @@ impl<D: DataProvider> FormEditor<D> {
             let current_text = self.current_text();
             if !self.ui_state.validation.allows_field_switch(self.ui_state.current_field, current_text) {
                 if let Some(reason) = self.ui_state.validation.field_switch_block_reason(self.ui_state.current_field, current_text) {
+                    // Record the block reason for UI
+                    self.ui_state
+                        .validation
+                        .set_last_switch_block(reason.clone());
                     return Err(anyhow::anyhow!("Cannot exit edit mode: {}", reason));
                 }
             }
