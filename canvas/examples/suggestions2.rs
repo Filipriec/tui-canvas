@@ -63,6 +63,10 @@ impl<D: DataProvider> AutoCursorFormEditor<D> {
         }
     }
 
+    fn close_suggestions(&mut self) {
+        self.editor.close_suggestions();
+    }
+
     // === COMMAND BUFFER HANDLING ===
 
     fn clear_command_buffer(&mut self) {
@@ -223,10 +227,6 @@ impl<D: DataProvider> AutoCursorFormEditor<D> {
         self.editor.open_suggestions(field_index);
     }
 
-    fn close_suggestions(&mut self) {
-        self.editor.close_suggestions();
-    }
-
     // === MODE TRANSITIONS WITH AUTOMATIC CURSOR MANAGEMENT ===
 
     fn enter_edit_mode(&mut self) {
@@ -314,7 +314,8 @@ impl<D: DataProvider> AutoCursorFormEditor<D> {
     }
 
     fn current_text(&self) -> &str {
-        self.editor.current_text()
+        let field_index = self.editor.current_field();
+        self.editor.data_provider().field_value(field_index)
     }
 
     fn data_provider(&self) -> &D {
@@ -671,7 +672,6 @@ async fn handle_key_press(
         }
         (AppMode::ReadOnly | AppMode::Highlight, KeyCode::Char('j'), _)
         | (AppMode::ReadOnly | AppMode::Highlight, KeyCode::Down, _) => {
-            editor.close_suggestions(); // ⬅ close dropdown
             editor.move_down();
             let field_names = ["Fruit", "Job", "Language", "Country", "Color"];
             let field_name = field_names.get(editor.current_field()).unwrap_or(&"Field");
@@ -680,7 +680,6 @@ async fn handle_key_press(
         }
         (AppMode::ReadOnly | AppMode::Highlight, KeyCode::Char('k'), _)
         | (AppMode::ReadOnly | AppMode::Highlight, KeyCode::Up, _) => {
-            editor.close_suggestions(); // ⬅ close dropdown
             editor.move_up();
             let field_names = ["Fruit", "Job", "Language", "Country", "Color"];
             let field_name = field_names.get(editor.current_field()).unwrap_or(&"Field");
@@ -751,11 +750,9 @@ async fn handle_key_press(
             editor.move_right();
         }
         (AppMode::Edit, KeyCode::Up, _) => {
-            editor.close_suggestions();
             editor.move_up();
         }
         (AppMode::Edit, KeyCode::Down, _) => {
-            editor.close_suggestions();
             editor.move_down();
         }
         (AppMode::Edit, KeyCode::Home, _) => {

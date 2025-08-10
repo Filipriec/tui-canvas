@@ -1,9 +1,10 @@
 // examples/validation_5.rs
-//! Enhanced Feature 5: Comprehensive external validation (UI-only) demo with Feature 4 integration
+//! Enhanced Feature 5: Comprehensive external validation (UI-only) demo with automatic validation
 //!
 //! Demonstrates:
-//! - Multiple external validation types: PSC lookup, email domain check, username availability, 
+//! - Multiple external validation types: PSC lookup, email domain check, username availability,
 //!   API key validation, credit card verification
+//! - AUTOMATIC validation on field transitions (arrows, Tab, Esc)
 //! - Async validation simulation with realistic delays
 //! - Validation caching and debouncing
 //! - Progressive validation (local → remote)
@@ -15,7 +16,8 @@
 //! Controls:
 //! - i/a: insert/append
 //! - Esc: exit edit mode (triggers validation on configured fields)
-//! - Tab/Shift+Tab: next/prev field (triggers validation)
+//! - Tab/Shift+Tab: next/prev field (triggers validation automatically)
+//! - Arrow keys: move between fields (triggers validation automatically)
 //! - v: manually trigger validation of current field
 //! - V: validate all fields
 //! - c: clear external validation state for current field
@@ -37,7 +39,7 @@ compile_error!(
 );
 
 use std::io;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::collections::HashMap;
 use std::time::{Instant, Duration};
 
@@ -85,13 +87,13 @@ impl ValidationResult {
             cached: false,
         }
     }
-    
+
     fn complete(mut self, state: ExternalValidationState) -> Self {
         self.state = state;
         self.completed_at = Some(Instant::now());
         self
     }
-    
+
     fn from_cache(state: ExternalValidationState, validation_type: String) -> Self {
         Self {
             state,
@@ -101,7 +103,7 @@ impl ValidationResult {
             cached: true,
         }
     }
-    
+
     fn duration(&self) -> Duration {
         self.completed_at.unwrap_or_else(Instant::now).duration_since(self.started_at)
     }
@@ -115,11 +117,11 @@ impl CustomFormatter for PSCFormatter {
         if raw.is_empty() {
             return FormattingResult::success("");
         }
-        
+
         if !raw.chars().all(|c| c.is_ascii_digit()) {
             return FormattingResult::error("PSC must contain only digits");
         }
-        
+
         match raw.len() {
             0 => FormattingResult::success(""),
             1..=3 => FormattingResult::success(raw.to_string()),
@@ -141,11 +143,11 @@ impl CustomFormatter for CreditCardFormatter {
         if raw.is_empty() {
             return FormattingResult::success("");
         }
-        
+
         if !raw.chars().all(|c| c.is_ascii_digit()) {
             return FormattingResult::error("Card number must contain only digits");
         }
-        
+
         let mut formatted = String::new();
         for (i, ch) in raw.chars().enumerate() {
             if i > 0 && i % 4 == 0 {
@@ -153,7 +155,7 @@ impl CustomFormatter for CreditCardFormatter {
             }
             formatted.push(ch);
         }
-        
+
         match raw.len() {
             0..=15 => FormattingResult::warning(formatted, "Card incomplete - validation pending"),
             16 => FormattingResult::success(formatted),
@@ -173,15 +175,15 @@ impl ValidationCache {
             results: HashMap::new(),
         }
     }
-    
+
     fn get(&self, key: &str) -> Option<&ExternalValidationState> {
         self.results.get(key)
     }
-    
+
     fn set(&mut self, key: String, result: ExternalValidationState) {
         self.results.insert(key, result);
     }
-    
+
     fn clear(&mut self) {
         self.results.clear();
     }
@@ -198,293 +200,293 @@ impl ValidationServices {
             cache: ValidationCache::new(),
         }
     }
-    
+
     /// PSC validation: simulates postal service API lookup
     fn validate_psc(&mut self, psc: &str) -> ExternalValidationState {
         let cache_key = format!("psc:{}", psc);
         if let Some(cached) = self.cache.get(&cache_key) {
             return cached.clone();
         }
-        
+
         if psc.is_empty() {
             return ExternalValidationState::NotValidated;
         }
-        
+
         if !psc.chars().all(|c| c.is_ascii_digit()) || psc.len() != 5 {
-            let result = ExternalValidationState::Invalid { 
-                message: "Invalid PSC format".to_string(), 
-                suggestion: Some("Enter 5 digits".to_string()) 
+            let result = ExternalValidationState::Invalid {
+                message: "Invalid PSC format".to_string(),
+                suggestion: Some("Enter 5 digits".to_string())
             };
             self.cache.set(cache_key, result.clone());
             return result;
         }
-        
+
         // Simulate realistic PSC validation scenarios
         let result = match psc {
-            "00000" | "99999" => ExternalValidationState::Invalid { 
-                message: "PSC does not exist".to_string(), 
-                suggestion: Some("Check postal code".to_string()) 
+            "00000" | "99999" => ExternalValidationState::Invalid {
+                message: "PSC does not exist".to_string(),
+                suggestion: Some("Check postal code".to_string())
             },
             "01001" => ExternalValidationState::Valid(Some("Prague 1 - verified".to_string())),
             "10000" => ExternalValidationState::Valid(Some("Bratislava - verified".to_string())),
-            "12345" => ExternalValidationState::Warning { 
-                message: "PSC region deprecated - still valid".to_string() 
+            "12345" => ExternalValidationState::Warning {
+                message: "PSC region deprecated - still valid".to_string()
             },
-            "50000" => ExternalValidationState::Invalid { 
-                message: "PSC temporarily unavailable".to_string(), 
-                suggestion: Some("Try again later".to_string()) 
+            "50000" => ExternalValidationState::Invalid {
+                message: "PSC temporarily unavailable".to_string(),
+                suggestion: Some("Try again later".to_string())
             },
             _ => {
                 // Most PSCs are valid with generic info
                 let region = match &psc[..2] {
                     "01" | "02" | "03" => "Prague region",
-                    "10" | "11" | "12" => "Bratislava region", 
+                    "10" | "11" | "12" => "Bratislava region",
                     "20" | "21" => "Brno region",
                     _ => "Valid postal region"
                 };
                 ExternalValidationState::Valid(Some(format!("{} - verified", region)))
             }
         };
-        
+
         self.cache.set(cache_key, result.clone());
         result
     }
-    
+
     /// Email validation: simulates domain checking
     fn validate_email(&mut self, email: &str) -> ExternalValidationState {
         let cache_key = format!("email:{}", email);
         if let Some(cached) = self.cache.get(&cache_key) {
             return cached.clone();
         }
-        
+
         if email.is_empty() {
             return ExternalValidationState::NotValidated;
         }
-        
+
         if !email.contains('@') {
-            let result = ExternalValidationState::Invalid { 
-                message: "Email must contain @".to_string(), 
-                suggestion: Some("Format: user@domain.com".to_string()) 
+            let result = ExternalValidationState::Invalid {
+                message: "Email must contain @".to_string(),
+                suggestion: Some("Format: user@domain.com".to_string())
             };
             self.cache.set(cache_key, result.clone());
             return result;
         }
-        
+
         let parts: Vec<&str> = email.split('@').collect();
         if parts.len() != 2 || parts[0].is_empty() || parts[1].is_empty() {
-            let result = ExternalValidationState::Invalid { 
-                message: "Invalid email format".to_string(), 
-                suggestion: Some("Format: user@domain.com".to_string()) 
+            let result = ExternalValidationState::Invalid {
+                message: "Invalid email format".to_string(),
+                suggestion: Some("Format: user@domain.com".to_string())
             };
             self.cache.set(cache_key, result.clone());
             return result;
         }
-        
+
         let domain = parts[1];
         let result = match domain {
             "gmail.com" | "outlook.com" | "yahoo.com" => {
                 ExternalValidationState::Valid(Some("Popular email provider - verified".to_string()))
             },
             "example.com" | "test.com" => {
-                ExternalValidationState::Warning { 
-                    message: "Test domain - email may not be deliverable".to_string() 
+                ExternalValidationState::Warning {
+                    message: "Test domain - email may not be deliverable".to_string()
                 }
             },
             "blocked.com" | "spam.com" => {
-                ExternalValidationState::Invalid { 
-                    message: "Domain blocked".to_string(), 
-                    suggestion: Some("Use different email provider".to_string()) 
+                ExternalValidationState::Invalid {
+                    message: "Domain blocked".to_string(),
+                    suggestion: Some("Use different email provider".to_string())
                 }
             },
             _ if domain.contains('.') => {
                 ExternalValidationState::Valid(Some("Domain appears valid - not verified".to_string()))
             },
             _ => {
-                ExternalValidationState::Invalid { 
-                    message: "Invalid domain format".to_string(), 
-                    suggestion: Some("Domain must contain '.'".to_string()) 
+                ExternalValidationState::Invalid {
+                    message: "Invalid domain format".to_string(),
+                    suggestion: Some("Domain must contain '.'".to_string())
                 }
             }
         };
-        
+
         self.cache.set(cache_key, result.clone());
         result
     }
-    
+
     /// Username validation: simulates availability checking
     fn validate_username(&mut self, username: &str) -> ExternalValidationState {
         let cache_key = format!("username:{}", username);
         if let Some(cached) = self.cache.get(&cache_key) {
             return cached.clone();
         }
-        
+
         if username.is_empty() {
             return ExternalValidationState::NotValidated;
         }
-        
+
         if username.len() < 3 {
-            let result = ExternalValidationState::Invalid { 
-                message: "Username too short".to_string(), 
-                suggestion: Some("Minimum 3 characters".to_string()) 
+            let result = ExternalValidationState::Invalid {
+                message: "Username too short".to_string(),
+                suggestion: Some("Minimum 3 characters".to_string())
             };
             self.cache.set(cache_key, result.clone());
             return result;
         }
-        
+
         if !username.chars().all(|c| c.is_alphanumeric() || c == '_') {
-            let result = ExternalValidationState::Invalid { 
-                message: "Invalid characters".to_string(), 
-                suggestion: Some("Use letters, numbers, underscore only".to_string()) 
+            let result = ExternalValidationState::Invalid {
+                message: "Invalid characters".to_string(),
+                suggestion: Some("Use letters, numbers, underscore only".to_string())
             };
             self.cache.set(cache_key, result.clone());
             return result;
         }
-        
+
         let result = match username {
             "admin" | "root" | "user" | "test" => {
-                ExternalValidationState::Invalid { 
-                    message: "Username reserved".to_string(), 
-                    suggestion: Some("Choose different username".to_string()) 
+                ExternalValidationState::Invalid {
+                    message: "Username reserved".to_string(),
+                    suggestion: Some("Choose different username".to_string())
                 }
             },
             "john123" | "alice_dev" => {
-                ExternalValidationState::Invalid { 
-                    message: "Username already taken".to_string(), 
-                    suggestion: Some("Try variations or add numbers".to_string()) 
+                ExternalValidationState::Invalid {
+                    message: "Username already taken".to_string(),
+                    suggestion: Some("Try variations or add numbers".to_string())
                 }
             },
             username if username.starts_with("temp_") => {
-                ExternalValidationState::Warning { 
-                    message: "Temporary username pattern - are you sure?".to_string() 
+                ExternalValidationState::Warning {
+                    message: "Temporary username pattern - are you sure?".to_string()
                 }
             },
             _ => {
                 ExternalValidationState::Valid(Some("Username available - good choice!".to_string()))
             }
         };
-        
+
         self.cache.set(cache_key, result.clone());
         result
     }
-    
+
     /// API Key validation: simulates authentication service
     fn validate_api_key(&mut self, key: &str) -> ExternalValidationState {
         let cache_key = format!("apikey:{}", key);
         if let Some(cached) = self.cache.get(&cache_key) {
             return cached.clone();
         }
-        
+
         if key.is_empty() {
             return ExternalValidationState::NotValidated;
         }
-        
+
         if key.len() < 20 {
-            let result = ExternalValidationState::Invalid { 
-                message: "API key too short".to_string(), 
-                suggestion: Some("Valid keys are 32+ characters".to_string()) 
+            let result = ExternalValidationState::Invalid {
+                message: "API key too short".to_string(),
+                suggestion: Some("Valid keys are 32+ characters".to_string())
             };
             self.cache.set(cache_key, result.clone());
             return result;
         }
-        
+
         let result = match key {
             "invalid_key_12345678901" => {
-                ExternalValidationState::Invalid { 
-                    message: "API key not found".to_string(), 
-                    suggestion: Some("Check key and permissions".to_string()) 
+                ExternalValidationState::Invalid {
+                    message: "API key not found".to_string(),
+                    suggestion: Some("Check key and permissions".to_string())
                 }
             },
             "expired_key_12345678901" => {
-                ExternalValidationState::Invalid { 
-                    message: "API key expired".to_string(), 
-                    suggestion: Some("Generate new key".to_string()) 
+                ExternalValidationState::Invalid {
+                    message: "API key expired".to_string(),
+                    suggestion: Some("Generate new key".to_string())
                 }
             },
             "limited_key_12345678901" => {
-                ExternalValidationState::Warning { 
-                    message: "API key has limited permissions".to_string() 
+                ExternalValidationState::Warning {
+                    message: "API key has limited permissions".to_string()
                 }
             },
             key if key.starts_with("test_") => {
-                ExternalValidationState::Warning { 
-                    message: "Test API key - limited functionality".to_string() 
+                ExternalValidationState::Warning {
+                    message: "Test API key - limited functionality".to_string()
                 }
             },
             _ if key.len() >= 32 => {
                 ExternalValidationState::Valid(Some("API key authenticated - full access".to_string()))
             },
             _ => {
-                ExternalValidationState::Invalid { 
-                    message: "Invalid API key format".to_string(), 
-                    suggestion: Some("Keys should be 32+ alphanumeric characters".to_string()) 
+                ExternalValidationState::Invalid {
+                    message: "Invalid API key format".to_string(),
+                    suggestion: Some("Keys should be 32+ alphanumeric characters".to_string())
                 }
             }
         };
-        
+
         self.cache.set(cache_key, result.clone());
         result
     }
-    
+
     /// Credit Card validation: simulates bank verification
     fn validate_credit_card(&mut self, card: &str) -> ExternalValidationState {
         let cache_key = format!("card:{}", card);
         if let Some(cached) = self.cache.get(&cache_key) {
             return cached.clone();
         }
-        
+
         if card.is_empty() {
             return ExternalValidationState::NotValidated;
         }
-        
+
         if !card.chars().all(|c| c.is_ascii_digit()) || card.len() != 16 {
-            let result = ExternalValidationState::Invalid { 
-                message: "Invalid card format".to_string(), 
-                suggestion: Some("Enter 16 digits".to_string()) 
+            let result = ExternalValidationState::Invalid {
+                message: "Invalid card format".to_string(),
+                suggestion: Some("Enter 16 digits".to_string())
             };
             self.cache.set(cache_key, result.clone());
             return result;
         }
-        
+
         // Basic Luhn algorithm check (simplified)
         let sum: u32 = card.chars()
             .filter_map(|c| c.to_digit(10))
             .enumerate()
             .map(|(i, digit)| {
-                if i % 2 == 0 { 
+                if i % 2 == 0 {
                     let doubled = digit * 2;
                     if doubled > 9 { doubled - 9 } else { doubled }
-                } else { 
-                    digit 
+                } else {
+                    digit
                 }
             })
             .sum();
-        
+
         if sum % 10 != 0 {
-            let result = ExternalValidationState::Invalid { 
-                message: "Invalid card number (failed checksum)".to_string(), 
-                suggestion: Some("Check card number".to_string()) 
+            let result = ExternalValidationState::Invalid {
+                message: "Invalid card number (failed checksum)".to_string(),
+                suggestion: Some("Check card number".to_string())
             };
             self.cache.set(cache_key, result.clone());
             return result;
         }
-        
+
         let result = match &card[..4] {
             "4000" => ExternalValidationState::Valid(Some("Visa - card verified".to_string())),
             "5555" => ExternalValidationState::Valid(Some("Mastercard - card verified".to_string())),
-            "4111" => ExternalValidationState::Warning { 
-                message: "Test card number - not for real transactions".to_string() 
+            "4111" => ExternalValidationState::Warning {
+                message: "Test card number - not for real transactions".to_string()
             },
-            "0000" => ExternalValidationState::Invalid { 
-                message: "Card declined by issuer".to_string(), 
-                suggestion: Some("Contact your bank".to_string()) 
+            "0000" => ExternalValidationState::Invalid {
+                message: "Card declined by issuer".to_string(),
+                suggestion: Some("Contact your bank".to_string())
             },
             _ => ExternalValidationState::Valid(Some("Card number valid - bank not verified".to_string()))
         };
-        
+
         self.cache.set(cache_key, result.clone());
         result
     }
-    
+
     fn clear_cache(&mut self) {
         self.cache.clear();
     }
@@ -546,16 +548,15 @@ impl DataProvider for ValidationDemoData {
     }
 }
 
-/// Enhanced editor with comprehensive external validation management
+/// Enhanced editor with automatic external validation management
 struct ValidationDemoEditor<D: DataProvider> {
     editor: FormEditor<D>,
-    services: ValidationServices,
+    services: Arc<Mutex<ValidationServices>>,
     validation_history: Vec<(usize, String, ValidationResult)>,
     debug_message: String,
     show_history: bool,
     example_mode: usize,
     validation_enabled: bool,
-    auto_validate: bool,
     validation_stats: HashMap<usize, (u32, Duration)>, // field -> (count, total_time)
 }
 
@@ -564,15 +565,70 @@ impl<D: DataProvider> ValidationDemoEditor<D> {
         let mut editor = FormEditor::new(data_provider);
         editor.set_validation_enabled(true);
 
+        let services = Arc::new(Mutex::new(ValidationServices::new()));
+        let services_for_cb = Arc::clone(&services);
+        let services_for_history = Arc::clone(&services);
+
+        // Create a history tracker that we'll share between callback and editor
+        let validation_history: Arc<Mutex<Vec<(usize, String, ValidationResult)>>> = Arc::new(Mutex::new(Vec::new()));
+        let history_for_cb = Arc::clone(&validation_history);
+
+        // Library-level automatic external validation on field transitions
+        editor.set_external_validation_callback(move |field_idx, text| {
+            let mut svc = services_for_cb.lock().unwrap();
+            
+            let validation_type = match field_idx {
+                0 => "PSC Lookup",
+                1 => "Email Domain Check", 
+                2 => "Username Availability",
+                3 => "API Key Auth",
+                4 => "Credit Card Verify",
+                _ => "Unknown",
+            }.to_string();
+
+            let start_time = Instant::now();
+            
+            let validation_result = match field_idx {
+                0 => svc.validate_psc(text),
+                1 => svc.validate_email(text),
+                2 => svc.validate_username(text),
+                3 => svc.validate_api_key(text),
+                4 => svc.validate_credit_card(text),
+                _ => ExternalValidationState::NotValidated,
+            };
+
+            // Record in shared history (if we can lock it)
+            if let Ok(mut history) = history_for_cb.try_lock() {
+                let duration = start_time.elapsed();
+                let result = ValidationResult {
+                    state: validation_result.clone(),
+                    started_at: start_time,
+                    completed_at: Some(Instant::now()),
+                    validation_type,
+                    cached: false, // We could enhance this by checking if it was from cache
+                };
+                
+                history.push((field_idx, text.to_string(), result));
+                
+                // Limit history size
+                if history.len() > 50 {
+                    history.remove(0);
+                }
+            }
+
+            validation_result
+        });
+
         Self {
             editor,
-            services: ValidationServices::new(),
+            services,
             validation_history: Vec::new(),
-            debug_message: "🧪 Enhanced External Validation Demo - Multiple validation types with rich scenarios!".to_string(),
+            debug_message:
+                "🧪 Enhanced External Validation Demo - Automatic validation on field transitions!"
+                    .to_string(),
             show_history: false,
             example_mode: 0,
             validation_enabled: true,
-            auto_validate: true,
             validation_stats: HashMap::new(),
         }
     }
@@ -586,7 +642,7 @@ impl<D: DataProvider> ValidationDemoEditor<D> {
         match self.current_field() {
             0 => "PSC",
             1 => "Email",
-            2 => "Username", 
+            2 => "Username",
             3 => "API Key",
             4 => "Credit Card",
             _ => "Plain Text",
@@ -608,7 +664,7 @@ impl<D: DataProvider> ValidationDemoEditor<D> {
         self.current_field() < 5
     }
 
-    /// Trigger external validation for specific field
+    /// Trigger external validation for specific field (manual validation)
     fn validate_field(&mut self, field_index: usize) {
         if !self.validation_enabled || field_index >= 5 {
             return;
@@ -626,7 +682,7 @@ impl<D: DataProvider> ValidationDemoEditor<D> {
         let validation_type = match field_index {
             0 => "PSC Lookup",
             1 => "Email Domain Check",
-            2 => "Username Availability", 
+            2 => "Username Availability",
             3 => "API Key Auth",
             4 => "Credit Card Verify",
             _ => "Unknown",
@@ -634,14 +690,17 @@ impl<D: DataProvider> ValidationDemoEditor<D> {
 
         let mut result = ValidationResult::new(validation_type.clone());
 
-        // Perform validation (in real app, this would be async)
-        let validation_result = match field_index {
-            0 => self.services.validate_psc(&raw_value),
-            1 => self.services.validate_email(&raw_value),
-            2 => self.services.validate_username(&raw_value),
-            3 => self.services.validate_api_key(&raw_value),
-            4 => self.services.validate_credit_card(&raw_value),
-            _ => ExternalValidationState::NotValidated,
+        // Perform validation using the shared services
+        let validation_result = {
+            let mut svc = self.services.lock().unwrap();
+            match field_index {
+                0 => svc.validate_psc(&raw_value),
+                1 => svc.validate_email(&raw_value),
+                2 => svc.validate_username(&raw_value),
+                3 => svc.validate_api_key(&raw_value),
+                4 => svc.validate_credit_card(&raw_value),
+                _ => ExternalValidationState::NotValidated,
+            }
         };
 
         result = result.complete(validation_result.clone());
@@ -651,7 +710,7 @@ impl<D: DataProvider> ValidationDemoEditor<D> {
 
         // Record in history
         self.validation_history.push((field_index, raw_value, result.clone()));
-        
+
         // Update stats
         let stats = self.validation_stats.entry(field_index).or_insert((0, Duration::from_secs(0)));
         stats.0 += 1;
@@ -665,7 +724,7 @@ impl<D: DataProvider> ValidationDemoEditor<D> {
         let duration_ms = result.duration().as_millis();
         let cached_text = if result.cached { " (cached)" } else { "" };
         self.debug_message = format!(
-            "🔍 {} validation completed in {}ms{}",
+            "🔍 {} validation completed in {}ms{} (manual)",
             validation_type, duration_ms, cached_text
         );
     }
@@ -675,7 +734,7 @@ impl<D: DataProvider> ValidationDemoEditor<D> {
         for i in 0..field_count {
             self.validate_field(i);
         }
-        self.debug_message = "🔍 All fields validated".to_string();
+        self.debug_message = "🔍 All fields validated manually".to_string();
     }
 
     fn clear_validation_state(&mut self, field_index: Option<usize>) {
@@ -690,7 +749,9 @@ impl<D: DataProvider> ValidationDemoEditor<D> {
                 }
                 self.validation_history.clear();
                 self.validation_stats.clear();
-                self.services.clear_cache();
+                if let Ok(mut svc) = self.services.lock() {
+                    svc.clear_cache();
+                }
                 self.debug_message = "🧹 Cleared all validation states and cache".to_string();
             }
         }
@@ -720,8 +781,8 @@ impl<D: DataProvider> ValidationDemoEditor<D> {
     fn cycle_examples(&mut self) {
         let examples = [
             // Valid examples
-            vec!["01001", "user@gmail.com", "alice_dev", "valid_api_key_123456789012345", "4000123456789012", "Valid data"],
-            // Invalid examples  
+            vec!["01001", "user@gmail.com", "alice_dev_new", "valid_api_key_123456789012345", "4000123456789012", "Valid data"],
+            // Invalid examples
             vec!["00000", "invalid-email", "admin", "short_key", "0000000000000000", "Invalid data"],
             // Warning examples
             vec!["12345", "test@example.com", "temp_user", "test_api_key_123456789012345", "4111111111111111", "Warning cases"],
@@ -739,7 +800,7 @@ impl<D: DataProvider> ValidationDemoEditor<D> {
         }
 
         let mode_names = ["Valid Examples", "Invalid Examples", "Warning Cases", "Mixed Scenarios"];
-        self.debug_message = format!("📋 Loaded: {}", mode_names[self.example_mode]);
+        self.debug_message = format!("📋 Loaded: {} (navigate to trigger validation)", mode_names[self.example_mode]);
     }
 
     fn get_validation_summary(&self) -> String {
@@ -758,7 +819,7 @@ impl<D: DataProvider> ValidationDemoEditor<D> {
         self.editor.ui_state().validation_state().get_external_validation(field_index)
     }
 
-    // Editor pass-through methods
+    // Editor pass-through methods - simplified since library handles automatic validation
     fn enter_edit_mode(&mut self) {
         self.editor.enter_edit_mode();
         let rules = self.field_validation_rules();
@@ -766,34 +827,36 @@ impl<D: DataProvider> ValidationDemoEditor<D> {
     }
 
     fn exit_edit_mode(&mut self) {
-        let current_field = self.current_field();
         self.editor.exit_edit_mode();
-        
-        // Auto-validate on blur if enabled
-        if self.auto_validate && self.has_external_validation() {
-            self.validate_field(current_field);
-        }
-        
-        self.debug_message = format!("🔒 NORMAL - Cursor: Steady Block █ - {}", self.field_type());
+        // Library automatically validates on exit, no manual call needed
+        self.debug_message = format!("🔒 NORMAL - Cursor: Steady Block █ - {} (auto-validated)", self.field_type());
     }
 
     fn next_field(&mut self) {
-        let current = self.current_field();
         if let Ok(()) = self.editor.next_field() {
-            if self.auto_validate && current < 5 {
-                self.validate_field(current);
-            }
-            self.debug_message = "➡ Next field".to_string();
+            // Library triggers external validation automatically via transition_to_field()
+            self.debug_message = "➡ Next field (auto-validation triggered by library)".to_string();
         }
     }
 
     fn prev_field(&mut self) {
-        let current = self.current_field();
         if let Ok(()) = self.editor.prev_field() {
-            if self.auto_validate && current < 5 {
-                self.validate_field(current);
-            }
-            self.debug_message = "⬅ Previous field".to_string();
+            // Library triggers external validation automatically via transition_to_field()
+            self.debug_message = "⬅ Previous field (auto-validation triggered by library)".to_string();
+        }
+    }
+
+    fn move_up(&mut self) {
+        if let Ok(()) = self.editor.move_up() {
+            // Library triggers external validation automatically via transition_to_field()
+            self.debug_message = "⬆ Move up (auto-validation triggered by library)".to_string();
+        }
+    }
+
+    fn move_down(&mut self) {
+        if let Ok(()) = self.editor.move_down() {
+            // Library triggers external validation automatically via transition_to_field()
+            self.debug_message = "⬇ Move down (auto-validation triggered by library)".to_string();
         }
     }
 
@@ -823,7 +886,7 @@ fn run_app<B: Backend>(
             let km = key.modifiers;
 
             // Quit
-            if matches!(kc, KeyCode::F(10)) || 
+            if matches!(kc, KeyCode::F(10)) ||
                (kc == KeyCode::Char('q') && km.contains(KeyModifiers::CONTROL)) ||
                (kc == KeyCode::Char('c') && km.contains(KeyModifiers::CONTROL)) {
                 break;
@@ -839,16 +902,25 @@ fn run_app<B: Backend>(
                 },
                 (_, KeyCode::Esc, _) => editor.exit_edit_mode(),
 
-                // Movement - cursor within field
-                (_, KeyCode::Left, _) | (AppMode::ReadOnly, KeyCode::Char('h'), _) => { let _ = editor.editor.move_left(); },
-                (_, KeyCode::Right, _) | (AppMode::ReadOnly, KeyCode::Char('l'), _) => { let _ = editor.editor.move_right(); },
-                (_, KeyCode::Up, _) | (AppMode::ReadOnly, KeyCode::Char('k'), _) => { let _ = editor.editor.move_up(); },
-                (_, KeyCode::Down, _) | (AppMode::ReadOnly, KeyCode::Char('j'), _) => { let _ = editor.editor.move_down(); },
-                // Field switching
+                // Movement - these now trigger automatic validation via the library!
+                (_, KeyCode::Left, _) | (AppMode::ReadOnly, KeyCode::Char('h'), _) => { 
+                    let _ = editor.editor.move_left(); 
+                },
+                (_, KeyCode::Right, _) | (AppMode::ReadOnly, KeyCode::Char('l'), _) => { 
+                    let _ = editor.editor.move_right(); 
+                },
+                (_, KeyCode::Up, _) | (AppMode::ReadOnly, KeyCode::Char('k'), _) => { 
+                    editor.move_up(); // Use wrapper to get debug message
+                },
+                (_, KeyCode::Down, _) | (AppMode::ReadOnly, KeyCode::Char('j'), _) => { 
+                    editor.move_down(); // Use wrapper to get debug message
+                },
+                
+                // Field switching - these trigger automatic validation via the library!
                 (_, KeyCode::Tab, _) => editor.next_field(),
                 (_, KeyCode::BackTab, _) => editor.prev_field(),
 
-                // Validation commands (ONLY in ReadOnly mode)
+                // Manual validation commands (ONLY in ReadOnly mode)
                 (AppMode::ReadOnly, KeyCode::Char('v'), _) => {
                     let field = editor.current_field();
                     editor.validate_field(field);
@@ -868,8 +940,8 @@ fn run_app<B: Backend>(
                 // Editing
                 (AppMode::Edit, KeyCode::Left, _) => { let _ = editor.editor.move_left(); },
                 (AppMode::Edit, KeyCode::Right, _) => { let _ = editor.editor.move_right(); },
-                (AppMode::Edit, KeyCode::Up, _) => { let _ = editor.editor.move_up(); },
-                (AppMode::Edit, KeyCode::Down, _) => { let _ = editor.editor.move_down(); },
+                (AppMode::Edit, KeyCode::Up, _) => { editor.move_up(); },
+                (AppMode::Edit, KeyCode::Down, _) => { editor.move_down(); },
                 (AppMode::Edit, KeyCode::Char(c), m) if !m.contains(KeyModifiers::CONTROL) => {
                     let _ = editor.insert_char(c);
                 },
@@ -916,25 +988,24 @@ fn render_validation_panel(
     // Status bar
     let mode_text = match editor.mode() {
         AppMode::Edit => "INSERT | (bar cursor)",
-        AppMode::ReadOnly => "NORMAL █ (block cursor)", 
+        AppMode::ReadOnly => "NORMAL █ (block cursor)",
         _ => "NORMAL █ (block cursor)",
     };
 
     let summary = editor.get_validation_summary();
     let status_text = format!(
-        "-- {} -- {} | {} | Auto: {} | View: {}",
+        "-- {} -- {} | {} | View: {}",
         mode_text,
         editor.debug_message,
         summary,
-        if editor.auto_validate { "ON" } else { "OFF" },
         if editor.show_history { "HISTORY" } else { "STATUS" }
     );
 
     let status = Paragraph::new(Line::from(Span::raw(status_text)))
-        .block(Block::default().borders(Borders::ALL).title("🧪 External Validation Demo"));
+        .block(Block::default().borders(Borders::ALL).title("🧪 Automatic External Validation Demo"));
     f.render_widget(status, chunks[0]);
 
-    // Validation states for all fields - FIXED: render each field on its own line
+    // Validation states for all fields - render each field on its own line
     let mut field_lines: Vec<Line> = Vec::new();
     for i in 0..editor.data_provider().field_count() {
         let field_name = editor.data_provider().field_name(i);
@@ -969,9 +1040,8 @@ fn render_validation_panel(
         field_lines.push(field_line);
     }
 
-    // Use Vec<Line> to avoid a single long line overflowing
     let validation_states = Paragraph::new(field_lines)
-        .block(Block::default().borders(Borders::ALL).title("🔍 Validation States"));
+        .block(Block::default().borders(Borders::ALL).title("🔍 Validation States (Library Auto-triggered)"));
     f.render_widget(validation_states, chunks[1]);
 
     // History or Help panel
@@ -983,13 +1053,13 @@ fn render_validation_panel(
             .map(|(field_idx, value, result)| {
                 let field_name = match field_idx {
                     0 => "PSC",
-                    1 => "Email", 
+                    1 => "Email",
                     2 => "Username",
                     3 => "API Key",
                     4 => "Card",
                     _ => "Other",
                 };
-                
+
                 let duration_ms = result.duration().as_millis();
                 let cached_text = if result.cached { " (cached)" } else { "" };
                 let short_value = if value.len() > 15 {
@@ -997,15 +1067,15 @@ fn render_validation_panel(
                 } else {
                     value.clone()
                 };
-                
+
                 let state_summary = match &result.state {
                     ExternalValidationState::Valid(_) => "✓ Valid",
-                    ExternalValidationState::Invalid { .. } => "✖ Invalid", 
+                    ExternalValidationState::Invalid { .. } => "✖ Invalid",
                     ExternalValidationState::Warning { .. } => "⚠ Warning",
                     ExternalValidationState::Validating => "… Validating",
                     ExternalValidationState::NotValidated => "○ Not validated",
                 };
-                
+
                 ListItem::new(format!(
                     "{}: '{}' → {} ({}ms{})",
                     field_name, short_value, state_summary, duration_ms, cached_text
@@ -1014,36 +1084,36 @@ fn render_validation_panel(
             .collect();
 
         let history = List::new(recent_history)
-            .block(Block::default().borders(Borders::ALL).title("📜 Validation History (recent 5)"));
+            .block(Block::default().borders(Borders::ALL).title("📜 Auto-Validation History (recent 5)"));
         f.render_widget(history, chunks[2]);
     } else {
         let help_text = match editor.mode() {
             AppMode::ReadOnly => {
-                "🎯 CURSOR-STYLE: Normal █ | Insert |\n\
-                 🧪 EXTERNAL VALIDATION DEMO - Multiple validation types with async simulation\n\
+                "🎯 FULLY AUTOMATIC VALIDATION: Library handles all validation on field transitions!\n\
+                 🧪 EXTERNAL VALIDATION DEMO - No manual triggers needed, just navigate!\n\
                  \n\
-                 Commands: v=validate current, V=validate all, c=clear current, C=clear all\n\
-                 e=cycle examples, r=toggle history, h=field help, F1=toggle validation\n\
-                 Movement: Tab/Shift+Tab=switch fields, i/a=insert/append, Esc=exit edit\n\
+                 🚀 AUTOMATIC: Arrow keys, Tab, and Esc trigger validation automatically\n\
+                 Manual: v=validate current, V=validate all, c=clear current, C=clear all\n\
+                 Controls: e=cycle examples, r=toggle history, h=field help, F1=toggle validation\n\
                  \n\
-                 Try different values to see validation in action!"
+                 Just load examples and navigate - validation happens automatically!"
             }
             AppMode::Edit => {
                 "🎯 INSERT MODE - Cursor: | (bar)\n\
-                 ✏️ Type to see validation on field blur\n\
+                 ✏️ Type to edit field content\n\
                  \n\
-                 Current field validation will trigger when you:\n\
+                 🚀 AUTOMATIC: Library validates when you leave this field via:\n\
                  • Press Esc (exit edit mode)\n\
-                 • Press Tab (move to next field)\n\
-                 • Press 'v' manually\n\
+                 • Press Tab/Shift+Tab (move between fields)\n\
+                 • Press arrow keys (Up/Down move between fields)\n\
                  \n\
                  Esc=exit edit, arrows=navigate, Backspace/Del=delete"
             }
-            _ => "🧪 Enhanced External Validation Demo"
+            _ => "🧪 Enhanced Fully Automatic External Validation Demo"
         };
 
         let help = Paragraph::new(help_text)
-            .block(Block::default().borders(Borders::ALL).title("🚀 External Validation Features"))
+            .block(Block::default().borders(Borders::ALL).title("🚀 Fully Automatic External Validation"))
             .style(Style::default().fg(Color::Gray))
             .wrap(Wrap { trim: true });
         f.render_widget(help, chunks[2]);
@@ -1051,16 +1121,19 @@ fn render_validation_panel(
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    println!("🧪 Enhanced External Validation Demo (Feature 5)");
+    println!("🧪 Enhanced Fully Automatic External Validation Demo (Feature 5)");
     println!("✅ validation feature: ENABLED");
-    println!("✅ gui feature: ENABLED"); 
+    println!("✅ gui feature: ENABLED");
     println!("✅ cursor-style feature: ENABLED");
+    println!("🚀 NEW: Library handles all automatic validation!");
     println!("🧪 Enhanced features:");
     println!("   • 5 different external validation types with realistic scenarios");
+    println!("   • LIBRARY-LEVEL automatic validation on all field transitions");
     println!("   • Validation caching and performance metrics");
     println!("   • Comprehensive validation history and error handling");
     println!("   • Multiple example datasets for testing edge cases");
     println!("   • Progressive validation patterns (local + remote simulation)");
+    println!("   • NO manual validation calls needed - library handles everything!");
     println!();
 
     enable_raw_mode()?;
@@ -1092,11 +1165,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("{:?}", err);
     }
 
-    println!("🧪 Enhanced external validation demo completed!");
-    println!("🏆 You experienced comprehensive external validation with:");
+    println!("🧪 Enhanced fully automatic external validation demo completed!");
+    println!("🏆 You experienced library-level automatic external validation with:");
     println!("   • Multiple validation services (PSC, Email, Username, API Key, Credit Card)");
+    println!("   • AUTOMATIC validation handled entirely by the library");
     println!("   • Realistic async validation simulation with caching");
     println!("   • Comprehensive error handling and user feedback");
     println!("   • Performance metrics and validation history tracking");
+    println!("   • Zero manual validation calls needed!");
     Ok(())
 }

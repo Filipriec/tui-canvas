@@ -23,7 +23,13 @@ pub struct FormEditor<D: DataProvider> {
     pub(crate) suggestions: Vec<SuggestionItem>,
 
     #[cfg(feature = "validation")]
-    external_validation_callback: Option<Box<dyn FnMut(usize, &str) + Send + Sync>>,
+    external_validation_callback: Option<
+        Box<
+            dyn FnMut(usize, &str) -> crate::validation::ExternalValidationState
+                + Send
+                + Sync,
+        >,
+    >,
 }
 
 impl<D: DataProvider> FormEditor<D> {
@@ -59,7 +65,7 @@ impl<D: DataProvider> FormEditor<D> {
     }
 
     /// Get current field text (convenience method)
-    fn current_text(&self) -> &str {
+    pub fn current_text(&self) -> &str {
         // Convenience wrapper, kept for compatibility with existing code
         let field_index = self.ui_state.current_field;
         if field_index < self.data_provider.field_count() {
@@ -208,7 +214,10 @@ impl<D: DataProvider> FormEditor<D> {
     #[cfg(feature = "validation")]
     pub fn set_external_validation_callback<F>(&mut self, callback: F)
     where
-        F: FnMut(usize, &str) + Send + Sync + 'static,
+        F: FnMut(usize, &str) -> crate::validation::ExternalValidationState
+            + Send
+            + Sync
+            + 'static,
     {
         self.external_validation_callback = Some(Box::new(callback));
     }
@@ -373,9 +382,10 @@ impl<D: DataProvider> FormEditor<D> {
                     // Trigger external validation state
                     self.set_external_validation(prev_field, crate::validation::ExternalValidationState::Validating);
 
-                    // Invoke external callback if registered
+                    // Invoke external callback if registered and set final state
                     if let Some(cb) = self.external_validation_callback.as_mut() {
-                        cb(prev_field, &text);
+                        let final_state = cb(prev_field, &text);
+                        self.set_external_validation(prev_field, final_state);
                     }
                 }
             }
@@ -398,6 +408,9 @@ impl<D: DataProvider> FormEditor<D> {
             max_pos,
             self.ui_state.current_mode == AppMode::Edit,
         );
+
+        // Automatically close suggestions on field switch
+        self.close_suggestions();
 
         Ok(())
     }
@@ -785,8 +798,9 @@ impl<D: DataProvider> FormEditor<D> {
                 );
 
                 // Update cursor position
-                self.ui_state.cursor_pos = suggestion.value_to_store.len();
-                self.ui_state.ideal_cursor_column = self.ui_state.cursor_pos;
+                let char_len = suggestion.value_to_store.chars().count();
+                self.ui_state.cursor_pos = char_len;
+                self.ui_state.ideal_cursor_column = char_len;
 
                 // Close suggestions
                 self.ui_state.deactivate_suggestions();
@@ -810,16 +824,6 @@ impl<D: DataProvider> FormEditor<D> {
     // ===================================================================
     // MOVEMENT METHODS (keeping existing implementations)
     // ===================================================================
-
-    /// Move to previous field (vim k / up arrow)
-    pub fn move_up_only(&mut self) -> Result<()> {
-        self.move_up()
-    }
-
-    /// Move to next field (vim j / down arrow)
-    pub fn move_down_only(&mut self) -> Result<()> {
-        self.move_down()
-    }
 
     /// Move to first line (vim gg)
     pub fn move_first_line(&mut self) -> Result<()> {
@@ -1162,6 +1166,27 @@ impl<D: DataProvider> FormEditor<D> {
             if self.ui_state.cursor_pos > max_normal_pos {
                 self.ui_state.cursor_pos = max_normal_pos;
                 self.ui_state.ideal_cursor_column = self.ui_state.cursor_pos;
+            }
+        }
+
+        // Trigger external validation on blur/exit edit mode
+        #[cfg(feature = "validation")]
+        {
+            let field_index = self.ui_state.current_field;
+            if let Some(cfg) = self.ui_state.validation.get_field_config(field_index) {
+                if cfg.external_validation_enabled {
+                    let text = self.current_text().to_string();
+                    if !text.is_empty() {
+                        self.set_external_validation(
+                            field_index,
+                            crate::validation::ExternalValidationState::Validating,
+                        );
+                        if let Some(cb) = self.external_validation_callback.as_mut() {
+                            let final_state = cb(field_index, &text);
+                            self.set_external_validation(field_index, final_state);
+                        }
+                    }
+                }
             }
         }
 
