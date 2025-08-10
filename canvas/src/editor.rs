@@ -35,6 +35,7 @@ impl<D: DataProvider> FormEditor<D> {
             .unwrap_or_else(|| s.len())
     }
 
+    #[allow(dead_code)]
     /// Convert a byte index to a char index in a string
     fn byte_to_char_index(s: &str, byte_idx: usize) -> usize {
         s[..byte_idx].chars().count()
@@ -57,7 +58,7 @@ impl<D: DataProvider> FormEditor<D> {
         editor
     }
 
-    /// Convert a char index to a byte index in a string
+    /// Get current field text (convenience method)
     fn current_text(&self) -> &str {
         // Convenience wrapper, kept for compatibility with existing code
         let field_index = self.ui_state.current_field;
@@ -336,6 +337,11 @@ impl<D: DataProvider> FormEditor<D> {
             }
         }
 
+        // No-op if the resolved target is the same as current
+        if target_field == prev_field {
+            return Ok(());
+        }
+
         // 3. Blocking validation before leaving current field
         #[cfg(feature = "validation")]
         {
@@ -386,13 +392,127 @@ impl<D: DataProvider> FormEditor<D> {
 
         // 6. Clamp cursor to new field
         let current_text = self.current_text();
-        let max_pos = current_text.len();
+        let max_pos = current_text.chars().count();
         self.ui_state.set_cursor(
             self.ui_state.ideal_cursor_column,
             max_pos,
             self.ui_state.current_mode == AppMode::Edit,
         );
 
+        Ok(())
+    }
+
+    /// Handle character insertion with proper mask/limit coordination
+    pub fn insert_char(&mut self, ch: char) -> Result<()> {
+        if self.ui_state.current_mode != AppMode::Edit {
+            return Ok(()); // Ignore in non-edit modes
+        }
+
+        let field_index = self.ui_state.current_field;
+        let raw_cursor_pos = self.ui_state.cursor_pos;
+        let current_raw_text = self.data_provider.field_value(field_index);
+
+        // Mask gate: reject input that doesn't fit the mask at current position
+        #[cfg(feature = "validation")]
+        {
+            if let Some(cfg) = self.ui_state.validation.get_field_config(field_index) {
+                if let Some(mask) = &cfg.display_mask {
+                    let display_cursor_pos = mask.raw_pos_to_display_pos(raw_cursor_pos);
+
+                    // Reject if at/after end of mask pattern (in char positions)
+                    let pattern_char_len = mask.pattern().chars().count();
+                    if display_cursor_pos >= pattern_char_len {
+                        return Ok(());
+                    }
+
+                    // Reject if on a separator, not an input position
+                    if !mask.is_input_position(display_cursor_pos) {
+                        return Ok(());
+                    }
+
+                    // Reject if mask is already full
+                    let input_slots = (0..pattern_char_len)
+                        .filter(|&pos| mask.is_input_position(pos))
+                        .count();
+                    if current_raw_text.chars().count() >= input_slots {
+                        return Ok(());
+                    }
+                }
+            }
+        }
+
+        // Validation: character insertion
+        #[cfg(feature = "validation")]
+        {
+            let vr = self.ui_state.validation.validate_char_insertion(
+                field_index,
+                current_raw_text,
+                raw_cursor_pos,
+                ch,
+            );
+            if !vr.is_acceptable() {
+                return Ok(()); // Silently reject invalid input
+            }
+        }
+
+        // Build new raw text with inserted character at char index raw_cursor_pos
+        let new_raw_text = {
+            let mut temp = current_raw_text.to_string();
+            let byte_pos = Self::char_to_byte_index(current_raw_text, raw_cursor_pos);
+            temp.insert(byte_pos, ch);
+            temp
+        };
+
+        // Post-validate full content and mask capacity
+        #[cfg(feature = "validation")]
+        {
+            if let Some(cfg) = self.ui_state.validation.get_field_config(field_index) {
+                // Check character limits
+                if let Some(limits) = &cfg.character_limits {
+                    if let Some(result) = limits.validate_content(&new_raw_text) {
+                        if !result.is_acceptable() {
+                            return Ok(()); // Silently reject
+                        }
+                    }
+                }
+                // Check mask capacity again against new length
+                if let Some(mask) = &cfg.display_mask {
+                    let pattern_char_len = mask.pattern().chars().count();
+                    let input_slots = (0..pattern_char_len)
+                        .filter(|&pos| mask.is_input_position(pos))
+                        .count();
+                    if new_raw_text.chars().count() > input_slots {
+                        return Ok(());
+                    }
+                }
+            }
+        }
+
+        // Commit
+        self.data_provider
+            .set_field_value(field_index, new_raw_text.clone());
+
+        // Move cursor
+        #[cfg(feature = "validation")]
+        {
+            if let Some(cfg) = self.ui_state.validation.get_field_config(field_index) {
+                if let Some(mask) = &cfg.display_mask {
+                    let new_raw_pos = raw_cursor_pos + 1;
+                    let display_pos = mask.raw_pos_to_display_pos(new_raw_pos);
+                    let next_input_display = mask.next_input_position(display_pos);
+                    let next_raw_pos = mask.display_pos_to_raw_pos(next_input_display);
+                    let max_raw = new_raw_text.chars().count();
+
+                    self.ui_state.cursor_pos = next_raw_pos.min(max_raw);
+                    self.ui_state.ideal_cursor_column = self.ui_state.cursor_pos;
+                    return Ok(());
+                }
+            }
+        }
+
+        // No mask -> simple increment
+        self.ui_state.cursor_pos = raw_cursor_pos + 1;
+        self.ui_state.ideal_cursor_column = self.ui_state.cursor_pos;
         Ok(())
     }
 
@@ -430,8 +550,8 @@ impl<D: DataProvider> FormEditor<D> {
             if let Some(cfg) = self.ui_state.validation.get_field_config(field_index) {
                 if let Some(mask) = &cfg.display_mask {
                     let display_pos = mask.raw_pos_to_display_pos(self.ui_state.cursor_pos);
-                    if let Some(prev_display_pos) = mask.prev_input_position(display_pos) {
-                        let raw_pos = mask.display_pos_to_raw_pos(prev_display_pos);
+                    if let Some(prev_input) = mask.prev_input_position(display_pos) {
+                        let raw_pos = mask.display_pos_to_raw_pos(prev_input);
                         let max_pos = self.current_text().chars().count();
                         self.ui_state.cursor_pos = raw_pos.min(max_pos);
                         self.ui_state.ideal_cursor_column = self.ui_state.cursor_pos;
@@ -464,19 +584,13 @@ impl<D: DataProvider> FormEditor<D> {
             if let Some(cfg) = self.ui_state.validation.get_field_config(field_index) {
                 if let Some(mask) = &cfg.display_mask {
                     let display_pos = mask.raw_pos_to_display_pos(self.ui_state.cursor_pos);
-                    if let Some(next_display_pos) = mask.next_input_position(display_pos) {
-                        let raw_pos = mask.display_pos_to_raw_pos(next_display_pos);
-                        let max_pos = self.current_text().chars().count();
-                        self.ui_state.cursor_pos = raw_pos.min(max_pos);
-                        self.ui_state.ideal_cursor_column = self.ui_state.cursor_pos;
-                        moved = true;
-                    } else {
-                        // Move to end if there is no next input
-                        let max_pos = self.current_text().chars().count();
-                        self.ui_state.cursor_pos = max_pos;
-                        self.ui_state.ideal_cursor_column = max_pos;
-                        moved = true;
-                    }
+                    // Next input position now returns usize
+                    let next_display_pos = mask.next_input_position(display_pos);
+                    let next_pos = mask.display_pos_to_raw_pos(next_display_pos);
+                    let max_pos = self.current_text().chars().count();
+                    self.ui_state.cursor_pos = next_pos.min(max_pos);
+                    self.ui_state.ideal_cursor_column = self.ui_state.cursor_pos;
+                    moved = true;
                 }
             }
         }
@@ -522,10 +636,11 @@ impl<D: DataProvider> FormEditor<D> {
         let current_text = self.current_text();
 
         // Calculate append position: always move right, even at line end
+        let char_len = current_text.chars().count();
         let append_pos = if current_text.is_empty() {
             0
         } else {
-            (self.ui_state.cursor_pos + 1).min(current_text.len())
+            (self.ui_state.cursor_pos + 1).min(char_len)
         };
 
         // Set cursor position for append
@@ -865,10 +980,11 @@ impl<D: DataProvider> FormEditor<D> {
         let is_edit_mode = self.ui_state.current_mode == AppMode::Edit;
 
         // Clamp to valid bounds for current mode
+        let char_len = current_text.chars().count();
         let final_pos = if is_edit_mode {
-            new_pos.min(current_text.len())
+            new_pos.min(char_len)
         } else {
-            new_pos.min(current_text.len().saturating_sub(1))
+            new_pos.min(char_len.saturating_sub(1))
         };
 
         self.ui_state.cursor_pos = final_pos;
@@ -899,10 +1015,11 @@ impl<D: DataProvider> FormEditor<D> {
         }
 
         let current_pos = self.ui_state.cursor_pos;
+        let char_len = current_text.chars().count();
         let new_pos = find_word_end(current_text, current_pos);
 
         // If we didn't move, try next word
-        let final_pos = if new_pos == current_pos && current_pos + 1 < current_text.len() {
+        let final_pos = if new_pos == current_pos && current_pos + 1 < char_len {
             find_word_end(current_text, current_pos + 1)
         } else {
             new_pos
@@ -911,9 +1028,9 @@ impl<D: DataProvider> FormEditor<D> {
         // Clamp for read-only mode
         let is_edit_mode = self.ui_state.current_mode == AppMode::Edit;
         let clamped_pos = if is_edit_mode {
-            final_pos.min(current_text.len())
+            final_pos.min(char_len)
         } else {
-            final_pos.min(current_text.len().saturating_sub(1))
+            final_pos.min(char_len.saturating_sub(1))
         };
 
         self.ui_state.cursor_pos = clamped_pos;
@@ -1041,7 +1158,7 @@ impl<D: DataProvider> FormEditor<D> {
         let current_text = self.current_text();
         if !current_text.is_empty() {
             // In normal mode, cursor must be ON a character, not after the last one
-            let max_normal_pos = current_text.len().saturating_sub(1);
+            let max_normal_pos = current_text.chars().count().saturating_sub(1);
             if self.ui_state.cursor_pos > max_normal_pos {
                 self.ui_state.cursor_pos = max_normal_pos;
                 self.ui_state.ideal_cursor_column = self.ui_state.cursor_pos;
@@ -1144,10 +1261,11 @@ impl<D: DataProvider> FormEditor<D> {
         let is_edit_mode = self.ui_state.current_mode == AppMode::Edit;
 
         // Clamp to valid bounds for current mode
+        let char_len = current_text.chars().count();
         let max_pos = if is_edit_mode {
-            current_text.len() // Edit mode: can go past end
+            char_len
         } else {
-            current_text.len().saturating_sub(1).max(0) // Read-only: stay within text
+            char_len.saturating_sub(1)
         };
 
         let clamped_pos = position.min(max_pos);
@@ -1268,12 +1386,12 @@ impl<D: DataProvider> FormEditor<D> {
 
     /// Enhanced movement methods that update selection in highlight mode
     pub fn move_left_with_selection(&mut self) {
-        self.move_left();
+        let _ = self.move_left();
         // Selection anchor stays in place, cursor position updates automatically
     }
 
     pub fn move_right_with_selection(&mut self) {
-        self.move_right();
+        let _ = self.move_right();
         // Selection anchor stays in place, cursor position updates automatically
     }
 
