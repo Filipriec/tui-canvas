@@ -1,8 +1,8 @@
 // examples/suggestions2.rs
-//! Production-ready non-blocking suggestions demonstration
+//! Production-ready Tab-triggered suggestions demonstration
 //!
 //! This example demonstrates:
-//! - Instant, responsive suggestions dropdown
+//! - Tab-triggered suggestions dropdown
 //! - Non-blocking architecture for real network/database calls
 //! - Multiple suggestion field types
 //! - Professional-grade user experience
@@ -62,7 +62,7 @@ impl<D: DataProvider> AutoCursorFormEditor<D> {
         Self {
             editor: FormEditor::new(data_provider),
             has_unsaved_changes: false,
-            debug_message: "🚀 Production-Ready Suggestions Demo - Copy this architecture for your app!".to_string(),
+            debug_message: "🚀 Production-Ready Tab-Triggered Suggestions Demo - Copy this architecture for your app!".to_string(),
             command_buffer: String::new(),
         }
     }
@@ -232,12 +232,12 @@ impl<D: DataProvider> AutoCursorFormEditor<D> {
 
     fn enter_edit_mode(&mut self) {
         self.editor.enter_edit_mode(); // 🎯 Library automatically sets cursor to bar |
-        self.debug_message = "✏️  INSERT MODE - Cursor: Steady Bar |".to_string();
+        self.debug_message = "✏️  INSERT MODE - Cursor: Steady Bar | - Press Tab for suggestions".to_string();
     }
 
     fn enter_append_mode(&mut self) {
         self.editor.enter_append_mode(); // 🎯 Library automatically positions cursor and sets mode
-        self.debug_message = "✏️  INSERT (append) - Cursor: Steady Bar |".to_string();
+        self.debug_message = "✏️  INSERT (append) - Cursor: Steady Bar | - Press Tab for suggestions".to_string();
     }
 
     fn exit_edit_mode(&mut self) {
@@ -257,7 +257,7 @@ impl<D: DataProvider> AutoCursorFormEditor<D> {
     // === PRODUCTION-READY NON-BLOCKING SUGGESTIONS ===
 
     /// Trigger suggestions with non-blocking approach (production pattern)
-    /// 
+    ///
     /// This method demonstrates the proper way to integrate suggestions with
     /// real APIs, databases, or any async data source without blocking the UI.
     async fn trigger_suggestions_async(
@@ -286,17 +286,6 @@ impl<D: DataProvider> AutoCursorFormEditor<D> {
                     self.set_debug_message(format!("❌ Suggestion error: {}", e));
                 }
             }
-        }
-    }
-
-    /// Auto-trigger suggestions for current field (production pattern)
-    /// 
-    /// Call this after character input, deletion, or field entry to automatically
-    /// show suggestions. Perfect for real-time search-as-you-type functionality.
-    async fn auto_trigger_suggestions(&mut self, provider: &mut ProductionSuggestionsProvider) {
-        let field_index = self.current_field();
-        if self.data_provider().supports_suggestions(field_index) {
-            self.trigger_suggestions_async(provider, field_index).await;
         }
     }
 
@@ -437,15 +426,15 @@ impl DataProvider for ApplicationData {
 // ===================================================================
 
 /// Production-ready suggestions provider
-/// 
+///
 /// Replace the data sources below with your actual:
 /// - REST API calls (reqwest, hyper)
-/// - Database queries (sqlx, diesel)  
+/// - Database queries (sqlx, diesel)
 /// - Search engines (elasticsearch, algolia)
 /// - Cache lookups (redis, memcached)
 /// - GraphQL queries
 /// - gRPC services
-/// 
+///
 /// The non-blocking architecture works with any async data source.
 struct ProductionSuggestionsProvider {
     // Add your API clients, database connections, cache clients here
@@ -473,7 +462,7 @@ impl ProductionSuggestionsProvider {
         //     .send()
         //     .await?;
         // let fruits: Vec<Fruit> = response.json().await?;
-        
+
         let fruits = vec![
             ("Apple", "🍎 Crisp and sweet"),
             ("Banana", "🍌 Rich in potassium"),
@@ -500,7 +489,7 @@ impl ProductionSuggestionsProvider {
         // )
         // .fetch_all(&self.db_pool)
         // .await?;
-        
+
         let jobs = vec![
             ("Software Engineer", "👨‍💻 Build applications"),
             ("Product Manager", "📋 Manage product roadmap"),
@@ -522,7 +511,7 @@ impl ProductionSuggestionsProvider {
         // if let Some(cached_result) = cached {
         //     return Ok(serde_json::from_str(&cached_result)?);
         // }
-        
+
         let languages = vec![
             ("Rust", "🦀 Systems programming"),
             ("Python", "🐍 Versatile and popular"),
@@ -545,7 +534,7 @@ impl ProductionSuggestionsProvider {
         //     .send()
         //     .await?;
         // let countries: Vec<Country> = response.json().await?;
-        
+
         let countries = vec![
             ("United States", "🇺🇸 North America"),
             ("Canada", "🇨🇦 Great neighbors"),
@@ -598,7 +587,7 @@ impl SuggestionsProvider for ProductionSuggestionsProvider {
     async fn fetch_suggestions(&mut self, field_index: usize, query: &str) -> Result<Vec<SuggestionItem>> {
         match field_index {
             0 => self.get_fruit_suggestions(query).await,      // API call
-            1 => self.get_job_suggestions(query).await,        // Database query  
+            1 => self.get_job_suggestions(query).await,        // Database query
             2 => self.get_language_suggestions(query).await,   // Cache + API
             3 => self.get_country_suggestions(query).await,    // Geographic API
             4 => self.get_color_suggestions(query).await,      // Local data
@@ -607,7 +596,7 @@ impl SuggestionsProvider for ProductionSuggestionsProvider {
     }
 }
 
-/// Production-ready key handling with non-blocking suggestions
+/// Production-ready key handling with Tab-triggered suggestions
 async fn handle_key_press(
     key: KeyCode,
     modifiers: KeyModifiers,
@@ -625,7 +614,7 @@ async fn handle_key_press(
     }
 
     match (mode, key, modifiers) {
-        // === NON-BLOCKING SUGGESTIONS HANDLING ===
+        // === TAB-TRIGGERED SUGGESTIONS HANDLING ===
         (_, KeyCode::Tab, _) => {
             if editor.is_suggestions_active() {
                 // Cycle through suggestions
@@ -677,22 +666,20 @@ async fn handle_key_press(
             }
         }
 
-        // === MODE TRANSITIONS WITH AUTO-SUGGESTIONS ===
+        // === MODE TRANSITIONS (NO AUTO-SUGGESTIONS) ===
         (AppMode::ReadOnly, KeyCode::Char('i'), _) => {
             editor.enter_edit_mode();
             editor.clear_command_buffer();
-            // Auto-show suggestions on entering insert mode
-            editor.auto_trigger_suggestions(suggestions_provider).await;
         }
         (AppMode::ReadOnly, KeyCode::Char('a'), _) => {
             editor.enter_append_mode();
-            editor.set_debug_message("✏️  INSERT (append) - Cursor: Steady Bar |".to_string());
+            editor.set_debug_message("✏️  INSERT (append) - Cursor: Steady Bar | - Press Tab for suggestions".to_string());
             editor.clear_command_buffer();
         }
         (AppMode::ReadOnly, KeyCode::Char('A'), _) => {
             editor.move_line_end();
             editor.enter_edit_mode();
-            editor.set_debug_message("✏️  INSERT (end of line) - Cursor: Steady Bar |".to_string());
+            editor.set_debug_message("✏️  INSERT (end of line) - Cursor: Steady Bar | - Press Tab for suggestions".to_string());
             editor.clear_command_buffer();
         }
 
@@ -821,16 +808,22 @@ async fn handle_key_press(
             editor.move_line_end();
         }
 
-        // === DELETE OPERATIONS WITH AUTO-SUGGESTIONS ===
+        // === DELETE OPERATIONS (AUTO-FETCH WHEN SUGGESTIONS ACTIVE) ===
         (AppMode::Edit, KeyCode::Backspace, _) => {
             editor.delete_backward()?;
-            // Auto-trigger suggestions after deletion
-            editor.auto_trigger_suggestions(suggestions_provider).await;
+            // Auto-fetch only if suggestions are already active (triggered by Tab)
+            if editor.is_suggestions_active() {
+                let field_index = editor.current_field();
+                editor.trigger_suggestions_async(suggestions_provider, field_index).await;
+            }
         }
         (AppMode::Edit, KeyCode::Delete, _) => {
             editor.delete_forward()?;
-            // Auto-trigger suggestions after deletion
-            editor.auto_trigger_suggestions(suggestions_provider).await;
+            // Auto-fetch only if suggestions are already active (triggered by Tab)
+            if editor.is_suggestions_active() {
+                let field_index = editor.current_field();
+                editor.trigger_suggestions_async(suggestions_provider, field_index).await;
+            }
         }
 
         // Delete operations in normal mode (vim x)
@@ -843,11 +836,14 @@ async fn handle_key_press(
             editor.set_debug_message("X: deleted character backward".to_string());
         }
 
-        // === CHARACTER INPUT WITH REAL-TIME SUGGESTIONS ===
+        // === CHARACTER INPUT (AUTO-FETCH WHEN SUGGESTIONS ACTIVE) ===
         (AppMode::Edit, KeyCode::Char(c), m) if !m.contains(KeyModifiers::CONTROL) => {
             editor.insert_char(c)?;
-            // Auto-trigger suggestions after typing - this is the magic!
-            editor.auto_trigger_suggestions(suggestions_provider).await;
+            // Auto-fetch only if suggestions are already active (triggered by Tab)
+            if editor.is_suggestions_active() {
+                let field_index = editor.current_field();
+                editor.trigger_suggestions_async(suggestions_provider, field_index).await;
+            }
         }
 
         // === DEBUG/INFO COMMANDS ===
@@ -980,7 +976,7 @@ fn render_status_and_help(
     );
 
     let status = Paragraph::new(Line::from(Span::raw(status_text)))
-        .block(Block::default().borders(Borders::ALL).title("🚀 Production-Ready Non-Blocking Suggestions"));
+        .block(Block::default().borders(Borders::ALL).title("🚀 Production-Ready Smart Suggestions (Tab to activate → type to filter)"));
 
     f.render_widget(status, chunks[0]);
 
@@ -992,19 +988,19 @@ fn render_status_and_help(
              Actions: i/a/A=insert, v/V=visual, x/X=delete, ?=info, Enter=next field\n\
              Integration: Replace data sources with your APIs, databases, caches\n\
              Architecture: Non-blocking • Instant UI • Stale protection • Professional UX\n\
-             Tab=suggestions, Enter=select • Ready for: REST, GraphQL, SQL, Redis, etc."
+             🔑 Tab=activate suggestions → type to filter • Enter=select • Ready for: REST, GraphQL, SQL, Redis"
         }
         AppMode::Edit => {
-            "🚀 INSERT MODE - Type for instant suggestions!\n\
-             Real-time search-as-you-type with non-blocking architecture\n\
-             Perfect for: User search, autocomplete, typeahead, smart suggestions\n\
+            "🚀 INSERT MODE - Press Tab to activate suggestions, then type to filter!\n\
+             Tab=activate suggestions • Type/Backspace=filter while active • Enter=select\n\
+             Perfect for: Autocomplete, search dropdowns, data entry assistance\n\
              Navigation: arrows=move, Ctrl+arrows=words, Home/End=line edges\n\
              Copy this pattern for production: API calls, database queries, cache lookups"
         }
         AppMode::Highlight => {
             "🚀 VISUAL MODE - Selection with suggestions support\n\
              Selection: hjkl/arrows=extend, w/b/e=word selection, Esc=normal\n\
-             Professional editor experience with modern autocomplete!"
+             Professional editor experience with Tab-triggered autocomplete!"
         }
         _ => "🚀 Copy this suggestions architecture for your production app!"
     };
@@ -1019,23 +1015,24 @@ fn render_status_and_help(
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Print production-ready information
-    println!("🚀 Production-Ready Non-Blocking Suggestions Demo");
-    println!("✅ Instant, responsive UI - no blocking on network/database calls");
+    println!("🚀 Production-Ready Tab-Triggered Suggestions Demo");
+    println!("✅ Press Tab to activate suggestions, then type to filter in real-time");
     println!("✅ Professional autocomplete architecture");
     println!("✅ Copy this pattern for your production application!");
     println!();
     println!("🏗️  Integration Ready For:");
     println!("   📡 REST APIs (reqwest, hyper)");
-    println!("   🗄️  Databases (sqlx, diesel, mongodb)"); 
+    println!("   🗄️  Databases (sqlx, diesel, mongodb)");
     println!("   🔍 Search Engines (elasticsearch, algolia, typesense)");
     println!("   💾 Caches (redis, memcached)");
     println!("   🌐 GraphQL APIs");
     println!("   🔗 gRPC Services");
     println!();
     println!("⚡ Key Features:");
-    println!("   • Dropdown appears instantly (never waits for network)");
+    println!("   • Press Tab to activate suggestions dropdown");
+    println!("   • Real-time filtering while suggestions are active");
     println!("   • Built-in stale result protection");
-    println!("   • Search-as-you-type with real-time filtering");
+    println!("   • Tab cycles through suggestions");
     println!("   • Professional-grade user experience");
     println!("   • Easy to integrate with any async data source");
     println!();
