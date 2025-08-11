@@ -275,7 +275,8 @@ impl<D: DataProvider> AutoCursorFormEditor<D> {
     }
 
     fn current_text(&self) -> &str {
-        self.editor.current_text()
+        let field_index = self.editor.current_field();
+        self.editor.data_provider().field_value(field_index)
     }
 
     fn data_provider(&self) -> &D {

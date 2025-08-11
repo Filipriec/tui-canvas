@@ -383,7 +383,10 @@ impl<D: DataProvider> ComputedFieldsEditor<D> {
     fn current_field(&self) -> usize { self.editor.current_field() }
     fn cursor_position(&self) -> usize { self.editor.cursor_position() }
     fn mode(&self) -> AppMode { self.editor.mode() }
-    fn current_text(&self) -> &str { self.editor.current_text() }
+    fn current_text(&self) -> &str {
+        let field_index = self.editor.current_field();
+        self.editor.data_provider().field_value(field_index)
+    }
     fn data_provider(&self) -> &D { self.editor.data_provider() }
     fn ui_state(&self) -> &canvas::EditorState { self.editor.ui_state() }
     fn move_left(&mut self) { self.editor.move_left(); }
