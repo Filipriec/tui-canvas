@@ -42,6 +42,11 @@ required-features = ["suggestions", "gui", "cursor-style"]
 path = "examples/suggestions.rs"
 
 [[example]]
+name = "suggestions2"
+required-features = ["suggestions", "gui", "cursor-style"]
+path = "examples/suggestions2.rs"
+
+[[example]]
 name = "canvas_cursor_auto"
 required-features = ["gui", "cursor-style"]
 path = "examples/canvas_cursor_auto.rs"

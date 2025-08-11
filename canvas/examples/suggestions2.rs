@@ -479,10 +479,12 @@ impl ProductionSuggestionsProvider {
             ("Banana", "🍌 Rich in potassium"),
             ("Cherry", "🍒 Small and tart"),
             ("Date", "📅 Sweet and chewy"),
+            ("Ananas", "🍎 Crisp and sweet"),
             ("Elderberry", "🫐 Dark purple berry"),
             ("Fig", "🍇 Sweet Mediterranean fruit"),
             ("Grape", "🍇 Perfect for wine"),
             ("Honeydew", "🍈 Sweet melon"),
+            ("avocado", "🍎 Crisp and sweet"),
         ];
 
         Ok(self.filter_suggestions(fruits, query))
