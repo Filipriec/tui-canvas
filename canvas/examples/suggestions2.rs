@@ -670,6 +670,7 @@ async fn handle_key_press(
         (AppMode::ReadOnly, KeyCode::Char('i'), _) => {
             editor.enter_edit_mode();
             editor.clear_command_buffer();
+            // For auto-suggestions on insert: add `editor.auto_trigger_suggestions(suggestions_provider).await;`
         }
         (AppMode::ReadOnly, KeyCode::Char('a'), _) => {
             editor.enter_append_mode();
@@ -812,6 +813,7 @@ async fn handle_key_press(
         (AppMode::Edit, KeyCode::Backspace, _) => {
             editor.delete_backward()?;
             // Auto-fetch only if suggestions are already active (triggered by Tab)
+            // For full auto-triggering: remove the `if` check below
             if editor.is_suggestions_active() {
                 let field_index = editor.current_field();
                 editor.trigger_suggestions_async(suggestions_provider, field_index).await;
@@ -820,6 +822,7 @@ async fn handle_key_press(
         (AppMode::Edit, KeyCode::Delete, _) => {
             editor.delete_forward()?;
             // Auto-fetch only if suggestions are already active (triggered by Tab)
+            // For full auto-triggering: remove the `if` check below
             if editor.is_suggestions_active() {
                 let field_index = editor.current_field();
                 editor.trigger_suggestions_async(suggestions_provider, field_index).await;
@@ -840,6 +843,7 @@ async fn handle_key_press(
         (AppMode::Edit, KeyCode::Char(c), m) if !m.contains(KeyModifiers::CONTROL) => {
             editor.insert_char(c)?;
             // Auto-fetch only if suggestions are already active (triggered by Tab)
+            // For full auto-triggering: remove the `if` check below
             if editor.is_suggestions_active() {
                 let field_index = editor.current_field();
                 editor.trigger_suggestions_async(suggestions_provider, field_index).await;
