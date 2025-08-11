@@ -71,12 +71,12 @@ impl<D: DataProvider> AdvancedPatternFormEditor<D> {
 
     // ... (keeping all the same methods as before for brevity)
     // [All the previous methods: clear_command_buffer, add_to_command_buffer, etc.]
-    
+
     fn clear_command_buffer(&mut self) { self.command_buffer.clear(); }
     fn add_to_command_buffer(&mut self, ch: char) { self.command_buffer.push(ch); }
     fn get_command_buffer(&self) -> &str { &self.command_buffer }
     fn has_pending_command(&self) -> bool { !self.command_buffer.is_empty() }
-    
+
     fn toggle_validation(&mut self) {
         self.validation_enabled = !self.validation_enabled;
         self.editor.set_validation_enabled(self.validation_enabled);
@@ -89,14 +89,14 @@ impl<D: DataProvider> AdvancedPatternFormEditor<D> {
 
     fn move_left(&mut self) { self.editor.move_left(); self.field_switch_blocked = false; self.block_reason = None; }
     fn move_right(&mut self) { self.editor.move_right(); self.field_switch_blocked = false; self.block_reason = None; }
-    
+
     fn move_up(&mut self) {
         match self.editor.move_up() {
             Ok(()) => { self.update_field_validation_status(); self.field_switch_blocked = false; self.block_reason = None; }
             Err(e) => { self.field_switch_blocked = true; self.block_reason = Some(e.to_string()); self.debug_message = format!("🚫 Field switch blocked: {}", e); }
         }
     }
-    
+
     fn move_down(&mut self) {
         match self.editor.move_down() {
             Ok(()) => { self.update_field_validation_status(); self.field_switch_blocked = false; self.block_reason = None; }
@@ -106,19 +106,19 @@ impl<D: DataProvider> AdvancedPatternFormEditor<D> {
 
     fn move_line_start(&mut self) { self.editor.move_line_start(); }
     fn move_line_end(&mut self) { self.editor.move_line_end(); }
-    
+
     fn enter_edit_mode(&mut self) {
         // Library will automatically update cursor to bar | in insert mode
         self.editor.enter_edit_mode();
         self.debug_message = "✏️  INSERT MODE - Cursor: Steady Bar | - Testing advanced pattern validation".to_string();
     }
-    
+
     fn enter_append_mode(&mut self) {
         // Library will automatically update cursor to bar | in insert mode
         self.editor.enter_append_mode();
         self.debug_message = "✏️  INSERT (append) - Cursor: Steady Bar | - Advanced patterns active".to_string();
     }
-    
+
     fn exit_edit_mode(&mut self) {
         // Library will automatically update cursor to block █ in normal mode
         self.editor.exit_edit_mode();
@@ -156,7 +156,10 @@ impl<D: DataProvider> AdvancedPatternFormEditor<D> {
     fn current_field(&self) -> usize { self.editor.current_field() }
     fn cursor_position(&self) -> usize { self.editor.cursor_position() }
     fn mode(&self) -> AppMode { self.editor.mode() }
-    fn current_text(&self) -> &str { self.editor.current_text() }
+    fn current_text(&self) -> &str {
+        let field_index = self.editor.current_field();
+        self.editor.data_provider().field_value(field_index)
+    }
     fn data_provider(&self) -> &D { self.editor.data_provider() }
     fn ui_state(&self) -> &canvas::EditorState { self.editor.ui_state() }
     fn set_mode(&mut self, mode: AppMode) { self.editor.set_mode(mode); }
@@ -384,7 +387,7 @@ impl DataProvider for AdvancedPatternData {
                             // Even positions (0,2,4...): vowels (a,e,i,o,u)
                             // Odd positions (1,3,5...): consonants
                             let vowels = ['a', 'e', 'i', 'o', 'u', 'A', 'E', 'I', 'O', 'U'];
-                            
+
                             // For demo purposes, we'll just accept alphabetic characters
                             // In real usage, you'd implement the alternating logic based on position
                             c.is_alphabetic()

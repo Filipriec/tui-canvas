@@ -108,7 +108,7 @@ impl<D: DataProvider> MaskDemoFormEditor<D> {
 
     fn get_current_field_info(&self) -> (String, String, String) {
         let field_index = self.editor.current_field();
-        let raw_data = self.editor.current_text();
+        let raw_data = self.editor.data_provider().field_value(field_index);
         let display_data = if self.validation_enabled {
             self.editor.current_display_text()
         } else {
@@ -117,8 +117,8 @@ impl<D: DataProvider> MaskDemoFormEditor<D> {
 
         let mask_info = if let Some(config) = self.editor.validation_state().get_field_config(field_index) {
             if let Some(mask) = &config.display_mask {
-                format!("Pattern: '{}', Mode: {:?}", 
-                       mask.pattern(), 
+                format!("Pattern: '{}', Mode: {:?}",
+                       mask.pattern(),
                        mask.display_mode())
             } else {
                 "No mask configured".to_string()
@@ -131,13 +131,13 @@ impl<D: DataProvider> MaskDemoFormEditor<D> {
     }
 
     // === ENHANCED MOVEMENT WITH MASK AWARENESS ===
-    fn move_left(&mut self) { 
-        self.editor.move_left(); 
+    fn move_left(&mut self) {
+        self.editor.move_left();
         self.update_cursor_info();
     }
 
-    fn move_right(&mut self) { 
-        self.editor.move_right(); 
+    fn move_right(&mut self) {
+        self.editor.move_right();
         self.update_cursor_info();
     }
 
@@ -155,13 +155,13 @@ impl<D: DataProvider> MaskDemoFormEditor<D> {
         }
     }
 
-    fn move_line_start(&mut self) { 
-        self.editor.move_line_start(); 
+    fn move_line_start(&mut self) {
+        self.editor.move_line_start();
         self.update_cursor_info();
     }
 
-    fn move_line_end(&mut self) { 
-        self.editor.move_line_end(); 
+    fn move_line_end(&mut self) {
+        self.editor.move_line_end();
         self.update_cursor_info();
     }
 
@@ -237,12 +237,15 @@ impl<D: DataProvider> MaskDemoFormEditor<D> {
     fn current_field(&self) -> usize { self.editor.current_field() }
     fn cursor_position(&self) -> usize { self.editor.cursor_position() }
     fn mode(&self) -> AppMode { self.editor.mode() }
-    fn current_text(&self) -> &str { self.editor.current_text() }
+    fn current_text(&self) -> &str {
+        let field_index = self.editor.current_field();
+        self.editor.data_provider().field_value(field_index)
+    }
     fn data_provider(&self) -> &D { self.editor.data_provider() }
     fn ui_state(&self) -> &canvas::EditorState { self.editor.ui_state() }
-    fn set_mode(&mut self, mode: AppMode) { 
+    fn set_mode(&mut self, mode: AppMode) {
         // Library automatically updates cursor for the mode
-        self.editor.set_mode(mode); 
+        self.editor.set_mode(mode);
     }
 
     fn next_field(&mut self) {
@@ -265,7 +268,7 @@ impl<D: DataProvider> MaskDemoFormEditor<D> {
 
     fn show_mask_details(&mut self) {
         let (raw, display, mask_info) = self.get_current_field_info();
-        self.debug_message = format!("🔍 Field {}: {} | Raw: '{}' Display: '{}'", 
+        self.debug_message = format!("🔍 Field {}: {} | Raw: '{}' Display: '{}'",
                                    self.current_field() + 1, mask_info, raw, display);
     }
 
@@ -331,11 +334,11 @@ impl DataProvider for MaskDemoData {
                     .build())
             }
             1 => {
-                // 📞 Phone (Template) - FIXED: Perfect mask/limit coordination  
+                // 📞 Phone (Template) - FIXED: Perfect mask/limit coordination
                 let phone_template = DisplayMask::new("(###) ###-####", '#')
                     .with_template('_');
                 Some(ValidationConfigBuilder::new()
-                    .with_display_mask(phone_template)  
+                    .with_display_mask(phone_template)
                     .with_max_length(10)  // ✅ CRITICAL: Exactly matches 10 input positions
                     .build())
             }
@@ -361,7 +364,7 @@ impl DataProvider for MaskDemoData {
                 let ssn_mask = DisplayMask::new("XXX-XX-XXXX", 'X');
                 Some(ValidationConfigBuilder::new()
                     .with_display_mask(ssn_mask)
-                    .with_max_length(9)  // ✅ CRITICAL: Exactly matches 9 input positions  
+                    .with_max_length(9)  // ✅ CRITICAL: Exactly matches 9 input positions
                     .build())
             }
             6 => {
@@ -595,9 +598,9 @@ fn render_mask_status(
     };
 
     let mask_status = editor.get_mask_status();
-    let status_text = format!("-- {} -- {} | Masks: {} | View: {}", 
-                             mode_text, 
-                             editor.debug_message(), 
+    let status_text = format!("-- {} -- {} | Masks: {} | View: {}",
+                             mode_text,
+                             editor.debug_message(),
                              mask_status,
                              if editor.show_raw_data { "RAW" } else { "FORMATTED" });
 
@@ -609,7 +612,7 @@ fn render_mask_status(
     // Data comparison showing raw vs display
     let (raw_data, display_data, mask_info) = editor.get_current_field_info();
     let field_name = editor.data_provider().field_name(editor.current_field());
-    
+
     let comparison_text = format!(
         "📝 Current Field: {}\n\
          🔧 Mask Config: {}\n\
@@ -648,7 +651,7 @@ fn render_mask_status(
              • Dynamic vs Template modes  • Custom separators  • Different input chars\n\
              \n\
              Commands: i/a=insert, m=mask details, r=toggle raw/display view\n\
-             Movement: hjkl/arrows=move, 0=$=line start/end, Tab=next field, F1=toggle masks\n\
+             Movement: hjkl/arrows=move, 0/$=line start/end, Tab=next field, F1=toggle masks\n\
              ?=detailed info, Ctrl+C=quit"
         }
         AppMode::Edit => {

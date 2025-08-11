@@ -34,7 +34,6 @@ use ratatui::{
     widgets::{Block, Borders, Paragraph, Wrap},
     Frame, Terminal,
 };
-
 use canvas::{
     canvas::{
         gui::render_canvas_default,
@@ -62,10 +61,8 @@ struct ValidationFormEditor<D: DataProvider> {
 impl<D: DataProvider> ValidationFormEditor<D> {
     fn new(data_provider: D) -> Self {
         let mut editor = FormEditor::new(data_provider);
-        
         // Enable validation by default
         editor.set_validation_enabled(true);
-        
         Self {
             editor,
             has_unsaved_changes: false,
@@ -98,7 +95,6 @@ impl<D: DataProvider> ValidationFormEditor<D> {
     fn toggle_validation(&mut self) {
         self.validation_enabled = !self.validation_enabled;
         self.editor.set_validation_enabled(self.validation_enabled);
-        
         if self.validation_enabled {
             self.debug_message = "✅ Validation ENABLED - Try exceeding limits!".to_string();
         } else {
@@ -110,14 +106,12 @@ impl<D: DataProvider> ValidationFormEditor<D> {
         if !self.validation_enabled {
             return (true, None);
         }
-        
         let can_switch = self.editor.can_switch_fields();
         let reason = if !can_switch {
             self.editor.field_switch_block_reason()
         } else {
             None
         };
-        
         (can_switch, reason)
     }
 
@@ -125,11 +119,9 @@ impl<D: DataProvider> ValidationFormEditor<D> {
         if !self.validation_enabled {
             return "❌ DISABLED".to_string();
         }
-
         if self.field_switch_blocked {
             return "🚫 SWITCH BLOCKED".to_string();
         }
-
         let summary = self.editor.validation_summary();
         if summary.has_errors() {
             format!("❌ {} ERRORS", summary.error_fields)
@@ -162,7 +154,6 @@ impl<D: DataProvider> ValidationFormEditor<D> {
         for i in 0..field_count {
             self.editor.validate_field(i);
         }
-        
         let summary = self.editor.validation_summary();
         self.debug_message = format!(
             "🔍 Validated all fields: {} valid, {} warnings, {} errors",
@@ -250,7 +241,6 @@ impl<D: DataProvider> ValidationFormEditor<D> {
         if !self.validation_enabled {
             return;
         }
-
         if let Some(result) = self.editor.current_field_validation() {
             match result {
                 ValidationResult::Valid => {
@@ -298,7 +288,10 @@ impl<D: DataProvider> ValidationFormEditor<D> {
                     ValidationResult::Valid => {
                         // Don't spam with valid messages, just show character count if applicable
                         if let Some(limits) = self.get_current_field_limits() {
-                            if let Some(status) = limits.status_text(self.editor.current_text()) {
+                            let field_index = self.editor.current_field();
+                            if let Some(status) = limits.status_text(
+                                self.editor.data_provider().field_value(field_index)
+                            ) {
                                 self.debug_message = format!("✏️  {}", status);
                             }
                         }
@@ -537,7 +530,6 @@ fn handle_key_press(
             editor.enter_edit_mode();
             editor.clear_command_buffer();
         }
-
         // Escape: Exit edit mode
         (_, KeyCode::Esc, _) => {
             if mode == AppMode::Edit {
@@ -630,7 +622,6 @@ fn handle_key_press(
                 summary.validated_fields
             ));
         }
-
         _ => {
             if editor.has_pending_command() {
                 editor.clear_command_buffer();
@@ -662,7 +653,6 @@ fn run_app<B: Backend>(
             }
         }
     }
-
     Ok(())
 }
 
@@ -706,27 +696,27 @@ fn render_validation_status(
     };
 
     let validation_status = editor.get_validation_status();
+
     let status_text = if editor.has_pending_command() {
-        format!("-- {} -- {} [{}] | Validation: {}", 
+        format!("-- {} -- {} [{}] | Validation: {}",
                 mode_text, editor.debug_message(), editor.get_command_buffer(), validation_status)
     } else if editor.has_unsaved_changes() {
-        format!("-- {} -- [Modified] {} | Validation: {}", 
+        format!("-- {} -- [Modified] {} | Validation: {}",
                 mode_text, editor.debug_message(), validation_status)
     } else {
-        format!("-- {} -- {} | Validation: {}", 
+        format!("-- {} -- {} | Validation: {}",
                 mode_text, editor.debug_message(), validation_status)
     };
 
     let status = Paragraph::new(Line::from(Span::raw(status_text)))
         .block(Block::default().borders(Borders::ALL).title("🔍 Validation Status"));
-
     f.render_widget(status, chunks[0]);
 
     // Validation summary with field switching info
     let summary = editor.editor.validation_summary();
     let summary_text = if editor.validation_enabled {
         let switch_info = if editor.field_switch_blocked {
-            format!("\n🚫 Field switching blocked: {}", 
+            format!("\n🚫 Field switching blocked: {}",
                    editor.block_reason.as_deref().unwrap_or("Unknown reason"))
         } else {
             let (can_switch, reason) = editor.check_field_switch_allowed();
@@ -765,7 +755,6 @@ fn render_validation_status(
         .block(Block::default().borders(Borders::ALL).title("📈 Validation Overview"))
         .style(summary_style)
         .wrap(Wrap { trim: true });
-
     f.render_widget(validation_summary, chunks[1]);
 
     // Enhanced help text
@@ -792,7 +781,6 @@ fn render_validation_status(
         .block(Block::default().borders(Borders::ALL).title("🚀 Validation Commands"))
         .style(Style::default().fg(Color::Gray))
         .wrap(Wrap { trim: true });
-
     f.render_widget(help, chunks[2]);
 }
 
@@ -817,10 +805,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let data = ValidationDemoData::new();
     let mut editor = ValidationFormEditor::new(data);
-
+    
     // Initialize with normal mode - library automatically sets block cursor
     editor.set_mode(AppMode::ReadOnly);
-
+    
     // Demonstrate that CursorManager is available and working
     CursorManager::update_for_mode(AppMode::ReadOnly)?;
 

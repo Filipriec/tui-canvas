@@ -1,6 +1,6 @@
 /* examples/validation_4.rs
    Enhanced Feature 4 Demo: Multiple custom formatters with comprehensive edge cases
-   
+
    Demonstrates:
    - Multiple formatter types: PSC, Phone, Credit Card, Date
    - Edge case handling: incomplete input, invalid chars, overflow
@@ -53,18 +53,18 @@ impl CustomFormatter for PSCFormatter {
         if raw.is_empty() {
             return FormattingResult::success("");
         }
-        
+
         // Validate: only digits allowed
         if !raw.chars().all(|c| c.is_ascii_digit()) {
             return FormattingResult::error("PSC must contain only digits");
         }
-        
+
         let len = raw.chars().count();
         match len {
             0 => FormattingResult::success(""),
             1..=3 => FormattingResult::success(raw),
             4 => FormattingResult::warning(
-                format!("{} ", &raw[..3]), 
+                format!("{} ", &raw[..3]),
                 "PSC incomplete (4/5 digits)"
             ),
             5 => {
@@ -88,12 +88,12 @@ impl CustomFormatter for PhoneFormatter {
         if raw.is_empty() {
             return FormattingResult::success("");
         }
-        
+
         // Only digits allowed
         if !raw.chars().all(|c| c.is_ascii_digit()) {
             return FormattingResult::error("Phone must contain only digits");
         }
-        
+
         let len = raw.chars().count();
         match len {
             0 => FormattingResult::success(""),
@@ -120,11 +120,11 @@ impl CustomFormatter for CreditCardFormatter {
         if raw.is_empty() {
             return FormattingResult::success("");
         }
-        
+
         if !raw.chars().all(|c| c.is_ascii_digit()) {
             return FormattingResult::error("Card number must contain only digits");
         }
-        
+
         let mut formatted = String::new();
         for (i, ch) in raw.chars().enumerate() {
             if i > 0 && i % 4 == 0 {
@@ -132,7 +132,7 @@ impl CustomFormatter for CreditCardFormatter {
             }
             formatted.push(ch);
         }
-        
+
         let len = raw.chars().count();
         match len {
             0..=15 => FormattingResult::warning(formatted, format!("Card incomplete ({}/16 digits)", len)),
@@ -155,11 +155,11 @@ impl CustomFormatter for DateFormatter {
         if raw.is_empty() {
             return FormattingResult::success("");
         }
-        
+
         if !raw.chars().all(|c| c.is_ascii_digit()) {
             return FormattingResult::error("Date must contain only digits");
         }
-        
+
         let len = raw.len();
         match len {
             0 => FormattingResult::success(""),
@@ -170,11 +170,11 @@ impl CustomFormatter for DateFormatter {
                 let month = &raw[..2];
                 let day = &raw[2..4];
                 let year = &raw[4..];
-                
+
                 // Basic validation
                 let m: u32 = month.parse().unwrap_or(0);
                 let d: u32 = day.parse().unwrap_or(0);
-                
+
                 if m == 0 || m > 12 {
                     FormattingResult::warning(
                         format!("{}/{}/{}", month, day, year),
@@ -217,15 +217,15 @@ impl DataProvider for MultiFormatterDemoData {
     fn field_count(&self) -> usize {
         self.fields.len()
     }
-    
+
     fn field_name(&self, index: usize) -> &str {
         &self.fields[index].0
     }
-    
+
     fn field_value(&self, index: usize) -> &str {
         &self.fields[index].1
     }
-    
+
     fn set_field_value(&mut self, index: usize, value: String) {
         self.fields[index].1 = value;
     }
@@ -288,7 +288,7 @@ impl<D: DataProvider> EnhancedDemoEditor<D> {
         match self.editor.current_field() {
             0 => "PSC",
             1 => "Phone",
-            2 => "Credit Card", 
+            2 => "Credit Card",
             3 => "Date",
             _ => "Plain Text",
         }
@@ -320,16 +320,16 @@ impl<D: DataProvider> EnhancedDemoEditor<D> {
             // Edge cases
             vec!["00000", "0000000000", "0000000000000000", "99", "13012024", ""],
         ];
-        
+
         self.example_mode = (self.example_mode + 1) % examples.len();
         let current_examples = &examples[self.example_mode];
-        
+
         for (i, example) in current_examples.iter().enumerate() {
             if i < self.editor.data_provider().field_count() {
                 self.editor.data_provider_mut().set_field_value(i, example.to_string());
             }
         }
-        
+
         let mode_names = ["Valid Examples", "Incomplete Input", "Invalid Characters", "Edge Cases"];
         self.debug_message = format!("📋 Loaded: {}", mode_names[self.example_mode]);
     }
@@ -364,9 +364,10 @@ impl<D: DataProvider> EnhancedDemoEditor<D> {
     }
 
     fn get_current_field_analysis(&self) -> (String, String, String, Option<String>) {
-        let raw = self.editor.current_text();
+        let field_index = self.editor.current_field();
+        let raw = self.editor.data_provider().field_value(field_index);
         let display = self.editor.current_display_text();
-        
+
         let status = if raw == display {
             if self.has_formatter() {
                 if self.mode() == AppMode::Edit {
@@ -445,9 +446,10 @@ impl<D: DataProvider> EnhancedDemoEditor<D> {
 
         let raw_pos = self.editor.cursor_position();
         let display_pos = self.editor.display_cursor_position();
-        let raw = self.editor.current_text();
+        let field_index = self.editor.current_field();
+        let raw = self.editor.data_provider().field_value(field_index);
         let display = self.editor.current_display_text();
-        
+
         if raw_pos != display_pos {
             self.debug_message = format!(
                 "🗺️ Position mapping: Raw[{}]='{}' ↔ Display[{}]='{}'",
@@ -468,7 +470,7 @@ impl<D: DataProvider> EnhancedDemoEditor<D> {
     fn data_provider(&self) -> &D { self.editor.data_provider() }
     fn data_provider_mut(&mut self) -> &mut D { self.editor.data_provider_mut() }
     fn ui_state(&self) -> &canvas::EditorState { self.editor.ui_state() }
-    
+
     fn move_up(&mut self) { let _ = self.editor.move_up(); }
     fn move_down(&mut self) { let _ = self.editor.move_down(); }
     fn move_left(&mut self) { let _ = self.editor.move_left(); }
@@ -488,7 +490,7 @@ fn handle_key_press(
     let mode = editor.mode();
 
     // Quit
-    if matches!(key, KeyCode::F(10)) || 
+    if matches!(key, KeyCode::F(10)) ||
        (key == KeyCode::Char('q') && modifiers.contains(KeyModifiers::CONTROL)) ||
        (key == KeyCode::Char('c') && modifiers.contains(KeyModifiers::CONTROL)) {
         return Ok(false);
@@ -530,7 +532,7 @@ fn handle_key_press(
             let (raw, display, status, warning) = editor.get_current_field_analysis();
             let warning_text = warning.map(|w| format!(" ⚠️ {}", w)).unwrap_or_default();
             editor.debug_message = format!(
-                "🔍 Field {}: {} | Raw: '{}' | Display: '{}'{}", 
+                "🔍 Field {}: {} | Raw: '{}' | Display: '{}'{}",
                 editor.current_field() + 1, status, raw, display, warning_text
             );
         },
@@ -618,7 +620,7 @@ fn render_enhanced_status(
     let (raw, display, status, warning) = editor.get_current_field_analysis();
     let field_name = editor.data_provider().field_name(editor.current_field());
     let field_type = editor.current_field_type();
-    
+
     let mut analysis_lines = vec![
         format!("📝 Current: {} ({})", field_name, field_type),
         format!("🔧 Status: {}", status),
