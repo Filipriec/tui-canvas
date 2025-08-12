@@ -7,7 +7,10 @@ use crate::canvas::CursorManager;
 
 use anyhow::Result;
 use crate::canvas::state::EditorState;
-use crate::data_provider::{DataProvider, SuggestionsProvider, SuggestionItem};
+use crate::{DataProvider, SuggestionItem};
+#[cfg(feature = "suggestions")]
+use crate::SuggestionsProvider;
+
 use crate::canvas::modes::AppMode;
 use crate::canvas::state::SelectionState;
 
@@ -157,7 +160,7 @@ impl<D: DataProvider> FormEditor<D> {
                 if matches!(self.ui_state.current_mode, AppMode::Edit) {
                     return raw.to_string();
                 }
-                if let Some((formatted, _mapper, _warning)) = cfg.run_custom_formatter(raw) {
+                if let Some((formatted, mapper, warning)) = cfg.run_custom_formatter(raw) {
                     return formatted;
                 }
             }
@@ -254,7 +257,7 @@ impl<D: DataProvider> FormEditor<D> {
                     return raw.to_string();
                 }
                 // Not editing -> formatted
-                if let Some((formatted, _mapper, _warning)) = cfg.run_custom_formatter(raw) {
+                if let Some((formatted, mapper, warning)) = cfg.run_custom_formatter(raw) {
                     return formatted;
                 }
             }
@@ -768,7 +771,7 @@ impl<D: DataProvider> FormEditor<D> {
     pub fn current_formatter_warning(&self) -> Option<String> {
         let idx = self.ui_state.current_field;
         if let Some(cfg) = self.ui_state.validation.get_field_config(idx) {
-            if let Some((_fmt, _mapper, warn)) = cfg.run_custom_formatter(self.current_text()) {
+            if let Some((fmt, mapper, warn)) = cfg.run_custom_formatter(self.current_text()) {
                 return warn;
             }
         }
@@ -929,7 +932,7 @@ impl<D: DataProvider> FormEditor<D> {
                 // Validate the new content if validation is enabled
                 #[cfg(feature = "validation")]
                 {
-                    let _validation_result = self.ui_state.validation.validate_field_content(
+                    let validation_result = self.ui_state.validation.validate_field_content(
                         field_index,
                         &suggestion.value_to_store,
                     );
@@ -1373,7 +1376,7 @@ impl<D: DataProvider> FormEditor<D> {
         // Validate the new content if validation is enabled
         #[cfg(feature = "validation")]
         {
-            let _validation_result = self.ui_state.validation.validate_field_content(
+            let validation_result = self.ui_state.validation.validate_field_content(
                 field_index,
                 &value,
             );
@@ -1393,7 +1396,7 @@ impl<D: DataProvider> FormEditor<D> {
             // Validate the new content if validation is enabled
             #[cfg(feature = "validation")]
             {
-                let _validation_result = self.ui_state.validation.validate_field_content(
+                let validation_result = self.ui_state.validation.validate_field_content(
                     field_index,
                     &value,
                 );

@@ -114,7 +114,7 @@ async fn state_machine_example() {
             }
         }
 
-        fn handle_feature_action(&mut self, action: &CanvasAction, _context: &ActionContext) -> Option<String> {
+        fn handle_feature_action(&mut self, action: &CanvasAction, context: &ActionContext) -> Option<String> {
             match action {
                 CanvasAction::Custom(cmd) => match cmd.as_str() {
                     "submit" => {
@@ -147,7 +147,7 @@ async fn state_machine_example() {
     println!("  Initial state: {:?}", form.state);
 
     // Type some text to trigger state change
-    let _result = ActionDispatcher::dispatch(
+    let result = ActionDispatcher::dispatch(
         CanvasAction::InsertChar('u'),
         &mut form,
         &mut ideal_cursor,
@@ -231,7 +231,7 @@ async fn event_driven_example() {
             self.has_changes = changed;
         }
 
-        fn handle_feature_action(&mut self, action: &CanvasAction, _context: &ActionContext) -> Option<String> {
+        fn handle_feature_action(&mut self, action: &CanvasAction, context: &ActionContext) -> Option<String> {
             match action {
                 CanvasAction::Custom(cmd) => match cmd.as_str() {
                     "validate" => {
@@ -384,7 +384,7 @@ async fn validation_pipeline_example() {
         fn has_unsaved_changes(&self) -> bool { self.has_changes }
         fn set_has_unsaved_changes(&mut self, changed: bool) { self.has_changes = changed; }
 
-        fn handle_feature_action(&mut self, action: &CanvasAction, _context: &ActionContext) -> Option<String> {
+        fn handle_feature_action(&mut self, action: &CanvasAction, context: &ActionContext) -> Option<String> {
             match action {
                 CanvasAction::Custom(cmd) => match cmd.as_str() {
                     "validate" => {

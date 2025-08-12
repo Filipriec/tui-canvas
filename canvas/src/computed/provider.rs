@@ -25,7 +25,7 @@ pub trait ComputedProvider {
     /// Get list of field dependencies for optimization.
     /// If field A depends on fields [1, 3], only recompute A when fields 1 or 3 change.
     /// Default: depend on all fields (always recompute) with a reasonable upper bound.
-    fn field_dependencies(&self, _field_index: usize) -> Vec<usize> {
+    fn field_dependencies(&self, field_index: usize) -> Vec<usize> {
         (0..100).collect()
     }
 }

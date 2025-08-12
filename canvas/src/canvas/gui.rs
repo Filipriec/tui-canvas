@@ -269,7 +269,7 @@ where
 {
     let mut active_field_input_rect = None;
 
-    for (i, _input) in inputs.iter().enumerate() {
+    for (i, input) in inputs.iter().enumerate() {
         let is_active = i == *current_field_idx;
         let typed_text = get_display_value(i);
 
@@ -323,7 +323,7 @@ fn apply_highlighting<'a, T: CanvasTheme>(
     current_cursor_pos: usize,
     highlight_state: &HighlightState,
     theme: &T,
-    _is_active: bool,
+    is_active: bool,
 ) -> Line<'a> {
     let text_len = text.chars().count();
 
@@ -335,10 +335,10 @@ fn apply_highlighting<'a, T: CanvasTheme>(
             ))
         }
         HighlightState::Characterwise { anchor } => {
-            apply_characterwise_highlighting(text, text_len, field_index, current_field_idx, current_cursor_pos, anchor, theme, _is_active)
+            apply_characterwise_highlighting(text, text_len, field_index, current_field_idx, current_cursor_pos, anchor, theme, is_active)
         }
         HighlightState::Linewise { anchor_line } => {
-            apply_linewise_highlighting(text, field_index, current_field_idx, anchor_line, theme, _is_active)
+            apply_linewise_highlighting(text, field_index, current_field_idx, anchor_line, theme, is_active)
         }
     }
 }
@@ -353,7 +353,7 @@ fn apply_characterwise_highlighting<'a, T: CanvasTheme>(
     current_cursor_pos: usize,
     anchor: &(usize, usize),
     theme: &T,
-    _is_active: bool,
+    is_active: bool,
 ) -> Line<'a> {
     let (anchor_field, anchor_char) = *anchor;
     let start_field = min(anchor_field, *current_field_idx);
@@ -456,7 +456,7 @@ fn apply_linewise_highlighting<'a, T: CanvasTheme>(
     current_field_idx: &usize,
     anchor_line: &usize,
     theme: &T,
-    _is_active: bool,
+    is_active: bool,
 ) -> Line<'a> {
     let start_field = min(*anchor_line, *current_field_idx);
     let end_field = max(*anchor_line, *current_field_idx);
@@ -487,7 +487,7 @@ fn set_cursor_position(
     field_rect: Rect,
     text: &str,
     current_cursor_pos: usize,
-    _has_display_override: bool,
+    has_display_override: bool,
 ) {
     // Sum display widths of the first current_cursor_pos characters
     let mut cols: u16 = 0;

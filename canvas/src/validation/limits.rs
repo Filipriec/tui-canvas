@@ -122,7 +122,7 @@ impl CharacterLimits {
     pub fn validate_insertion(
         &self,
         current_text: &str,
-        _position: usize,
+        position: usize,
         character: char,
     ) -> Option<ValidationResult> {
         let current_count = self.count(current_text);
