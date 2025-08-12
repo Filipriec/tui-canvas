@@ -19,33 +19,33 @@ pub trait DataProvider {
     fn set_field_value(&mut self, index: usize, value: String);
 
     /// Check if field supports suggestions (optional)
-    fn supports_suggestions(&self, field_index: usize) -> bool {
+    fn supports_suggestions(&self, _field_index: usize) -> bool {
         false
     }
 
     /// Get display value (for password masking, etc.) - optional
-    fn display_value(&self, index: usize) -> Option<&str> {
+    fn display_value(&self, _index: usize) -> Option<&str> {
         None // Default: use actual value
     }
-    
+
     /// Get validation configuration for a field (optional)
     /// Only available when the 'validation' feature is enabled
     #[cfg(feature = "validation")]
-    fn validation_config(&self, field_index: usize) -> Option<crate::validation::ValidationConfig> {
+    fn validation_config(&self, _field_index: usize) -> Option<crate::validation::ValidationConfig> {
         None
     }
 
     /// Check if field is computed (display-only, skip in navigation)
     /// Default: not computed
     #[cfg(feature = "computed")]
-    fn is_computed_field(&self, field_index: usize) -> bool {
+    fn is_computed_field(&self, _field_index: usize) -> bool {
         false
     }
 
     /// Get computed field value if this is a computed field.
     /// Returns None for regular fields. Default: not computed.
     #[cfg(feature = "computed")]
-    fn computed_field_value(&self, field_index: usize) -> Option<String> {
+    fn computed_field_value(&self, _field_index: usize) -> Option<String> {
         None
     }
 }

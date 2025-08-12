@@ -4,13 +4,9 @@
 #[cfg(feature = "cursor-style")]
 use crate::canvas::CursorManager;
 
-
 use anyhow::Result;
 use crate::canvas::state::EditorState;
 use crate::{DataProvider, SuggestionItem};
-#[cfg(feature = "suggestions")]
-use crate::SuggestionsProvider;
-
 use crate::canvas::modes::AppMode;
 use crate::canvas::state::SelectionState;
 
@@ -49,8 +45,9 @@ impl<D: DataProvider> FormEditor<D> {
     fn byte_to_char_index(s: &str, byte_idx: usize) -> usize {
         s[..byte_idx].chars().count()
     }
+
     pub fn new(data_provider: D) -> Self {
-        let mut editor = Self {
+        let editor = Self {
             ui_state: EditorState::new(),
             data_provider,
             suggestions: Vec::new(),
@@ -61,10 +58,14 @@ impl<D: DataProvider> FormEditor<D> {
         // Initialize validation configurations if validation feature is enabled
         #[cfg(feature = "validation")]
         {
+            let mut editor = editor;
             editor.initialize_validation();
+            editor
         }
-
-        editor
+        #[cfg(not(feature = "validation"))]
+        {
+            editor
+        }
     }
 
     /// Get current field text (convenience method)
@@ -160,7 +161,7 @@ impl<D: DataProvider> FormEditor<D> {
                 if matches!(self.ui_state.current_mode, AppMode::Edit) {
                     return raw.to_string();
                 }
-                if let Some((formatted, mapper, warning)) = cfg.run_custom_formatter(raw) {
+                if let Some((formatted, _mapper, _warning)) = cfg.run_custom_formatter(raw) {
                     return formatted;
                 }
             }
@@ -177,11 +178,6 @@ impl<D: DataProvider> FormEditor<D> {
     /// Get reference to UI state for rendering
     pub fn ui_state(&self) -> &EditorState {
         &self.ui_state
-    }
-
-    /// Mutable access to UI state for internal crate use only.
-    pub(crate) fn ui_state_mut(&mut self) -> &mut EditorState {
-        &mut self.ui_state
     }
 
     /// Open the suggestions UI for `field_index` (UI-only; does not fetch).
@@ -257,7 +253,7 @@ impl<D: DataProvider> FormEditor<D> {
                     return raw.to_string();
                 }
                 // Not editing -> formatted
-                if let Some((formatted, mapper, warning)) = cfg.run_custom_formatter(raw) {
+                if let Some((formatted, _mapper, _warning)) = cfg.run_custom_formatter(raw) {
                     return formatted;
                 }
             }
@@ -305,7 +301,6 @@ impl<D: DataProvider> FormEditor<D> {
     // ===================================================================
 
     /// Centralized field transition logic
-    #[cfg_attr(not(feature = "validation"), allow(unused_variables))]
     pub fn transition_to_field(&mut self, new_field: usize) -> Result<()> {
         let field_count = self.data_provider.field_count();
         if field_count == 0 {
@@ -314,8 +309,11 @@ impl<D: DataProvider> FormEditor<D> {
 
         let prev_field = self.ui_state.current_field;
 
-        // 1. Bounds check
+        // FIX 2: Only mut when computed feature actually modifies it
+        #[cfg(feature = "computed")]
         let mut target_field = new_field.min(field_count - 1);
+        #[cfg(not(feature = "computed"))]
+        let target_field = new_field.min(field_count - 1);
 
         // 2. Computed field skipping
         #[cfg(feature = "computed")]
@@ -432,8 +430,20 @@ impl<D: DataProvider> FormEditor<D> {
             return Ok(()); // Ignore in non-edit modes
         }
 
+        // Variables are only declared when the features that use them are enabled
+        #[cfg(feature = "validation")]
         let field_index = self.ui_state.current_field;
+        #[cfg(feature = "validation")]
         let raw_cursor_pos = self.ui_state.cursor_pos;
+        #[cfg(feature = "validation")]
+        let current_raw_text = self.data_provider.field_value(field_index);
+
+        // When validation is disabled, we declare these variables differently
+        #[cfg(not(feature = "validation"))]
+        let field_index = self.ui_state.current_field;
+        #[cfg(not(feature = "validation"))]
+        let raw_cursor_pos = self.ui_state.cursor_pos;
+        #[cfg(not(feature = "validation"))]
         let current_raw_text = self.data_provider.field_value(field_index);
 
         // Mask gate: reject input that doesn't fit the mask at current position
@@ -566,7 +576,12 @@ impl<D: DataProvider> FormEditor<D> {
     /// Restore left and right movement within the current field
     /// Move cursor left within current field
     pub fn move_left(&mut self) -> Result<()> {
+        // FIX 3: Only mut when validation feature modifies it
+        #[cfg(feature = "validation")]
         let mut moved = false;
+        #[cfg(not(feature = "validation"))]
+        let moved = false;
+        
         // Try mask-aware movement if validation/mask config exists
         #[cfg(feature = "validation")]
         {
@@ -600,11 +615,16 @@ impl<D: DataProvider> FormEditor<D> {
 
     /// Move cursor right within current field
     pub fn move_right(&mut self) -> Result<()> {
+        // FIX 4: Only mut when validation feature modifies it
+        #[cfg(feature = "validation")]
         let mut moved = false;
-        let field_index = self.ui_state.current_field;
+        #[cfg(not(feature = "validation"))]
+        let moved = false;
+        
         // Try mask-aware movement if mask is configured for this field
         #[cfg(feature = "validation")]
         {
+            let field_index = self.ui_state.current_field;
             if let Some(cfg) = self.ui_state.validation.get_field_config(field_index) {
                 if let Some(mask) = &cfg.display_mask {
                     let display_pos = mask.raw_pos_to_display_pos(self.ui_state.cursor_pos);
@@ -771,7 +791,7 @@ impl<D: DataProvider> FormEditor<D> {
     pub fn current_formatter_warning(&self) -> Option<String> {
         let idx = self.ui_state.current_field;
         if let Some(cfg) = self.ui_state.validation.get_field_config(idx) {
-            if let Some((fmt, mapper, warn)) = cfg.run_custom_formatter(self.current_text()) {
+            if let Some((_fmt, _mapper, warn)) = cfg.run_custom_formatter(self.current_text()) {
                 return warn;
             }
         }
@@ -811,38 +831,45 @@ impl<D: DataProvider> FormEditor<D> {
 
     /// Begin suggestions loading for a field (UI updates immediately, no fetch)
     /// This opens the dropdown with "Loading..." state instantly
-    /// 
-    /// The caller is responsible for fetching suggestions and calling 
+    ///
+    /// The caller is responsible for fetching suggestions and calling
     /// `apply_suggestions_result()` when ready.
+    #[cfg(feature = "suggestions")]
     pub fn start_suggestions(&mut self, field_index: usize) -> Option<String> {
         if !self.data_provider.supports_suggestions(field_index) {
             return None;
         }
 
         let query = self.current_text().to_string();
-        
+
         // Open suggestions UI immediately - user sees dropdown right away
         self.ui_state.open_suggestions(field_index);
-        
+
         // ADD THIS LINE - mark as loading so UI shows "Loading..."
         self.ui_state.suggestions.is_loading = true;
-        
+
         // Store the query we're loading for (prevents stale results)
         self.ui_state.suggestions.active_query = Some(query.clone());
-        
+
         // Clear any old suggestions
         self.suggestions.clear();
-        
+
         // Return the query so caller knows what to fetch
         Some(query)
     }
 
+    #[cfg(not(feature = "suggestions"))]
+    pub fn start_suggestions(&mut self, _field_index: usize) -> Option<String> {
+        None
+    }
+
     /// Apply fetched suggestions results
-    /// 
+    ///
     /// This will ignore stale results if the field or query has changed since
     /// `start_suggestions()` was called.
-    /// 
+    ///
     /// Returns `true` if results were applied, `false` if they were stale/ignored.
+    #[cfg(feature = "suggestions")]
     pub fn apply_suggestions_result(
         &mut self,
         field_index: usize,
@@ -874,9 +901,20 @@ impl<D: DataProvider> FormEditor<D> {
         true
     }
 
+    #[cfg(not(feature = "suggestions"))]
+    pub fn apply_suggestions_result(
+        &mut self,
+        _field_index: usize,
+        _query: &str,
+        _results: Vec<SuggestionItem>,
+    ) -> bool {
+        false
+    }
+
     /// Check if there's an active suggestions query waiting for results
-    /// 
+    ///
     /// Returns (field_index, query) if suggestions are loading, None otherwise.
+    #[cfg(feature = "suggestions")]
     pub fn pending_suggestions_query(&self) -> Option<(usize, String)> {
         if self.ui_state.suggestions.is_loading {
             if let (Some(field), Some(query)) = (
@@ -886,6 +924,11 @@ impl<D: DataProvider> FormEditor<D> {
                 return Some((field, query.clone()));
             }
         }
+        None
+    }
+
+    #[cfg(not(feature = "suggestions"))]
+    pub fn pending_suggestions_query(&self) -> Option<(usize, String)> {
         None
     }
 
@@ -932,7 +975,7 @@ impl<D: DataProvider> FormEditor<D> {
                 // Validate the new content if validation is enabled
                 #[cfg(feature = "validation")]
                 {
-                    let validation_result = self.ui_state.validation.validate_field_content(
+                    let _validation_result = self.ui_state.validation.validate_field_content(
                         field_index,
                         &suggestion.value_to_store,
                     );
@@ -1197,8 +1240,12 @@ impl<D: DataProvider> FormEditor<D> {
         current_text.replace_range(start..end, "");
         self.data_provider.set_field_value(field_index, current_text.clone());
 
-        // Always run reposition logic
+        // FIX 5: Only mut when validation feature might modify it
+        #[cfg(feature = "validation")]
         let mut target_cursor = new_cursor;
+        #[cfg(not(feature = "validation"))]
+        let target_cursor = new_cursor;
+
         #[cfg(feature = "validation")]
         {
             if let Some(cfg) = self.ui_state.validation.get_field_config(field_index) {
@@ -1240,7 +1287,12 @@ impl<D: DataProvider> FormEditor<D> {
             current_text.replace_range(start..end, "");
             self.data_provider.set_field_value(field_index, current_text.clone());
 
+            // FIX 6: Only mut when validation feature might modify it
+            #[cfg(feature = "validation")]
             let mut target_cursor = self.ui_state.cursor_pos;
+            #[cfg(not(feature = "validation"))]
+            let target_cursor = self.ui_state.cursor_pos;
+
             #[cfg(feature = "validation")]
             {
                 if let Some(cfg) = self.ui_state.validation.get_field_config(field_index) {
@@ -1349,22 +1401,6 @@ impl<D: DataProvider> FormEditor<D> {
     // HELPER METHODS
     // ===================================================================
 
-    /// Clamp cursor position to valid bounds for current field and mode
-    fn clamp_cursor_to_current_field(&mut self) {
-        let current_text = self.current_text();
-        let is_edit_mode = self.ui_state.current_mode == AppMode::Edit;
-
-        use crate::canvas::actions::movement::line::safe_cursor_position;
-        let safe_pos = safe_cursor_position(
-            current_text,
-            self.ui_state.ideal_cursor_column,
-            is_edit_mode
-        );
-
-        self.ui_state.cursor_pos = safe_pos;
-    }
-
-
     /// Set the value of the current field
     pub fn set_current_field_value(&mut self, value: String) {
         let field_index = self.ui_state.current_field;
@@ -1376,7 +1412,7 @@ impl<D: DataProvider> FormEditor<D> {
         // Validate the new content if validation is enabled
         #[cfg(feature = "validation")]
         {
-            let validation_result = self.ui_state.validation.validate_field_content(
+            let _validation_result = self.ui_state.validation.validate_field_content(
                 field_index,
                 &value,
             );
@@ -1396,7 +1432,7 @@ impl<D: DataProvider> FormEditor<D> {
             // Validate the new content if validation is enabled
             #[cfg(feature = "validation")]
             {
-                let validation_result = self.ui_state.validation.validate_field_content(
+                let _validation_result = self.ui_state.validation.validate_field_content(
                     field_index,
                     &value,
                 );
@@ -1474,15 +1510,14 @@ impl<D: DataProvider> FormEditor<D> {
     }
 
     /// Cleanup cursor style (call this when shutting down)
+    #[cfg(feature = "cursor-style")]
     pub fn cleanup_cursor(&self) -> std::io::Result<()> {
-        #[cfg(feature = "cursor-style")]
-        {
-            crate::canvas::CursorManager::reset()
-        }
-        #[cfg(not(feature = "cursor-style"))]
-        {
-            Ok(())
-        }
+        crate::canvas::CursorManager::reset()
+    }
+
+    #[cfg(not(feature = "cursor-style"))]
+    pub fn cleanup_cursor(&self) -> std::io::Result<()> {
+        Ok(())
     }
 
 

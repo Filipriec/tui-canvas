@@ -88,42 +88,27 @@ pub fn render_canvas_with_highlight<T: CanvasTheme, D: DataProvider>(
         highlight_state,
         editor.display_cursor_position(), // Use display cursor position for masks
         false, // TODO: track unsaved changes in editor
-        |i| {
-            // Get display value for field i using editor logic (Feature 4 + masks)
-            #[cfg(feature = "validation")]
-            {
-                editor.display_text_for_field(i)
-            }
-            #[cfg(not(feature = "validation"))]
-            {
-                data_provider.field_value(i).to_string()
-            }
+        // Closures for getting display values and overrides
+        #[cfg(feature = "validation")]
+        |field_idx| editor.display_text_for_field(field_idx),
+        #[cfg(not(feature = "validation"))]
+        |field_idx| data_provider.field_value(field_idx).to_string(),
+        // Closure for checking display overrides
+        #[cfg(feature = "validation")]
+        |field_idx| {
+            editor.ui_state().validation_state().get_field_config(field_idx)
+                .map(|cfg| {
+                    let has_formatter = cfg.custom_formatter.is_some();
+                    let has_mask = cfg.display_mask.is_some();
+                    has_formatter || has_mask
+                })
+                .unwrap_or(false)
         },
-        |i| {
-            // Check if field has display override (custom formatter or mask)
-            #[cfg(feature = "validation")]
-            {
-                editor.ui_state().validation_state().get_field_config(i)
-                    .map(|cfg| {
-                        // Formatter takes precedence; if present, it's a display override
-                        #[allow(unused_mut)]
-                        let mut has_override = false;
-                        #[cfg(feature = "validation")]
-                        {
-                            has_override = cfg.custom_formatter.is_some();
-                        }
-                        has_override || cfg.display_mask.is_some()
-                    })
-                    .unwrap_or(false)
-            }
-            #[cfg(not(feature = "validation"))]
-            {
-                false
-            }
-        },
-        // NEW: provide completion for the active field
-        |i| {
-            if i == current_field_idx {
+        #[cfg(not(feature = "validation"))]
+        |_field_idx| false,
+        // Closure for providing completion
+        |field_idx| {
+            if field_idx == current_field_idx {
                 active_completion.clone()
             } else {
                 None
@@ -269,7 +254,8 @@ where
 {
     let mut active_field_input_rect = None;
 
-    for (i, input) in inputs.iter().enumerate() {
+    // FIX: Iterate over indices only since we never use the input values directly
+    for i in 0..inputs.len() {
         let is_active = i == *current_field_idx;
         let typed_text = get_display_value(i);
 
@@ -353,7 +339,7 @@ fn apply_characterwise_highlighting<'a, T: CanvasTheme>(
     current_cursor_pos: usize,
     anchor: &(usize, usize),
     theme: &T,
-    is_active: bool,
+    _is_active: bool,
 ) -> Line<'a> {
     let (anchor_field, anchor_char) = *anchor;
     let start_field = min(anchor_field, *current_field_idx);
@@ -456,7 +442,7 @@ fn apply_linewise_highlighting<'a, T: CanvasTheme>(
     current_field_idx: &usize,
     anchor_line: &usize,
     theme: &T,
-    is_active: bool,
+    _is_active: bool,
 ) -> Line<'a> {
     let start_field = min(*anchor_line, *current_field_idx);
     let end_field = max(*anchor_line, *current_field_idx);
@@ -487,7 +473,7 @@ fn set_cursor_position(
     field_rect: Rect,
     text: &str,
     current_cursor_pos: usize,
-    has_display_override: bool,
+    _has_display_override: bool,
 ) {
     // Sum display widths of the first current_cursor_pos characters
     let mut cols: u16 = 0;
