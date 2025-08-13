@@ -307,6 +307,22 @@ impl<D: DataProvider> AutoCursorFormEditor<D> {
     fn has_unsaved_changes(&self) -> bool {
         self.has_unsaved_changes
     }
+
+    fn open_line_below(&mut self) -> anyhow::Result<()> {
+        let result = self.editor.open_line_below();
+        if result.is_ok() {
+            self.debug_message = "✏️  INSERT (open line below) - Cursor: Steady Bar |".to_string();
+        }
+        result
+    }
+
+    fn open_line_above(&mut self) -> anyhow::Result<()> {
+        let result = self.editor.open_line_above();
+        if result.is_ok() {
+            self.debug_message = "✏️  INSERT (open line above) - Cursor: Steady Bar |".to_string();
+        }
+        result
+    }
 }
 
 // Demo form data with interesting text for cursor demonstration
@@ -390,10 +406,17 @@ fn handle_key_press(
             editor.set_debug_message("✏️  INSERT (end of line) - Cursor: Steady Bar |".to_string());
             editor.clear_command_buffer();
         }
+
         (AppMode::ReadOnly, KeyCode::Char('o'), _) => {
-            editor.move_line_end();
-            editor.enter_edit_mode(); // 🎯 Automatic: cursor becomes bar |
-            editor.set_debug_message("✏️  INSERT (open line) - Cursor: Steady Bar |".to_string());
+            if let Err(e) = editor.open_line_below() {
+                editor.set_debug_message(format!("Error opening line below: {}", e));
+            }
+            editor.clear_command_buffer();
+        }
+        (AppMode::ReadOnly, KeyCode::Char('O'), _) => {
+            if let Err(e) = editor.open_line_above() {
+                editor.set_debug_message(format!("Error opening line above: {}", e));
+            }
             editor.clear_command_buffer();
         }
 
@@ -508,9 +531,16 @@ fn handle_key_press(
             editor.clear_command_buffer();
         }
         (AppMode::ReadOnly | AppMode::Highlight, KeyCode::Char('e'), _) => {
-            editor.move_word_end();
-            editor.set_debug_message("e: word end".to_string());
-            editor.clear_command_buffer();
+            // Check if this is 'ge' command
+            if editor.get_command_buffer() == "g" {
+                editor.move_word_end_prev();
+                editor.set_debug_message("ge: previous word end".to_string());
+                editor.clear_command_buffer();
+            } else {
+                editor.move_word_end();
+                editor.set_debug_message("e: word end".to_string());
+                editor.clear_command_buffer();
+            }
         }
 
         // Line movement
