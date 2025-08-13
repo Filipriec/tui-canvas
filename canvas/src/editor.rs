@@ -78,6 +78,69 @@ fn find_last_word_start_in_field(text: &str) -> usize {
     pos
 }
 
+
+// Helper function to find the end of the last WORD in a field
+fn find_last_WORD_end_in_field(text: &str) -> usize {
+    let chars: Vec<char> = text.chars().collect();
+    if chars.is_empty() {
+        return 0;
+    }
+
+    let mut pos = chars.len().saturating_sub(1);
+
+    // Skip trailing whitespace
+    while pos > 0 && chars[pos].is_whitespace() {
+        pos -= 1;
+    }
+
+    // If the whole field is whitespace, return 0
+    if pos == 0 && chars[0].is_whitespace() {
+        return 0;
+    }
+
+    // We're now at the end of the last WORD
+    pos
+}
+
+
+/// Helper: Find start of last WORD in a field (for cross-field B movement)
+fn find_last_WORD_start_in_field(text: &str) -> usize {
+    if text.is_empty() {
+        return 0;
+    }
+
+    let chars: Vec<char> = text.chars().collect();
+    if chars.is_empty() {
+        return 0;
+    }
+
+    let mut pos = chars.len().saturating_sub(1);
+
+    // Skip trailing whitespace
+    while pos > 0 && chars[pos].is_whitespace() {
+        pos -= 1;
+    }
+
+    // If the whole field is whitespace, return 0
+    if pos == 0 && chars[0].is_whitespace() {
+        return 0;
+    }
+
+    // Now we're on a non-whitespace character
+    // Find the start of this WORD by going backwards while chars are non-whitespace
+    while pos > 0 {
+        let prev_char = chars[pos - 1];
+
+        // Stop if we hit whitespace (WORD boundary)
+        if prev_char.is_whitespace() {
+            break;
+        }
+        pos -= 1;
+    }
+
+    pos
+}
+
 impl<D: DataProvider> FormEditor<D> {
     /// Convert a char index to a byte index in a string
     fn char_to_byte_index(s: &str, char_idx: usize) -> usize {
@@ -1508,6 +1571,308 @@ impl<D: DataProvider> FormEditor<D> {
         }
     }
 
+    /// Move to start of next WORD (vim W) - can cross field boundaries
+    pub fn move_WORD_next(&mut self) {
+        use crate::canvas::actions::movement::word::find_next_WORD_start;
+        let current_text = self.current_text();
+
+        if current_text.is_empty() {
+            // Empty field - try to move to next field
+            if self.move_down().is_ok() {
+                // Successfully moved to next field, try to find first WORD
+                let new_text = self.current_text();
+                if !new_text.is_empty() {
+                    let first_WORD_pos = if new_text.chars().next().map_or(false, |c| !c.is_whitespace()) {
+                        // Field starts with non-whitespace, go to position 0
+                        0
+                    } else {
+                        // Field starts with whitespace, find first WORD
+                        find_next_WORD_start(new_text, 0)
+                    };
+                    let is_edit_mode = self.ui_state.current_mode == AppMode::Edit;
+                    let char_len = new_text.chars().count();
+                    let final_pos = if is_edit_mode {
+                        first_WORD_pos.min(char_len)
+                    } else {
+                        first_WORD_pos.min(char_len.saturating_sub(1))
+                    };
+                    self.ui_state.cursor_pos = final_pos;
+                    self.ui_state.ideal_cursor_column = final_pos;
+                }
+            }
+            return;
+        }
+
+        let current_pos = self.ui_state.cursor_pos;
+        let new_pos = find_next_WORD_start(current_text, current_pos);
+
+        // Check if we've hit the end of the current field
+        if new_pos >= current_text.chars().count() {
+            // At end of field - jump to next field and start from beginning
+            if self.move_down().is_ok() {
+                // Successfully moved to next field
+                let new_text = self.current_text();
+                if new_text.is_empty() {
+                    // New field is empty, cursor stays at 0
+                    self.ui_state.cursor_pos = 0;
+                    self.ui_state.ideal_cursor_column = 0;
+                } else {
+                    // Find first WORD in new field
+                    let first_WORD_pos = if new_text.chars().next().map_or(false, |c| !c.is_whitespace()) {
+                        // Field starts with non-whitespace, go to position 0
+                        0
+                    } else {
+                        // Field starts with whitespace, find first WORD
+                        find_next_WORD_start(new_text, 0)
+                    };
+                    let is_edit_mode = self.ui_state.current_mode == AppMode::Edit;
+                    let char_len = new_text.chars().count();
+                    let final_pos = if is_edit_mode {
+                        first_WORD_pos.min(char_len)
+                    } else {
+                        first_WORD_pos.min(char_len.saturating_sub(1))
+                    };
+                    self.ui_state.cursor_pos = final_pos;
+                    self.ui_state.ideal_cursor_column = final_pos;
+                }
+            }
+            // If move_down() failed, we stay where we are (at end of last field)
+        } else {
+            // Normal WORD movement within current field
+            let is_edit_mode = self.ui_state.current_mode == AppMode::Edit;
+            let char_len = current_text.chars().count();
+            let final_pos = if is_edit_mode {
+                new_pos.min(char_len)
+            } else {
+                new_pos.min(char_len.saturating_sub(1))
+            };
+
+            self.ui_state.cursor_pos = final_pos;
+            self.ui_state.ideal_cursor_column = final_pos;
+        }
+    }
+
+    /// Move to start of previous WORD (vim B) - can cross field boundaries
+    pub fn move_WORD_prev(&mut self) {
+        use crate::canvas::actions::movement::word::find_prev_WORD_start;
+        let current_text = self.current_text();
+
+        if current_text.is_empty() {
+            // Empty field - try to move to previous field and find last WORD
+            let current_field = self.ui_state.current_field;
+            if self.move_up().is_ok() {
+                // Check if we actually moved to a different field
+                if self.ui_state.current_field != current_field {
+                    let new_text = self.current_text();
+                    if !new_text.is_empty() {
+                        let last_WORD_start = find_last_WORD_start_in_field(new_text);
+                        self.ui_state.cursor_pos = last_WORD_start;
+                        self.ui_state.ideal_cursor_column = last_WORD_start;
+                    }
+                }
+            }
+            return;
+        }
+
+        let current_pos = self.ui_state.cursor_pos;
+
+        // Special case: if we're at position 0, jump to previous field
+        if current_pos == 0 {
+            let current_field = self.ui_state.current_field;
+            if self.move_up().is_ok() {
+                // Check if we actually moved to a different field
+                if self.ui_state.current_field != current_field {
+                    let new_text = self.current_text();
+                    if !new_text.is_empty() {
+                        let last_WORD_start = find_last_WORD_start_in_field(new_text);
+                        self.ui_state.cursor_pos = last_WORD_start;
+                        self.ui_state.ideal_cursor_column = last_WORD_start;
+                    }
+                }
+            }
+            return;
+        }
+
+        // Try to find previous WORD in current field
+        let new_pos = find_prev_WORD_start(current_text, current_pos);
+
+        // Check if we actually moved
+        if new_pos < current_pos {
+            // Normal WORD movement within current field - we found a previous WORD
+            self.ui_state.cursor_pos = new_pos;
+            self.ui_state.ideal_cursor_column = new_pos;
+        } else {
+            // We didn't move (probably at start of first WORD), try previous field
+            let current_field = self.ui_state.current_field;
+            if self.move_up().is_ok() {
+                // Check if we actually moved to a different field
+                if self.ui_state.current_field != current_field {
+                    let new_text = self.current_text();
+                    if !new_text.is_empty() {
+                        let last_WORD_start = find_last_WORD_start_in_field(new_text);
+                        self.ui_state.cursor_pos = last_WORD_start;
+                        self.ui_state.ideal_cursor_column = last_WORD_start;
+                    }
+                }
+            }
+        }
+    }
+
+    /// Move to end of current/next WORD (vim E) - can cross field boundaries
+    pub fn move_WORD_end(&mut self) {
+        use crate::canvas::actions::movement::word::find_WORD_end;
+        let current_text = self.current_text();
+
+        if current_text.is_empty() {
+            // Empty field - try to move to next field (but don't recurse)
+            if self.move_down().is_ok() {
+                let new_text = self.current_text();
+                if !new_text.is_empty() {
+                    // Find first WORD end in new field
+                    let first_WORD_end = find_WORD_end(new_text, 0);
+                    let is_edit_mode = self.ui_state.current_mode == AppMode::Edit;
+                    let char_len = new_text.chars().count();
+                    let final_pos = if is_edit_mode {
+                        first_WORD_end.min(char_len)
+                    } else {
+                        first_WORD_end.min(char_len.saturating_sub(1))
+                    };
+                    self.ui_state.cursor_pos = final_pos;
+                    self.ui_state.ideal_cursor_column = final_pos;
+                }
+            }
+            return;
+        }
+
+        let current_pos = self.ui_state.cursor_pos;
+        let char_len = current_text.chars().count();
+        let new_pos = find_WORD_end(current_text, current_pos);
+
+        // Check if we didn't move or hit the end of the field
+        if new_pos == current_pos && current_pos + 1 < char_len {
+            // Try next character and find WORD end from there
+            let next_pos = find_WORD_end(current_text, current_pos + 1);
+            if next_pos < char_len {
+                let is_edit_mode = self.ui_state.current_mode == AppMode::Edit;
+                let final_pos = if is_edit_mode {
+                    next_pos.min(char_len)
+                } else {
+                    next_pos.min(char_len.saturating_sub(1))
+                };
+                self.ui_state.cursor_pos = final_pos;
+                self.ui_state.ideal_cursor_column = final_pos;
+                return;
+            }
+        }
+
+        // If we're at or near the end of the field, try next field (but don't recurse)
+        if new_pos >= char_len.saturating_sub(1) {
+            if self.move_down().is_ok() {
+                // Find first WORD end in new field
+                let new_text = self.current_text();
+                if !new_text.is_empty() {
+                    let first_WORD_end = find_WORD_end(new_text, 0);
+                    let is_edit_mode = self.ui_state.current_mode == AppMode::Edit;
+                    let new_char_len = new_text.chars().count();
+                    let final_pos = if is_edit_mode {
+                        first_WORD_end.min(new_char_len)
+                    } else {
+                        first_WORD_end.min(new_char_len.saturating_sub(1))
+                    };
+                    self.ui_state.cursor_pos = final_pos;
+                    self.ui_state.ideal_cursor_column = final_pos;
+                }
+            }
+        } else {
+            // Normal WORD end movement within current field
+            let is_edit_mode = self.ui_state.current_mode == AppMode::Edit;
+            let final_pos = if is_edit_mode {
+                new_pos.min(char_len)
+            } else {
+                new_pos.min(char_len.saturating_sub(1))
+            };
+
+            self.ui_state.cursor_pos = final_pos;
+            self.ui_state.ideal_cursor_column = final_pos;
+        }
+    }
+
+    /// Move to end of previous WORD (vim gE) - can cross field boundaries
+    pub fn move_WORD_end_prev(&mut self) {
+        use crate::canvas::actions::movement::word::{find_prev_WORD_end, find_WORD_end};
+        let current_text = self.current_text();
+
+        if current_text.is_empty() {
+            // Empty field - try to move to previous field (but don't recurse)
+            let current_field = self.ui_state.current_field;
+            if self.move_up().is_ok() {
+                // Check if we actually moved to a different field
+                if self.ui_state.current_field != current_field {
+                    let new_text = self.current_text();
+                    if !new_text.is_empty() {
+                        // Find end of last WORD in the field
+                        let char_len = new_text.chars().count();
+                        // Start from end and find the last WORD end
+                        let last_WORD_end = find_last_WORD_end_in_field(new_text);
+                        self.ui_state.cursor_pos = last_WORD_end;
+                        self.ui_state.ideal_cursor_column = last_WORD_end;
+                    }
+                }
+            }
+            return;
+        }
+
+        let current_pos = self.ui_state.cursor_pos;
+
+        // Special case: if we're at position 0, jump to previous field (but don't recurse)
+        if current_pos == 0 {
+            let current_field = self.ui_state.current_field;
+            if self.move_up().is_ok() {
+                // Check if we actually moved to a different field
+                if self.ui_state.current_field != current_field {
+                    let new_text = self.current_text();
+                    if !new_text.is_empty() {
+                        let last_WORD_end = find_last_WORD_end_in_field(new_text);
+                        self.ui_state.cursor_pos = last_WORD_end;
+                        self.ui_state.ideal_cursor_column = last_WORD_end;
+                    }
+                }
+            }
+            return;
+        }
+
+        let new_pos = find_prev_WORD_end(current_text, current_pos);
+
+        // Check if we didn't move significantly (near start of field)
+        if new_pos == current_pos || new_pos <= 1 {
+            // Try to jump to previous field (but don't recurse)
+            let current_field = self.ui_state.current_field;
+            if self.move_up().is_ok() {
+                // Check if we actually moved to a different field
+                if self.ui_state.current_field != current_field {
+                    let new_text = self.current_text();
+                    if !new_text.is_empty() {
+                        let last_WORD_end = find_last_WORD_end_in_field(new_text);
+                        self.ui_state.cursor_pos = last_WORD_end;
+                        self.ui_state.ideal_cursor_column = last_WORD_end;
+                    }
+                }
+            }
+        } else {
+            // Normal WORD movement within current field
+            let is_edit_mode = self.ui_state.current_mode == AppMode::Edit;
+            let char_len = current_text.chars().count();
+            let final_pos = if is_edit_mode {
+                new_pos.min(char_len)
+            } else {
+                new_pos.min(char_len.saturating_sub(1))
+            };
+
+            self.ui_state.cursor_pos = final_pos;
+            self.ui_state.ideal_cursor_column = final_pos;
+        }
+    }
+
     /// Delete character before cursor (vim x in insert mode / backspace)
     pub fn delete_backward(&mut self) -> Result<()> {
         if self.ui_state.current_mode != AppMode::Edit {
@@ -1901,6 +2266,22 @@ impl<D: DataProvider> FormEditor<D> {
 
     pub fn move_word_end_prev_with_selection(&mut self) {
         self.move_word_end_prev();
+    }
+
+    pub fn move_WORD_next_with_selection(&mut self) {
+        self.move_WORD_next();
+    }
+
+    pub fn move_WORD_end_with_selection(&mut self) {
+        self.move_WORD_end();
+    }
+
+    pub fn move_WORD_prev_with_selection(&mut self) {
+        self.move_WORD_prev();
+    }
+
+    pub fn move_WORD_end_prev_with_selection(&mut self) {
+        self.move_WORD_end_prev();
     }
 
     pub fn move_line_start_with_selection(&mut self) {

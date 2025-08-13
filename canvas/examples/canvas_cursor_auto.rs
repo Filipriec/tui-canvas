@@ -323,6 +323,26 @@ impl<D: DataProvider> AutoCursorFormEditor<D> {
         }
         result
     }
+
+    fn move_WORD_next(&mut self) {
+        self.editor.move_WORD_next();
+        self.update_visual_selection();
+    }
+
+    fn move_WORD_prev(&mut self) {
+        self.editor.move_WORD_prev();
+        self.update_visual_selection();
+    }
+
+    fn move_WORD_end(&mut self) {
+        self.editor.move_WORD_end();
+        self.update_visual_selection();
+    }
+
+    fn move_WORD_end_prev(&mut self) {
+        self.editor.move_WORD_end_prev();
+        self.update_visual_selection();
+    }
 }
 
 // Demo form data with interesting text for cursor demonstration
@@ -543,6 +563,29 @@ fn handle_key_press(
             }
         }
 
+        (AppMode::ReadOnly | AppMode::Highlight, KeyCode::Char('W'), _) => {
+            editor.move_WORD_next();
+            editor.set_debug_message("W: next WORD start".to_string());
+            editor.clear_command_buffer();
+        }
+        (AppMode::ReadOnly | AppMode::Highlight, KeyCode::Char('B'), _) => {
+            editor.move_WORD_prev();
+            editor.set_debug_message("B: previous WORD start".to_string());
+            editor.clear_command_buffer();
+        }
+        (AppMode::ReadOnly | AppMode::Highlight, KeyCode::Char('E'), _) => {
+            // Check if this is 'gE' command
+            if editor.get_command_buffer() == "g" {
+                editor.move_WORD_end_prev();
+                editor.set_debug_message("gE: previous WORD end".to_string());
+                editor.clear_command_buffer();
+            } else {
+                editor.move_WORD_end();
+                editor.set_debug_message("E: WORD end".to_string());
+                editor.clear_command_buffer();
+            }
+        }
+
         // Line movement
         (AppMode::ReadOnly | AppMode::Highlight, KeyCode::Char('0'), _)
         | (AppMode::ReadOnly | AppMode::Highlight, KeyCode::Home, _) => {
@@ -752,9 +795,9 @@ fn render_status_and_help(
                 }
             } else {
                 "🎯 CURSOR-STYLE DEMO: Normal █ | Insert | | Visual blinking█\n\
-                 Normal: hjkl/arrows=move, w/b/e=words, 0/$=line, gg/G=first/last\n\
-                 i/a/A=insert, v/b=visual, x/X=delete, ?=info\n\
-                 F1=demo manual cursor, F2=restore automatic"
+                Normal: hjkl/arrows=move, w/b/e=words, W/B/E=WORDS, 0/$=line, gg/G=first/last\n\
+                i/a/A/o/O=insert, v/V=visual, x/X=delete, ?=info\n\
+                F1=demo manual cursor, F2=restore automatic"
             }
         }
         AppMode::Edit => {
