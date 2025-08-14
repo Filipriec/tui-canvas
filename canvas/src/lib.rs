@@ -25,7 +25,9 @@ pub use canvas::CursorManager;
 
 // Main API exports
 pub use editor::FormEditor;
-pub use data_provider::{DataProvider, SuggestionsProvider, SuggestionItem};
+pub use data_provider::DataProvider;
+#[cfg(feature = "suggestions")]
+pub use data_provider::{SuggestionsProvider, SuggestionItem};
 
 // UI state (read-only access for users)
 pub use canvas::state::EditorState;

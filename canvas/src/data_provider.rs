@@ -2,6 +2,7 @@
 //! Simplified user interface - only business data, no UI state
 
 use anyhow::Result;
+#[cfg(feature = "suggestions")]
 use async_trait::async_trait;
 
 /// User implements this - only business data, no UI state
@@ -51,6 +52,7 @@ pub trait DataProvider {
 }
 
 /// Optional: User implements this for suggestions data
+#[cfg(feature = "suggestions")]
 #[async_trait]
 pub trait SuggestionsProvider {
     /// Fetch suggestions (user's business logic)
@@ -58,6 +60,7 @@ pub trait SuggestionsProvider {
         -> Result<Vec<SuggestionItem>>;
 }
 
+#[cfg(feature = "suggestions")]
 #[derive(Debug, Clone)]
 pub struct SuggestionItem {
     pub display_text: String,
