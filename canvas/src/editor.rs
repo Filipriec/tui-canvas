@@ -9,6 +9,10 @@ use crate::canvas::state::EditorState;
 use crate::{DataProvider, SuggestionItem};
 use crate::canvas::modes::AppMode;
 use crate::canvas::state::SelectionState;
+use crate::canvas::actions::movement::word::{
+    find_last_word_start_in_field, find_last_word_end_in_field,
+    find_last_WORD_start_in_field, find_last_WORD_end_in_field,
+};
 
 /// Main editor that manages UI state internally and delegates data to user
 pub struct FormEditor<D: DataProvider> {
@@ -29,116 +33,6 @@ pub struct FormEditor<D: DataProvider> {
                 + Sync,
         >,
     >,
-}
-
-/// Helper: Find start of last word in a field (for cross-field b movement)
-fn find_last_word_start_in_field(text: &str) -> usize {
-    if text.is_empty() {
-        return 0;
-    }
-    
-    let chars: Vec<char> = text.chars().collect();
-    if chars.is_empty() {
-        return 0;
-    }
-    
-    let mut pos = chars.len().saturating_sub(1);
-    
-    // Skip trailing whitespace
-    while pos > 0 && chars[pos].is_whitespace() {
-        pos -= 1;
-    }
-    
-    // If the whole field is whitespace, return 0
-    if pos == 0 && chars[0].is_whitespace() {
-        return 0;
-    }
-    
-    // Now we're on a non-whitespace character
-    // Find the start of this word by going backwards while chars are the same type
-    let char_type = if chars[pos].is_alphanumeric() { "alnum" } else { "punct" };
-    
-    while pos > 0 {
-        let prev_char = chars[pos - 1];
-        let prev_type = if prev_char.is_alphanumeric() { 
-            "alnum" 
-        } else if prev_char.is_whitespace() { 
-            "space" 
-        } else { 
-            "punct" 
-        };
-        
-        // Stop if we hit whitespace or different word type
-        if prev_type == "space" || prev_type != char_type {
-            break;
-        }
-        pos -= 1;
-    }
-    
-    pos
-}
-
-
-// Helper function to find the end of the last WORD in a field
-fn find_last_WORD_end_in_field(text: &str) -> usize {
-    let chars: Vec<char> = text.chars().collect();
-    if chars.is_empty() {
-        return 0;
-    }
-
-    let mut pos = chars.len().saturating_sub(1);
-
-    // Skip trailing whitespace
-    while pos > 0 && chars[pos].is_whitespace() {
-        pos -= 1;
-    }
-
-    // If the whole field is whitespace, return 0
-    if pos == 0 && chars[0].is_whitespace() {
-        return 0;
-    }
-
-    // We're now at the end of the last WORD
-    pos
-}
-
-
-/// Helper: Find start of last WORD in a field (for cross-field B movement)
-fn find_last_WORD_start_in_field(text: &str) -> usize {
-    if text.is_empty() {
-        return 0;
-    }
-
-    let chars: Vec<char> = text.chars().collect();
-    if chars.is_empty() {
-        return 0;
-    }
-
-    let mut pos = chars.len().saturating_sub(1);
-
-    // Skip trailing whitespace
-    while pos > 0 && chars[pos].is_whitespace() {
-        pos -= 1;
-    }
-
-    // If the whole field is whitespace, return 0
-    if pos == 0 && chars[0].is_whitespace() {
-        return 0;
-    }
-
-    // Now we're on a non-whitespace character
-    // Find the start of this WORD by going backwards while chars are non-whitespace
-    while pos > 0 {
-        let prev_char = chars[pos - 1];
-
-        // Stop if we hit whitespace (WORD boundary)
-        if prev_char.is_whitespace() {
-            break;
-        }
-        pos -= 1;
-    }
-
-    pos
 }
 
 impl<D: DataProvider> FormEditor<D> {
@@ -1496,22 +1390,21 @@ impl<D: DataProvider> FormEditor<D> {
 
     /// Move to end of previous word (vim ge) - can cross field boundaries
     pub fn move_word_end_prev(&mut self) {
-        use crate::canvas::actions::movement::word::find_prev_word_end;
+        use crate::canvas::actions::movement::word::{find_prev_word_end, find_last_word_end_in_field};
         let current_text = self.current_text();
 
         if current_text.is_empty() {
-            // Empty field - try to move to previous field
+            // Empty field - try to move to previous field (but don't recurse)
             let current_field = self.ui_state.current_field;
             if self.move_up().is_ok() {
                 // Check if we actually moved to a different field
                 if self.ui_state.current_field != current_field {
-                    // Position at end and find last word end
                     let new_text = self.current_text();
                     if !new_text.is_empty() {
-                        let char_len = new_text.chars().count();
-                        self.ui_state.cursor_pos = char_len;
-                        self.ui_state.ideal_cursor_column = char_len;
-                        self.move_word_end_prev();
+                        // Find end of last word in the field
+                        let last_word_end = find_last_word_end_in_field(new_text);
+                        self.ui_state.cursor_pos = last_word_end;
+                        self.ui_state.ideal_cursor_column = last_word_end;
                     }
                 }
             }
@@ -1520,7 +1413,7 @@ impl<D: DataProvider> FormEditor<D> {
 
         let current_pos = self.ui_state.cursor_pos;
 
-        // Special case: if we're at position 0, jump to previous field
+        // Special case: if we're at position 0, jump to previous field (but don't recurse)
         if current_pos == 0 {
             let current_field = self.ui_state.current_field;
             if self.move_up().is_ok() {
@@ -1528,31 +1421,30 @@ impl<D: DataProvider> FormEditor<D> {
                 if self.ui_state.current_field != current_field {
                     let new_text = self.current_text();
                     if !new_text.is_empty() {
-                        let char_len = new_text.chars().count();
-                        self.ui_state.cursor_pos = char_len;
-                        self.ui_state.ideal_cursor_column = char_len;
-                        self.move_word_end_prev();
+                        let last_word_end = find_last_word_end_in_field(new_text);
+                        self.ui_state.cursor_pos = last_word_end;
+                        self.ui_state.ideal_cursor_column = last_word_end;
                     }
                 }
             }
             return;
         }
 
+        // CHANGE THIS LINE: replace find_prev_word_end_corrected with find_prev_word_end
         let new_pos = find_prev_word_end(current_text, current_pos);
 
-        // Check if we didn't move significantly (near start of field)
-        if new_pos == current_pos || new_pos <= 1 {
-            // Try to jump to previous field
+        // Only try to cross fields if we didn't move at all (stayed at same position)
+        if new_pos == current_pos {
+            // We didn't move within the current field, try previous field
             let current_field = self.ui_state.current_field;
             if self.move_up().is_ok() {
                 // Check if we actually moved to a different field
                 if self.ui_state.current_field != current_field {
                     let new_text = self.current_text();
                     if !new_text.is_empty() {
-                        let char_len = new_text.chars().count();
-                        self.ui_state.cursor_pos = char_len;
-                        self.ui_state.ideal_cursor_column = char_len;
-                        self.move_word_end_prev();
+                        let last_word_end = find_last_word_end_in_field(new_text);
+                        self.ui_state.cursor_pos = last_word_end;
+                        self.ui_state.ideal_cursor_column = last_word_end;
                     }
                 }
             }
@@ -1811,8 +1703,6 @@ impl<D: DataProvider> FormEditor<D> {
                     let new_text = self.current_text();
                     if !new_text.is_empty() {
                         // Find end of last WORD in the field
-                        let char_len = new_text.chars().count();
-                        // Start from end and find the last WORD end
                         let last_WORD_end = find_last_WORD_end_in_field(new_text);
                         self.ui_state.cursor_pos = last_WORD_end;
                         self.ui_state.ideal_cursor_column = last_WORD_end;
@@ -1843,9 +1733,9 @@ impl<D: DataProvider> FormEditor<D> {
 
         let new_pos = find_prev_WORD_end(current_text, current_pos);
 
-        // Check if we didn't move significantly (near start of field)
-        if new_pos == current_pos || new_pos <= 1 {
-            // Try to jump to previous field (but don't recurse)
+        // Only try to cross fields if we didn't move at all (stayed at same position)
+        if new_pos == current_pos {
+            // We didn't move within the current field, try previous field
             let current_field = self.ui_state.current_field;
             if self.move_up().is_ok() {
                 // Check if we actually moved to a different field

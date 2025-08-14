@@ -1,6 +1,7 @@
 // src/canvas/actions/movement/word.rs
+// Replace the entire file with this corrected version:
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Copy, Clone)]
 enum CharType {
     Whitespace,
     Alphanumeric,
@@ -55,7 +56,7 @@ pub fn find_word_end(text: &str, current_pos: usize) -> usize {
 
     let mut pos = current_pos.min(len - 1);
     let current_type = get_char_type(chars[pos]);
-    
+
     // If we're not on whitespace, move to end of current word
     if current_type != CharType::Whitespace {
         while pos < len && get_char_type(chars[pos]) == current_type {
@@ -107,45 +108,58 @@ pub fn find_prev_word_start(text: &str, current_pos: usize) -> usize {
     }
 }
 
-/// Find the end of the previous word
+/// Find the end of the previous word (CORRECTED VERSION for vim's ge command)
 pub fn find_prev_word_end(text: &str, current_pos: usize) -> usize {
     let chars: Vec<char> = text.chars().collect();
     if chars.is_empty() || current_pos == 0 {
         return 0;
     }
 
-    let mut pos = current_pos.saturating_sub(1);
+    // Find all word end positions using boundary detection
+    let mut word_ends = Vec::new();
+    let mut in_word = false;
+    let mut current_word_type: Option<CharType> = None;
 
-    // Skip whitespace backwards
-    while pos > 0 && get_char_type(chars[pos]) == CharType::Whitespace {
-        pos -= 1;
+    for (i, &ch) in chars.iter().enumerate() {
+        let char_type = get_char_type(ch);
+        
+        match char_type {
+            CharType::Whitespace => {
+                if in_word {
+                    // End of a word
+                    word_ends.push(i - 1);
+                    in_word = false;
+                    current_word_type = None;
+                }
+            }
+            _ => {
+                if !in_word || current_word_type != Some(char_type) {
+                    // Start of a new word (or word type change)
+                    if in_word {
+                        // End the previous word first
+                        word_ends.push(i - 1);
+                    }
+                    in_word = true;
+                    current_word_type = Some(char_type);
+                }
+            }
+        }
     }
 
-    if pos == 0 && get_char_type(chars[0]) == CharType::Whitespace {
-        return 0;
-    }
-    if pos == 0 && get_char_type(chars[0]) != CharType::Whitespace {
-        return 0;
+    // Add the final word end if text doesn't end with whitespace
+    if in_word && !chars.is_empty() {
+        word_ends.push(chars.len() - 1);
     }
 
-    let word_type = get_char_type(chars[pos]);
-    while pos > 0 && get_char_type(chars[pos - 1]) == word_type {
-        pos -= 1;
+    // Find the largest word end position that's before current_pos
+    for &end_pos in word_ends.iter().rev() {
+        if end_pos < current_pos {
+            return end_pos;
+        }
     }
 
-    // Skip whitespace before this word
-    while pos > 0 && get_char_type(chars[pos - 1]) == CharType::Whitespace {
-        pos -= 1;
-    }
-
-    if pos > 0 {
-        pos - 1
-    } else {
-        0
-    }
+    0
 }
-
-// Add these functions to your word movement module
 
 /// Find the start of the next WORD (whitespace-separated)
 pub fn find_next_WORD_start(text: &str, current_pos: usize) -> usize {
@@ -250,4 +264,140 @@ pub fn find_prev_WORD_end(text: &str, current_pos: usize) -> usize {
 
     // Return position of last character in WORD
     pos.saturating_sub(1)
+}
+
+// ============================================================================
+// FIELD BOUNDARY HELPER FUNCTIONS (for cross-field movement)
+// ============================================================================
+
+/// Find the start of the last word in a field (for cross-field 'b' movement)
+pub fn find_last_word_start_in_field(text: &str) -> usize {
+    if text.is_empty() {
+        return 0;
+    }
+
+    let chars: Vec<char> = text.chars().collect();
+    if chars.is_empty() {
+        return 0;
+    }
+
+    let mut pos = chars.len().saturating_sub(1);
+
+    // Skip trailing whitespace
+    while pos > 0 && chars[pos].is_whitespace() {
+        pos -= 1;
+    }
+
+    // If the whole field is whitespace, return 0
+    if pos == 0 && chars[0].is_whitespace() {
+        return 0;
+    }
+
+    // Now we're on a non-whitespace character
+    // Find the start of this word by going backwards while chars are the same type
+    let char_type = if chars[pos].is_alphanumeric() { "alnum" } else { "punct" };
+
+    while pos > 0 {
+        let prev_char = chars[pos - 1];
+        let prev_type = if prev_char.is_alphanumeric() {
+            "alnum"
+        } else if prev_char.is_whitespace() {
+            "space"
+        } else {
+            "punct"
+        };
+
+        // Stop if we hit whitespace or different word type
+        if prev_type == "space" || prev_type != char_type {
+            break;
+        }
+        pos -= 1;
+    }
+
+    pos
+}
+
+/// Find the end of the last word in a field (for cross-field 'ge' movement)
+pub fn find_last_word_end_in_field(text: &str) -> usize {
+    let chars: Vec<char> = text.chars().collect();
+    if chars.is_empty() {
+        return 0;
+    }
+
+    // Start from the end and find the last non-whitespace character
+    let mut pos = chars.len() - 1;
+    
+    // Skip trailing whitespace
+    while pos > 0 && chars[pos].is_whitespace() {
+        pos -= 1;
+    }
+
+    // If the whole field is whitespace, return 0
+    if chars[pos].is_whitespace() {
+        return 0;
+    }
+
+    // We're now at the end of the last word
+    pos
+}
+
+/// Find the start of the last WORD in a field (for cross-field 'B' movement)
+pub fn find_last_WORD_start_in_field(text: &str) -> usize {
+    if text.is_empty() {
+        return 0;
+    }
+
+    let chars: Vec<char> = text.chars().collect();
+    if chars.is_empty() {
+        return 0;
+    }
+
+    let mut pos = chars.len().saturating_sub(1);
+
+    // Skip trailing whitespace
+    while pos > 0 && chars[pos].is_whitespace() {
+        pos -= 1;
+    }
+
+    // If the whole field is whitespace, return 0
+    if pos == 0 && chars[0].is_whitespace() {
+        return 0;
+    }
+
+    // Now we're on a non-whitespace character
+    // Find the start of this WORD by going backwards while chars are non-whitespace
+    while pos > 0 {
+        let prev_char = chars[pos - 1];
+
+        // Stop if we hit whitespace (WORD boundary)
+        if prev_char.is_whitespace() {
+            break;
+        }
+        pos -= 1;
+    }
+
+    pos
+}
+
+/// Find the end of the last WORD in a field (for cross-field 'gE' movement)
+pub fn find_last_WORD_end_in_field(text: &str) -> usize {
+    let chars: Vec<char> = text.chars().collect();
+    if chars.is_empty() {
+        return 0;
+    }
+
+    let mut pos = chars.len().saturating_sub(1);
+
+    // Skip trailing whitespace
+    while pos > 0 && chars[pos].is_whitespace() {
+        pos -= 1;
+    }
+
+    // If the whole field is whitespace, return 0
+    if pos == 0 && chars[0].is_whitespace() {
+        return 0;
+    }
+
+    // We're now at the end of the last WORD
+    pos
 }
