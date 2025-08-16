@@ -1,6 +1,7 @@
 // src/data_provider.rs
 //! Simplified user interface - only business data, no UI state
 
+#[cfg(feature = "suggestions")]
 use anyhow::Result;
 #[cfg(feature = "suggestions")]
 use async_trait::async_trait;

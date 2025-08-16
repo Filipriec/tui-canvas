@@ -324,23 +324,23 @@ impl<D: DataProvider> AutoCursorFormEditor<D> {
         result
     }
 
-    fn move_WORD_next(&mut self) {
-        self.editor.move_WORD_next();
+    fn move_big_word_next(&mut self) {
+        self.editor.move_big_word_next();
         self.update_visual_selection();
     }
 
-    fn move_WORD_prev(&mut self) {
-        self.editor.move_WORD_prev();
+    fn move_big_word_prev(&mut self) {
+        self.editor.move_big_word_prev();
         self.update_visual_selection();
     }
 
-    fn move_WORD_end(&mut self) {
-        self.editor.move_WORD_end();
+    fn move_big_word_end(&mut self) {
+        self.editor.move_big_word_end();
         self.update_visual_selection();
     }
 
-    fn move_WORD_end_prev(&mut self) {
-        self.editor.move_WORD_end_prev();
+    fn move_big_word_end_prev(&mut self) {
+        self.editor.move_big_word_end_prev();
         self.update_visual_selection();
     }
 }
@@ -564,23 +564,23 @@ fn handle_key_press(
         }
 
         (AppMode::ReadOnly | AppMode::Highlight, KeyCode::Char('W'), _) => {
-            editor.move_WORD_next();
+            editor.move_big_word_next();
             editor.set_debug_message("W: next WORD start".to_string());
             editor.clear_command_buffer();
         }
         (AppMode::ReadOnly | AppMode::Highlight, KeyCode::Char('B'), _) => {
-            editor.move_WORD_prev();
+            editor.move_big_word_prev();
             editor.set_debug_message("B: previous WORD start".to_string());
             editor.clear_command_buffer();
         }
         (AppMode::ReadOnly | AppMode::Highlight, KeyCode::Char('E'), _) => {
             // Check if this is 'gE' command
             if editor.get_command_buffer() == "g" {
-                editor.move_WORD_end_prev();
+                editor.move_big_word_end_prev();
                 editor.set_debug_message("gE: previous WORD end".to_string());
                 editor.clear_command_buffer();
             } else {
-                editor.move_WORD_end();
+                editor.move_big_word_end();
                 editor.set_debug_message("E: WORD end".to_string());
                 editor.clear_command_buffer();
             }

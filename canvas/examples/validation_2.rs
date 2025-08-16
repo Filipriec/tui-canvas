@@ -129,12 +129,11 @@ impl<D: DataProvider> AdvancedPatternFormEditor<D> {
     fn insert_char(&mut self, ch: char) -> anyhow::Result<()> {
         let result = self.editor.insert_char(ch);
         if result.is_ok() {
-            if let Some(validation_result) = self.editor.current_field_validation() {
-                match validation_result {
-                    ValidationResult::Valid => { self.debug_message = "✅ Character accepted".to_string(); }
-                    ValidationResult::Warning { message } => { self.debug_message = format!("⚠️  Warning: {}", message); }
-                    ValidationResult::Error { message } => { self.debug_message = format!("❌ Pattern violation: {}", message); }
-                }
+            let validation_result = self.editor.validate_current_field();
+            match validation_result {
+                ValidationResult::Valid => { self.debug_message = "✅ Character accepted".to_string(); }
+                ValidationResult::Warning { message } => { self.debug_message = format!("⚠️  Warning: {}", message); }
+                ValidationResult::Error { message } => { self.debug_message = format!("❌ Pattern violation: {}", message); }
             }
         }
         Ok(result?)
@@ -183,12 +182,11 @@ impl<D: DataProvider> AdvancedPatternFormEditor<D> {
 
     fn update_field_validation_status(&mut self) {
         if !self.validation_enabled { return; }
-        if let Some(result) = self.editor.current_field_validation() {
-            match result {
-                ValidationResult::Valid => { self.debug_message = format!("Field {}: ✅ Pattern valid", self.editor.current_field() + 1); }
-                ValidationResult::Warning { message } => { self.debug_message = format!("Field {}: ⚠️  {}", self.editor.current_field() + 1, message); }
-                ValidationResult::Error { message } => { self.debug_message = format!("Field {}: ❌ {}", self.editor.current_field() + 1, message); }
-            }
+        let result = self.editor.validate_current_field();
+        match result {
+            ValidationResult::Valid => { self.debug_message = format!("Field {}: ✅ Pattern valid", self.editor.current_field() + 1); }
+            ValidationResult::Warning { message } => { self.debug_message = format!("Field {}: ⚠️  {}", self.editor.current_field() + 1, message); }
+            ValidationResult::Error { message } => { self.debug_message = format!("Field {}: ❌ {}", self.editor.current_field() + 1, message); }
         }
     }
 

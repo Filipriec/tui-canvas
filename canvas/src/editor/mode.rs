@@ -196,20 +196,20 @@ impl<D: DataProvider> FormEditor<D> {
         self.move_word_end_prev();
     }
 
-    pub fn move_WORD_next_with_selection(&mut self) {
-        self.move_WORD_next();
+    pub fn move_big_word_next_with_selection(&mut self) {
+        self.move_big_word_next();
     }
 
-    pub fn move_WORD_end_with_selection(&mut self) {
-        self.move_WORD_end();
+    pub fn move_big_word_end_with_selection(&mut self) {
+        self.move_big_word_end();
     }
 
-    pub fn move_WORD_prev_with_selection(&mut self) {
-        self.move_WORD_prev();
+    pub fn move_big_word_prev_with_selection(&mut self) {
+        self.move_big_word_prev();
     }
 
-    pub fn move_WORD_end_prev_with_selection(&mut self) {
-        self.move_WORD_end_prev();
+    pub fn move_big_word_end_prev_with_selection(&mut self) {
+        self.move_big_word_end_prev();
     }
 
     pub fn move_line_start_with_selection(&mut self) {

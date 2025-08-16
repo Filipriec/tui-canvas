@@ -241,20 +241,17 @@ impl<D: DataProvider> ValidationFormEditor<D> {
         if !self.validation_enabled {
             return;
         }
-        if let Some(result) = self.editor.current_field_validation() {
-            match result {
-                ValidationResult::Valid => {
-                    self.debug_message = format!("Field {}: ✅ Valid", self.editor.current_field() + 1);
-                }
-                ValidationResult::Warning { message } => {
-                    self.debug_message = format!("Field {}: ⚠️  {}", self.editor.current_field() + 1, message);
-                }
-                ValidationResult::Error { message } => {
-                    self.debug_message = format!("Field {}: ❌ {}", self.editor.current_field() + 1, message);
-                }
+        let result = self.editor.validate_current_field();
+        match result {
+            ValidationResult::Valid => {
+                self.debug_message = format!("Field {}: ✅ Valid", self.editor.current_field() + 1);
             }
-        } else {
-            self.debug_message = format!("Field {}: 🔍 Not validated yet", self.editor.current_field() + 1);
+            ValidationResult::Warning { message } => {
+                self.debug_message = format!("Field {}: ⚠️  {}", self.editor.current_field() + 1, message);
+            }
+            ValidationResult::Error { message } => {
+                self.debug_message = format!("Field {}: ❌ {}", self.editor.current_field() + 1, message);
+            }
         }
     }
 
@@ -283,25 +280,24 @@ impl<D: DataProvider> ValidationFormEditor<D> {
         if result.is_ok() {
             self.has_unsaved_changes = true;
             // Show real-time validation feedback
-            if let Some(validation_result) = self.editor.current_field_validation() {
-                match validation_result {
-                    ValidationResult::Valid => {
-                        // Don't spam with valid messages, just show character count if applicable
-                        if let Some(limits) = self.get_current_field_limits() {
-                            let field_index = self.editor.current_field();
-                            if let Some(status) = limits.status_text(
-                                self.editor.data_provider().field_value(field_index)
-                            ) {
-                                self.debug_message = format!("✏️  {}", status);
-                            }
+            let validation_result = self.editor.validate_current_field();
+            match validation_result {
+                ValidationResult::Valid => {
+                    // Don't spam with valid messages, just show character count if applicable
+                    if let Some(limits) = self.get_current_field_limits() {
+                        let field_index = self.editor.current_field();
+                        if let Some(status) = limits.status_text(
+                            self.editor.data_provider().field_value(field_index)
+                        ) {
+                            self.debug_message = format!("✏️  {}", status);
                         }
                     }
-                    ValidationResult::Warning { message } => {
-                        self.debug_message = format!("⚠️  {}", message);
-                    }
-                    ValidationResult::Error { message } => {
-                        self.debug_message = format!("❌ {}", message);
-                    }
+                }
+                ValidationResult::Warning { message } => {
+                    self.debug_message = format!("⚠️  {}", message);
+                }
+                ValidationResult::Error { message } => {
+                    self.debug_message = format!("❌ {}", message);
                 }
             }
         }

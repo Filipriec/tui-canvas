@@ -7,11 +7,7 @@ use crate::canvas::modes::AppMode;
 use crate::editor::FormEditor;
 use crate::DataProvider;
 use crate::canvas::actions::movement::word::{
-    find_last_WORD_end_in_field, find_last_WORD_start_in_field,
-    find_last_word_end_in_field, find_last_word_start_in_field,
-    find_next_WORD_start, find_next_word_start, find_prev_WORD_end,
-    find_prev_WORD_start, find_prev_word_end, find_prev_word_start,
-    find_WORD_end, find_word_end,
+    find_last_big_word_start_in_field, find_last_word_start_in_field,
 };
 
 impl<D: DataProvider> FormEditor<D> {
@@ -380,7 +376,6 @@ impl<D: DataProvider> FormEditor<D> {
             return;
         }
 
-        // CHANGE THIS LINE: replace find_prev_word_end_corrected with find_prev_word_end
         let new_pos = find_prev_word_end(current_text, current_pos);
 
         // Only try to cross fields if we didn't move at all (stayed at same position)
@@ -413,30 +408,30 @@ impl<D: DataProvider> FormEditor<D> {
         }
     }
 
-    /// Move to start of next WORD (vim W) - can cross field boundaries
-    pub fn move_WORD_next(&mut self) {
-        use crate::canvas::actions::movement::word::find_next_WORD_start;
+    /// Move to start of next big_word (vim W) - can cross field boundaries
+    pub fn move_big_word_next(&mut self) {
+        use crate::canvas::actions::movement::word::find_next_big_word_start;
         let current_text = self.current_text();
 
         if current_text.is_empty() {
             // Empty field - try to move to next field
             if self.move_down().is_ok() {
-                // Successfully moved to next field, try to find first WORD
+                // Successfully moved to next field, try to find first big_word
                 let new_text = self.current_text();
                 if !new_text.is_empty() {
-                    let first_WORD_pos = if new_text.chars().next().map_or(false, |c| !c.is_whitespace()) {
+                    let first_big_word_pos = if new_text.chars().next().map_or(false, |c| !c.is_whitespace()) {
                         // Field starts with non-whitespace, go to position 0
                         0
                     } else {
-                        // Field starts with whitespace, find first WORD
-                        find_next_WORD_start(new_text, 0)
+                        // Field starts with whitespace, find first big_word
+                        find_next_big_word_start(new_text, 0)
                     };
                     let is_edit_mode = self.ui_state.current_mode == AppMode::Edit;
                     let char_len = new_text.chars().count();
                     let final_pos = if is_edit_mode {
-                        first_WORD_pos.min(char_len)
+                        first_big_word_pos.min(char_len)
                     } else {
-                        first_WORD_pos.min(char_len.saturating_sub(1))
+                        first_big_word_pos.min(char_len.saturating_sub(1))
                     };
                     self.ui_state.cursor_pos = final_pos;
                     self.ui_state.ideal_cursor_column = final_pos;
@@ -446,7 +441,7 @@ impl<D: DataProvider> FormEditor<D> {
         }
 
         let current_pos = self.ui_state.cursor_pos;
-        let new_pos = find_next_WORD_start(current_text, current_pos);
+        let new_pos = find_next_big_word_start(current_text, current_pos);
 
         // Check if we've hit the end of the current field
         if new_pos >= current_text.chars().count() {
@@ -459,20 +454,20 @@ impl<D: DataProvider> FormEditor<D> {
                     self.ui_state.cursor_pos = 0;
                     self.ui_state.ideal_cursor_column = 0;
                 } else {
-                    // Find first WORD in new field
-                    let first_WORD_pos = if new_text.chars().next().map_or(false, |c| !c.is_whitespace()) {
+                    // Find first big_word in new field
+                    let first_big_word_pos = if new_text.chars().next().map_or(false, |c| !c.is_whitespace()) {
                         // Field starts with non-whitespace, go to position 0
                         0
                     } else {
-                        // Field starts with whitespace, find first WORD
-                        find_next_WORD_start(new_text, 0)
+                        // Field starts with whitespace, find first big_word
+                        find_next_big_word_start(new_text, 0)
                     };
                     let is_edit_mode = self.ui_state.current_mode == AppMode::Edit;
                     let char_len = new_text.chars().count();
                     let final_pos = if is_edit_mode {
-                        first_WORD_pos.min(char_len)
+                        first_big_word_pos.min(char_len)
                     } else {
-                        first_WORD_pos.min(char_len.saturating_sub(1))
+                        first_big_word_pos.min(char_len.saturating_sub(1))
                     };
                     self.ui_state.cursor_pos = final_pos;
                     self.ui_state.ideal_cursor_column = final_pos;
@@ -480,7 +475,7 @@ impl<D: DataProvider> FormEditor<D> {
             }
             // If move_down() failed, we stay where we are (at end of last field)
         } else {
-            // Normal WORD movement within current field
+            // Normal big_word movement within current field
             let is_edit_mode = self.ui_state.current_mode == AppMode::Edit;
             let char_len = current_text.chars().count();
             let final_pos = if is_edit_mode {
@@ -494,22 +489,22 @@ impl<D: DataProvider> FormEditor<D> {
         }
     }
 
-    /// Move to start of previous WORD (vim B) - can cross field boundaries
-    pub fn move_WORD_prev(&mut self) {
-        use crate::canvas::actions::movement::word::find_prev_WORD_start;
+    /// Move to start of previous big_word (vim B) - can cross field boundaries
+    pub fn move_big_word_prev(&mut self) {
+        use crate::canvas::actions::movement::word::find_prev_big_word_start;
         let current_text = self.current_text();
 
         if current_text.is_empty() {
-            // Empty field - try to move to previous field and find last WORD
+            // Empty field - try to move to previous field and find last big_word
             let current_field = self.ui_state.current_field;
             if self.move_up().is_ok() {
                 // Check if we actually moved to a different field
                 if self.ui_state.current_field != current_field {
                     let new_text = self.current_text();
                     if !new_text.is_empty() {
-                        let last_WORD_start = find_last_WORD_start_in_field(new_text);
-                        self.ui_state.cursor_pos = last_WORD_start;
-                        self.ui_state.ideal_cursor_column = last_WORD_start;
+                        let last_big_word_start = find_last_big_word_start_in_field(new_text);
+                        self.ui_state.cursor_pos = last_big_word_start;
+                        self.ui_state.ideal_cursor_column = last_big_word_start;
                     }
                 }
             }
@@ -526,43 +521,43 @@ impl<D: DataProvider> FormEditor<D> {
                 if self.ui_state.current_field != current_field {
                     let new_text = self.current_text();
                     if !new_text.is_empty() {
-                        let last_WORD_start = find_last_WORD_start_in_field(new_text);
-                        self.ui_state.cursor_pos = last_WORD_start;
-                        self.ui_state.ideal_cursor_column = last_WORD_start;
+                        let last_big_word_start = find_last_big_word_start_in_field(new_text);
+                        self.ui_state.cursor_pos = last_big_word_start;
+                        self.ui_state.ideal_cursor_column = last_big_word_start;
                     }
                 }
             }
             return;
         }
 
-        // Try to find previous WORD in current field
-        let new_pos = find_prev_WORD_start(current_text, current_pos);
+        // Try to find previous big_word in current field
+        let new_pos = find_prev_big_word_start(current_text, current_pos);
 
         // Check if we actually moved
         if new_pos < current_pos {
-            // Normal WORD movement within current field - we found a previous WORD
+            // Normal big_word movement within current field - we found a previous big_word
             self.ui_state.cursor_pos = new_pos;
             self.ui_state.ideal_cursor_column = new_pos;
         } else {
-            // We didn't move (probably at start of first WORD), try previous field
+            // We didn't move (probably at start of first big_word), try previous field
             let current_field = self.ui_state.current_field;
             if self.move_up().is_ok() {
                 // Check if we actually moved to a different field
                 if self.ui_state.current_field != current_field {
                     let new_text = self.current_text();
                     if !new_text.is_empty() {
-                        let last_WORD_start = find_last_WORD_start_in_field(new_text);
-                        self.ui_state.cursor_pos = last_WORD_start;
-                        self.ui_state.ideal_cursor_column = last_WORD_start;
+                        let last_big_word_start = find_last_big_word_start_in_field(new_text);
+                        self.ui_state.cursor_pos = last_big_word_start;
+                        self.ui_state.ideal_cursor_column = last_big_word_start;
                     }
                 }
             }
         }
     }
 
-    /// Move to end of current/next WORD (vim E) - can cross field boundaries
-    pub fn move_WORD_end(&mut self) {
-        use crate::canvas::actions::movement::word::find_WORD_end;
+    /// Move to end of current/next big_word (vim E) - can cross field boundaries
+    pub fn move_big_word_end(&mut self) {
+        use crate::canvas::actions::movement::word::find_big_word_end;
         let current_text = self.current_text();
 
         if current_text.is_empty() {
@@ -570,14 +565,14 @@ impl<D: DataProvider> FormEditor<D> {
             if self.move_down().is_ok() {
                 let new_text = self.current_text();
                 if !new_text.is_empty() {
-                    // Find first WORD end in new field
-                    let first_WORD_end = find_WORD_end(new_text, 0);
+                    // Find first big_word end in new field
+                    let first_big_word_end = find_big_word_end(new_text, 0);
                     let is_edit_mode = self.ui_state.current_mode == AppMode::Edit;
                     let char_len = new_text.chars().count();
                     let final_pos = if is_edit_mode {
-                        first_WORD_end.min(char_len)
+                        first_big_word_end.min(char_len)
                     } else {
-                        first_WORD_end.min(char_len.saturating_sub(1))
+                        first_big_word_end.min(char_len.saturating_sub(1))
                     };
                     self.ui_state.cursor_pos = final_pos;
                     self.ui_state.ideal_cursor_column = final_pos;
@@ -588,12 +583,12 @@ impl<D: DataProvider> FormEditor<D> {
 
         let current_pos = self.ui_state.cursor_pos;
         let char_len = current_text.chars().count();
-        let new_pos = find_WORD_end(current_text, current_pos);
+        let new_pos = find_big_word_end(current_text, current_pos);
 
         // Check if we didn't move or hit the end of the field
         if new_pos == current_pos && current_pos + 1 < char_len {
-            // Try next character and find WORD end from there
-            let next_pos = find_WORD_end(current_text, current_pos + 1);
+            // Try next character and find big_word end from there
+            let next_pos = find_big_word_end(current_text, current_pos + 1);
             if next_pos < char_len {
                 let is_edit_mode = self.ui_state.current_mode == AppMode::Edit;
                 let final_pos = if is_edit_mode {
@@ -610,23 +605,23 @@ impl<D: DataProvider> FormEditor<D> {
         // If we're at or near the end of the field, try next field (but don't recurse)
         if new_pos >= char_len.saturating_sub(1) {
             if self.move_down().is_ok() {
-                // Find first WORD end in new field
+                // Find first big_word end in new field
                 let new_text = self.current_text();
                 if !new_text.is_empty() {
-                    let first_WORD_end = find_WORD_end(new_text, 0);
+                    let first_big_word_end = find_big_word_end(new_text, 0);
                     let is_edit_mode = self.ui_state.current_mode == AppMode::Edit;
                     let new_char_len = new_text.chars().count();
                     let final_pos = if is_edit_mode {
-                        first_WORD_end.min(new_char_len)
+                        first_big_word_end.min(new_char_len)
                     } else {
-                        first_WORD_end.min(new_char_len.saturating_sub(1))
+                        first_big_word_end.min(new_char_len.saturating_sub(1))
                     };
                     self.ui_state.cursor_pos = final_pos;
                     self.ui_state.ideal_cursor_column = final_pos;
                 }
             }
         } else {
-            // Normal WORD end movement within current field
+            // Normal big_word end movement within current field
             let is_edit_mode = self.ui_state.current_mode == AppMode::Edit;
             let final_pos = if is_edit_mode {
                 new_pos.min(char_len)
@@ -639,23 +634,24 @@ impl<D: DataProvider> FormEditor<D> {
         }
     }
 
-    /// Move to end of previous WORD (vim gE) - can cross field boundaries
-    pub fn move_WORD_end_prev(&mut self) {
-        use crate::canvas::actions::movement::word::{find_prev_WORD_end, find_WORD_end};
+    /// Move to end of previous big_word (vim gE) - can cross field boundaries
+    pub fn move_big_word_end_prev(&mut self) {
+        use crate::canvas::actions::movement::word::{
+            find_prev_big_word_end, find_big_word_end,
+        };
+
         let current_text = self.current_text();
 
         if current_text.is_empty() {
-            // Empty field - try to move to previous field (but don't recurse)
             let current_field = self.ui_state.current_field;
             if self.move_up().is_ok() {
-                // Check if we actually moved to a different field
                 if self.ui_state.current_field != current_field {
                     let new_text = self.current_text();
                     if !new_text.is_empty() {
-                        // Find end of last WORD in the field
-                        let last_WORD_end = find_last_WORD_end_in_field(new_text);
-                        self.ui_state.cursor_pos = last_WORD_end;
-                        self.ui_state.ideal_cursor_column = last_WORD_end;
+                        // Find first big_word end in new field
+                        let last_big_word_end = find_big_word_end(new_text, 0);
+                        self.ui_state.cursor_pos = last_big_word_end;
+                        self.ui_state.ideal_cursor_column = last_big_word_end;
                     }
                 }
             }
@@ -663,43 +659,23 @@ impl<D: DataProvider> FormEditor<D> {
         }
 
         let current_pos = self.ui_state.cursor_pos;
-
-        // Special case: if we're at position 0, jump to previous field (but don't recurse)
-        if current_pos == 0 {
-            let current_field = self.ui_state.current_field;
-            if self.move_up().is_ok() {
-                // Check if we actually moved to a different field
-                if self.ui_state.current_field != current_field {
-                    let new_text = self.current_text();
-                    if !new_text.is_empty() {
-                        let last_WORD_end = find_last_WORD_end_in_field(new_text);
-                        self.ui_state.cursor_pos = last_WORD_end;
-                        self.ui_state.ideal_cursor_column = last_WORD_end;
-                    }
-                }
-            }
-            return;
-        }
-
-        let new_pos = find_prev_WORD_end(current_text, current_pos);
+        let new_pos = find_prev_big_word_end(current_text, current_pos);
 
         // Only try to cross fields if we didn't move at all (stayed at same position)
         if new_pos == current_pos {
-            // We didn't move within the current field, try previous field
             let current_field = self.ui_state.current_field;
             if self.move_up().is_ok() {
-                // Check if we actually moved to a different field
                 if self.ui_state.current_field != current_field {
                     let new_text = self.current_text();
                     if !new_text.is_empty() {
-                        let last_WORD_end = find_last_WORD_end_in_field(new_text);
-                        self.ui_state.cursor_pos = last_WORD_end;
-                        self.ui_state.ideal_cursor_column = last_WORD_end;
+                        let last_big_word_end = find_big_word_end(new_text, 0);
+                        self.ui_state.cursor_pos = last_big_word_end;
+                        self.ui_state.ideal_cursor_column = last_big_word_end;
                     }
                 }
             }
         } else {
-            // Normal WORD movement within current field
+            // Normal big_word movement within current field
             let is_edit_mode = self.ui_state.current_mode == AppMode::Edit;
             let char_len = current_text.chars().count();
             let final_pos = if is_edit_mode {
@@ -707,7 +683,6 @@ impl<D: DataProvider> FormEditor<D> {
             } else {
                 new_pos.min(char_len.saturating_sub(1))
             };
-
             self.ui_state.cursor_pos = final_pos;
             self.ui_state.ideal_cursor_column = final_pos;
         }

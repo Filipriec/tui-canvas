@@ -14,7 +14,8 @@ pub struct EditorState {
     // Mode state
     pub(crate) current_mode: AppMode,
 
-    // Suggestions dropdown state
+    // Suggestions dropdown state (only available with suggestions feature)
+    #[cfg(feature = "suggestions")]
     pub(crate) suggestions: SuggestionsUIState,
 
     // Selection state (for vim visual mode)
@@ -29,6 +30,7 @@ pub struct EditorState {
     pub(crate) computed: Option<crate::computed::ComputedState>,
 }
 
+#[cfg(feature = "suggestions")]
 #[derive(Debug, Clone)]
 pub struct SuggestionsUIState {
     pub(crate) is_active: bool,
@@ -53,6 +55,7 @@ impl EditorState {
             cursor_pos: 0,
             ideal_cursor_column: 0,
             current_mode: AppMode::Edit,
+            #[cfg(feature = "suggestions")]
             suggestions: SuggestionsUIState {
                 is_active: false,
                 is_loading: false,
@@ -103,11 +106,13 @@ impl EditorState {
     }
 
     /// Check if suggestions dropdown is active (for user's business logic)
+    #[cfg(feature = "suggestions")]
     pub fn is_suggestions_active(&self) -> bool {
         self.suggestions.is_active
     }
 
     /// Check if suggestions dropdown is loading (for user's business logic)
+    #[cfg(feature = "suggestions")]
     pub fn is_suggestions_loading(&self) -> bool {
         self.suggestions.is_loading
     }
@@ -153,6 +158,7 @@ impl EditorState {
     }
 
     /// Explicitly open suggestions — should only be called on Tab
+    #[cfg(feature = "suggestions")]
     pub(crate) fn open_suggestions(&mut self, field_index: usize) {
         self.suggestions.is_active = true;
         self.suggestions.is_loading = true;
@@ -163,6 +169,7 @@ impl EditorState {
     }
 
     /// Explicitly close suggestions — should be called on Esc or field change
+    #[cfg(feature = "suggestions")]
     pub(crate) fn close_suggestions(&mut self) {
         self.suggestions.is_active = false;
         self.suggestions.is_loading = false;

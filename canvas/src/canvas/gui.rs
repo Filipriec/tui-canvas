@@ -69,6 +69,7 @@ pub fn render_canvas_with_highlight<T: CanvasTheme, D: DataProvider>(
     let is_edit_mode = matches!(ui_state.mode(), crate::canvas::modes::AppMode::Edit);
 
     // Precompute completion for active field
+    #[cfg(feature = "suggestions")]
     let active_completion = if ui_state.is_suggestions_active()
         && ui_state.suggestions.active_field == Some(current_field_idx)
     {
@@ -76,6 +77,9 @@ pub fn render_canvas_with_highlight<T: CanvasTheme, D: DataProvider>(
     } else {
         None
     };
+
+    #[cfg(not(feature = "suggestions"))]
+    let active_completion: Option<String> = None;
 
     render_canvas_fields(
         f,

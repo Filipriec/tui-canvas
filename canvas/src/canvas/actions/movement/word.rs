@@ -161,8 +161,8 @@ pub fn find_prev_word_end(text: &str, current_pos: usize) -> usize {
     0
 }
 
-/// Find the start of the next WORD (whitespace-separated)
-pub fn find_next_WORD_start(text: &str, current_pos: usize) -> usize {
+/// Find the start of the next big_word (whitespace-separated)
+pub fn find_next_big_word_start(text: &str, current_pos: usize) -> usize {
     let chars: Vec<char> = text.chars().collect();
     if chars.is_empty() || current_pos >= chars.len() {
         return text.chars().count();
@@ -170,12 +170,12 @@ pub fn find_next_WORD_start(text: &str, current_pos: usize) -> usize {
 
     let mut pos = current_pos;
 
-    // If we're on non-whitespace, skip to end of current WORD
+    // If we're on non-whitespace, skip to end of current big_word
     while pos < chars.len() && !chars[pos].is_whitespace() {
         pos += 1;
     }
 
-    // Skip whitespace to find start of next WORD
+    // Skip whitespace to find start of next big_word
     while pos < chars.len() && chars[pos].is_whitespace() {
         pos += 1;
     }
@@ -183,8 +183,8 @@ pub fn find_next_WORD_start(text: &str, current_pos: usize) -> usize {
     pos
 }
 
-/// Find the start of the previous WORD (whitespace-separated)
-pub fn find_prev_WORD_start(text: &str, current_pos: usize) -> usize {
+/// Find the start of the previous big_word (whitespace-separated)
+pub fn find_prev_big_word_start(text: &str, current_pos: usize) -> usize {
     let chars: Vec<char> = text.chars().collect();
     if chars.is_empty() || current_pos == 0 {
         return 0;
@@ -197,7 +197,7 @@ pub fn find_prev_WORD_start(text: &str, current_pos: usize) -> usize {
         pos -= 1;
     }
 
-    // Find start of current WORD by going back while non-whitespace
+    // Find start of current big_word by going back while non-whitespace
     while pos > 0 && !chars[pos - 1].is_whitespace() {
         pos -= 1;
     }
@@ -205,8 +205,8 @@ pub fn find_prev_WORD_start(text: &str, current_pos: usize) -> usize {
     pos
 }
 
-/// Find the end of the current/next WORD (whitespace-separated)
-pub fn find_WORD_end(text: &str, current_pos: usize) -> usize {
+/// Find the end of the current/next big_word (whitespace-separated)
+pub fn find_big_word_end(text: &str, current_pos: usize) -> usize {
     let chars: Vec<char> = text.chars().collect();
     if chars.is_empty() {
         return 0;
@@ -214,7 +214,7 @@ pub fn find_WORD_end(text: &str, current_pos: usize) -> usize {
 
     let mut pos = current_pos;
 
-    // If we're on whitespace, skip to start of next WORD
+    // If we're on whitespace, skip to start of next big_word
     while pos < chars.len() && chars[pos].is_whitespace() {
         pos += 1;
     }
@@ -224,17 +224,17 @@ pub fn find_WORD_end(text: &str, current_pos: usize) -> usize {
         return chars.len();
     }
 
-    // Find end of current WORD (last non-whitespace char)
+    // Find end of current big_word (last non-whitespace char)
     while pos < chars.len() && !chars[pos].is_whitespace() {
         pos += 1;
     }
 
-    // Return position of last character in WORD
+    // Return position of last character in big_word
     pos.saturating_sub(1)
 }
 
-/// Find the end of the previous WORD (whitespace-separated)
-pub fn find_prev_WORD_end(text: &str, current_pos: usize) -> usize {
+/// Find the end of the previous big_word (whitespace-separated)
+pub fn find_prev_big_word_end(text: &str, current_pos: usize) -> usize {
     let chars: Vec<char> = text.chars().collect();
     if chars.is_empty() || current_pos == 0 {
         return 0;
@@ -252,17 +252,17 @@ pub fn find_prev_WORD_end(text: &str, current_pos: usize) -> usize {
         return 0;
     }
 
-    // Skip back to start of current WORD, then forward to end
+    // Skip back to start of current big_word, then forward to end
     while pos > 0 && !chars[pos - 1].is_whitespace() {
         pos -= 1;
     }
 
-    // Now find end of this WORD
+    // Now find end of this big_word
     while pos < chars.len() && !chars[pos].is_whitespace() {
         pos += 1;
     }
 
-    // Return position of last character in WORD
+    // Return position of last character in big_word
     pos.saturating_sub(1)
 }
 
@@ -341,8 +341,8 @@ pub fn find_last_word_end_in_field(text: &str) -> usize {
     pos
 }
 
-/// Find the start of the last WORD in a field (for cross-field 'B' movement)
-pub fn find_last_WORD_start_in_field(text: &str) -> usize {
+/// Find the start of the last big_word in a field (for cross-field 'B' movement)
+pub fn find_last_big_word_start_in_field(text: &str) -> usize {
     if text.is_empty() {
         return 0;
     }
@@ -365,11 +365,11 @@ pub fn find_last_WORD_start_in_field(text: &str) -> usize {
     }
 
     // Now we're on a non-whitespace character
-    // Find the start of this WORD by going backwards while chars are non-whitespace
+    // Find the start of this big_word by going backwards while chars are non-whitespace
     while pos > 0 {
         let prev_char = chars[pos - 1];
 
-        // Stop if we hit whitespace (WORD boundary)
+        // Stop if we hit whitespace (big_word boundary)
         if prev_char.is_whitespace() {
             break;
         }
@@ -379,8 +379,8 @@ pub fn find_last_WORD_start_in_field(text: &str) -> usize {
     pos
 }
 
-/// Find the end of the last WORD in a field (for cross-field 'gE' movement)
-pub fn find_last_WORD_end_in_field(text: &str) -> usize {
+/// Find the end of the last big_word in a field (for cross-field 'gE' movement)
+pub fn find_last_big_word_end_in_field(text: &str) -> usize {
     let chars: Vec<char> = text.chars().collect();
     if chars.is_empty() {
         return 0;
@@ -398,6 +398,6 @@ pub fn find_last_WORD_end_in_field(text: &str) -> usize {
         return 0;
     }
 
-    // We're now at the end of the last WORD
+    // We're now at the end of the last big_word
     pos
 }
