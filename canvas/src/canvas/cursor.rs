@@ -15,15 +15,26 @@ impl CursorManager {
     /// Update cursor style based on current mode
     #[cfg(feature = "cursor-style")]
     pub fn update_for_mode(mode: AppMode) -> io::Result<()> {
-        let style = match mode {
-            AppMode::Edit => SetCursorStyle::SteadyBar,           // Thin line for insert
-            AppMode::ReadOnly => SetCursorStyle::SteadyBlock,     // Block for normal
-            AppMode::Highlight => SetCursorStyle::BlinkingBlock,  // Blinking for visual
-            AppMode::General => SetCursorStyle::SteadyBlock,      // Block for general
-            AppMode::Command => SetCursorStyle::SteadyUnderScore, // Underscore for command
-        };
-        
-        execute!(io::stdout(), style)
+        // NORMALMODE: force underscore for every mode
+        #[cfg(feature = "textmode-normal")]
+        {
+            let style = SetCursorStyle::SteadyUnderScore;
+            return execute!(io::stdout(), style);
+        }
+
+        // Default (not normal): original mapping
+        #[cfg(not(feature = "textmode-normal"))]
+        {
+            let style = match mode {
+                AppMode::Edit => SetCursorStyle::SteadyBar,           // Thin line for insert
+                AppMode::ReadOnly => SetCursorStyle::SteadyBlock,     // Block for normal
+                AppMode::Highlight => SetCursorStyle::BlinkingBlock,  // Blinking for visual
+                AppMode::General => SetCursorStyle::SteadyBlock,      // Block for general
+                AppMode::Command => SetCursorStyle::SteadyUnderScore, // Underscore for command
+            };
+
+            return execute!(io::stdout(), style);
+        }
     }
 
     /// No-op when cursor-style feature is disabled

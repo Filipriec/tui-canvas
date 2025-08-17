@@ -1,4 +1,4 @@
-// examples/canvas_textarea_cursor_auto.rs
+// examples/textarea_vim.rs
 //! Demonstrates automatic cursor management with the textarea widget
 //!
 //! This example REQUIRES the `cursor-style` and `textarea` features to compile.

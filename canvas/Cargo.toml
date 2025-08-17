@@ -29,13 +29,26 @@ regex = { workspace = true, optional = true }
 tokio-test = "0.4.4"
 
 [features]
-default = []
+default = ["textmode-vim"]
 gui = ["ratatui", "crossterm"]
 suggestions = ["tokio"]
 cursor-style = ["crossterm"]
 validation = ["regex"]
 computed = []
 textarea = ["gui"]
+
+# text modes (mutually exclusive; default to vim)
+textmode-vim = []
+textmode-normal = []
+
+all-nontextmodes = [
+    "gui",
+    "suggestions",
+    "cursor-style",
+    "validation",
+    "computed",
+    "textarea"
+]
 
 [[example]]
 name = "suggestions"
@@ -77,6 +90,11 @@ name = "computed_fields"
 required-features = ["gui", "computed"]
 
 [[example]]
-name = "canvas_textarea_cursor_auto"
+name = "textarea_vim"
 required-features = ["gui", "cursor-style", "textarea"]
-path = "examples/canvas_textarea_cursor_auto.rs"
+path = "examples/textarea_vim.rs"
+
+[[example]]
+name = "textarea_normal"
+required-features = ["gui", "cursor-style", "textarea"]
+path = "examples/textarea_normal.rs"
