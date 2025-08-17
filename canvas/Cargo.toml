@@ -35,6 +35,7 @@ suggestions = ["tokio"]
 cursor-style = ["crossterm"]
 validation = ["regex"]
 computed = []
+textarea = ["gui"]
 
 [[example]]
 name = "suggestions"
@@ -74,3 +75,8 @@ required-features = ["gui", "validation", "cursor-style"]
 [[example]]
 name = "computed_fields"
 required-features = ["gui", "computed"]
+
+[[example]]
+name = "canvas_textarea_cursor_auto"
+required-features = ["gui", "cursor-style", "textarea"]
+path = "examples/canvas_textarea_cursor_auto.rs"

@@ -63,3 +63,11 @@ pub use canvas::gui::render_canvas_default;
 
 #[cfg(all(feature = "gui", feature = "suggestions"))]
 pub use suggestions::gui::render_suggestions_dropdown;
+
+
+// First-class textarea module and exports
+#[cfg(feature = "textarea")]
+pub mod textarea;
+
+#[cfg(feature = "textarea")]
+pub use textarea::{TextArea, TextAreaProvider, TextAreaState, TextAreaEditor};

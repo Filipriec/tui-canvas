@@ -1,0 +1,585 @@
+// examples/canvas_textarea_cursor_auto.rs
+//! Demonstrates automatic cursor management with the textarea widget
+//!
+//! This example REQUIRES the `cursor-style` and `textarea` features to compile.
+//!
+//! Run with:
+//! cargo run --example canvas_textarea_cursor_auto --features "gui,cursor-style,textarea"
+
+// REQUIRE cursor-style and textarea features
+#[cfg(not(feature = "cursor-style"))]
+compile_error!(
+    "This example requires the 'cursor-style' feature. \
+     Run with: cargo run --example canvas_textarea_cursor_auto --features \"gui,cursor-style,textarea\""
+);
+
+#[cfg(not(feature = "textarea"))]
+compile_error!(
+    "This example requires the 'textarea' feature. \
+     Run with: cargo run --example canvas_textarea_cursor_auto --features \"gui,cursor-style,textarea\""
+);
+
+use std::io;
+use crossterm::{
+    event::{
+        self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers,
+    },
+    execute,
+    terminal::{
+        disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
+    },
+};
+use ratatui::{
+    backend::{Backend, CrosstermBackend},
+    layout::{Constraint, Direction, Layout},
+    style::{Color, Style},
+    text::{Line, Span},
+    widgets::{Block, Borders, Paragraph},
+    Frame, Terminal,
+};
+
+use canvas::{
+    canvas::{
+        modes::AppMode,
+        CursorManager, // This import only exists when cursor-style feature is enabled
+    },
+    textarea::{TextArea, TextAreaState},
+};
+
+/// Enhanced TextArea that demonstrates automatic cursor management
+struct AutoCursorTextArea {
+    textarea: TextAreaState,
+    has_unsaved_changes: bool,
+    debug_message: String,
+    mode: AppMode,
+    command_buffer: String,
+}
+
+impl AutoCursorTextArea {
+    fn new() -> Self {
+        let initial_text = "🎯 Automatic Cursor Management Demo\n\
+Welcome to the textarea cursor demo!\n\
+\n\
+Try different modes:\n\
+• Normal mode: Block cursor █\n\
+• Insert mode: Bar cursor |\n\
+\n\
+Navigation commands:\n\
+• hjkl or arrow keys: move cursor\n\
+• i: enter insert mode\n\
+• Esc: return to normal mode\n\
+\n\
+Watch how the terminal cursor changes automatically!\n\
+This text can be edited when in insert mode.\n\
+\n\
+Press ? for help, F1/F2 for manual cursor control demo.";
+
+        let mut textarea = TextAreaState::from_text(initial_text);
+        textarea.set_placeholder("Start typing...");
+        
+        Self {
+            textarea,
+            has_unsaved_changes: false,
+            debug_message: "🎯 Automatic Cursor Demo - cursor-style feature enabled!".to_string(),
+            mode: AppMode::ReadOnly,
+            command_buffer: String::new(),
+        }
+    }
+
+    // === MODE TRANSITIONS WITH AUTOMATIC CURSOR MANAGEMENT ===
+
+    fn enter_insert_mode(&mut self) -> std::io::Result<()> {
+        self.mode = AppMode::Edit;
+        CursorManager::update_for_mode(AppMode::Edit)?; // 🎯 Automatic: cursor becomes bar |
+        self.debug_message = "✏️  INSERT MODE - Cursor: Steady Bar |".to_string();
+        Ok(())
+    }
+
+    fn enter_append_mode(&mut self) -> std::io::Result<()> {
+        // Move cursor to end of current line, then enter insert mode
+        self.send_key_to_textarea(KeyCode::End, KeyModifiers::NONE);
+        self.enter_insert_mode()
+    }
+
+    fn exit_to_normal_mode(&mut self) -> std::io::Result<()> {
+        self.mode = AppMode::ReadOnly;
+        CursorManager::update_for_mode(AppMode::ReadOnly)?; // 🎯 Automatic: cursor becomes steady block
+        self.debug_message = "🔒 NORMAL MODE - Cursor: Steady Block █".to_string();
+        Ok(())
+    }
+
+    // === MANUAL CURSOR OVERRIDE DEMONSTRATION ===
+
+    fn demo_manual_cursor_control(&mut self) -> std::io::Result<()> {
+        // Users can still manually control cursor if needed
+        CursorManager::update_for_mode(AppMode::Command)?;
+        self.debug_message = "🔧 Manual override: Command cursor _".to_string();
+        Ok(())
+    }
+
+    fn restore_automatic_cursor(&mut self) -> std::io::Result<()> {
+        // Restore automatic cursor based on current mode
+        CursorManager::update_for_mode(self.mode)?;
+        self.debug_message = "🎯 Restored automatic cursor management".to_string();
+        Ok(())
+    }
+
+    // === TEXTAREA OPERATIONS ===
+
+    fn handle_textarea_input(&mut self, key: KeyEvent) {
+        self.textarea.input(key);
+        if key.code != KeyCode::Left && key.code != KeyCode::Right 
+            && key.code != KeyCode::Up && key.code != KeyCode::Down
+            && key.code != KeyCode::Home && key.code != KeyCode::End {
+            self.has_unsaved_changes = true;
+        }
+    }
+
+    fn send_key_to_textarea(&mut self, code: KeyCode, modifiers: KeyModifiers) {
+        let key_event = KeyEvent {
+            code,
+            modifiers,
+            kind: KeyEventKind::Press,
+            state: crossterm::event::KeyEventState::NONE,
+        };
+        self.textarea.input(key_event);
+    }
+
+    // === MOVEMENT OPERATIONS (for normal mode) ===
+
+    fn move_left(&mut self) {
+        self.send_key_to_textarea(KeyCode::Left, KeyModifiers::NONE);
+        self.update_debug_for_movement("← left");
+    }
+
+    fn move_right(&mut self) {
+        self.send_key_to_textarea(KeyCode::Right, KeyModifiers::NONE);
+        self.update_debug_for_movement("→ right");
+    }
+
+    fn move_up(&mut self) {
+        self.send_key_to_textarea(KeyCode::Up, KeyModifiers::NONE);
+        self.update_debug_for_movement("↑ up");
+    }
+
+    fn move_down(&mut self) {
+        self.send_key_to_textarea(KeyCode::Down, KeyModifiers::NONE);
+        self.update_debug_for_movement("↓ down");
+    }
+
+    fn move_word_next(&mut self) {
+        // Use Alt+f for word forward (from textarea implementation)
+        self.send_key_to_textarea(KeyCode::Char('f'), KeyModifiers::ALT);
+        self.update_debug_for_movement("w: next word");
+    }
+
+    fn move_word_prev(&mut self) {
+        // Use Alt+b for word backward (from textarea implementation)
+        self.send_key_to_textarea(KeyCode::Char('b'), KeyModifiers::ALT);
+        self.update_debug_for_movement("b: previous word");
+    }
+
+    fn move_word_end(&mut self) {
+        // Use Alt+e for word end (from textarea implementation)
+        self.send_key_to_textarea(KeyCode::Char('e'), KeyModifiers::ALT);
+        self.update_debug_for_movement("e: word end");
+    }
+
+    fn move_line_start(&mut self) {
+        self.send_key_to_textarea(KeyCode::Home, KeyModifiers::NONE);
+        self.update_debug_for_movement("0: line start");
+    }
+
+    fn move_line_end(&mut self) {
+        self.send_key_to_textarea(KeyCode::End, KeyModifiers::NONE);
+        self.update_debug_for_movement("$: line end");
+    }
+
+    fn move_first_line(&mut self) {
+        // Move to very beginning of text
+        self.send_key_to_textarea(KeyCode::Char('a'), KeyModifiers::CONTROL);
+        self.update_debug_for_movement("gg: first line");
+    }
+
+    fn move_last_line(&mut self) {
+        // Move to very end of text  
+        self.send_key_to_textarea(KeyCode::Char('e'), KeyModifiers::CONTROL);
+        self.update_debug_for_movement("G: last line");
+    }
+
+    fn update_debug_for_movement(&mut self, action: &str) {
+        self.debug_message = action.to_string();
+    }
+
+    // === DELETE OPERATIONS ===
+
+    fn delete_char_forward(&mut self) {
+        self.send_key_to_textarea(KeyCode::Delete, KeyModifiers::NONE);
+        self.has_unsaved_changes = true;
+        self.debug_message = "x: deleted character".to_string();
+    }
+
+    fn delete_char_backward(&mut self) {
+        self.send_key_to_textarea(KeyCode::Backspace, KeyModifiers::NONE);
+        self.has_unsaved_changes = true;
+        self.debug_message = "X: deleted character backward".to_string();
+    }
+
+    // === COMMAND BUFFER HANDLING ===
+
+    fn clear_command_buffer(&mut self) {
+        self.command_buffer.clear();
+    }
+
+    fn add_to_command_buffer(&mut self, ch: char) {
+        self.command_buffer.push(ch);
+    }
+
+    fn get_command_buffer(&self) -> &str {
+        &self.command_buffer
+    }
+
+    fn has_pending_command(&self) -> bool {
+        !self.command_buffer.is_empty()
+    }
+
+    // === GETTERS ===
+
+    fn mode(&self) -> AppMode {
+        self.mode
+    }
+
+    fn debug_message(&self) -> &str {
+        &self.debug_message
+    }
+
+    fn has_unsaved_changes(&self) -> bool {
+        self.has_unsaved_changes
+    }
+
+    fn set_debug_message(&mut self, msg: String) {
+        self.debug_message = msg;
+    }
+
+    fn get_cursor_info(&self) -> String {
+        // Since we can't access the internal editor, we'll provide a simpler status
+        format!("Textarea cursor positioned")
+    }
+}
+
+/// Handle key press with automatic cursor management
+fn handle_key_press(
+    key_event: KeyEvent,
+    editor: &mut AutoCursorTextArea,
+) -> anyhow::Result<bool> {
+    let KeyEvent { code: key, modifiers, .. } = key_event;
+    let mode = editor.mode();
+
+    // Quit handling
+    if (key == KeyCode::Char('q') && modifiers.contains(KeyModifiers::CONTROL))
+        || (key == KeyCode::Char('c') && modifiers.contains(KeyModifiers::CONTROL))
+        || key == KeyCode::F(10)
+    {
+        return Ok(false);
+    }
+
+    match (mode, key, modifiers) {
+        // === MODE TRANSITIONS WITH AUTOMATIC CURSOR MANAGEMENT ===
+        (AppMode::ReadOnly, KeyCode::Char('i'), _) => {
+            editor.enter_insert_mode()?;
+            editor.clear_command_buffer();
+        }
+        (AppMode::ReadOnly, KeyCode::Char('a'), _) => {
+            editor.enter_append_mode()?;
+            editor.clear_command_buffer();
+        }
+        (AppMode::ReadOnly, KeyCode::Char('A'), _) => {
+            editor.move_line_end();
+            editor.enter_insert_mode()?;
+            editor.clear_command_buffer();
+        }
+
+        // Escape: Exit any mode back to normal
+        (AppMode::Edit, KeyCode::Esc, _) => {
+            editor.exit_to_normal_mode()?;
+        }
+
+        // === INSERT MODE: Pass to textarea ===
+        (AppMode::Edit, _, _) => {
+            editor.handle_textarea_input(key_event);
+        }
+
+        // === CURSOR MANAGEMENT DEMONSTRATION ===
+        (AppMode::ReadOnly, KeyCode::F(1), _) => {
+            editor.demo_manual_cursor_control()?;
+        }
+        (AppMode::ReadOnly, KeyCode::F(2), _) => {
+            editor.restore_automatic_cursor()?;
+        }
+
+        // === MOVEMENT: VIM-STYLE NAVIGATION (Normal mode) ===
+        (AppMode::ReadOnly, KeyCode::Char('h'), _)
+        | (AppMode::ReadOnly, KeyCode::Left, _) => {
+            editor.move_left();
+            editor.clear_command_buffer();
+        }
+        (AppMode::ReadOnly, KeyCode::Char('l'), _)
+        | (AppMode::ReadOnly, KeyCode::Right, _) => {
+            editor.move_right();
+            editor.clear_command_buffer();
+        }
+        (AppMode::ReadOnly, KeyCode::Char('j'), _)
+        | (AppMode::ReadOnly, KeyCode::Down, _) => {
+            editor.move_down();
+            editor.clear_command_buffer();
+        }
+        (AppMode::ReadOnly, KeyCode::Char('k'), _)
+        | (AppMode::ReadOnly, KeyCode::Up, _) => {
+            editor.move_up();
+            editor.clear_command_buffer();
+        }
+
+        // Word movement
+        (AppMode::ReadOnly, KeyCode::Char('w'), _) => {
+            editor.move_word_next();
+            editor.clear_command_buffer();
+        }
+        (AppMode::ReadOnly, KeyCode::Char('b'), _) => {
+            editor.move_word_prev();
+            editor.clear_command_buffer();
+        }
+        (AppMode::ReadOnly, KeyCode::Char('e'), _) => {
+            if editor.get_command_buffer() == "g" {
+                // TODO: Implement ge (previous word end)
+                editor.move_word_prev();
+                editor.set_debug_message("ge: previous word end (simplified)".to_string());
+                editor.clear_command_buffer();
+            } else {
+                editor.move_word_end();
+                editor.clear_command_buffer();
+            }
+        }
+
+        // Line movement
+        (AppMode::ReadOnly, KeyCode::Char('0'), _)
+        | (AppMode::ReadOnly, KeyCode::Home, _) => {
+            editor.move_line_start();
+            editor.clear_command_buffer();
+        }
+        (AppMode::ReadOnly, KeyCode::Char('$'), _)
+        | (AppMode::ReadOnly, KeyCode::End, _) => {
+            editor.move_line_end();
+            editor.clear_command_buffer();
+        }
+
+        // Document movement with command buffer
+        (AppMode::ReadOnly, KeyCode::Char('g'), _) => {
+            if editor.get_command_buffer() == "g" {
+                editor.move_first_line();
+                editor.clear_command_buffer();
+            } else {
+                editor.clear_command_buffer();
+                editor.add_to_command_buffer('g');
+                editor.set_debug_message("g".to_string());
+            }
+        }
+        (AppMode::ReadOnly, KeyCode::Char('G'), _) => {
+            editor.move_last_line();
+            editor.clear_command_buffer();
+        }
+
+        // === DELETE OPERATIONS (Normal mode) ===
+        (AppMode::ReadOnly, KeyCode::Char('x'), _) => {
+            editor.delete_char_forward();
+            editor.clear_command_buffer();
+        }
+        (AppMode::ReadOnly, KeyCode::Char('X'), _) => {
+            editor.delete_char_backward();
+            editor.clear_command_buffer();
+        }
+
+        // === DEBUG/INFO COMMANDS ===
+        (AppMode::ReadOnly, KeyCode::Char('?'), _) => {
+            editor.set_debug_message(format!(
+                "{}, Mode: {:?} - Cursor managed automatically!",
+                editor.get_cursor_info(),
+                mode
+            ));
+            editor.clear_command_buffer();
+        }
+
+        _ => {
+            if editor.has_pending_command() {
+                editor.clear_command_buffer();
+                editor.set_debug_message("Invalid command sequence".to_string());
+            } else {
+                editor.set_debug_message(format!(
+                    "Unhandled: {:?} + {:?} in {:?} mode",
+                    key, modifiers, mode
+                ));
+            }
+        }
+    }
+
+    Ok(true)
+}
+
+fn run_app<B: Backend>(
+    terminal: &mut Terminal<B>,
+    mut editor: AutoCursorTextArea,
+) -> io::Result<()> {
+    loop {
+        terminal.draw(|f| ui(f, &mut editor))?;
+
+        if let Event::Key(key) = event::read()? {
+            match handle_key_press(key, &mut editor) {
+                Ok(should_continue) => {
+                    if !should_continue {
+                        break;
+                    }
+                }
+                Err(e) => {
+                    editor.set_debug_message(format!("Error: {}", e));
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
+
+fn ui(f: &mut Frame, editor: &mut AutoCursorTextArea) {
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Min(8), Constraint::Length(8)])
+        .split(f.area());
+
+    render_textarea(f, chunks[0], editor);
+    render_status_and_help(f, chunks[1], editor);
+}
+
+fn render_textarea(
+    f: &mut Frame,
+    area: ratatui::layout::Rect,
+    editor: &mut AutoCursorTextArea,
+) {
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .title("🎯 Textarea with Automatic Cursor Management");
+
+    let textarea_widget = TextArea::default().block(block.clone());
+    
+    f.render_stateful_widget(textarea_widget, area, &mut editor.textarea);
+
+    // Set cursor position for terminal cursor
+    // Always show cursor - CursorManager handles the style (block/bar/blinking)
+    let (cx, cy) = editor.textarea.cursor(area, Some(&block));
+    f.set_cursor_position((cx, cy));
+}
+
+fn render_status_and_help(
+    f: &mut Frame,
+    area: ratatui::layout::Rect,
+    editor: &AutoCursorTextArea,
+) {
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Length(3), Constraint::Length(5)])
+        .split(area);
+
+    // Status bar with cursor information
+    let mode_text = match editor.mode() {
+        AppMode::Edit => "INSERT | (bar cursor)",
+        AppMode::ReadOnly => "NORMAL █ (block cursor)",
+        AppMode::Highlight => "VISUAL █ (blinking block)",
+        _ => "NORMAL █ (block cursor)",
+    };
+
+    let status_text = if editor.has_pending_command() {
+        format!("-- {} -- {} [{}]", mode_text, editor.debug_message(), editor.get_command_buffer())
+    } else if editor.has_unsaved_changes() {
+        format!("-- {} -- [Modified] {} | {}", mode_text, editor.debug_message(), editor.get_cursor_info())
+    } else {
+        format!("-- {} -- {} | {}", mode_text, editor.debug_message(), editor.get_cursor_info())
+    };
+
+    let status = Paragraph::new(Line::from(Span::raw(status_text)))
+        .block(Block::default().borders(Borders::ALL).title("🎯 Automatic Cursor Status"));
+
+    f.render_widget(status, chunks[0]);
+
+    // Help text
+    let help_text = match editor.mode() {
+        AppMode::ReadOnly => {
+            if editor.has_pending_command() {
+                match editor.get_command_buffer() {
+                    "g" => "Press 'g' again for first line, or any other key to cancel",
+                    _ => "Pending command... (Esc to cancel)"
+                }
+            } else {
+                "🎯 CURSOR-STYLE DEMO: Normal █ | Insert | \n\
+                Normal: hjkl/arrows=move, w/b/e=words, 0/$=line, g/G=first/last\n\
+                i/a/A=insert, x/X=delete, ?=info\n\
+                F1=demo manual cursor, F2=restore automatic, Ctrl+Q=quit"
+            }
+        }
+        AppMode::Edit => {
+            "🎯 INSERT MODE - Cursor: | (bar)\n\
+            Type to edit text, arrows=move, Enter=new line\n\
+            Esc=normal mode"
+        }
+        AppMode::Highlight => {
+            "🎯 VISUAL MODE - Cursor: █ (blinking block)\n\
+            hjkl/arrows=extend selection\n\
+            Esc=normal mode"
+        }
+        _ => "🎯 Watch the cursor change automatically!"
+    };
+
+    let help = Paragraph::new(help_text)
+        .block(Block::default().borders(Borders::ALL).title("🚀 Automatic Cursor Management"))
+        .style(Style::default().fg(Color::Gray));
+
+    f.render_widget(help, chunks[1]);
+}
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Print feature status
+    println!("🎯 Canvas Textarea Cursor Auto Demo");
+    println!("✅ cursor-style feature: ENABLED");
+    println!("✅ textarea feature: ENABLED");
+    println!("🚀 Automatic cursor management: ACTIVE");
+    println!("📖 Watch your terminal cursor change based on mode!");
+    println!();
+
+    enable_raw_mode()?;
+    let mut stdout = io::stdout();
+    execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
+    let backend = CrosstermBackend::new(stdout);
+    let mut terminal = Terminal::new(backend)?;
+
+    let mut editor = AutoCursorTextArea::new();
+
+    // Initialize with normal mode - library automatically sets block cursor
+    editor.exit_to_normal_mode()?;
+
+    let res = run_app(&mut terminal, editor);
+
+    // Reset cursor on exit
+    CursorManager::reset()?;
+
+    disable_raw_mode()?;
+    execute!(
+        terminal.backend_mut(),
+        LeaveAlternateScreen,
+        DisableMouseCapture
+    )?;
+    terminal.show_cursor()?;
+
+    if let Err(err) = res {
+        println!("{:?}", err);
+    }
+
+    println!("🎯 Cursor automatically reset to default!");
+    Ok(())
+}
