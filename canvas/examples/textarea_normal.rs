@@ -200,9 +200,16 @@ Press ? for help, Ctrl+Q to quit.";
     }
 }
 
-/// Handle key press in NORMALMODE (always editing)
-fn handle_key_press(key_event: KeyEvent, editor: &mut AutoCursorTextArea) -> anyhow::Result<bool> {
-    let KeyEvent { code: key, modifiers, .. } = key_event;
+/// Handle key press in NORMALMODE (always editing, casual editor style)
+fn handle_key_press(
+    key_event: KeyEvent,
+    editor: &mut AutoCursorTextArea,
+) -> anyhow::Result<bool> {
+    let KeyEvent {
+        code: key,
+        modifiers,
+        ..
+    } = key_event;
 
     // Quit
     if (key == KeyCode::Char('q') && modifiers.contains(KeyModifiers::CONTROL))
@@ -214,52 +221,32 @@ fn handle_key_press(key_event: KeyEvent, editor: &mut AutoCursorTextArea) -> any
 
     match (key, modifiers) {
         // Movement
-        (KeyCode::Char('h'), _) | (KeyCode::Left, _) => editor.move_left(),
-        (KeyCode::Char('l'), _) | (KeyCode::Right, _) => editor.move_right(),
-        (KeyCode::Char('j'), _) | (KeyCode::Down, _) => editor.move_down(),
-        (KeyCode::Char('k'), _) | (KeyCode::Up, _) => editor.move_up(),
+        (KeyCode::Left, _) => editor.move_left(),
+        (KeyCode::Right, _) => editor.move_right(),
+        (KeyCode::Up, _) => editor.move_up(),
+        (KeyCode::Down, _) => editor.move_down(),
 
-        // Word movement
-        (KeyCode::Char('w'), _) => editor.move_word_next(),
-        (KeyCode::Char('b'), _) => editor.move_word_prev(),
-        (KeyCode::Char('e'), _) => {
-            if editor.get_command_buffer() == "g" {
-                editor.move_word_end_prev();
-                editor.clear_command_buffer();
-            } else {
-                editor.move_word_end();
-                editor.clear_command_buffer();
-            }
+        // Word movement (Ctrl+Arrows)
+        (KeyCode::Left, m) if m.contains(KeyModifiers::CONTROL) => editor.move_word_prev(),
+        (KeyCode::Right, m) if m.contains(KeyModifiers::CONTROL) => editor.move_word_next(),
+        (KeyCode::Right, m) if m.contains(KeyModifiers::CONTROL | KeyModifiers::SHIFT) => {
+            editor.move_word_end()
         }
-
-        // Big word movement
-        (KeyCode::Char('W'), _) => editor.move_big_word_next(),
-        (KeyCode::Char('B'), _) => editor.move_big_word_prev(),
-        (KeyCode::Char('E'), _) => editor.move_big_word_end(),
 
         // Line/document movement
-        (KeyCode::Char('0'), _) | (KeyCode::Home, _) => editor.move_line_start(),
-        (KeyCode::Char('$'), _) | (KeyCode::End, _) => editor.move_line_end(),
-        (KeyCode::Char('g'), _) => {
-            if editor.get_command_buffer() == "g" {
-                editor.move_first_line();
-                editor.clear_command_buffer();
-            } else {
-                editor.clear_command_buffer();
-                editor.add_to_command_buffer('g');
-                editor.set_debug_message("g".to_string());
-            }
-        }
-        (KeyCode::Char('G'), _) => editor.move_last_line(),
+        (KeyCode::Home, _) => editor.move_line_start(),
+        (KeyCode::End, _) => editor.move_line_end(),
+        (KeyCode::Home, m) if m.contains(KeyModifiers::CONTROL) => editor.move_first_line(),
+        (KeyCode::End, m) if m.contains(KeyModifiers::CONTROL) => editor.move_last_line(),
 
         // Delete
-        (KeyCode::Char('x'), _) => editor.delete_char_forward(),
-        (KeyCode::Char('X'), _) => editor.delete_char_backward(),
+        (KeyCode::Delete, _) => editor.delete_char_forward(),
+        (KeyCode::Backspace, _) => editor.delete_char_backward(),
 
         // Debug/info
         (KeyCode::Char('?'), _) => {
             editor.set_debug_message(format!(
-                "{}, Mode: NORMALMODE (always editing, underscore cursor)",
+                "{}, Mode: NORMALMODE (casual editor, underscore cursor)",
                 editor.get_cursor_info()
             ));
             editor.clear_command_buffer();

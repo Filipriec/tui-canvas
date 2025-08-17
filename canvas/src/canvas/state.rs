@@ -54,7 +54,13 @@ impl EditorState {
             current_field: 0,
             cursor_pos: 0,
             ideal_cursor_column: 0,
+            // NORMALMODE: always start in Edit
+            #[cfg(feature = "textmode-normal")]
             current_mode: AppMode::Edit,
+            // Default (vim): start in ReadOnly
+            #[cfg(not(feature = "textmode-normal"))]
+            current_mode: AppMode::ReadOnly,
+
             #[cfg(feature = "suggestions")]
             suggestions: SuggestionsUIState {
                 is_active: false,

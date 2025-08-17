@@ -91,10 +91,10 @@ required-features = ["gui", "computed"]
 
 [[example]]
 name = "textarea_vim"
-required-features = ["gui", "cursor-style", "textarea"]
+required-features = ["gui", "cursor-style", "textarea", "textmode-vim"]
 path = "examples/textarea_vim.rs"
 
 [[example]]
 name = "textarea_normal"
-required-features = ["gui", "cursor-style", "textarea"]
+required-features = ["gui", "cursor-style", "textarea", "textmode-normal"]
 path = "examples/textarea_normal.rs"

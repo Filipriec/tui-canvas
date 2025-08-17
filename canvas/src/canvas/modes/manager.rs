@@ -36,13 +36,22 @@ impl ModeManager {
 
     /// Transition to new mode with automatic cursor update (when cursor-style feature enabled)
     pub fn transition_to_mode(current_mode: AppMode, new_mode: AppMode) -> std::io::Result<AppMode> {
-        if current_mode != new_mode {
-            #[cfg(feature = "cursor-style")]
-            {
-                let _ = CursorManager::update_for_mode(new_mode);
-            }
+        #[cfg(feature = "textmode-normal")]
+        {
+            // Always force Edit in normalmode
+            return Ok(AppMode::Edit);
         }
-        Ok(new_mode)
+
+        #[cfg(not(feature = "textmode-normal"))]
+        {
+            if current_mode != new_mode {
+                #[cfg(feature = "cursor-style")]
+                {
+                    let _ = CursorManager::update_for_mode(new_mode);
+                }
+            }
+            Ok(new_mode)
+        }
     }
 
     /// Enter highlight mode with cursor styling

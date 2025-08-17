@@ -53,10 +53,19 @@ impl<D: DataProvider> FormEditor<D> {
         {
             let mut editor = editor;
             editor.initialize_validation();
+
+            #[cfg(feature = "cursor-style")]
+            {
+                let _ = CursorManager::update_for_mode(editor.ui_state.current_mode);
+            }
             editor
         }
         #[cfg(not(feature = "validation"))]
         {
+            #[cfg(feature = "cursor-style")]
+            {
+                let _ = CursorManager::update_for_mode(editor.ui_state.current_mode);
+            }
             editor
         }
     }

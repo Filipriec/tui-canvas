@@ -16,9 +16,6 @@ pub mod validation;
 #[cfg(feature = "computed")]
 pub mod computed;
 
-#[path = "textmode/check.rs"]
-mod textmode_check;
-
 #[cfg(feature = "cursor-style")]
 pub use canvas::CursorManager;
 

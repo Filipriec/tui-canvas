@@ -18,7 +18,7 @@ impl CursorManager {
         // NORMALMODE: force underscore for every mode
         #[cfg(feature = "textmode-normal")]
         {
-            let style = SetCursorStyle::SteadyUnderScore;
+            let style = SetCursorStyle::SteadyBar;
             return execute!(io::stdout(), style);
         }
 
