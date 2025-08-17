@@ -12,6 +12,10 @@ pub mod suggestions;
 #[cfg(feature = "validation")]
 pub mod validation;
 
+// First-class textarea module and exports
+#[cfg(feature = "textarea")]
+pub mod textarea;
+
 // Only include computed module if feature is enabled
 #[cfg(feature = "computed")]
 pub mod computed;
@@ -56,18 +60,17 @@ pub use computed::{ComputedProvider, ComputedContext, ComputedState};
 pub use canvas::theme::{CanvasTheme, DefaultCanvasTheme};
 
 #[cfg(feature = "gui")]
-pub use canvas::gui::render_canvas;
+pub use canvas::gui::{render_canvas, render_canvas_default};
 
 #[cfg(feature = "gui")]
-pub use canvas::gui::render_canvas_default;
+pub use canvas::gui::render_canvas_with_options;
+
+#[cfg(feature = "gui")]
+pub use canvas::gui::{CanvasDisplayOptions, OverflowMode};
 
 #[cfg(all(feature = "gui", feature = "suggestions"))]
 pub use suggestions::gui::render_suggestions_dropdown;
 
-
-// First-class textarea module and exports
-#[cfg(feature = "textarea")]
-pub mod textarea;
 
 #[cfg(feature = "textarea")]
 pub use textarea::{TextArea, TextAreaProvider, TextAreaState, TextAreaEditor};

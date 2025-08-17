@@ -6,7 +6,7 @@ use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, BorderType, Paragraph},
+    widgets::{Block, Borders, BorderType, Paragraph, Wrap},
     Frame,
 };
 
@@ -20,8 +20,60 @@ use unicode_width::UnicodeWidthChar;
 #[cfg(feature = "gui")]
 use std::cmp::{max, min};
 
-/// Render ONLY the canvas form fields - no suggestions rendering here
-/// Updated to work with FormEditor instead of CanvasState trait
+#[cfg(feature = "gui")]
+#[derive(Debug, Clone, Copy)]
+pub enum OverflowMode {
+    Indicator(char), // default '$'
+    Wrap,
+}
+
+#[cfg(feature = "gui")]
+#[derive(Debug, Clone, Copy)]
+pub struct CanvasDisplayOptions {
+    pub overflow: OverflowMode,
+}
+
+#[cfg(feature = "gui")]
+impl Default for CanvasDisplayOptions {
+    fn default() -> Self {
+        Self {
+            overflow: OverflowMode::Indicator('$'),
+        }
+    }
+}
+
+/// Utility: measure display width of a string
+#[cfg(feature = "gui")]
+fn display_width(s: &str) -> u16 {
+    s.chars()
+        .map(|c| UnicodeWidthChar::width(c).unwrap_or(0) as u16)
+        .sum()
+}
+
+/// Utility: clip a string to fit width, append indicator if overflow
+#[cfg(feature = "gui")]
+fn clip_with_indicator_line<'a>(s: &'a str, width: u16, indicator: char) -> Line<'a> {
+    if width == 0 {
+        return Line::from("");
+    }
+    if display_width(s) <= width {
+        return Line::from(Span::raw(s));
+    }
+    let budget = width.saturating_sub(1);
+    let mut out = String::new();
+    let mut used: u16 = 0;
+    for ch in s.chars() {
+        let w = UnicodeWidthChar::width(ch).unwrap_or(0) as u16;
+        if used + w > budget {
+            break;
+        }
+        out.push(ch);
+        used = used.saturating_add(w);
+    }
+    Line::from(vec![Span::raw(out), Span::raw(indicator.to_string())])
+}
+
+/// Default renderer: overflow indicator '$'
 #[cfg(feature = "gui")]
 pub fn render_canvas<T: CanvasTheme, D: DataProvider>(
     f: &mut Frame,
@@ -29,32 +81,43 @@ pub fn render_canvas<T: CanvasTheme, D: DataProvider>(
     editor: &FormEditor<D>,
     theme: &T,
 ) -> Option<Rect> {
-    // Convert SelectionState to HighlightState
-    let highlight_state = convert_selection_to_highlight(editor.ui_state().selection_state());
-    render_canvas_with_highlight(f, area, editor, theme, &highlight_state)
+    let opts = CanvasDisplayOptions::default();
+    render_canvas_with_options(f, area, editor, theme, opts)
 }
 
-/// Render canvas with explicit highlight state (for advanced use)
+/// Wrapped variant: opt into soft wrap instead of overflow indicator
 #[cfg(feature = "gui")]
-pub fn render_canvas_with_highlight<T: CanvasTheme, D: DataProvider>(
+pub fn render_canvas_with_options<T: CanvasTheme, D: DataProvider>(
+    f: &mut Frame,
+    area: Rect,
+    editor: &FormEditor<D>,
+    theme: &T,
+    opts: CanvasDisplayOptions,
+) -> Option<Rect> {
+    let highlight_state =
+        convert_selection_to_highlight(editor.ui_state().selection_state());
+    render_canvas_with_highlight_and_options(f, area, editor, theme, &highlight_state, opts)
+}
+
+/// Render canvas with explicit highlight state (with options)
+#[cfg(feature = "gui")]
+fn render_canvas_with_highlight_and_options<T: CanvasTheme, D: DataProvider>(
     f: &mut Frame,
     area: Rect,
     editor: &FormEditor<D>,
     theme: &T,
     highlight_state: &HighlightState,
+    opts: CanvasDisplayOptions,
 ) -> Option<Rect> {
     let ui_state = editor.ui_state();
     let data_provider = editor.data_provider();
 
-    // Build field information
     let field_count = data_provider.field_count();
     let mut fields: Vec<&str> = Vec::with_capacity(field_count);
     let mut inputs: Vec<String> = Vec::with_capacity(field_count);
 
     for i in 0..field_count {
         fields.push(data_provider.field_name(i));
-
-        // Use editor-provided effective display text per field (Feature 4/mask aware)
         #[cfg(feature = "validation")]
         {
             inputs.push(editor.display_text_for_field(i));
@@ -68,7 +131,6 @@ pub fn render_canvas_with_highlight<T: CanvasTheme, D: DataProvider>(
     let current_field_idx = ui_state.current_field();
     let is_edit_mode = matches!(ui_state.mode(), crate::canvas::modes::AppMode::Edit);
 
-    // Precompute completion for active field
     #[cfg(feature = "suggestions")]
     let active_completion = if ui_state.is_suggestions_active()
         && ui_state.suggestions.active_field == Some(current_field_idx)
@@ -77,11 +139,10 @@ pub fn render_canvas_with_highlight<T: CanvasTheme, D: DataProvider>(
     } else {
         None
     };
-
     #[cfg(not(feature = "suggestions"))]
     let active_completion: Option<String> = None;
 
-    render_canvas_fields(
+    render_canvas_fields_with_options(
         f,
         area,
         &fields,
@@ -90,27 +151,23 @@ pub fn render_canvas_with_highlight<T: CanvasTheme, D: DataProvider>(
         theme,
         is_edit_mode,
         highlight_state,
-        editor.display_cursor_position(), // Use display cursor position for masks
-        false, // TODO: track unsaved changes in editor
-        // Closures for getting display values and overrides
+        editor.display_cursor_position(),
+        false,
         #[cfg(feature = "validation")]
         |field_idx| editor.display_text_for_field(field_idx),
         #[cfg(not(feature = "validation"))]
         |field_idx| data_provider.field_value(field_idx).to_string(),
-        // Closure for checking display overrides
         #[cfg(feature = "validation")]
         |field_idx| {
-            editor.ui_state().validation_state().get_field_config(field_idx)
-                .map(|cfg| {
-                    let has_formatter = cfg.custom_formatter.is_some();
-                    let has_mask = cfg.display_mask.is_some();
-                    has_formatter || has_mask
-                })
+            editor
+                .ui_state()
+                .validation_state()
+                .get_field_config(field_idx)
+                .map(|cfg| cfg.custom_formatter.is_some() || cfg.display_mask.is_some())
                 .unwrap_or(false)
         },
         #[cfg(not(feature = "validation"))]
         |_field_idx| false,
-        // Closure for providing completion
         |field_idx| {
             if field_idx == current_field_idx {
                 active_completion.clone()
@@ -118,24 +175,32 @@ pub fn render_canvas_with_highlight<T: CanvasTheme, D: DataProvider>(
                 None
             }
         },
+        opts,
     )
 }
 
-/// Convert SelectionState to HighlightState for rendering
 #[cfg(feature = "gui")]
-fn convert_selection_to_highlight(selection: &crate::canvas::state::SelectionState) -> HighlightState {
+fn convert_selection_to_highlight(
+    selection: &crate::canvas::state::SelectionState,
+) -> HighlightState {
     use crate::canvas::state::SelectionState;
 
     match selection {
         SelectionState::None => HighlightState::Off,
-        SelectionState::Characterwise { anchor } => HighlightState::Characterwise { anchor: *anchor },
-        SelectionState::Linewise { anchor_field } => HighlightState::Linewise { anchor_line: *anchor_field },
+        SelectionState::Characterwise { anchor } => {
+            HighlightState::Characterwise { anchor: *anchor }
+        }
+        SelectionState::Linewise { anchor_field } => {
+            HighlightState::Linewise {
+                anchor_line: *anchor_field,
+            }
+        }
     }
 }
 
-/// Core canvas field rendering
+/// Core canvas field rendering with options
 #[cfg(feature = "gui")]
-fn render_canvas_fields<T: CanvasTheme, F1, F2, F3>(
+fn render_canvas_fields_with_options<T: CanvasTheme, F1, F2, F3>(
     f: &mut Frame,
     area: Rect,
     fields: &[&str],
@@ -149,19 +214,18 @@ fn render_canvas_fields<T: CanvasTheme, F1, F2, F3>(
     get_display_value: F1,
     has_display_override: F2,
     get_completion: F3,
+    opts: CanvasDisplayOptions,
 ) -> Option<Rect>
 where
     F1: Fn(usize) -> String,
     F2: Fn(usize) -> bool,
     F3: Fn(usize) -> Option<String>,
 {
-    // Create layout
     let columns = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([Constraint::Percentage(30), Constraint::Percentage(70)])
         .split(area);
 
-    // Border style based on state
     let border_style = if has_unsaved_changes {
         Style::default().fg(theme.warning())
     } else if is_edit_mode {
@@ -170,7 +234,6 @@ where
         Style::default().fg(theme.secondary())
     };
 
-    // Input container
     let input_container = Block::default()
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
@@ -186,29 +249,100 @@ where
 
     f.render_widget(&input_container, input_block);
 
-    // Input area layout
     let input_area = input_container.inner(input_block);
+
+    // NOTE: We keep one visual row per field; Wrap mode renders wrapped content
+    // visually within that row (ratatui handles visual wrapping). To fully
+    // expand rows by wrapped height, we'd convert to per-field dynamic heights.
     let input_rows = Layout::default()
         .direction(Direction::Vertical)
         .constraints(vec![Constraint::Length(1); fields.len()])
         .split(input_area);
 
-    // Render field labels
     render_field_labels(f, columns[0], input_block, fields, theme);
 
-    // Render field values and return active field rect
-    render_field_values(
-        f,
-        input_rows.to_vec(),
-        inputs,
-        current_field_idx,
-        theme,
-        highlight_state,
-        current_cursor_pos,
-        get_display_value,
-        has_display_override,
-        get_completion,
-    )
+    let mut active_field_input_rect = None;
+
+    for i in 0..inputs.len() {
+        let is_active = i == *current_field_idx;
+        let typed_text = get_display_value(i);
+        let inner_width = input_rows[i].width;
+
+        let line = match (opts.overflow, highlight_state) {
+            // No highlighting, just apply overflow mode
+            (OverflowMode::Indicator(ind), HighlightState::Off) => {
+                clip_with_indicator_line(&typed_text, inner_width, ind)
+            }
+
+            // Highlighting is active - need to handle both highlighting and overflow
+            (OverflowMode::Indicator(_ind), HighlightState::Characterwise { .. }) => {
+                // For now, prioritize highlighting over clipping to avoid mangling spans
+                // TODO: Could implement post-processing to clip highlighted spans if needed
+                apply_highlighting(
+                    &typed_text,
+                    i,
+                    current_field_idx,
+                    current_cursor_pos,
+                    highlight_state,
+                    theme,
+                    is_active,
+                )
+            }
+
+            (OverflowMode::Indicator(_ind), HighlightState::Linewise { .. }) => {
+                // For now, prioritize highlighting over clipping to avoid mangling spans  
+                // TODO: Could implement post-processing to clip highlighted spans if needed
+                apply_highlighting(
+                    &typed_text,
+                    i,
+                    current_field_idx,
+                    current_cursor_pos,
+                    highlight_state,
+                    theme,
+                    is_active,
+                )
+            }
+
+            // Wrap mode - just show text and let paragraph handle wrapping
+            (OverflowMode::Wrap, HighlightState::Off) => {
+                Line::from(Span::raw(typed_text.clone()))
+            }
+
+            (OverflowMode::Wrap, _) => {
+                // Apply highlighting and let wrapping handle overflow
+                apply_highlighting(
+                    &typed_text,
+                    i,
+                    current_field_idx,
+                    current_cursor_pos,
+                    highlight_state,
+                    theme,
+                    is_active,
+                )
+            }
+        };
+
+        let mut p = Paragraph::new(line).alignment(Alignment::Left);
+
+        if matches!(opts.overflow, OverflowMode::Wrap) {
+            p = p.wrap(Wrap { trim: false });
+        }
+
+        f.render_widget(p, input_rows[i]);
+
+        if is_active {
+            active_field_input_rect = Some(input_rows[i]);
+            set_cursor_position(
+                f,
+                input_rows[i],
+                &typed_text,
+                current_cursor_pos,
+                has_display_override(i),
+            );
+        }
+    }
+
+    active_field_input_rect
 }
 
 /// Render field labels
@@ -237,73 +371,6 @@ fn render_field_labels<T: CanvasTheme>(
     }
 }
 
-/// Render field values with highlighting
-#[cfg(feature = "gui")]
-fn render_field_values<T: CanvasTheme, F1, F2, F3>(
-    f: &mut Frame,
-    input_rows: Vec<Rect>,
-    inputs: &[String],
-    current_field_idx: &usize,
-    theme: &T,
-    highlight_state: &HighlightState,
-    current_cursor_pos: usize,
-    get_display_value: F1,
-    has_display_override: F2,
-    get_completion: F3,
-) -> Option<Rect>
-where
-    F1: Fn(usize) -> String,
-    F2: Fn(usize) -> bool,
-    F3: Fn(usize) -> Option<String>,
-{
-    let mut active_field_input_rect = None;
-
-    // FIX: Iterate over indices only since we never use the input values directly
-    for i in 0..inputs.len() {
-        let is_active = i == *current_field_idx;
-        let typed_text = get_display_value(i);
-
-        let line = if is_active {
-            // Compose typed + gray completion for the active field
-            let normal_style = Style::default().fg(theme.fg());
-            let gray_style = Style::default().fg(theme.suggestion_gray());
-
-            let mut spans: Vec<Span> = Vec::new();
-            spans.push(Span::styled(typed_text.clone(), normal_style));
-
-            if let Some(completion) = get_completion(i) {
-                if !completion.is_empty() {
-                    spans.push(Span::styled(completion, gray_style));
-                }
-            }
-
-            Line::from(spans)
-        } else {
-            // Non-active fields: keep existing highlighting logic
-            apply_highlighting(
-                &typed_text,
-                i,
-                current_field_idx,
-                current_cursor_pos,
-                highlight_state,
-                theme,
-                is_active,
-            )
-        };
-
-        let input_display = Paragraph::new(line).alignment(Alignment::Left);
-        f.render_widget(input_display, input_rows[i]);
-
-        // Set cursor for active field at end of typed text (not after completion)
-        if is_active {
-            active_field_input_rect = Some(input_rows[i]);
-            set_cursor_position(f, input_rows[i], &typed_text, current_cursor_pos, has_display_override(i));
-        }
-    }
-
-    active_field_input_rect
-}
-
 /// Apply highlighting based on highlight state
 #[cfg(feature = "gui")]
 fn apply_highlighting<'a, T: CanvasTheme>(
@@ -319,21 +386,34 @@ fn apply_highlighting<'a, T: CanvasTheme>(
 
     match highlight_state {
         HighlightState::Off => {
-            Line::from(Span::styled(
-                text,
-                Style::default().fg(theme.fg())
-            ))
+            Line::from(Span::styled(text, Style::default().fg(theme.fg())))
         }
         HighlightState::Characterwise { anchor } => {
-            apply_characterwise_highlighting(text, text_len, field_index, current_field_idx, current_cursor_pos, anchor, theme, is_active)
+            apply_characterwise_highlighting(
+                text,
+                text_len,
+                field_index,
+                current_field_idx,
+                current_cursor_pos,
+                anchor,
+                theme,
+                is_active,
+            )
         }
         HighlightState::Linewise { anchor_line } => {
-            apply_linewise_highlighting(text, field_index, current_field_idx, anchor_line, theme, is_active)
+            apply_linewise_highlighting(
+                text,
+                field_index,
+                current_field_idx,
+                anchor_line,
+                theme,
+                is_active,
+            )
         }
     }
 }
 
-/// Apply characterwise highlighting - PROPER VIM-LIKE VERSION
+/// Apply characterwise highlighting (unchanged)
 #[cfg(feature = "gui")]
 fn apply_characterwise_highlighting<'a, T: CanvasTheme>(
     text: &'a str,
@@ -349,21 +429,20 @@ fn apply_characterwise_highlighting<'a, T: CanvasTheme>(
     let start_field = min(anchor_field, *current_field_idx);
     let end_field = max(anchor_field, *current_field_idx);
 
-    // Vim-like styling:
-    // - Selected text: contrasting color + background (like vim visual selection)
-    // - All other text: normal color (no special colors for active fields, etc.)
     let highlight_style = Style::default()
-        .fg(theme.highlight())          // ✅ Contrasting text color for selected text
-        .bg(theme.highlight_bg())       // ✅ Background for selected text
+        .fg(theme.highlight())
+        .bg(theme.highlight_bg())
         .add_modifier(Modifier::BOLD);
 
-    let normal_style = Style::default().fg(theme.fg()); // ✅ Normal text color everywhere else
+    let normal_style = Style::default().fg(theme.fg());
 
     if field_index >= start_field && field_index <= end_field {
         if start_field == end_field {
-            // Single field selection
             let (start_char, end_char) = if anchor_field == *current_field_idx {
-                (min(anchor_char, current_cursor_pos), max(anchor_char, current_cursor_pos))
+                (
+                    min(anchor_char, current_cursor_pos),
+                    max(anchor_char, current_cursor_pos),
+                )
             } else if anchor_field < *current_field_idx {
                 (anchor_char, current_cursor_pos)
             } else {
@@ -374,19 +453,19 @@ fn apply_characterwise_highlighting<'a, T: CanvasTheme>(
             let clamped_end = end_char.min(text_len);
 
             let before: String = text.chars().take(clamped_start).collect();
-            let highlighted: String = text.chars()
+            let highlighted: String = text
+                .chars()
                 .skip(clamped_start)
                 .take(clamped_end.saturating_sub(clamped_start) + 1)
                 .collect();
             let after: String = text.chars().skip(clamped_end + 1).collect();
 
             Line::from(vec![
-                Span::styled(before, normal_style),         // Normal text color
-                Span::styled(highlighted, highlight_style), // Contrasting color + background
-                Span::styled(after, normal_style),          // Normal text color
+                Span::styled(before, normal_style),
+                Span::styled(highlighted, highlight_style),
+                Span::styled(after, normal_style),
             ])
         } else {
-            // Multi-field selection
             if field_index == anchor_field {
                 if anchor_field < *current_field_idx {
                     let clamped_start = anchor_char.min(text_len);
@@ -428,17 +507,15 @@ fn apply_characterwise_highlighting<'a, T: CanvasTheme>(
                     ])
                 }
             } else {
-                // Middle field: highlight entire field
                 Line::from(Span::styled(text, highlight_style))
             }
         }
     } else {
-        // Outside selection: always normal text color (no special active field color)
         Line::from(Span::styled(text, normal_style))
     }
 }
 
-/// Apply linewise highlighting - PROPER VIM-LIKE VERSION
+/// Apply linewise highlighting (unchanged)
 #[cfg(feature = "gui")]
 fn apply_linewise_highlighting<'a, T: CanvasTheme>(
     text: &'a str,
@@ -451,26 +528,21 @@ fn apply_linewise_highlighting<'a, T: CanvasTheme>(
     let start_field = min(*anchor_line, *current_field_idx);
     let end_field = max(*anchor_line, *current_field_idx);
 
-    // Vim-like styling:
-    // - Selected lines: contrasting text color + background
-    // - All other lines: normal text color (no special active field color)
     let highlight_style = Style::default()
-        .fg(theme.highlight())          // ✅ Contrasting text color for selected text
-        .bg(theme.highlight_bg())       // ✅ Background for selected text
+        .fg(theme.highlight())
+        .bg(theme.highlight_bg())
         .add_modifier(Modifier::BOLD);
 
-    let normal_style = Style::default().fg(theme.fg()); // ✅ Normal text color everywhere else
+    let normal_style = Style::default().fg(theme.fg());
 
     if field_index >= start_field && field_index <= end_field {
-        // Selected line: contrasting text color + background
         Line::from(Span::styled(text, highlight_style))
     } else {
-        // Normal line: normal text color (no special active field color)
         Line::from(Span::styled(text, normal_style))
     }
 }
 
-/// Set cursor position
+/// Set cursor position (x clamp only; no Y offset with wrap in this version)
 #[cfg(feature = "gui")]
 fn set_cursor_position(
     f: &mut Frame,
@@ -479,7 +551,6 @@ fn set_cursor_position(
     current_cursor_pos: usize,
     _has_display_override: bool,
 ) {
-    // Sum display widths of the first current_cursor_pos characters
     let mut cols: u16 = 0;
     for (i, ch) in text.chars().enumerate() {
         if i >= current_cursor_pos {
@@ -491,14 +562,13 @@ fn set_cursor_position(
     let cursor_x = field_rect.x.saturating_add(cols);
     let cursor_y = field_rect.y;
 
-    // Clamp to field bounds
     let max_cursor_x = field_rect.x + field_rect.width.saturating_sub(1);
     let safe_cursor_x = cursor_x.min(max_cursor_x);
 
     f.set_cursor_position((safe_cursor_x, cursor_y));
 }
 
-/// Set default theme if custom not specified
+/// Default theme
 #[cfg(feature = "gui")]
 pub fn render_canvas_default<D: DataProvider>(
     f: &mut Frame,

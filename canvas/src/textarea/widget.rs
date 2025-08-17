@@ -11,10 +11,13 @@ use ratatui::{
 };
 
 #[cfg(feature = "gui")]
-use crate::data_provider::DataProvider; // bring trait into scope
+use crate::data_provider::DataProvider;
 
 #[cfg(feature = "gui")]
-use crate::textarea::state::TextAreaState;
+use crate::textarea::state::{TextAreaState, TextOverflowMode};
+
+#[cfg(feature = "gui")]
+use unicode_width::UnicodeWidthChar;
 
 #[cfg(feature = "gui")]
 #[derive(Debug, Clone)]
@@ -61,6 +64,38 @@ impl<'a> TextArea<'a> {
 }
 
 #[cfg(feature = "gui")]
+fn display_width(s: &str) -> u16 {
+    s.chars()
+        .map(|c| UnicodeWidthChar::width(c).unwrap_or(0) as u16)
+        .sum()
+}
+
+#[cfg(feature = "gui")]
+fn clip_with_indicator(s: &str, width: u16, indicator: char) -> Line<'static> {
+    if width == 0 {
+        return Line::from("");
+    }
+
+    if display_width(s) <= width {
+        return Line::from(Span::raw(s.to_string()));
+    }
+
+    let budget = width.saturating_sub(1);
+    let mut out = String::new();
+    let mut used: u16 = 0;
+    for ch in s.chars() {
+        let w = UnicodeWidthChar::width(ch).unwrap_or(0) as u16;
+        if used + w > budget {
+            break;
+        }
+        out.push(ch);
+        used = used.saturating_add(w);
+    }
+
+    Line::from(vec![Span::raw(out), Span::raw(indicator.to_string())])
+}
+
+#[cfg(feature = "gui")]
 impl<'a> StatefulWidget for TextArea<'a> {
     type State = TextAreaState;
 
@@ -89,7 +124,14 @@ impl<'a> StatefulWidget for TextArea<'a> {
         } else {
             for i in start..end {
                 let s = state.editor.data_provider().field_value(i);
-                display_lines.push(Line::from(Span::raw(s.to_string())));
+                match state.overflow_mode {
+                    TextOverflowMode::Wrap => {
+                        display_lines.push(Line::from(Span::raw(s.to_string())));
+                    }
+                    TextOverflowMode::Indicator { ch } => {
+                        display_lines.push(clip_with_indicator(s, inner.width, ch));
+                    }
+                }
             }
         }
 
@@ -97,7 +139,7 @@ impl<'a> StatefulWidget for TextArea<'a> {
             .alignment(Alignment::Left)
             .style(self.style);
 
-        if state.wrap {
+        if matches!(state.overflow_mode, TextOverflowMode::Wrap) {
             p = p.wrap(Wrap { trim: false });
         }
 

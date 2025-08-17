@@ -15,11 +15,17 @@ use unicode_width::UnicodeWidthChar;
 
 pub type TextAreaEditor = FormEditor<TextAreaProvider>;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TextOverflowMode {
+    Indicator { ch: char }, // show trailing indicator (default '$')
+    Wrap,                    // soft wrap lines
+}
+
 pub struct TextAreaState {
     pub(crate) editor: TextAreaEditor,
     pub(crate) scroll_y: u16,
-    pub(crate) wrap: bool,
     pub(crate) placeholder: Option<String>,
+    pub(crate) overflow_mode: TextOverflowMode,
 }
 
 impl Default for TextAreaState {
@@ -27,8 +33,8 @@ impl Default for TextAreaState {
         Self {
             editor: FormEditor::new(TextAreaProvider::default()),
             scroll_y: 0,
-            wrap: false,
             placeholder: None,
+            overflow_mode: TextOverflowMode::Indicator { ch: '$' },
         }
     }
 }
@@ -54,8 +60,8 @@ impl TextAreaState {
         Self {
             editor: FormEditor::new(provider),
             scroll_y: 0,
-            wrap: false,
             placeholder: None,
+            overflow_mode: TextOverflowMode::Indicator { ch: '$' },
         }
     }
 
@@ -70,12 +76,18 @@ impl TextAreaState {
         self.editor.ui_state.ideal_cursor_column = 0;
     }
 
-    pub fn set_wrap(&mut self, wrap: bool) {
-        self.wrap = wrap;
-    }
-
     pub fn set_placeholder<S: Into<String>>(&mut self, s: S) {
         self.placeholder = Some(s.into());
+    }
+
+    // RUNTIME TOGGLES ----------------------------------------------------
+
+    pub fn use_overflow_indicator(&mut self, ch: char) {
+        self.overflow_mode = TextOverflowMode::Indicator { ch };
+    }
+
+    pub fn use_wrap(&mut self) {
+        self.overflow_mode = TextOverflowMode::Wrap;
     }
 
     // Textarea-specific primitive: split at cursor
@@ -106,10 +118,8 @@ impl TextAreaState {
             return;
         }
 
-        if let Some((prev_idx, new_col)) = self
-            .editor
-            .data_provider_mut()
-            .join_with_prev(line_idx)
+        if let Some((prev_idx, new_col)) =
+            self.editor.data_provider_mut().join_with_prev(line_idx)
         {
             let _ = self.transition_to_field(prev_idx);
             self.set_cursor_position(new_col);
@@ -128,42 +138,12 @@ impl TextAreaState {
             return;
         }
 
-        if let Some(new_col) = self
-            .editor
-            .data_provider_mut()
-            .join_with_next(line_idx)
+        if let Some(new_col) =
+            self.editor.data_provider_mut().join_with_next(line_idx)
         {
             self.set_cursor_position(new_col);
             self.enter_edit_mode();
         }
-    }
-
-    // Override for multiline: insert new blank line below and enter insert mode.
-    pub fn open_line_below(&mut self) -> Result<()> {
-        let line_idx = self.current_field();
-        let new_idx = self
-            .editor
-            .data_provider_mut()
-            .insert_blank_line_after(line_idx);
-
-        self.transition_to_field(new_idx)?;
-        self.move_line_start();
-        self.enter_edit_mode();
-        Ok(())
-    }
-
-    // Override for multiline: insert new blank line above and enter insert mode.
-    pub fn open_line_above(&mut self) -> Result<()> {
-        let line_idx = self.current_field();
-        let new_idx = self
-            .editor
-            .data_provider_mut()
-            .insert_blank_line_before(line_idx);
-
-        self.transition_to_field(new_idx)?;
-        self.move_line_start();
-        self.enter_edit_mode();
-        Ok(())
     }
 
     // Drive from KeyEvent; you can still call all FormEditor methods directly
@@ -199,7 +179,7 @@ impl TextAreaState {
                 self.move_line_end();
             }
 
-            // Optional: word motions
+            // Optional: word motions (kept)
             (KeyCode::Char('b'), KeyModifiers::ALT) => self.move_word_prev(),
             (KeyCode::Char('f'), KeyModifiers::ALT) => self.move_word_next(),
             (KeyCode::Char('e'), KeyModifiers::ALT) => self.move_word_end(),
