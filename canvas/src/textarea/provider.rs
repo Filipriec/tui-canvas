@@ -90,6 +90,27 @@ impl TextAreaProvider {
         self.lines[prev_idx].push_str(&curr);
         Some((prev_idx, prev_len))
     }
+
+    pub fn insert_blank_line_after(&mut self, idx: usize) -> usize {
+        let clamped = idx.min(self.lines.len());
+        let insert_at = if clamped >= self.lines.len() {
+            self.lines.len()
+        } else {
+            clamped + 1
+        };
+        if insert_at == self.lines.len() {
+            self.lines.push(String::new());
+        } else {
+            self.lines.insert(insert_at, String::new());
+        }
+        insert_at
+    }
+
+    pub fn insert_blank_line_before(&mut self, idx: usize) -> usize {
+        let insert_at = idx.min(self.lines.len());
+        self.lines.insert(insert_at, String::new());
+        insert_at
+    }
 }
 
 impl DataProvider for TextAreaProvider {

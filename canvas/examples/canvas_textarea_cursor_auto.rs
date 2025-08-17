@@ -22,7 +22,7 @@ compile_error!(
 use std::io;
 use crossterm::{
     event::{
-        self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers,
+        self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEvent, KeyModifiers,
     },
     execute,
     terminal::{
@@ -47,11 +47,11 @@ use canvas::{
 };
 
 /// Enhanced TextArea that demonstrates automatic cursor management
+/// Now uses direct FormEditor method calls via Deref!
 struct AutoCursorTextArea {
     textarea: TextAreaState,
     has_unsaved_changes: bool,
     debug_message: String,
-    mode: AppMode,
     command_buffer: String,
 }
 
@@ -66,7 +66,8 @@ Try different modes:\n\
 \n\
 Navigation commands:\n\
 • hjkl or arrow keys: move cursor\n\
-• i: enter insert mode\n\
+• i/a/A/o/O: enter insert mode\n\
+• w/b/e/W/B/E: word movements\n\
 • Esc: return to normal mode\n\
 \n\
 Watch how the terminal cursor changes automatically!\n\
@@ -81,7 +82,6 @@ Press ? for help, F1/F2 for manual cursor control demo.";
             textarea,
             has_unsaved_changes: false,
             debug_message: "🎯 Automatic Cursor Demo - cursor-style feature enabled!".to_string(),
-            mode: AppMode::ReadOnly,
             command_buffer: String::new(),
         }
     }
@@ -89,20 +89,21 @@ Press ? for help, F1/F2 for manual cursor control demo.";
     // === MODE TRANSITIONS WITH AUTOMATIC CURSOR MANAGEMENT ===
 
     fn enter_insert_mode(&mut self) -> std::io::Result<()> {
-        self.mode = AppMode::Edit;
+        self.textarea.enter_edit_mode(); // 🎯 Direct FormEditor method call via Deref!
         CursorManager::update_for_mode(AppMode::Edit)?; // 🎯 Automatic: cursor becomes bar |
         self.debug_message = "✏️  INSERT MODE - Cursor: Steady Bar |".to_string();
         Ok(())
     }
 
     fn enter_append_mode(&mut self) -> std::io::Result<()> {
-        // Move cursor to end of current line, then enter insert mode
-        self.send_key_to_textarea(KeyCode::End, KeyModifiers::NONE);
-        self.enter_insert_mode()
+        self.textarea.enter_append_mode(); // 🎯 Direct FormEditor method call!
+        CursorManager::update_for_mode(AppMode::Edit)?;
+        self.debug_message = "✏️  INSERT (append) - Cursor: Steady Bar |".to_string();
+        Ok(())
     }
 
     fn exit_to_normal_mode(&mut self) -> std::io::Result<()> {
-        self.mode = AppMode::ReadOnly;
+        self.textarea.exit_edit_mode(); // 🎯 Direct FormEditor method call!
         CursorManager::update_for_mode(AppMode::ReadOnly)?; // 🎯 Automatic: cursor becomes steady block
         self.debug_message = "🔒 NORMAL MODE - Cursor: Steady Block █".to_string();
         Ok(())
@@ -119,7 +120,7 @@ Press ? for help, F1/F2 for manual cursor control demo.";
 
     fn restore_automatic_cursor(&mut self) -> std::io::Result<()> {
         // Restore automatic cursor based on current mode
-        CursorManager::update_for_mode(self.mode)?;
+        CursorManager::update_for_mode(self.textarea.mode())?; // 🎯 Direct method call!
         self.debug_message = "🎯 Restored automatic cursor management".to_string();
         Ok(())
     }
@@ -128,83 +129,91 @@ Press ? for help, F1/F2 for manual cursor control demo.";
 
     fn handle_textarea_input(&mut self, key: KeyEvent) {
         self.textarea.input(key);
-        if key.code != KeyCode::Left && key.code != KeyCode::Right 
-            && key.code != KeyCode::Up && key.code != KeyCode::Down
-            && key.code != KeyCode::Home && key.code != KeyCode::End {
-            self.has_unsaved_changes = true;
-        }
+        self.has_unsaved_changes = true;
     }
 
-    fn send_key_to_textarea(&mut self, code: KeyCode, modifiers: KeyModifiers) {
-        let key_event = KeyEvent {
-            code,
-            modifiers,
-            kind: KeyEventKind::Press,
-            state: crossterm::event::KeyEventState::NONE,
-        };
-        self.textarea.input(key_event);
-    }
-
-    // === MOVEMENT OPERATIONS (for normal mode) ===
+    // === MOVEMENT OPERATIONS (using direct FormEditor methods!) ===
 
     fn move_left(&mut self) {
-        self.send_key_to_textarea(KeyCode::Left, KeyModifiers::NONE);
+        self.textarea.move_left(); // 🎯 Direct FormEditor method call!
         self.update_debug_for_movement("← left");
     }
 
     fn move_right(&mut self) {
-        self.send_key_to_textarea(KeyCode::Right, KeyModifiers::NONE);
+        self.textarea.move_right(); // 🎯 Direct FormEditor method call!
         self.update_debug_for_movement("→ right");
     }
 
     fn move_up(&mut self) {
-        self.send_key_to_textarea(KeyCode::Up, KeyModifiers::NONE);
+        self.textarea.move_up(); // 🎯 Direct FormEditor method call!
         self.update_debug_for_movement("↑ up");
     }
 
     fn move_down(&mut self) {
-        self.send_key_to_textarea(KeyCode::Down, KeyModifiers::NONE);
+        self.textarea.move_down(); // 🎯 Direct FormEditor method call!
         self.update_debug_for_movement("↓ down");
     }
 
     fn move_word_next(&mut self) {
-        // Use Alt+f for word forward (from textarea implementation)
-        self.send_key_to_textarea(KeyCode::Char('f'), KeyModifiers::ALT);
+        self.textarea.move_word_next(); // 🎯 Direct FormEditor method call!
         self.update_debug_for_movement("w: next word");
     }
 
     fn move_word_prev(&mut self) {
-        // Use Alt+b for word backward (from textarea implementation)
-        self.send_key_to_textarea(KeyCode::Char('b'), KeyModifiers::ALT);
+        self.textarea.move_word_prev(); // 🎯 Direct FormEditor method call!
         self.update_debug_for_movement("b: previous word");
     }
 
     fn move_word_end(&mut self) {
-        // Use Alt+e for word end (from textarea implementation)
-        self.send_key_to_textarea(KeyCode::Char('e'), KeyModifiers::ALT);
+        self.textarea.move_word_end(); // 🎯 Direct FormEditor method call!
         self.update_debug_for_movement("e: word end");
     }
 
+    fn move_word_end_prev(&mut self) {
+        self.textarea.move_word_end_prev(); // 🎯 Direct FormEditor method call!
+        self.update_debug_for_movement("ge: previous word end");
+    }
+
     fn move_line_start(&mut self) {
-        self.send_key_to_textarea(KeyCode::Home, KeyModifiers::NONE);
+        self.textarea.move_line_start(); // 🎯 Direct FormEditor method call!
         self.update_debug_for_movement("0: line start");
     }
 
     fn move_line_end(&mut self) {
-        self.send_key_to_textarea(KeyCode::End, KeyModifiers::NONE);
+        self.textarea.move_line_end(); // 🎯 Direct FormEditor method call!
         self.update_debug_for_movement("$: line end");
     }
 
     fn move_first_line(&mut self) {
-        // Move to very beginning of text
-        self.send_key_to_textarea(KeyCode::Char('a'), KeyModifiers::CONTROL);
+        self.textarea.move_first_line(); // 🎯 Direct FormEditor method call!
         self.update_debug_for_movement("gg: first line");
     }
 
     fn move_last_line(&mut self) {
-        // Move to very end of text  
-        self.send_key_to_textarea(KeyCode::Char('e'), KeyModifiers::CONTROL);
+        self.textarea.move_last_line(); // 🎯 Direct FormEditor method call!
         self.update_debug_for_movement("G: last line");
+    }
+
+    // === BIG WORD MOVEMENTS ===
+
+    fn move_big_word_next(&mut self) {
+        self.textarea.move_big_word_next(); // 🎯 Direct FormEditor method call!
+        self.update_debug_for_movement("W: next WORD");
+    }
+
+    fn move_big_word_prev(&mut self) {
+        self.textarea.move_big_word_prev(); // 🎯 Direct FormEditor method call!
+        self.update_debug_for_movement("B: previous WORD");
+    }
+
+    fn move_big_word_end(&mut self) {
+        self.textarea.move_big_word_end(); // 🎯 Direct FormEditor method call!
+        self.update_debug_for_movement("E: WORD end");
+    }
+
+    fn move_big_word_end_prev(&mut self) {
+        self.textarea.move_big_word_end_prev(); // 🎯 Direct FormEditor method call!
+        self.update_debug_for_movement("gE: previous WORD end");
     }
 
     fn update_debug_for_movement(&mut self, action: &str) {
@@ -214,15 +223,39 @@ Press ? for help, F1/F2 for manual cursor control demo.";
     // === DELETE OPERATIONS ===
 
     fn delete_char_forward(&mut self) {
-        self.send_key_to_textarea(KeyCode::Delete, KeyModifiers::NONE);
-        self.has_unsaved_changes = true;
-        self.debug_message = "x: deleted character".to_string();
+        if let Ok(_) = self.textarea.delete_forward() { // 🎯 Direct FormEditor method call!
+            self.has_unsaved_changes = true;
+            self.debug_message = "x: deleted character".to_string();
+        }
     }
 
     fn delete_char_backward(&mut self) {
-        self.send_key_to_textarea(KeyCode::Backspace, KeyModifiers::NONE);
-        self.has_unsaved_changes = true;
-        self.debug_message = "X: deleted character backward".to_string();
+        if let Ok(_) = self.textarea.delete_backward() { // 🎯 Direct FormEditor method call!
+            self.has_unsaved_changes = true;
+            self.debug_message = "X: deleted character backward".to_string();
+        }
+    }
+
+    // === VIM-STYLE EDITING ===
+
+    fn open_line_below(&mut self) -> anyhow::Result<()> {
+        let result = self.textarea.open_line_below(); // 🎯 Textarea-specific override!
+        if result.is_ok() {
+            CursorManager::update_for_mode(AppMode::Edit)?;
+            self.debug_message = "✏️  INSERT (open line below) - Cursor: Steady Bar |".to_string();
+            self.has_unsaved_changes = true;
+        }
+        result
+    }
+
+    fn open_line_above(&mut self) -> anyhow::Result<()> {
+        let result = self.textarea.open_line_above(); // 🎯 Textarea-specific override!
+        if result.is_ok() {
+            CursorManager::update_for_mode(AppMode::Edit)?;
+            self.debug_message = "✏️  INSERT (open line above) - Cursor: Steady Bar |".to_string();
+            self.has_unsaved_changes = true;
+        }
+        result
     }
 
     // === COMMAND BUFFER HANDLING ===
@@ -246,7 +279,7 @@ Press ? for help, F1/F2 for manual cursor control demo.";
     // === GETTERS ===
 
     fn mode(&self) -> AppMode {
-        self.mode
+        self.textarea.mode() // 🎯 Direct FormEditor method call!
     }
 
     fn debug_message(&self) -> &str {
@@ -262,8 +295,11 @@ Press ? for help, F1/F2 for manual cursor control demo.";
     }
 
     fn get_cursor_info(&self) -> String {
-        // Since we can't access the internal editor, we'll provide a simpler status
-        format!("Textarea cursor positioned")
+        format!(
+            "Line {}, Col {}",
+            self.textarea.current_field() + 1, // 🎯 Direct FormEditor method call!
+            self.textarea.cursor_position() + 1 // 🎯 Direct FormEditor method call!
+        )
     }
 }
 
@@ -296,6 +332,20 @@ fn handle_key_press(
         (AppMode::ReadOnly, KeyCode::Char('A'), _) => {
             editor.move_line_end();
             editor.enter_insert_mode()?;
+            editor.clear_command_buffer();
+        }
+
+        // Vim o/O commands
+        (AppMode::ReadOnly, KeyCode::Char('o'), _) => {
+            if let Err(e) = editor.open_line_below() {
+                editor.set_debug_message(format!("Error opening line below: {}", e));
+            }
+            editor.clear_command_buffer();
+        }
+        (AppMode::ReadOnly, KeyCode::Char('O'), _) => {
+            if let Err(e) = editor.open_line_above() {
+                editor.set_debug_message(format!("Error opening line above: {}", e));
+            }
             editor.clear_command_buffer();
         }
 
@@ -350,12 +400,29 @@ fn handle_key_press(
         }
         (AppMode::ReadOnly, KeyCode::Char('e'), _) => {
             if editor.get_command_buffer() == "g" {
-                // TODO: Implement ge (previous word end)
-                editor.move_word_prev();
-                editor.set_debug_message("ge: previous word end (simplified)".to_string());
+                editor.move_word_end_prev();
                 editor.clear_command_buffer();
             } else {
                 editor.move_word_end();
+                editor.clear_command_buffer();
+            }
+        }
+
+        // Big word movement (vim W/B/E commands)
+        (AppMode::ReadOnly, KeyCode::Char('W'), _) => {
+            editor.move_big_word_next();
+            editor.clear_command_buffer();
+        }
+        (AppMode::ReadOnly, KeyCode::Char('B'), _) => {
+            editor.move_big_word_prev();
+            editor.clear_command_buffer();
+        }
+        (AppMode::ReadOnly, KeyCode::Char('E'), _) => {
+            if editor.get_command_buffer() == "g" {
+                editor.move_big_word_end_prev();
+                editor.clear_command_buffer();
+            } else {
+                editor.move_big_word_end();
                 editor.clear_command_buffer();
             }
         }
@@ -468,7 +535,7 @@ fn render_textarea(
         .title("🎯 Textarea with Automatic Cursor Management");
 
     let textarea_widget = TextArea::default().block(block.clone());
-    
+
     f.render_stateful_widget(textarea_widget, area, &mut editor.textarea);
 
     // Set cursor position for terminal cursor
@@ -518,8 +585,8 @@ fn render_status_and_help(
                 }
             } else {
                 "🎯 CURSOR-STYLE DEMO: Normal █ | Insert | \n\
-                Normal: hjkl/arrows=move, w/b/e=words, 0/$=line, g/G=first/last\n\
-                i/a/A=insert, x/X=delete, ?=info\n\
+                Normal: hjkl/arrows=move, w/b/e=words, W/B/E=WORDS, 0/$=line, g/G=first/last\n\
+                i/a/A/o/O=insert, x/X=delete, ?=info\n\
                 F1=demo manual cursor, F2=restore automatic, Ctrl+Q=quit"
             }
         }
