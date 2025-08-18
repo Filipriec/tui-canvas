@@ -1,6 +1,6 @@
 # Canvas
 
-Canvas is a Rust library for building form‑based and textarea‑driven terminal user interfaces.  
+Canvas is a Rust library for building form‑based and textarea‑driven terminal user interfaces.
 It provides the core logic for text editing, validation, suggestions, and cursor management.
 
 The library does not enforce a specific terminal UI framework:
@@ -12,15 +12,16 @@ The library does not enforce a specific terminal UI framework:
 
 ## Overview
 
-Canvas is designed for applications that require structured text input in a terminal environment.  
+Canvas is designed for applications that require structured text input in a terminal environment.
 It provides:
 
-- Text editing modes (Vim‑like or normal)  
-- Validation (regex, masks, limits, formatting)  
-- Suggestions (asynchronous dropdowns)  
-- Computed fields (derived values)  
-- Textarea widget with cursor management  
-- Extensible architecture for custom behaviors  
+- Text editing modes (Vim‑like or normal)
+- Validation (regex, masks, limits, formatting)
+- Suggestions (asynchronous dropdowns)
+- Computed fields (derived values)
+- Textarea widget with cursor management
+- Syntax highlighting (via syntect)
+- Extensible architecture for custom behaviors
 
 ---
 
@@ -29,7 +30,7 @@ It provides:
 Add the dependency to your `Cargo.toml`:
 
 ```toml
-[dependedsncies]
+[dependencies]
 canvas = { version = "0.x", features = ["gui", "cursor-style", "textarea", "validation"] }
 ```
 
@@ -39,14 +40,15 @@ canvas = { version = "0.x", features = ["gui", "cursor-style", "textarea", "vali
 
 The library is feature‑gated. Enable only what you need:
 
-- `gui` – terminal rendering support (ratatui + crossterm)  
-- `cursor-style` – styled cursor support  
-- `validation` – regex, masks, limits, formatting  
-- `suggestions` – asynchronous suggestions dropdowns  
-- `computed` – derived fields  
-- `textarea` – textarea widget  
-- `textmode-vim` – Vim‑like editing (default)  
-- `textmode-normal` – normal editing mode  
+- `gui` – terminal rendering support (ratatui + crossterm)
+- `cursor-style` – styled cursor support
+- `validation` – regex, masks, limits, formatting
+- `suggestions` – asynchronous suggestions dropdowns
+- `computed` – derived fields
+- `textarea` – textarea widget
+- `syntect` – syntax highlighting support
+- `textmode-vim` – Vim‑like editing (default)
+- `textmode-normal` – normal editing mode
 
 **Note:** `textmode-vim` and `textmode-normal` are mutually exclusive. Enable exactly one.
 
@@ -56,7 +58,7 @@ The default feature set is `["textmode-vim"]`.
 
 ## Running Examples
 
-The repository includes several examples. Each requires specific feature flags.  
+The repository includes several examples. Each requires specific feature flags.
 Use the following commands to run them:
 
 ```bash
@@ -65,6 +67,9 @@ cargo run --example textarea_vim --features "gui cursor-style textarea textmode-
 
 # Textarea with Normal mode
 cargo run --example textarea_normal --features "gui cursor-style textarea textmode-normal"
+
+# Textarea with syntax highlighting
+cargo run --example textarea_syntax --features "gui cursor-style textarea syntect textmode-normal"
 
 # Validation examples
 cargo run --example validation_1 --features "gui validation cursor-style"
@@ -88,16 +93,16 @@ cargo run --example computed_fields --features "gui computed"
 
 ## Documentation
 
-- API documentation: `cargo doc --open`  
-- Migration notes: `CANVAS_MIGRATION.md`  
+- API documentation: `cargo doc --open`
+- Migration notes: `CANVAS_MIGRATION.md`
 
 ---
 
 ## License
 
-Licensed under either of:  
-- Apache License, Version 2.0  
-- MIT License  
+Licensed under either of:
+- Apache License, Version 2.0
+- MIT License
 
 at your option.
 
@@ -106,4 +111,3 @@ at your option.
 ## Contributing
 
 Contributions are welcome. Please follow the existing code structure and feature‑gating conventions.
-
