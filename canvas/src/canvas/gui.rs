@@ -74,100 +74,7 @@ fn clip_with_indicator_line<'a>(s: &'a str, width: u16, indicator: char) -> Line
 }
 
 #[cfg(feature = "gui")]
-fn slice_by_display_cols(s: &str, start_cols: u16, max_cols: u16) -> String {
-    if max_cols == 0 {
-        return String::new();
-    }
-    let mut cols: u16 = 0;
-    let mut out = String::new();
-    let mut taken: u16 = 0;
-    let mut started = false;
-
-    for ch in s.chars() {
-        let w = UnicodeWidthChar::width(ch).unwrap_or(0) as u16;
-        let next = cols.saturating_add(w);
-
-        if !started {
-            if next <= start_cols {
-                cols = next;
-                continue;
-            } else {
-                started = true;
-            }
-        }
-
-        if taken.saturating_add(w) > max_cols {
-            break;
-        }
-        out.push(ch);
-        taken = taken.saturating_add(w);
-        cols = next;
-    }
-
-    out
-}
-
-#[cfg(feature = "gui")]
 const RIGHT_PAD: u16 = 3;
-
-#[cfg(feature = "gui")]
-fn compute_h_scroll_with_padding(cursor_cols: u16, width: u16) -> (u16, u16) {
-    let mut h = 0u16;
-    for _ in 0..2 {
-        let left_cols = if h > 0 { 1 } else { 0 };
-        let max_x_visible = width.saturating_sub(1 + RIGHT_PAD + left_cols);
-        let needed = cursor_cols.saturating_sub(max_x_visible);
-        if needed <= h {
-            return (h, left_cols);
-        }
-        h = needed;
-    }
-    let left_cols = if h > 0 { 1 } else { 0 };
-    (h, left_cols)
-}
-
-#[cfg(feature = "gui")]
-fn active_indicator_viewport(
-    s: &str,
-    width: u16,
-    indicator: char,
-    cursor_chars: usize,
-    _right_padding: u16,
-) -> (Line<'static>, u16, u16) {
-    if width == 0 {
-        return (Line::from(""), 0, 0);
-    }
-
-    let total_cols = display_width(s);
-    let mut cursor_cols: u16 = 0;
-    for (i, ch) in s.chars().enumerate() {
-        if i >= cursor_chars {
-            break;
-        }
-        cursor_cols = cursor_cols
-            .saturating_add(UnicodeWidthChar::width(ch).unwrap_or(0) as u16);
-    }
-
-    let (h_scroll, left_cols) = compute_h_scroll_with_padding(cursor_cols, width);
-
-    let content_budget = width.saturating_sub(left_cols);
-    let show_right = total_cols.saturating_sub(h_scroll) > content_budget;
-    let right_cols: u16 = if show_right { 1 } else { 0 };
-
-    let visible_cols = width.saturating_sub(left_cols + right_cols);
-    let visible = slice_by_display_cols(s, h_scroll, visible_cols);
-
-    let mut spans: Vec<Span> = Vec::with_capacity(3);
-    if left_cols == 1 {
-        spans.push(Span::raw(indicator.to_string()));
-    }
-    spans.push(Span::raw(visible));
-    if show_right {
-        spans.push(Span::raw(indicator.to_string()));
-    }
-
-    (Line::from(spans), h_scroll, left_cols)
-}
 
 /// Default renderer: overflow indicator '$'
 #[cfg(feature = "gui")]
@@ -365,8 +272,8 @@ where
         let typed_text = get_display_value(i);
         let inner_width = input_rows[i].width;
 
-        let mut h_scroll_for_cursor: u16 = 0;
-        let mut left_offset_for_cursor: u16 = 0;
+        let h_scroll_for_cursor: u16 = 0;
+        let left_offset_for_cursor: u16 = 0;
 
         let line = if is_active {
             // Active field: typed text + optional gray completion

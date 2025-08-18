@@ -1,6 +1,7 @@
 // src/canvas/actions/types.rs
 
 /// All available canvas actions
+#[non_exhaustive]
 #[derive(Debug, Clone, PartialEq)]
 pub enum CanvasAction {
     // Movement actions
@@ -42,6 +43,7 @@ pub enum CanvasAction {
 }
 
 /// Result type for canvas actions
+#[non_exhaustive]
 #[derive(Debug, Clone)]
 pub enum ActionResult {
     Success,
