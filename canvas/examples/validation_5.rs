@@ -203,7 +203,7 @@ impl ValidationServices {
 
     /// PSC validation: simulates postal service API lookup
     fn validate_psc(&mut self, psc: &str) -> ExternalValidationState {
-        let cache_key = format!("psc:{}", psc);
+        let cache_key = format!("psc:{psc}");
         if let Some(cached) = self.cache.get(&cache_key) {
             return cached.clone();
         }
@@ -244,7 +244,7 @@ impl ValidationServices {
                     "20" | "21" => "Brno region",
                     _ => "Valid postal region"
                 };
-                ExternalValidationState::Valid(Some(format!("{} - verified", region)))
+                ExternalValidationState::Valid(Some(format!("{region} - verified")))
             }
         };
 
@@ -254,7 +254,7 @@ impl ValidationServices {
 
     /// Email validation: simulates domain checking
     fn validate_email(&mut self, email: &str) -> ExternalValidationState {
-        let cache_key = format!("email:{}", email);
+        let cache_key = format!("email:{email}");
         if let Some(cached) = self.cache.get(&cache_key) {
             return cached.clone();
         }
@@ -315,7 +315,7 @@ impl ValidationServices {
 
     /// Username validation: simulates availability checking
     fn validate_username(&mut self, username: &str) -> ExternalValidationState {
-        let cache_key = format!("username:{}", username);
+        let cache_key = format!("username:{username}");
         if let Some(cached) = self.cache.get(&cache_key) {
             return cached.clone();
         }
@@ -371,7 +371,7 @@ impl ValidationServices {
 
     /// API Key validation: simulates authentication service
     fn validate_api_key(&mut self, key: &str) -> ExternalValidationState {
-        let cache_key = format!("apikey:{}", key);
+        let cache_key = format!("apikey:{key}");
         if let Some(cached) = self.cache.get(&cache_key) {
             return cached.clone();
         }
@@ -429,7 +429,7 @@ impl ValidationServices {
 
     /// Credit Card validation: simulates bank verification
     fn validate_credit_card(&mut self, card: &str) -> ExternalValidationState {
-        let cache_key = format!("card:{}", card);
+        let cache_key = format!("card:{card}");
         if let Some(cached) = self.cache.get(&cache_key) {
             return cached.clone();
         }
@@ -724,8 +724,7 @@ impl<D: DataProvider> ValidationDemoEditor<D> {
         let duration_ms = result.duration().as_millis();
         let cached_text = if result.cached { " (cached)" } else { "" };
         self.debug_message = format!(
-            "🔍 {} validation completed in {}ms{} (manual)",
-            validation_type, duration_ms, cached_text
+            "🔍 {validation_type} validation completed in {duration_ms}ms{cached_text} (manual)"
         );
     }
 
@@ -812,7 +811,7 @@ impl<D: DataProvider> ValidationDemoEditor<D> {
             0
         };
 
-        format!("Total: {} validations, Avg: {}ms", total_validations, avg_time_ms)
+        format!("Total: {total_validations} validations, Avg: {avg_time_ms}ms")
     }
 
     fn get_field_validation_state(&self, field_index: usize) -> ExternalValidationState {
@@ -1032,8 +1031,8 @@ fn render_validation_panel(
         };
 
         let field_line = Line::from(vec![
-            Span::styled(format!("{}{}: ", indicator, field_name), Style::default().fg(Color::White)),
-            Span::raw(format!("'{}' → ", value_display)),
+            Span::styled(format!("{indicator}{field_name}: "), Style::default().fg(Color::White)),
+            Span::raw(format!("'{value_display}' → ")),
             Span::styled(state_text.to_string(), Style::default().fg(color)),
         ]);
 
@@ -1077,8 +1076,7 @@ fn render_validation_panel(
                 };
 
                 ListItem::new(format!(
-                    "{}: '{}' → {} ({}ms{})",
-                    field_name, short_value, state_summary, duration_ms, cached_text
+                    "{field_name}: '{short_value}' → {state_summary} ({duration_ms}ms{cached_text})"
                 ))
             })
             .collect();
@@ -1162,7 +1160,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     CursorManager::reset()?;
 
     if let Err(err) = res {
-        println!("{:?}", err);
+        println!("{err:?}");
     }
 
     println!("🧪 Enhanced fully automatic external validation demo completed!");

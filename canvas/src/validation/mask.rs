@@ -2,9 +2,11 @@
 //! Pure display mask system - user-defined patterns only
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Default)]
 pub enum MaskDisplayMode {
     /// Only show separators as user types
     /// Example: "" → "", "123" → "123", "12345" → "(123) 45"
+    #[default]
     Dynamic,
     
     /// Show full template with placeholders from start
@@ -15,11 +17,6 @@ pub enum MaskDisplayMode {
     },
 }
 
-impl Default for MaskDisplayMode {
-    fn default() -> Self {
-        MaskDisplayMode::Dynamic
-    }
-}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DisplayMask {

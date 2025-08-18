@@ -35,7 +35,7 @@ use ratatui::{
 };
 
 use canvas::{
-    canvas::{modes::AppMode, CursorManager},
+    canvas::CursorManager,
     textarea::{TextArea, TextAreaState},
 };
 
@@ -291,7 +291,7 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut editor: AutoCursorTextAre
                     }
                 }
                 Err(e) => {
-                    editor.set_debug_message(format!("Error: {}", e));
+                    editor.set_debug_message(format!("Error: {e}"));
                 }
             }
         }
@@ -389,7 +389,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     terminal.show_cursor()?;
 
     if let Err(err) = res {
-        println!("{:?}", err);
+        println!("{err:?}");
     }
 
     println!("🎯 Cursor automatically reset to default!");

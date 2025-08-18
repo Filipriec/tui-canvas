@@ -46,12 +46,11 @@ impl<D: DataProvider> FormEditor<D> {
             }
         }
 
-        if !moved {
-            if self.ui_state.cursor_pos > 0 {
+        if !moved
+            && self.ui_state.cursor_pos > 0 {
                 self.ui_state.cursor_pos -= 1;
                 self.ui_state.ideal_cursor_column = self.ui_state.cursor_pos;
             }
-        }
         Ok(())
     }
 
@@ -141,7 +140,7 @@ impl<D: DataProvider> FormEditor<D> {
                 // Successfully moved to next field, try to find first word
                 let new_text = self.current_text();
                 if !new_text.is_empty() {
-                    let first_word_pos = if new_text.chars().next().map_or(false, |c| !c.is_whitespace()) {
+                    let first_word_pos = if new_text.chars().next().is_some_and(|c| !c.is_whitespace()) {
                         // Field starts with non-whitespace, go to position 0
                         0
                     } else {
@@ -177,7 +176,7 @@ impl<D: DataProvider> FormEditor<D> {
                     self.ui_state.ideal_cursor_column = 0;
                 } else {
                     // Find first word in new field
-                    let first_word_pos = if new_text.chars().next().map_or(false, |c| !c.is_whitespace()) {
+                    let first_word_pos = if new_text.chars().next().is_some_and(|c| !c.is_whitespace()) {
                         // Field starts with non-whitespace, go to position 0
                         0
                     } else {
@@ -419,7 +418,7 @@ impl<D: DataProvider> FormEditor<D> {
                 // Successfully moved to next field, try to find first big_word
                 let new_text = self.current_text();
                 if !new_text.is_empty() {
-                    let first_big_word_pos = if new_text.chars().next().map_or(false, |c| !c.is_whitespace()) {
+                    let first_big_word_pos = if new_text.chars().next().is_some_and(|c| !c.is_whitespace()) {
                         // Field starts with non-whitespace, go to position 0
                         0
                     } else {
@@ -455,7 +454,7 @@ impl<D: DataProvider> FormEditor<D> {
                     self.ui_state.ideal_cursor_column = 0;
                 } else {
                     // Find first big_word in new field
-                    let first_big_word_pos = if new_text.chars().next().map_or(false, |c| !c.is_whitespace()) {
+                    let first_big_word_pos = if new_text.chars().next().is_some_and(|c| !c.is_whitespace()) {
                         // Field starts with non-whitespace, go to position 0
                         0
                     } else {
@@ -644,8 +643,8 @@ impl<D: DataProvider> FormEditor<D> {
 
         if current_text.is_empty() {
             let current_field = self.ui_state.current_field;
-            if self.move_up().is_ok() {
-                if self.ui_state.current_field != current_field {
+            if self.move_up().is_ok()
+                && self.ui_state.current_field != current_field {
                     let new_text = self.current_text();
                     if !new_text.is_empty() {
                         // Find first big_word end in new field
@@ -654,7 +653,6 @@ impl<D: DataProvider> FormEditor<D> {
                         self.ui_state.ideal_cursor_column = last_big_word_end;
                     }
                 }
-            }
             return;
         }
 
@@ -664,8 +662,8 @@ impl<D: DataProvider> FormEditor<D> {
         // Only try to cross fields if we didn't move at all (stayed at same position)
         if new_pos == current_pos {
             let current_field = self.ui_state.current_field;
-            if self.move_up().is_ok() {
-                if self.ui_state.current_field != current_field {
+            if self.move_up().is_ok()
+                && self.ui_state.current_field != current_field {
                     let new_text = self.current_text();
                     if !new_text.is_empty() {
                         let last_big_word_end = find_big_word_end(new_text, 0);
@@ -673,7 +671,6 @@ impl<D: DataProvider> FormEditor<D> {
                         self.ui_state.ideal_cursor_column = last_big_word_end;
                     }
                 }
-            }
         } else {
             // Normal big_word movement within current field
             let is_edit_mode = self.ui_state.current_mode == AppMode::Edit;

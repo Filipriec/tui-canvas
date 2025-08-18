@@ -314,11 +314,11 @@ impl<'a> StatefulWidget for TextArea<'a> {
                 match state.overflow_mode {
                     TextOverflowMode::Wrap => unreachable!(),
                     TextOverflowMode::Indicator { ch } => {
-                        let fits = display_width(&s) <= inner.width;
+                        let fits = display_width(s) <= inner.width;
 
                         let start_cols = if i == state.current_field() {
                             let col_idx = state.display_cursor_position();
-                            let cursor_cols = display_cols_up_to(&s, col_idx);
+                            let cursor_cols = display_cols_up_to(s, col_idx);
                             let (target_h, _left_cols) =
                                 compute_h_scroll_with_padding(cursor_cols, inner.width);
 
@@ -332,7 +332,7 @@ impl<'a> StatefulWidget for TextArea<'a> {
                         };
 
                         display_lines.push(clip_window_with_indicator_padded(
-                            &s,
+                            s,
                             inner.width,
                             ch,
                             start_cols,

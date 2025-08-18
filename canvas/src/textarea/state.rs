@@ -355,7 +355,7 @@ impl TextAreaState {
     #[cfg(feature = "gui")]
     pub fn cursor(&self, area: Rect, block: Option<&Block<'_>>) -> (u16, u16) {
         let inner = if let Some(b) = block { b.inner(area) } else { area };
-        let line_idx = self.current_field() as usize;
+        let line_idx = self.current_field();
 
         match self.overflow_mode {
             TextOverflowMode::Wrap => {
@@ -375,7 +375,7 @@ impl TextAreaState {
                 let col_chars = self.display_cursor_position();
 
                 let (subrow, x_cols) = wrapped_rows_to_cursor_indented(
-                    &current_line,
+                    current_line,
                     width,
                     indent,
                     col_chars,
@@ -478,7 +478,7 @@ impl TextAreaState {
                 }
 
                 let indent = self.wrap_indent_cols;
-                let line_idx = self.current_field() as usize;
+                let line_idx = self.current_field();
 
                 let prefix_rows =
                     self.visual_rows_before_line_and_intra_indented(width, line_idx);
@@ -487,7 +487,7 @@ impl TextAreaState {
                 let col = self.display_cursor_position();
 
                 let (subrow, _x_cols) =
-                    wrapped_rows_to_cursor_indented(&current_line, width, indent, col);
+                    wrapped_rows_to_cursor_indented(current_line, width, indent, col);
 
                 let caret_vis_row = prefix_rows.saturating_add(subrow);
 

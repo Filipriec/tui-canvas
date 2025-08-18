@@ -218,7 +218,7 @@ impl<D: DataProvider> AutoCursorFormEditor<D> {
             self.has_unsaved_changes = true;
             self.debug_message = "⌫ Deleted character backward".to_string();
         }
-        Ok(result?)
+        result
     }
 
     fn delete_forward(&mut self) -> anyhow::Result<()> {
@@ -227,7 +227,7 @@ impl<D: DataProvider> AutoCursorFormEditor<D> {
             self.has_unsaved_changes = true;
             self.debug_message = "⌦ Deleted character forward".to_string();
         }
-        Ok(result?)
+        result
     }
 
     // === SUGGESTIONS CONTROL WRAPPERS ===
@@ -259,7 +259,7 @@ impl<D: DataProvider> AutoCursorFormEditor<D> {
         if result.is_ok() {
             self.has_unsaved_changes = true;
         }
-        Ok(result?)
+        result
     }
 
     // === MANUAL CURSOR OVERRIDE DEMONSTRATION ===
@@ -562,7 +562,7 @@ impl ProductionSuggestionsProvider {
                 query.is_empty() || item.to_lowercase().starts_with(&query_lower)
             })
             .map(|(item, description)| SuggestionItem {
-                display_text: format!("{} - {}", item, description),
+                display_text: format!("{item} - {description}"),
                 value_to_store: item.to_string(),
             })
             .collect()
@@ -625,7 +625,7 @@ async fn handle_key_press(
                             }
                         }
                         Err(e) => {
-                            editor.set_debug_message(format!("❌ Suggestion error: {}", e));
+                            editor.set_debug_message(format!("❌ Suggestion error: {e}"));
                         }
                     }
                 }
@@ -639,7 +639,7 @@ async fn handle_key_press(
         (_, KeyCode::Enter, _) => {
             if editor.is_suggestions_active() {
                 if let Some(applied) = editor.apply_suggestion() {
-                    editor.set_debug_message(format!("✅ Selected: {}", applied));
+                    editor.set_debug_message(format!("✅ Selected: {applied}"));
                 } else {
                     editor.set_debug_message("❌ No suggestion selected".to_string());
                 }
@@ -647,7 +647,7 @@ async fn handle_key_press(
                 editor.next_field();
                 let field_names = ["Fruit", "Job", "Language", "Country", "Color"];
                 let field_name = field_names.get(editor.current_field()).unwrap_or(&"Field");
-                editor.set_debug_message(format!("Enter: moved to {} field", field_name));
+                editor.set_debug_message(format!("Enter: moved to {field_name} field"));
             }
         }
 
@@ -726,7 +726,7 @@ async fn handle_key_press(
             editor.move_down();
             let field_names = ["Fruit", "Job", "Language", "Country", "Color"];
             let field_name = field_names.get(editor.current_field()).unwrap_or(&"Field");
-            editor.set_debug_message(format!("↓ moved to {} field", field_name));
+            editor.set_debug_message(format!("↓ moved to {field_name} field"));
             editor.clear_command_buffer();
         }
         (AppMode::ReadOnly | AppMode::Highlight, KeyCode::Char('k'), _)
@@ -734,7 +734,7 @@ async fn handle_key_press(
             editor.move_up();
             let field_names = ["Fruit", "Job", "Language", "Country", "Color"];
             let field_name = field_names.get(editor.current_field()).unwrap_or(&"Field");
-            editor.set_debug_message(format!("↑ moved to {} field", field_name));
+            editor.set_debug_message(format!("↑ moved to {field_name} field"));
             editor.clear_command_buffer();
         }
 
@@ -829,7 +829,7 @@ async fn handle_key_press(
                             }
                         }
                         Err(e) => {
-                            editor.set_debug_message(format!("❌ Suggestion error: {}", e));
+                            editor.set_debug_message(format!("❌ Suggestion error: {e}"));
                         }
                     }
                 }
@@ -850,7 +850,7 @@ async fn handle_key_press(
                             }
                         }
                         Err(e) => {
-                            editor.set_debug_message(format!("❌ Suggestion error: {}", e));
+                            editor.set_debug_message(format!("❌ Suggestion error: {e}"));
                         }
                     }
                 }
@@ -883,7 +883,7 @@ async fn handle_key_press(
                             }
                         }
                         Err(e) => {
-                            editor.set_debug_message(format!("❌ Suggestion error: {}", e));
+                            editor.set_debug_message(format!("❌ Suggestion error: {e}"));
                         }
                     }
                 }
@@ -912,8 +912,7 @@ async fn handle_key_press(
                 let field_names = ["Fruit", "Job", "Language", "Country", "Color"];
                 let current_field = field_names.get(editor.current_field()).unwrap_or(&"Field");
                 editor.set_debug_message(format!(
-                    "{} field - Try: i=insert, Tab=suggestions, j/k=move. Key: {:?}",
-                    current_field, key
+                    "{current_field} field - Try: i=insert, Tab=suggestions, j/k=move. Key: {key:?}"
                 ));
             }
         }
@@ -939,7 +938,7 @@ async fn run_app<B: Backend>(
                     }
                 }
                 Err(e) => {
-                    editor.set_debug_message(format!("Error: {}", e));
+                    editor.set_debug_message(format!("Error: {e}"));
                 }
             }
         }
@@ -962,7 +961,7 @@ fn ui(f: &mut Frame, editor: &AutoCursorFormEditor<ApplicationData>) {
             f,
             chunks[0],
             input_rect,
-            &canvas::canvas::theme::DefaultCanvasTheme::default(),
+            &canvas::canvas::theme::DefaultCanvasTheme,
             editor.inner(),
         );
     }
@@ -1110,7 +1109,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     terminal.show_cursor()?;
 
     if let Err(err) = res {
-        println!("{:?}", err);
+        println!("{err:?}");
     }
 
     println!("🚀 Ready to integrate this architecture into your production app!");

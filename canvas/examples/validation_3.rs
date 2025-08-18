@@ -54,7 +54,6 @@ use canvas::{
     },
     DataProvider, FormEditor,
     ValidationConfig, ValidationConfigBuilder, DisplayMask,
-    validation::mask::MaskDisplayMode,
 };
 
 // Enhanced FormEditor wrapper for mask demonstration
@@ -144,14 +143,14 @@ impl<D: DataProvider> MaskDemoFormEditor<D> {
     fn move_up(&mut self) {
         match self.editor.move_up() {
             Ok(()) => { self.update_field_info(); }
-            Err(e) => { self.debug_message = format!("🚫 Field switch blocked: {}", e); }
+            Err(e) => { self.debug_message = format!("🚫 Field switch blocked: {e}"); }
         }
     }
 
     fn move_down(&mut self) {
         match self.editor.move_down() {
             Ok(()) => { self.update_field_info(); }
-            Err(e) => { self.debug_message = format!("🚫 Field switch blocked: {}", e); }
+            Err(e) => { self.debug_message = format!("🚫 Field switch blocked: {e}"); }
         }
     }
 
@@ -170,16 +169,16 @@ impl<D: DataProvider> MaskDemoFormEditor<D> {
             let raw_pos = self.editor.cursor_position();
             let display_pos = self.editor.display_cursor_position();
             if raw_pos != display_pos {
-                self.debug_message = format!("📍 Cursor: Raw pos {} → Display pos {} (mask active)", raw_pos, display_pos);
+                self.debug_message = format!("📍 Cursor: Raw pos {raw_pos} → Display pos {display_pos} (mask active)");
             } else {
-                self.debug_message = format!("📍 Cursor at position {} (no mask offset)", raw_pos);
+                self.debug_message = format!("📍 Cursor at position {raw_pos} (no mask offset)");
             }
         }
     }
 
     fn update_field_info(&mut self) {
         let field_name = self.editor.data_provider().field_name(self.editor.current_field());
-        self.debug_message = format!("📝 Switched to: {}", field_name);
+        self.debug_message = format!("📝 Switched to: {field_name}");
     }
 
     // === MODE TRANSITIONS ===
@@ -206,12 +205,12 @@ impl<D: DataProvider> MaskDemoFormEditor<D> {
         if result.is_ok() {
             let (raw, display, _) = self.get_current_field_info();
             if raw != display {
-                self.debug_message = format!("✏️ Added '{}': Raw='{}' Display='{}'", ch, raw, display);
+                self.debug_message = format!("✏️ Added '{ch}': Raw='{raw}' Display='{display}'");
             } else {
-                self.debug_message = format!("✏️ Added '{}': '{}'", ch, raw);
+                self.debug_message = format!("✏️ Added '{ch}': '{raw}'");
             }
         }
-        Ok(result?)
+        result
     }
 
     // === DELETE OPERATIONS ===
@@ -221,7 +220,7 @@ impl<D: DataProvider> MaskDemoFormEditor<D> {
             self.debug_message = "⌫ Character deleted".to_string();
             self.update_cursor_info();
         }
-        Ok(result?)
+        result
     }
 
     fn delete_forward(&mut self) -> anyhow::Result<()> {
@@ -230,7 +229,7 @@ impl<D: DataProvider> MaskDemoFormEditor<D> {
             self.debug_message = "⌦ Character deleted".to_string();
             self.update_cursor_info();
         }
-        Ok(result?)
+        result
     }
 
     // === DELEGATE TO ORIGINAL EDITOR ===
@@ -251,14 +250,14 @@ impl<D: DataProvider> MaskDemoFormEditor<D> {
     fn next_field(&mut self) {
         match self.editor.next_field() {
             Ok(()) => { self.update_field_info(); }
-            Err(e) => { self.debug_message = format!("🚫 Cannot move to next field: {}", e); }
+            Err(e) => { self.debug_message = format!("🚫 Cannot move to next field: {e}"); }
         }
     }
 
     fn prev_field(&mut self) {
         match self.editor.prev_field() {
             Ok(()) => { self.update_field_info(); }
-            Err(e) => { self.debug_message = format!("🚫 Cannot move to previous field: {}", e); }
+            Err(e) => { self.debug_message = format!("🚫 Cannot move to previous field: {e}"); }
         }
     }
 
@@ -287,7 +286,7 @@ impl<D: DataProvider> MaskDemoFormEditor<D> {
             }
         }
 
-        format!("🎭 {} MASKS", mask_count)
+        format!("🎭 {mask_count} MASKS")
     }
 }
 
@@ -549,7 +548,7 @@ fn run_app<B: Backend>(
                     }
                 }
                 Err(e) => {
-                    editor.set_debug_message(format!("Error: {}", e));
+                    editor.set_debug_message(format!("Error: {e}"));
                 }
             }
         }
@@ -726,7 +725,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     CursorManager::reset()?;
 
     if let Err(err) = res {
-        println!("{:?}", err);
+        println!("{err:?}");
     }
 
     println!("🎭 Display mask demo completed!");

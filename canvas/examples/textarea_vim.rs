@@ -339,13 +339,13 @@ fn handle_key_press(
         // Vim o/O commands
         (AppMode::ReadOnly, KeyCode::Char('o'), _) => {
             if let Err(e) = editor.open_line_below() {
-                editor.set_debug_message(format!("Error opening line below: {}", e));
+                editor.set_debug_message(format!("Error opening line below: {e}"));
             }
             editor.clear_command_buffer();
         }
         (AppMode::ReadOnly, KeyCode::Char('O'), _) => {
             if let Err(e) = editor.open_line_above() {
-                editor.set_debug_message(format!("Error opening line above: {}", e));
+                editor.set_debug_message(format!("Error opening line above: {e}"));
             }
             editor.clear_command_buffer();
         }
@@ -482,8 +482,7 @@ fn handle_key_press(
                 editor.set_debug_message("Invalid command sequence".to_string());
             } else {
                 editor.set_debug_message(format!(
-                    "Unhandled: {:?} + {:?} in {:?} mode",
-                    key, modifiers, mode
+                    "Unhandled: {key:?} + {modifiers:?} in {mode:?} mode"
                 ));
             }
         }
@@ -507,7 +506,7 @@ fn run_app<B: Backend>(
                     }
                 }
                 Err(e) => {
-                    editor.set_debug_message(format!("Error: {}", e));
+                    editor.set_debug_message(format!("Error: {e}"));
                 }
             }
         }
@@ -645,7 +644,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     terminal.show_cursor()?;
 
     if let Err(err) = res {
-        println!("{:?}", err);
+        println!("{err:?}");
     }
 
     println!("🎯 Cursor automatically reset to default!");

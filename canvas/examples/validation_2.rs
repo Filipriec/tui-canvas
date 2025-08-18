@@ -93,14 +93,14 @@ impl<D: DataProvider> AdvancedPatternFormEditor<D> {
     fn move_up(&mut self) {
         match self.editor.move_up() {
             Ok(()) => { self.update_field_validation_status(); self.field_switch_blocked = false; self.block_reason = None; }
-            Err(e) => { self.field_switch_blocked = true; self.block_reason = Some(e.to_string()); self.debug_message = format!("🚫 Field switch blocked: {}", e); }
+            Err(e) => { self.field_switch_blocked = true; self.block_reason = Some(e.to_string()); self.debug_message = format!("🚫 Field switch blocked: {e}"); }
         }
     }
 
     fn move_down(&mut self) {
         match self.editor.move_down() {
             Ok(()) => { self.update_field_validation_status(); self.field_switch_blocked = false; self.block_reason = None; }
-            Err(e) => { self.field_switch_blocked = true; self.block_reason = Some(e.to_string()); self.debug_message = format!("🚫 Field switch blocked: {}", e); }
+            Err(e) => { self.field_switch_blocked = true; self.block_reason = Some(e.to_string()); self.debug_message = format!("🚫 Field switch blocked: {e}"); }
         }
     }
 
@@ -132,23 +132,23 @@ impl<D: DataProvider> AdvancedPatternFormEditor<D> {
             let validation_result = self.editor.validate_current_field();
             match validation_result {
                 ValidationResult::Valid => { self.debug_message = "✅ Character accepted".to_string(); }
-                ValidationResult::Warning { message } => { self.debug_message = format!("⚠️  Warning: {}", message); }
-                ValidationResult::Error { message } => { self.debug_message = format!("❌ Pattern violation: {}", message); }
+                ValidationResult::Warning { message } => { self.debug_message = format!("⚠️  Warning: {message}"); }
+                ValidationResult::Error { message } => { self.debug_message = format!("❌ Pattern violation: {message}"); }
             }
         }
-        Ok(result?)
+        result
     }
 
     fn delete_backward(&mut self) -> anyhow::Result<()> {
         let result = self.editor.delete_backward();
         if result.is_ok() { self.debug_message = "⌫ Character deleted".to_string(); }
-        Ok(result?)
+        result
     }
 
     fn delete_forward(&mut self) -> anyhow::Result<()> {
         let result = self.editor.delete_forward();
         if result.is_ok() { self.debug_message = "⌦ Character deleted".to_string(); }
-        Ok(result?)
+        result
     }
 
     // Delegate methods
@@ -166,14 +166,14 @@ impl<D: DataProvider> AdvancedPatternFormEditor<D> {
     fn next_field(&mut self) {
         match self.editor.next_field() {
             Ok(()) => { self.update_field_validation_status(); self.field_switch_blocked = false; self.block_reason = None; }
-            Err(e) => { self.field_switch_blocked = true; self.block_reason = Some(e.to_string()); self.debug_message = format!("🚫 Cannot move to next field: {}", e); }
+            Err(e) => { self.field_switch_blocked = true; self.block_reason = Some(e.to_string()); self.debug_message = format!("🚫 Cannot move to next field: {e}"); }
         }
     }
 
     fn prev_field(&mut self) {
         match self.editor.prev_field() {
             Ok(()) => { self.update_field_validation_status(); self.field_switch_blocked = false; self.block_reason = None; }
-            Err(e) => { self.field_switch_blocked = true; self.block_reason = Some(e.to_string()); self.debug_message = format!("🚫 Cannot move to previous field: {}", e); }
+            Err(e) => { self.field_switch_blocked = true; self.block_reason = Some(e.to_string()); self.debug_message = format!("🚫 Cannot move to previous field: {e}"); }
         }
     }
 
@@ -492,7 +492,7 @@ fn run_app<B: Backend>(
                     }
                 }
                 Err(e) => {
-                    editor.set_debug_message(format!("Error: {}", e));
+                    editor.set_debug_message(format!("Error: {e}"));
                 }
             }
         }
@@ -654,7 +654,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     terminal.show_cursor()?;
 
     if let Err(err) = res {
-        println!("{:?}", err);
+        println!("{err:?}");
     }
 
     println!("🚀 Advanced pattern validation demo completed!");

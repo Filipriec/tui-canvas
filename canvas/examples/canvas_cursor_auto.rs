@@ -38,7 +38,7 @@ use ratatui::{
 use canvas::{
     canvas::{
         gui::render_canvas_default,
-        modes::{AppMode, ModeManager, HighlightState},
+        modes::AppMode,
         CursorManager, // This import only exists when cursor-style feature is enabled
     },
     DataProvider, FormEditor,
@@ -205,7 +205,7 @@ impl<D: DataProvider> AutoCursorFormEditor<D> {
             self.has_unsaved_changes = true;
             self.debug_message = "⌫ Deleted character backward".to_string();
         }
-        Ok(result?)
+        result
     }
 
     fn delete_forward(&mut self) -> anyhow::Result<()> {
@@ -214,7 +214,7 @@ impl<D: DataProvider> AutoCursorFormEditor<D> {
             self.has_unsaved_changes = true;
             self.debug_message = "⌦ Deleted character forward".to_string();
         }
-        Ok(result?)
+        result
     }
 
     // === MODE TRANSITIONS WITH AUTOMATIC CURSOR MANAGEMENT ===
@@ -240,7 +240,7 @@ impl<D: DataProvider> AutoCursorFormEditor<D> {
         if result.is_ok() {
             self.has_unsaved_changes = true;
         }
-        Ok(result?)
+        result
     }
 
     // === MANUAL CURSOR OVERRIDE DEMONSTRATION ===
@@ -429,13 +429,13 @@ fn handle_key_press(
 
         (AppMode::ReadOnly, KeyCode::Char('o'), _) => {
             if let Err(e) = editor.open_line_below() {
-                editor.set_debug_message(format!("Error opening line below: {}", e));
+                editor.set_debug_message(format!("Error opening line below: {e}"));
             }
             editor.clear_command_buffer();
         }
         (AppMode::ReadOnly, KeyCode::Char('O'), _) => {
             if let Err(e) = editor.open_line_above() {
-                editor.set_debug_message(format!("Error opening line above: {}", e));
+                editor.set_debug_message(format!("Error opening line above: {e}"));
             }
             editor.clear_command_buffer();
         }
@@ -694,8 +694,7 @@ fn handle_key_press(
                 editor.set_debug_message("Invalid command sequence".to_string());
             } else {
                 editor.set_debug_message(format!(
-                    "Unhandled: {:?} + {:?} in {:?} mode",
-                    key, modifiers, mode
+                    "Unhandled: {key:?} + {modifiers:?} in {mode:?} mode"
                 ));
             }
         }
@@ -719,7 +718,7 @@ fn run_app<B: Backend>(
                     }
                 }
                 Err(e) => {
-                    editor.set_debug_message(format!("Error: {}", e));
+                    editor.set_debug_message(format!("Error: {e}"));
                 }
             }
         }
@@ -858,7 +857,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     terminal.show_cursor()?;
 
     if let Err(err) = res {
-        println!("{:?}", err);
+        println!("{err:?}");
     }
 
     println!("🎯 Cursor automatically reset to default!");

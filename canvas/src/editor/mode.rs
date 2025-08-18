@@ -25,7 +25,6 @@ impl<D: DataProvider> FormEditor<D> {
             {
                 let _ = CursorManager::update_for_mode(AppMode::Edit);
             }
-            return;
         }
 
         // Default (not normal): original vim behavior
@@ -119,7 +118,7 @@ impl<D: DataProvider> FormEditor<D> {
             {
                 self.close_suggestions();
             }
-            return Ok(());
+            Ok(())
         }
 
         // Default (not normal): original vim behavior
@@ -155,7 +154,6 @@ impl<D: DataProvider> FormEditor<D> {
             {
                 let _ = CursorManager::update_for_mode(AppMode::Edit);
             }
-            return;
         }
 
         // Default (not normal): vim behavior
@@ -169,7 +167,6 @@ impl<D: DataProvider> FormEditor<D> {
         // NORMALMODE: ignore request (stay in Edit)
         #[cfg(feature = "textmode-normal")]
         {
-            return;
         }
 
         // Default (not normal): original vim
@@ -193,7 +190,6 @@ impl<D: DataProvider> FormEditor<D> {
         // NORMALMODE: ignore
         #[cfg(feature = "textmode-normal")]
         {
-            return;
         }
 
         // Default (not normal): original vim
@@ -216,7 +212,6 @@ impl<D: DataProvider> FormEditor<D> {
         // NORMALMODE: ignore
         #[cfg(feature = "textmode-normal")]
         {
-            return;
         }
 
         // Default (not normal): original vim
@@ -237,7 +232,7 @@ impl<D: DataProvider> FormEditor<D> {
     pub fn is_highlight_mode(&self) -> bool {
         #[cfg(feature = "textmode-normal")]
         {
-            return false;
+            false
         }
         #[cfg(not(feature = "textmode-normal"))]
         {

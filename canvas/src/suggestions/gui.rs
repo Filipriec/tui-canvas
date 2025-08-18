@@ -149,8 +149,8 @@ fn calculate_dropdown_position(
     if dropdown_area.right() > frame_area.width {
         dropdown_area.x = frame_area.width.saturating_sub(dropdown_width);
     }
-    dropdown_area.x = dropdown_area.x.max(0);
-    dropdown_area.y = dropdown_area.y.max(0);
+    dropdown_area.x = dropdown_area.x;
+    dropdown_area.y = dropdown_area.y;
 
     dropdown_area
 }

@@ -141,10 +141,10 @@ impl<D: DataProvider> ValidationFormEditor<D> {
                 self.debug_message = "✅ Current field is valid!".to_string();
             }
             ValidationResult::Warning { message } => {
-                self.debug_message = format!("⚠️  Warning: {}", message);
+                self.debug_message = format!("⚠️  Warning: {message}");
             }
             ValidationResult::Error { message } => {
-                self.debug_message = format!("❌ Error: {}", message);
+                self.debug_message = format!("❌ Error: {message}");
             }
         }
     }
@@ -189,7 +189,7 @@ impl<D: DataProvider> ValidationFormEditor<D> {
             Err(e) => {
                 self.field_switch_blocked = true;
                 self.block_reason = Some(e.to_string());
-                self.debug_message = format!("🚫 Field switch blocked: {}", e);
+                self.debug_message = format!("🚫 Field switch blocked: {e}");
             }
         }
     }
@@ -204,7 +204,7 @@ impl<D: DataProvider> ValidationFormEditor<D> {
             Err(e) => {
                 self.field_switch_blocked = true;
                 self.block_reason = Some(e.to_string());
-                self.debug_message = format!("🚫 Field switch blocked: {}", e);
+                self.debug_message = format!("🚫 Field switch blocked: {e}");
             }
         }
     }
@@ -289,19 +289,19 @@ impl<D: DataProvider> ValidationFormEditor<D> {
                         if let Some(status) = limits.status_text(
                             self.editor.data_provider().field_value(field_index)
                         ) {
-                            self.debug_message = format!("✏️  {}", status);
+                            self.debug_message = format!("✏️  {status}");
                         }
                     }
                 }
                 ValidationResult::Warning { message } => {
-                    self.debug_message = format!("⚠️  {}", message);
+                    self.debug_message = format!("⚠️  {message}");
                 }
                 ValidationResult::Error { message } => {
-                    self.debug_message = format!("❌ {}", message);
+                    self.debug_message = format!("❌ {message}");
                 }
             }
         }
-        Ok(result?)
+        result
     }
 
     fn get_current_field_limits(&self) -> Option<&CharacterLimits> {
@@ -317,7 +317,7 @@ impl<D: DataProvider> ValidationFormEditor<D> {
             self.has_unsaved_changes = true;
             self.debug_message = "⌫ Deleted character".to_string();
         }
-        Ok(result?)
+        result
     }
 
     fn delete_forward(&mut self) -> anyhow::Result<()> {
@@ -326,7 +326,7 @@ impl<D: DataProvider> ValidationFormEditor<D> {
             self.has_unsaved_changes = true;
             self.debug_message = "⌦ Deleted character".to_string();
         }
-        Ok(result?)
+        result
     }
 
     // === DELEGATE TO ORIGINAL EDITOR ===
@@ -370,7 +370,7 @@ impl<D: DataProvider> ValidationFormEditor<D> {
             Err(e) => {
                 self.field_switch_blocked = true;
                 self.block_reason = Some(e.to_string());
-                self.debug_message = format!("🚫 Cannot move to next field: {}", e);
+                self.debug_message = format!("🚫 Cannot move to next field: {e}");
             }
         }
     }
@@ -385,7 +385,7 @@ impl<D: DataProvider> ValidationFormEditor<D> {
             Err(e) => {
                 self.field_switch_blocked = true;
                 self.block_reason = Some(e.to_string());
-                self.debug_message = format!("🚫 Cannot move to previous field: {}", e);
+                self.debug_message = format!("🚫 Cannot move to previous field: {e}");
             }
         }
     }
@@ -644,7 +644,7 @@ fn run_app<B: Backend>(
                     }
                 }
                 Err(e) => {
-                    editor.set_debug_message(format!("Error: {}", e));
+                    editor.set_debug_message(format!("Error: {e}"));
                 }
             }
         }
@@ -823,7 +823,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     terminal.show_cursor()?;
 
     if let Err(err) = res {
-        println!("{:?}", err);
+        println!("{err:?}");
     }
 
     println!("🔍 Validation demo completed!");

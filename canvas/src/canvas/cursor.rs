@@ -19,7 +19,7 @@ impl CursorManager {
         #[cfg(feature = "textmode-normal")]
         {
             let style = SetCursorStyle::SteadyBar;
-            return execute!(io::stdout(), style);
+            execute!(io::stdout(), style)
         }
 
         // Default (not normal): original mapping

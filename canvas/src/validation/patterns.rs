@@ -49,8 +49,8 @@ impl std::fmt::Debug for CharacterFilter {
             CharacterFilter::Alphabetic => write!(f, "Alphabetic"),
             CharacterFilter::Numeric => write!(f, "Numeric"),
             CharacterFilter::Alphanumeric => write!(f, "Alphanumeric"),
-            CharacterFilter::Exact(ch) => write!(f, "Exact('{}')", ch),
-            CharacterFilter::OneOf(chars) => write!(f, "OneOf({:?})", chars),
+            CharacterFilter::Exact(ch) => write!(f, "Exact('{ch}')"),
+            CharacterFilter::OneOf(chars) => write!(f, "OneOf({chars:?})"),
             CharacterFilter::Custom(_) => write!(f, "Custom(<function>)"),
         }
     }
@@ -130,10 +130,10 @@ impl CharacterFilter {
             CharacterFilter::Alphabetic => "alphabetic characters (a-z, A-Z)".to_string(),
             CharacterFilter::Numeric => "numeric characters (0-9)".to_string(),
             CharacterFilter::Alphanumeric => "alphanumeric characters (a-z, A-Z, 0-9)".to_string(),
-            CharacterFilter::Exact(ch) => format!("exactly '{}'", ch),
+            CharacterFilter::Exact(ch) => format!("exactly '{ch}'"),
             CharacterFilter::OneOf(chars) => {
                 let char_list: String = chars.iter().collect();
-                format!("one of: {}", char_list)
+                format!("one of: {char_list}")
             },
             CharacterFilter::Custom(_) => "custom filter".to_string(),
         }
@@ -207,9 +207,7 @@ impl PatternFilters {
     /// Validate entire text against all filters
     pub fn validate_text(&self, text: &str) -> Result<(), String> {
         for (position, character) in text.char_indices() {
-            if let Err(error) = self.validate_char_at_position(position, character) {
-                return Err(error);
-            }
+            self.validate_char_at_position(position, character)?
         }
         Ok(())
     }

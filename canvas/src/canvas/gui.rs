@@ -486,7 +486,7 @@ fn render_field_labels<T: CanvasTheme>(
 ) {
     for (i, field) in fields.iter().enumerate() {
         let label = Paragraph::new(Line::from(Span::styled(
-            format!("{}:", field),
+            format!("{field}:"),
             Style::default().fg(theme.fg()),
         )));
         f.render_widget(
@@ -595,50 +595,48 @@ fn apply_characterwise_highlighting<'a, T: CanvasTheme>(
                 Span::styled(highlighted, highlight_style),
                 Span::styled(after, normal_style),
             ])
-        } else {
-            if field_index == anchor_field {
-                if anchor_field < *current_field_idx {
-                    let clamped_start = anchor_char.min(text_len);
-                    let before: String = text.chars().take(clamped_start).collect();
-                    let highlighted: String = text.chars().skip(clamped_start).collect();
+        } else if field_index == anchor_field {
+            if anchor_field < *current_field_idx {
+                let clamped_start = anchor_char.min(text_len);
+                let before: String = text.chars().take(clamped_start).collect();
+                let highlighted: String = text.chars().skip(clamped_start).collect();
 
-                    Line::from(vec![
-                        Span::styled(before, normal_style),
-                        Span::styled(highlighted, highlight_style),
-                    ])
-                } else {
-                    let clamped_end = anchor_char.min(text_len);
-                    let highlighted: String = text.chars().take(clamped_end + 1).collect();
-                    let after: String = text.chars().skip(clamped_end + 1).collect();
-
-                    Line::from(vec![
-                        Span::styled(highlighted, highlight_style),
-                        Span::styled(after, normal_style),
-                    ])
-                }
-            } else if field_index == *current_field_idx {
-                if anchor_field < *current_field_idx {
-                    let clamped_end = current_cursor_pos.min(text_len);
-                    let highlighted: String = text.chars().take(clamped_end + 1).collect();
-                    let after: String = text.chars().skip(clamped_end + 1).collect();
-
-                    Line::from(vec![
-                        Span::styled(highlighted, highlight_style),
-                        Span::styled(after, normal_style),
-                    ])
-                } else {
-                    let clamped_start = current_cursor_pos.min(text_len);
-                    let before: String = text.chars().take(clamped_start).collect();
-                    let highlighted: String = text.chars().skip(clamped_start).collect();
-
-                    Line::from(vec![
-                        Span::styled(before, normal_style),
-                        Span::styled(highlighted, highlight_style),
-                    ])
-                }
+                Line::from(vec![
+                    Span::styled(before, normal_style),
+                    Span::styled(highlighted, highlight_style),
+                ])
             } else {
-                Line::from(Span::styled(text, highlight_style))
+                let clamped_end = anchor_char.min(text_len);
+                let highlighted: String = text.chars().take(clamped_end + 1).collect();
+                let after: String = text.chars().skip(clamped_end + 1).collect();
+
+                Line::from(vec![
+                    Span::styled(highlighted, highlight_style),
+                    Span::styled(after, normal_style),
+                ])
             }
+        } else if field_index == *current_field_idx {
+            if anchor_field < *current_field_idx {
+                let clamped_end = current_cursor_pos.min(text_len);
+                let highlighted: String = text.chars().take(clamped_end + 1).collect();
+                let after: String = text.chars().skip(clamped_end + 1).collect();
+
+                Line::from(vec![
+                    Span::styled(highlighted, highlight_style),
+                    Span::styled(after, normal_style),
+                ])
+            } else {
+                let clamped_start = current_cursor_pos.min(text_len);
+                let before: String = text.chars().take(clamped_start).collect();
+                let highlighted: String = text.chars().skip(clamped_start).collect();
+
+                Line::from(vec![
+                    Span::styled(before, normal_style),
+                    Span::styled(highlighted, highlight_style),
+                ])
+            }
+        } else {
+            Line::from(Span::styled(text, highlight_style))
         }
     } else {
         Line::from(Span::styled(text, normal_style))
@@ -710,6 +708,6 @@ pub fn render_canvas_default<D: DataProvider>(
     area: Rect,
     editor: &FormEditor<D>,
 ) -> Option<Rect> {
-    let theme = DefaultCanvasTheme::default();
+    let theme = DefaultCanvasTheme;
     render_canvas(f, area, editor, &theme)
 }

@@ -97,7 +97,7 @@ impl CustomFormatter for PhoneFormatter {
         let len = raw.chars().count();
         match len {
             0 => FormattingResult::success(""),
-            1..=3 => FormattingResult::success(format!("({})", raw)),
+            1..=3 => FormattingResult::success(format!("({raw})")),
             4..=6 => FormattingResult::success(format!("({}) {}", &raw[..3], &raw[3..])),
             7..=10 => FormattingResult::success(format!("({}) {}-{}", &raw[..3], &raw[3..6], &raw[6..])),
             10 => {
@@ -135,7 +135,7 @@ impl CustomFormatter for CreditCardFormatter {
 
         let len = raw.chars().count();
         match len {
-            0..=15 => FormattingResult::warning(formatted, format!("Card incomplete ({}/16 digits)", len)),
+            0..=15 => FormattingResult::warning(formatted, format!("Card incomplete ({len}/16 digits)")),
             16 => FormattingResult::success(formatted),
             _ => FormattingResult::warning(formatted, "Card too long (extra digits shown)"),
         }
@@ -177,16 +177,16 @@ impl CustomFormatter for DateFormatter {
 
                 if m == 0 || m > 12 {
                     FormattingResult::warning(
-                        format!("{}/{}/{}", month, day, year),
+                        format!("{month}/{day}/{year}"),
                         "Invalid month (01-12)"
                     )
                 } else if d == 0 || d > 31 {
                     FormattingResult::warning(
-                        format!("{}/{}/{}", month, day, year),
+                        format!("{month}/{day}/{year}"),
                         "Invalid day (01-31)"
                     )
                 } else {
-                    FormattingResult::success(format!("{}/{}/{}", month, day, year))
+                    FormattingResult::success(format!("{month}/{day}/{year}"))
                 }
             },
             _ => FormattingResult::error("Date too long (MMDDYYYY format)"),
@@ -384,7 +384,7 @@ impl<D: DataProvider> EnhancedDemoEditor<D> {
 
         let warning = if self.validation_enabled && self.has_formatter() {
             // Check if there are any formatting warnings
-            if raw.len() > 0 {
+            if !raw.is_empty() {
                 match self.editor.current_field() {
                     0 if raw.len() < 5 => Some(format!("PSC incomplete: {}/5", raw.len())),
                     1 if raw.len() < 10 => Some(format!("Phone incomplete: {}/10", raw.len())),
@@ -408,7 +408,7 @@ impl<D: DataProvider> EnhancedDemoEditor<D> {
         self.editor.enter_edit_mode();
         let field_type = self.current_field_type();
         let rules = self.get_input_rules();
-        self.debug_message = format!("✏️ INSERT MODE - Cursor: Steady Bar | - {} - {}", field_type, rules);
+        self.debug_message = format!("✏️ INSERT MODE - Cursor: Steady Bar | - {field_type} - {rules}");
     }
 
     fn exit_edit_mode(&mut self) {
@@ -429,9 +429,9 @@ impl<D: DataProvider> EnhancedDemoEditor<D> {
         if result.is_ok() {
             let (raw, display, _, _) = self.get_current_field_analysis();
             if raw != display && self.validation_enabled {
-                self.debug_message = format!("✏️ '{}' added - Real-time formatting active", ch);
+                self.debug_message = format!("✏️ '{ch}' added - Real-time formatting active");
             } else {
-                self.debug_message = format!("✏️ '{}' added", ch);
+                self.debug_message = format!("✏️ '{ch}' added");
             }
         }
         result
@@ -459,7 +459,7 @@ impl<D: DataProvider> EnhancedDemoEditor<D> {
                 display.chars().nth(display_pos).unwrap_or('∅')
             );
         } else {
-            self.debug_message = format!("📍 Cursor at position {} (no mapping needed)", raw_pos);
+            self.debug_message = format!("📍 Cursor at position {raw_pos} (no mapping needed)");
         }
     }
 
@@ -530,7 +530,7 @@ fn handle_key_press(
         // Field analysis
         (AppMode::ReadOnly, KeyCode::Char('?'), _) => {
             let (raw, display, status, warning) = editor.get_current_field_analysis();
-            let warning_text = warning.map(|w| format!(" ⚠️ {}", w)).unwrap_or_default();
+            let warning_text = warning.map(|w| format!(" ⚠️ {w}")).unwrap_or_default();
             editor.debug_message = format!(
                 "🔍 Field {}: {} | Raw: '{}' | Display: '{}'{}",
                 editor.current_field() + 1, status, raw, display, warning_text
@@ -558,7 +558,7 @@ fn run_app<B: Backend>(
                     }
                 }
                 Err(e) => {
-                    editor.debug_message = format!("❌ Error: {}", e);
+                    editor.debug_message = format!("❌ Error: {e}");
                 }
             }
         }
@@ -627,11 +627,11 @@ fn render_enhanced_status(
     ];
 
     if editor.show_raw_data || editor.mode() == AppMode::Edit {
-        analysis_lines.push(format!("💾 Raw Data: '{}'", raw));
-        analysis_lines.push(format!("✨ Display: '{}'", display));
+        analysis_lines.push(format!("💾 Raw Data: '{raw}'"));
+        analysis_lines.push(format!("✨ Display: '{display}'"));
     } else {
-        analysis_lines.push(format!("✨ User Sees: '{}'", display));
-        analysis_lines.push(format!("💾 Stored As: '{}'", raw));
+        analysis_lines.push(format!("✨ User Sees: '{display}'"));
+        analysis_lines.push(format!("💾 Stored As: '{raw}'"));
     }
 
     if editor.show_cursor_details {
@@ -643,7 +643,7 @@ fn render_enhanced_status(
     }
 
     if let Some(ref warn) = warning {
-        analysis_lines.push(format!("⚠️ Warning: {}", warn));
+        analysis_lines.push(format!("⚠️ Warning: {warn}"));
     }
 
     let analysis_color = if warning.is_some() {
@@ -742,7 +742,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     CursorManager::reset()?;
 
     if let Err(err) = res {
-        println!("{:?}", err);
+        println!("{err:?}");
     }
 
     println!("🧩 Enhanced custom formatter demo completed!");

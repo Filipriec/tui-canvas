@@ -39,7 +39,7 @@ impl ModeManager {
         #[cfg(feature = "textmode-normal")]
         {
             // Always force Edit in normalmode
-            return Ok(AppMode::Edit);
+            Ok(AppMode::Edit)
         }
 
         #[cfg(not(feature = "textmode-normal"))]

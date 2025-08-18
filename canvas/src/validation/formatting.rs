@@ -108,7 +108,7 @@ impl FormattingResult {
     pub fn success(formatted: impl Into<String>) -> Self {
         FormattingResult::Success {
             formatted: formatted.into(),
-            mapper: Arc::new(DefaultPositionMapper::default()),
+            mapper: Arc::new(DefaultPositionMapper),
         }
     }
 
@@ -117,7 +117,7 @@ impl FormattingResult {
         FormattingResult::Warning {
             formatted: formatted.into(),
             message: message.into(),
-            mapper: Arc::new(DefaultPositionMapper::default()),
+            mapper: Arc::new(DefaultPositionMapper),
         }
     }
 
@@ -187,7 +187,7 @@ mod tests {
 
     #[test]
     fn default_mapper_roundtrip_basic() {
-        let mapper = DefaultPositionMapper::default();
+        let mapper = DefaultPositionMapper;
         let raw = "01001";
         let formatted = "010 01";
 

@@ -23,8 +23,10 @@ pub struct CharacterLimits {
 
 /// How to count characters for limit checking
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Default)]
 pub enum CountMode {
     /// Count actual characters (default)
+    #[default]
     Characters,
     
     /// Count display width (useful for CJK characters)
@@ -34,11 +36,6 @@ pub enum CountMode {
     Bytes,
 }
 
-impl Default for CountMode {
-    fn default() -> Self {
-        CountMode::Characters
-    }
-}
 
 /// Result of a character limit check
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -157,9 +154,7 @@ impl CharacterLimits {
         if let Some(max) = self.max_length {
             if new_count > max {
                 return Some(ValidationResult::error(format!(
-                    "Character limit exceeded: {}/{}",
-                    new_count,
-                    max
+                    "Character limit exceeded: {new_count}/{max}"
                 )));
             }
 
@@ -167,9 +162,7 @@ impl CharacterLimits {
             if let Some(warning_threshold) = self.warning_threshold {
                 if new_count >= warning_threshold && current_count < warning_threshold {
                     return Some(ValidationResult::warning(format!(
-                        "Approaching character limit: {}/{}",
-                        new_count,
-                        max
+                        "Approaching character limit: {new_count}/{max}"
                     )));
                 }
             }
@@ -186,9 +179,7 @@ impl CharacterLimits {
         if let Some(min) = self.min_length {
             if count < min {
                 return Some(ValidationResult::warning(format!(
-                    "Minimum length not met: {}/{}", 
-                    count, 
-                    min
+                    "Minimum length not met: {count}/{min}"
                 )));
             }
         }
@@ -197,9 +188,7 @@ impl CharacterLimits {
         if let Some(max) = self.max_length {
             if count > max {
                 return Some(ValidationResult::error(format!(
-                    "Character limit exceeded: {}/{}", 
-                    count, 
-                    max
+                    "Character limit exceeded: {count}/{max}"
                 )));
             }
             
@@ -207,9 +196,7 @@ impl CharacterLimits {
             if let Some(warning_threshold) = self.warning_threshold {
                 if count >= warning_threshold {
                     return Some(ValidationResult::warning(format!(
-                        "Approaching character limit: {}/{}", 
-                        count, 
-                        max
+                        "Approaching character limit: {count}/{max}"
                     )));
                 }
             }
@@ -251,20 +238,16 @@ impl CharacterLimits {
         match self.check_limits(text) {
             LimitCheckResult::Ok => {
                 // Show current/max if we have a max limit
-                if let Some(max) = self.max_length {
-                    Some(format!("{}/{}", self.count(text), max))
-                } else {
-                    None
-                }
+                self.max_length.map(|max| format!("{}/{}", self.count(text), max))
             },
             LimitCheckResult::Warning { current, max } => {
-                Some(format!("{}/{} (approaching limit)", current, max))
+                Some(format!("{current}/{max} (approaching limit)"))
             },
             LimitCheckResult::Exceeded { current, max } => {
-                Some(format!("{}/{} (exceeded)", current, max))
+                Some(format!("{current}/{max} (exceeded)"))
             },
             LimitCheckResult::TooShort { current, min } => {
-                Some(format!("{}/{} minimum", current, min))
+                Some(format!("{current}/{min} minimum"))
             },
         }
     }
@@ -284,8 +267,7 @@ impl CharacterLimits {
             let count = self.count(text);
             if count > 0 && count < min {
                 return Some(format!(
-                    "Field must be empty or have at least {} characters (currently: {})",
-                    min, count
+                    "Field must be empty or have at least {min} characters (currently: {count})"
                 ));
             }
         }
