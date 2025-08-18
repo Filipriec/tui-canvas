@@ -7,7 +7,7 @@ use std::hash::{Hash, Hasher};
 use ratatui::style::{Modifier, Style};
 use syntect::{
     highlighting::{
-        HighlightIterator, Highlighter, Style as SynStyle, Theme, ThemeSet,
+        HighlightIterator, HighlightState, Highlighter, Style as SynStyle, Theme, ThemeSet,
     },
     parsing::{ParseState, ScopeStack, SyntaxReference, SyntaxSet},
 };
@@ -160,8 +160,8 @@ impl SyntectEngine {
         }
 
         let syntax = self.syntax_ref();
-        let theme = self.theme();
-        let highlighter = Highlighter::new(theme);
+        let theme = self.theme().clone(); // Clone to avoid borrow conflicts
+        let highlighter = Highlighter::new(&theme);
 
         let mut ps = if self.parse_after.is_empty() {
             ParseState::new(syntax)
@@ -177,12 +177,24 @@ impl SyntectEngine {
         let start = self.parse_after.len();
         for i in start..line_idx {
             let s = provider.field_value(i);
-            let ops = ps.parse_line(s);
-            // Advance stack by applying ops using HighlightIterator
-            let mut it = HighlightIterator::new(&highlighter, &ops[..], s, &mut stack);
+            
+            // Fix: parse_line takes 2 arguments: line and &SyntaxSet
+            let ops = match ps.parse_line(s, &self.ps) {
+                Ok(ops) => ops,
+                Err(_) => Vec::new(), // Handle parsing errors gracefully
+            };
+            
+            // Fix: HighlightState::new requires &Highlighter and ScopeStack
+            let mut highlight_state = HighlightState::new(&highlighter, stack.clone());
+            
+            // Fix: HighlightIterator::new expects &mut HighlightState as first parameter
+            let mut it = HighlightIterator::new(&mut highlight_state, &ops[..], s, &highlighter);
             while let Some((_style, _text)) = it.next() {
                 // Iterate to apply ops; we don't need the tokens here.
             }
+            
+            // Update the stack from the highlight state
+            stack = highlight_state.path.clone();
 
             let h = Self::hash_line(s);
 
@@ -209,8 +221,8 @@ impl SyntectEngine {
         self.ensure_state_before(line_idx, provider);
 
         let syntax = self.syntax_ref();
-        let theme = self.theme();
-        let highlighter = Highlighter::new(theme);
+        let theme = self.theme().clone(); // Clone to avoid borrow conflicts
+        let highlighter = Highlighter::new(&theme);
 
         let mut ps = if line_idx == 0 {
             ParseState::new(syntax)
@@ -220,7 +232,7 @@ impl SyntectEngine {
             ParseState::new(syntax)
         };
 
-        let mut stack = if line_idx == 0 {
+        let stack = if line_idx == 0 {
             ScopeStack::new()
         } else if self.stack_after.len() >= line_idx {
             self.stack_after[line_idx - 1].clone()
@@ -228,8 +240,17 @@ impl SyntectEngine {
             ScopeStack::new()
         };
 
-        let ops = ps.parse_line(line);
-        let mut iter = HighlightIterator::new(&highlighter, &ops[..], line, &mut stack);
+        // Fix: parse_line takes 2 arguments: line and &SyntaxSet
+        let ops = match ps.parse_line(line, &self.ps) {
+            Ok(ops) => ops,
+            Err(_) => Vec::new(), // Handle parsing errors gracefully
+        };
+        
+        // Fix: HighlightState::new requires &Highlighter and ScopeStack
+        let mut highlight_state = HighlightState::new(&highlighter, stack);
+        
+        // Fix: HighlightIterator::new expects &mut HighlightState as first parameter
+        let mut iter = HighlightIterator::new(&mut highlight_state, &ops[..], line, &highlighter);
 
         let mut out: Vec<StyledChunk> = Vec::new();
         while let Some((syn_style, slice)) = iter.next() {
@@ -253,11 +274,15 @@ impl SyntectEngine {
         } else {
             self.parse_after[line_idx] = ps;
         }
+        
+        // Update stack from highlight state
+        let final_stack = highlight_state.path.clone();
         if line_idx >= self.stack_after.len() {
-            self.stack_after.push(stack);
+            self.stack_after.push(final_stack);
         } else {
-            self.stack_after[line_idx] = stack;
+            self.stack_after[line_idx] = final_stack;
         }
+        
         if line_idx >= self.line_hashes.len() {
             self.line_hashes.push(h);
         } else {
