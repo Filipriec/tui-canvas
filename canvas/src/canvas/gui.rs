@@ -166,7 +166,6 @@ fn render_active_line_with_indicator<T: CanvasTheme>(
     if let Some(comp) = completion {
         if !comp.is_empty() && remaining_cols > 0 {
             visible_completion = slice_by_display_cols(comp, 0, remaining_cols);
-            remaining_cols = remaining_cols.saturating_sub(display_width(&visible_completion));
         }
     }
 
