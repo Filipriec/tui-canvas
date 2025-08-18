@@ -5,18 +5,10 @@ use super::engine::SyntectEngine;
 use crate::textarea::state::TextAreaState;
 
 // Remove Debug derive since TextAreaState doesn't implement Debug
+#[derive(Default)]
 pub struct TextAreaSyntaxState {
     pub textarea: TextAreaState,
     pub engine: SyntectEngine,
-}
-
-impl Default for TextAreaSyntaxState {
-    fn default() -> Self {
-        Self {
-            textarea: TextAreaState::default(),
-            engine: SyntectEngine::new(),
-        }
-    }
 }
 
 impl TextAreaSyntaxState {
