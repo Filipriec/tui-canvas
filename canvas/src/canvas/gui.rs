@@ -76,7 +76,121 @@ fn clip_with_indicator_line<'a>(s: &'a str, width: u16, indicator: char) -> Line
 #[cfg(feature = "gui")]
 const RIGHT_PAD: u16 = 3;
 
-/// Default renderer: overflow indicator '$'
+#[cfg(feature = "gui")]
+fn slice_by_display_cols(s: &str, start_cols: u16, max_cols: u16) -> String {
+    if max_cols == 0 {
+        return String::new();
+    }
+    let mut cols: u16 = 0;
+    let mut out = String::new();
+    let mut taken: u16 = 0;
+    let mut started = false;
+
+    for ch in s.chars() {
+        let w = UnicodeWidthChar::width(ch).unwrap_or(0) as u16;
+        let next = cols.saturating_add(w);
+
+        if !started {
+            if next <= start_cols {
+                cols = next;
+                continue;
+            } else {
+                started = true;
+            }
+        }
+
+        if taken.saturating_add(w) > max_cols {
+            break;
+        }
+        out.push(ch);
+        taken = taken.saturating_add(w);
+        cols = next;
+    }
+
+    out
+}
+
+#[cfg(feature = "gui")]
+fn compute_h_scroll_with_padding(cursor_cols: u16, width: u16) -> (u16, u16) {
+    let mut h = 0u16;
+    for _ in 0..2 {
+        let left_cols = if h > 0 { 1 } else { 0 };
+        let max_x_visible = width.saturating_sub(1 + RIGHT_PAD + left_cols);
+        let needed = cursor_cols.saturating_sub(max_x_visible);
+        if needed <= h {
+            return (h, left_cols);
+        }
+        h = needed;
+    }
+    let left_cols = if h > 0 { 1 } else { 0 };
+    (h, left_cols)
+}
+
+#[cfg(feature = "gui")]
+fn render_active_line_with_indicator<T: CanvasTheme>(
+    typed_text: &str,
+    completion: Option<&str>,
+    width: u16,
+    indicator: char,
+    cursor_chars: usize,
+    theme: &T,
+) -> (Line<'static>, u16, u16) {
+    if width == 0 {
+        return (Line::from(""), 0, 0);
+    }
+
+    // Cursor display column
+    let mut cursor_cols: u16 = 0;
+    for (i, ch) in typed_text.chars().enumerate() {
+        if i >= cursor_chars {
+            break;
+        }
+        cursor_cols = cursor_cols
+            .saturating_add(UnicodeWidthChar::width(ch).unwrap_or(0) as u16);
+    }
+
+    let (h_scroll, left_cols) = compute_h_scroll_with_padding(cursor_cols, width);
+
+    let total_cols = display_width(typed_text);
+    let content_budget = width.saturating_sub(left_cols);
+    let show_right = total_cols.saturating_sub(h_scroll) > content_budget;
+    let right_cols: u16 = if show_right { 1 } else { 0 };
+
+    let visible_cols = width.saturating_sub(left_cols + right_cols);
+    let visible_typed = slice_by_display_cols(typed_text, h_scroll, visible_cols);
+
+    let used_typed_cols = display_width(&visible_typed);
+    let mut remaining_cols = visible_cols.saturating_sub(used_typed_cols);
+    let mut visible_completion = String::new();
+
+    if let Some(comp) = completion {
+        if !comp.is_empty() && remaining_cols > 0 {
+            visible_completion = slice_by_display_cols(comp, 0, remaining_cols);
+            remaining_cols = remaining_cols.saturating_sub(display_width(&visible_completion));
+        }
+    }
+
+    let mut spans: Vec<Span> = Vec::with_capacity(3);
+    if left_cols == 1 {
+        spans.push(Span::raw(indicator.to_string()));
+    }
+    spans.push(Span::styled(
+        visible_typed,
+        Style::default().fg(theme.fg()),
+    ));
+    if !visible_completion.is_empty() {
+        spans.push(Span::styled(
+            visible_completion,
+            Style::default().fg(theme.suggestion_gray()),
+        ));
+    }
+    if show_right {
+        spans.push(Span::raw(indicator.to_string()));
+    }
+
+    (Line::from(spans), h_scroll, left_cols)
+}
+
 #[cfg(feature = "gui")]
 pub fn render_canvas<T: CanvasTheme, D: DataProvider>(
     f: &mut Frame,
@@ -88,7 +202,6 @@ pub fn render_canvas<T: CanvasTheme, D: DataProvider>(
     render_canvas_with_options(f, area, editor, theme, opts)
 }
 
-/// Wrapped variant: opt into soft wrap instead of overflow indicator
 #[cfg(feature = "gui")]
 pub fn render_canvas_with_options<T: CanvasTheme, D: DataProvider>(
     f: &mut Frame,
@@ -123,7 +236,6 @@ pub fn render_canvas_with_options<T: CanvasTheme, D: DataProvider>(
     )
 }
 
-/// Render canvas with explicit highlight state (with options)
 #[cfg(feature = "gui")]
 fn render_canvas_with_highlight_and_options<T: CanvasTheme, D: DataProvider>(
     f: &mut Frame,
@@ -272,75 +384,71 @@ where
         let typed_text = get_display_value(i);
         let inner_width = input_rows[i].width;
 
-        let h_scroll_for_cursor: u16 = 0;
-        let left_offset_for_cursor: u16 = 0;
+        // ---- BEGIN MODIFIED SECTION ----
+        let mut h_scroll_for_cursor: u16 = 0;
+        let mut left_offset_for_cursor: u16 = 0;
 
-        let line = if is_active {
-            // Active field: typed text + optional gray completion
-            let mut spans: Vec<Span> = Vec::new();
-            spans.push(Span::styled(
-                typed_text.clone(),
-                Style::default().fg(theme.fg()),
-            ));
-
-            if let Some(completion) = &active_completion {
-                if !completion.is_empty() {
-                    spans.push(Span::styled(
-                        completion.clone(),
-                        Style::default().fg(theme.suggestion_gray()),
-                    ));
-                }
+        let line = match highlight_state {
+            // Selection highlighting active: always use highlighting, even for the active field
+            HighlightState::Characterwise { .. } | HighlightState::Linewise { .. } => {
+                apply_highlighting(
+                    &typed_text,
+                    i,
+                    current_field_idx,
+                    current_cursor_pos,
+                    highlight_state,
+                    theme,
+                    is_active,
+                )
             }
 
-            Line::from(spans)
-        } else {
-            // Non-active fields: normal overflow/highlighting logic
-            match (opts.overflow, highlight_state) {
-                (OverflowMode::Indicator(ind), HighlightState::Off) => {
-                    if display_width(&typed_text) <= inner_width {
+            // No selection highlighting
+            HighlightState::Off => match opts.overflow {
+                // Indicator mode: special-case the active field to preserve h-scroll + indicators
+                OverflowMode::Indicator(ind) => {
+                    if is_active {
+                        let (l, hs, left_cols) = render_active_line_with_indicator(
+                            &typed_text,
+                            active_completion.as_deref(),
+                            inner_width,
+                            ind,
+                            current_cursor_pos,
+                            theme,
+                        );
+                        h_scroll_for_cursor = hs;
+                        left_offset_for_cursor = left_cols;
+                        l
+                    } else if display_width(&typed_text) <= inner_width {
                         Line::from(Span::raw(typed_text.clone()))
                     } else {
                         clip_with_indicator_line(&typed_text, inner_width, ind)
                     }
                 }
-                (OverflowMode::Indicator(_ind), HighlightState::Characterwise { .. }) => {
-                    apply_highlighting(
-                        &typed_text,
-                        i,
-                        current_field_idx,
-                        current_cursor_pos,
-                        highlight_state,
-                        theme,
-                        is_active,
-                    )
+
+                // Wrap mode: keep active completion for active line
+                OverflowMode::Wrap => {
+                    if is_active {
+                        let mut spans: Vec<Span> = Vec::new();
+                        spans.push(Span::styled(
+                                typed_text.clone(),
+                                Style::default().fg(theme.fg()),
+                        ));
+                        if let Some(completion) = &active_completion {
+                            if !completion.is_empty() {
+                                spans.push(Span::styled(
+                                        completion.clone(),
+                                        Style::default().fg(theme.suggestion_gray()),
+                                ));
+                            }
+                        }
+                        Line::from(spans)
+                    } else {
+                        Line::from(Span::raw(typed_text.clone()))
+                    }
                 }
-                (OverflowMode::Indicator(_ind), HighlightState::Linewise { .. }) => {
-                    apply_highlighting(
-                        &typed_text,
-                        i,
-                        current_field_idx,
-                        current_cursor_pos,
-                        highlight_state,
-                        theme,
-                        is_active,
-                    )
-                }
-                (OverflowMode::Wrap, HighlightState::Off) => {
-                    Line::from(Span::raw(typed_text.clone()))
-                }
-                (OverflowMode::Wrap, _) => {
-                    apply_highlighting(
-                        &typed_text,
-                        i,
-                        current_field_idx,
-                        current_cursor_pos,
-                        highlight_state,
-                        theme,
-                        is_active,
-                    )
-                }
-            }
-        };
+            },
+        };        
+        // ---- END MODIFIED SECTION ----
 
         let mut p = Paragraph::new(line).alignment(Alignment::Left);
 
