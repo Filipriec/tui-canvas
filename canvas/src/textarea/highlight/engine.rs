@@ -29,6 +29,12 @@ pub struct SyntectEngine {
     line_hashes: Vec<u64>,
 }
 
+impl Default for SyntectEngine {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SyntectEngine {
     pub fn new() -> Self {
         let ps = SyntaxSet::load_defaults_newlines();
@@ -179,17 +185,14 @@ impl SyntectEngine {
             let s = provider.field_value(i);
             
             // Fix: parse_line takes 2 arguments: line and &SyntaxSet
-            let ops = match ps.parse_line(s, &self.ps) {
-                Ok(ops) => ops,
-                Err(_) => Vec::new(), // Handle parsing errors gracefully
-            };
+            let ops = ps.parse_line(s, &self.ps).unwrap_or_default();
             
             // Fix: HighlightState::new requires &Highlighter and ScopeStack
             let mut highlight_state = HighlightState::new(&highlighter, stack.clone());
             
             // Fix: HighlightIterator::new expects &mut HighlightState as first parameter
-            let mut it = HighlightIterator::new(&mut highlight_state, &ops[..], s, &highlighter);
-            while let Some((_style, _text)) = it.next() {
+            let it = HighlightIterator::new(&mut highlight_state, &ops[..], s, &highlighter);
+            for (_style, _text) in it {
                 // Iterate to apply ops; we don't need the tokens here.
             }
             
@@ -241,19 +244,16 @@ impl SyntectEngine {
         };
 
         // Fix: parse_line takes 2 arguments: line and &SyntaxSet
-        let ops = match ps.parse_line(line, &self.ps) {
-            Ok(ops) => ops,
-            Err(_) => Vec::new(), // Handle parsing errors gracefully
-        };
+        let ops = ps.parse_line(line, &self.ps).unwrap_or_default();
         
         // Fix: HighlightState::new requires &Highlighter and ScopeStack
         let mut highlight_state = HighlightState::new(&highlighter, stack);
         
         // Fix: HighlightIterator::new expects &mut HighlightState as first parameter
-        let mut iter = HighlightIterator::new(&mut highlight_state, &ops[..], line, &highlighter);
+        let iter = HighlightIterator::new(&mut highlight_state, &ops[..], line, &highlighter);
 
         let mut out: Vec<StyledChunk> = Vec::new();
-        while let Some((syn_style, slice)) = iter.next() {
+        for (syn_style, slice) in iter {
             if slice.is_empty() {
                 continue;
             }
