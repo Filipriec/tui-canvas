@@ -1,5 +1,9 @@
 // src/editor/mod.rs
-// Only module declarations and re-exports.
+//! Editor submodule exports.
+//!
+//! This module exposes the internal editor pieces (core, editing, movement,
+//! navigation, mode, and optional features like suggestions, validation, and
+//! computed field helpers). Only module declarations and re-exports live here.
 
 pub mod core;
 pub mod display;

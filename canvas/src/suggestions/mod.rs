@@ -1,4 +1,8 @@
 // src/suggestions/mod.rs
+//! Suggestions subsystem - provider and optional GUI.
+//!
+//! Contains the suggestion provider types used by the editor and, when the GUI
+//! feature is enabled, the rendering helpers for the suggestions dropdown.
 
 pub mod state;
 #[cfg(feature = "gui")]

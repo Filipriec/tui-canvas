@@ -1,11 +1,10 @@
-/* file: canvas/src/computed/state.rs */
-/*
-Add computed state module file implementing caching and dependencies
-*/
-
-// ================================================================================================
-// COMPUTED FIELDS - State: caching and dependencies
-// ================================================================================================
+// src/computed/state.rs
+//! Computed field state: caching and dependency graph.
+//!
+//! This module holds the internal state necessary to track which fields are
+//! computed, their dependencies, and cached computed values. It is used by the
+//! editor to avoid unnecessary recomputation and to present computed fields as
+//! read-only.
 
 use std::collections::{HashMap, HashSet};
 

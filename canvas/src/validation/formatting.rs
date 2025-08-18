@@ -1,6 +1,11 @@
-/* canvas/src/validation/formatting.rs
-   Add new formatting module with CustomFormatter, PositionMapper, DefaultPositionMapper, and FormattingResult
-*/
+// src/validation/formatting.rs
+//! Custom formatting and position mapping for validation/display.
+//!
+//! This module defines the CustomFormatter trait along with helpers to map
+//! cursor positions between the raw stored text and the formatted display
+//! representation. Implementors may provide a custom PositionMapper to handle
+//! advanced formatting scenarios.
+
 use std::sync::Arc;
 
 /// Bidirectional mapping between raw input positions and formatted display positions.

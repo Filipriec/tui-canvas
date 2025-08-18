@@ -1,6 +1,7 @@
-// ================================================================================================
-// COMPUTED FIELDS - Provider and Context
-// ================================================================================================
+//! Provider interface and context for computed/display-only fields.
+//!
+//! Implementors provide logic to compute a field's display value from the
+//! other field values in the form.
 
 /// Context information provided to computed field calculations
 #[derive(Debug, Clone)]

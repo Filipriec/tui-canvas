@@ -1,6 +1,11 @@
 // src/validation/mod.rs
+//! Validation subsystem re-exports and helpers.
+//!
+//! This module collects validation-related modules (limits, masks, patterns,
+//! formatting, and state) and re-exports the most commonly used types so that
+//! callers can import them from `crate::validation`.
 
-// Core validation modules
+ // Core validation modules
 pub mod config;
 pub mod limits;
 pub mod state;
