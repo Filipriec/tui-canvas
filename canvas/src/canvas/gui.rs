@@ -112,10 +112,7 @@ const RIGHT_PAD: u16 = 3;
 
 #[cfg(feature = "gui")]
 fn compute_h_scroll_with_padding(cursor_cols: u16, width: u16) -> (u16, u16) {
-    // Returns (h_scroll, left_cols). left_cols = 1 if a left indicator is shown.
-    // We pre-emptively keep the caret out of the last RIGHT_PAD columns.
     let mut h = 0u16;
-    // Two passes are enough to converge (second pass accounts for left indicator).
     for _ in 0..2 {
         let left_cols = if h > 0 { 1 } else { 0 };
         let max_x_visible = width.saturating_sub(1 + RIGHT_PAD + left_cols);
@@ -135,13 +132,12 @@ fn active_indicator_viewport(
     width: u16,
     indicator: char,
     cursor_chars: usize,
-    _right_padding: u16, // kept for signature symmetry; we use RIGHT_PAD constant
+    _right_padding: u16,
 ) -> (Line<'static>, u16, u16) {
     if width == 0 {
         return (Line::from(""), 0, 0);
     }
 
-    // Total display width of the string and cursor display column
     let total_cols = display_width(s);
     let mut cursor_cols: u16 = 0;
     for (i, ch) in s.chars().enumerate() {
@@ -152,10 +148,8 @@ fn active_indicator_viewport(
             .saturating_add(UnicodeWidthChar::width(ch).unwrap_or(0) as u16);
     }
 
-    // Pre-emptive scroll: never let caret enter the last RIGHT_PAD columns
     let (h_scroll, left_cols) = compute_h_scroll_with_padding(cursor_cols, width);
 
-    // Right indicator if more content beyond the window start
     let content_budget = width.saturating_sub(left_cols);
     let show_right = total_cols.saturating_sub(h_scroll) > content_budget;
     let right_cols: u16 = if show_right { 1 } else { 0 };
@@ -198,7 +192,28 @@ pub fn render_canvas_with_options<T: CanvasTheme, D: DataProvider>(
 ) -> Option<Rect> {
     let highlight_state =
         convert_selection_to_highlight(editor.ui_state().selection_state());
-    render_canvas_with_highlight_and_options(f, area, editor, theme, &highlight_state, opts)
+
+    #[cfg(feature = "suggestions")]
+    let active_completion = if editor.ui_state().is_suggestions_active()
+        && editor.ui_state().suggestions.active_field
+            == Some(editor.ui_state().current_field())
+    {
+        editor.ui_state().suggestions.completion_text.clone()
+    } else {
+        None
+    };
+    #[cfg(not(feature = "suggestions"))]
+    let active_completion: Option<String> = None;
+
+    render_canvas_with_highlight_and_options(
+        f,
+        area,
+        editor,
+        theme,
+        &highlight_state,
+        active_completion,
+        opts,
+    )
 }
 
 /// Render canvas with explicit highlight state (with options)
@@ -209,6 +224,7 @@ fn render_canvas_with_highlight_and_options<T: CanvasTheme, D: DataProvider>(
     editor: &FormEditor<D>,
     theme: &T,
     highlight_state: &HighlightState,
+    active_completion: Option<String>,
     opts: CanvasDisplayOptions,
 ) -> Option<Rect> {
     let ui_state = editor.ui_state();
@@ -259,6 +275,7 @@ fn render_canvas_with_highlight_and_options<T: CanvasTheme, D: DataProvider>(
         },
         #[cfg(not(feature = "validation"))]
         |_field_idx| false,
+        active_completion,
         opts,
     )
 }
@@ -297,6 +314,7 @@ fn render_canvas_fields_with_options<T: CanvasTheme, F1, F2>(
     has_unsaved_changes: bool,
     get_display_value: F1,
     has_display_override: F2,
+    active_completion: Option<String>,
     opts: CanvasDisplayOptions,
 ) -> Option<Rect>
 where
@@ -333,9 +351,6 @@ where
 
     let input_area = input_container.inner(input_block);
 
-    // NOTE: We keep one visual row per field; Wrap mode renders wrapped content
-    // visually within that row (ratatui handles visual wrapping). To fully
-    // expand rows by wrapped height, we'd convert to per-field dynamic heights.
     let input_rows = Layout::default()
         .direction(Direction::Vertical)
         .constraints(vec![Constraint::Length(1); fields.len()])
@@ -353,64 +368,70 @@ where
         let mut h_scroll_for_cursor: u16 = 0;
         let mut left_offset_for_cursor: u16 = 0;
 
-        let line = match (opts.overflow, highlight_state) {
-            (OverflowMode::Indicator(ind), HighlightState::Off) => {
-                if is_active {
-                    let (l, hs, left_cols) = active_indicator_viewport(
-                        &typed_text,
-                        inner_width,
-                        ind,
-                        current_cursor_pos,
-                        RIGHT_PAD,
-                    );
-                    h_scroll_for_cursor = hs;
-                    left_offset_for_cursor = left_cols;
-                    l
-                } else {
+        let line = if is_active {
+            // Active field: typed text + optional gray completion
+            let mut spans: Vec<Span> = Vec::new();
+            spans.push(Span::styled(
+                typed_text.clone(),
+                Style::default().fg(theme.fg()),
+            ));
+
+            if let Some(completion) = &active_completion {
+                if !completion.is_empty() {
+                    spans.push(Span::styled(
+                        completion.clone(),
+                        Style::default().fg(theme.suggestion_gray()),
+                    ));
+                }
+            }
+
+            Line::from(spans)
+        } else {
+            // Non-active fields: normal overflow/highlighting logic
+            match (opts.overflow, highlight_state) {
+                (OverflowMode::Indicator(ind), HighlightState::Off) => {
                     if display_width(&typed_text) <= inner_width {
                         Line::from(Span::raw(typed_text.clone()))
                     } else {
                         clip_with_indicator_line(&typed_text, inner_width, ind)
                     }
                 }
-            }
-
-            // Existing highlighting paths (unchanged)
-            (OverflowMode::Indicator(_ind), HighlightState::Characterwise { .. }) => {
-                apply_highlighting(
-                    &typed_text,
-                    i,
-                    current_field_idx,
-                    current_cursor_pos,
-                    highlight_state,
-                    theme,
-                    is_active,
-                )
-            }
-            (OverflowMode::Indicator(_ind), HighlightState::Linewise { .. }) => {
-                apply_highlighting(
-                    &typed_text,
-                    i,
-                    current_field_idx,
-                    current_cursor_pos,
-                    highlight_state,
-                    theme,
-                    is_active,
-                )
-            }
-
-            // Wrap mode unchanged (Paragraph::wrap will handle it)
-            (OverflowMode::Wrap, HighlightState::Off) => Line::from(Span::raw(typed_text.clone())),
-            (OverflowMode::Wrap, _) => {
-                apply_highlighting(
-                    &typed_text,
-                    i,
-                    current_field_idx,
-                    current_cursor_pos,
-                    highlight_state,
-                    theme,
-                    is_active,
-                )
+                (OverflowMode::Indicator(_ind), HighlightState::Characterwise { .. }) => {
+                    apply_highlighting(
+                        &typed_text,
+                        i,
+                        current_field_idx,
+                        current_cursor_pos,
+                        highlight_state,
+                        theme,
+                        is_active,
+                    )
+                }
+                (OverflowMode::Indicator(_ind), HighlightState::Linewise { .. }) => {
+                    apply_highlighting(
+                        &typed_text,
+                        i,
+                        current_field_idx,
+                        current_cursor_pos,
+                        highlight_state,
+                        theme,
+                        is_active,
+                    )
+                }
+                (OverflowMode::Wrap, HighlightState::Off) => {
+                    Line::from(Span::raw(typed_text.clone()))
+                }
+                (OverflowMode::Wrap, _) => {
+                    apply_highlighting(
+                        &typed_text,
+                        i,
+                        current_field_idx,
+                        current_cursor_pos,
+                        highlight_state,
+                        theme,
+                        is_active,
+                    )
+                }
             }
         };
 
@@ -655,10 +676,8 @@ fn set_cursor_position_scrolled(
         cols = cols.saturating_add(UnicodeWidthChar::width(ch).unwrap_or(0) as u16);
     }
 
-    // Visible x = (cursor columns - scroll) + left indicator column (if any)
     let mut visible_x = cols.saturating_sub(h_scroll).saturating_add(left_offset);
 
-    // Hard clamp: keep RIGHT_PAD columns free at the right border
     let limit = field_rect.width.saturating_sub(1 + RIGHT_PAD);
     if visible_x > limit {
         visible_x = limit;
