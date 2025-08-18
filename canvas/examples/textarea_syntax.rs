@@ -38,41 +38,67 @@ struct SyntaxTextAreaDemo {
     has_unsaved_changes: bool,
     debug_message: String,
     current_language: String,
+    current_theme: String,
 }
 
 impl SyntaxTextAreaDemo {
     fn new() -> Self {
-        let initial_text = r#"// 🎯 Syntax Highlighting Demo
+        let initial_text = r#"// 🎯 Multi-language Syntax Highlighting Demo
+// ==========================
+// Rust
+// ==========================
 fn main() {
-    println!("Hello, world!");
-    
-    let numbers = vec![1, 2, 3, 4, 5];
-    let doubled: Vec<i32> = numbers
-        .iter()
-        .map(|x| x * 2)
-        .collect();
-    
-    for num in &doubled {
-        println!("Number: {}", num);
+    println!("Hello, Rust 🦀");
+    let nums = vec![1, 2, 3, 4, 5];
+    for n in nums {
+        println!("n = {}", n);
     }
 }
 
-// Try pressing F5-F8 to switch languages!
-// F1/F2: Switch overflow modes
-// F3/F4: Adjust wrap indent"#;
+// ==========================
+// Python
+// ==========================
+# 🐍 Python example
+def fib(n):
+    if n <= 1:
+        return n
+    return fib(n-1) + fib(n-2)
+
+print([fib(i) for i in range(6)])
+
+# ==========================
+// JavaScript
+// ==========================
+ // 🟨 JavaScript example
+function greet(name) {
+    console.log(`Hello, ${name}!`);
+}
+greet("World");
+
+// ==========================
+// Scheme
+// ==========================
+;; 🎭 Scheme example
+(define (square x) (* x x))
+(display (square 5))
+(newline)
+"#;
 
         let mut textarea = TextAreaSyntaxState::from_text(initial_text);
         textarea.set_placeholder("Start typing code...");
-        
-        // Set up syntax highlighting
-        let _ = textarea.set_syntax_theme("InspiredGitHub");
+
+        // Pick a colorful default theme
+        let default_theme = "base16-ocean.dark";
+        let _ = textarea.set_syntax_theme(default_theme);
+        // Default to Rust syntax
         let _ = textarea.set_syntax_by_extension("rs");
 
         Self {
             textarea,
             has_unsaved_changes: false,
-            debug_message: "🎯 Syntax highlighting enabled - Rust".to_string(),
+            debug_message: format!("🎯 Syntax highlighting enabled - Rust ({})", default_theme),
             current_language: "Rust".to_string(),
+            current_theme: default_theme.to_string(),
         }
     }
 
@@ -84,7 +110,7 @@ fn main() {
     fn switch_to_rust(&mut self) {
         let _ = self.textarea.set_syntax_by_extension("rs");
         self.current_language = "Rust".to_string();
-        self.debug_message = "🦀 Switched to Rust syntax".to_string();
+        self.debug_message = format!("🦀 Switched to Rust syntax ({})", self.current_theme);
         
         let rust_code = r#"// Rust example
 fn fibonacci(n: u32) -> u32 {
@@ -101,12 +127,13 @@ fn main() {
     }
 }"#;
         self.textarea.set_text(rust_code);
+        self.has_unsaved_changes = false;
     }
 
     fn switch_to_python(&mut self) {
         let _ = self.textarea.set_syntax_by_extension("py");
         self.current_language = "Python".to_string();
-        self.debug_message = "🐍 Switched to Python syntax".to_string();
+        self.debug_message = format!("🐍 Switched to Python syntax ({})", self.current_theme);
         
         let python_code = r#"# Python example
 def fibonacci(n):
@@ -121,12 +148,13 @@ def main():
 if __name__ == "__main__":
     main()"#;
         self.textarea.set_text(python_code);
+        self.has_unsaved_changes = false;
     }
 
     fn switch_to_javascript(&mut self) {
         let _ = self.textarea.set_syntax_by_extension("js");
         self.current_language = "JavaScript".to_string();
-        self.debug_message = "🟨 Switched to JavaScript syntax".to_string();
+        self.debug_message = format!("🟨 Switched to JavaScript syntax ({})", self.current_theme);
         
         let js_code = r#"// JavaScript example
 function fibonacci(n) {
@@ -142,12 +170,13 @@ function main() {
 
 main();"#;
         self.textarea.set_text(js_code);
+        self.has_unsaved_changes = false;
     }
 
     fn switch_to_scheme(&mut self) {
         let _ = self.textarea.set_syntax_by_name("Scheme");
         self.current_language = "Scheme".to_string();
-        self.debug_message = "🎭 Switched to Scheme syntax".to_string();
+        self.debug_message = format!("🎭 Switched to Scheme syntax ({})", self.current_theme);
         
         let scheme_code = r#";; Scheme example
 (define (fibonacci n)
@@ -163,14 +192,35 @@ main();"#;
 
 (main)"#;
         self.textarea.set_text(scheme_code);
+        self.has_unsaved_changes = false;
+    }
+
+    fn cycle_theme(&mut self) {
+        let themes = [
+            "InspiredGitHub",
+            "base16-ocean.dark",
+            "base16-eighties.dark",
+            "Solarized (dark)",
+            "Monokai Extended",
+        ];
+        let current_pos = themes.iter().position(|t| *t == self.current_theme);
+        let next_pos = match current_pos {
+            Some(p) => (p + 1) % themes.len(),
+            None => 0,
+        };
+        let next_theme = themes[next_pos];
+        let _ = self.textarea.set_syntax_theme(next_theme);
+        self.current_theme = next_theme.to_string();
+        self.debug_message = format!("🎨 Theme switched to {}", next_theme);
     }
 
     fn get_cursor_info(&self) -> String {
         format!(
-            "Line {}, Col {} | Lang: {}",
+            "Line {}, Col {} | Lang: {} | Theme: {}",
             self.textarea.current_field() + 1,
             self.textarea.cursor_position() + 1,
-            self.current_language
+            self.current_language,
+            self.current_theme
         )
     }
 
@@ -212,24 +262,27 @@ fn handle_key_press(
         (KeyCode::F(7), _) => editor.switch_to_javascript(),
         (KeyCode::F(8), _) => editor.switch_to_scheme(),
 
+        // Theme cycling
+        (KeyCode::F(9), _) => editor.cycle_theme(),
+
         // Overflow modes
         (KeyCode::F(1), _) => {
             editor.textarea.use_overflow_indicator('$');
-            editor.set_debug_message("Overflow: indicator '$' (wrap OFF)".to_string());
+            editor.set_debug_message(format!("Overflow: indicator '$' (wrap OFF) | Theme: {}", editor.current_theme));
         }
         (KeyCode::F(2), _) => {
             editor.textarea.use_wrap();
-            editor.set_debug_message("Overflow: wrap ON".to_string());
+            editor.set_debug_message(format!("Overflow: wrap ON | Theme: {}", editor.current_theme));
         }
 
         // Wrap indent
         (KeyCode::F(3), _) => {
             editor.textarea.set_wrap_indent_cols(4);
-            editor.set_debug_message("Wrap indent: 4 columns".to_string());
+            editor.set_debug_message(format!("Wrap indent: 4 columns | Theme: {}", editor.current_theme));
         }
         (KeyCode::F(4), _) => {
             editor.textarea.set_wrap_indent_cols(0);
-            editor.set_debug_message("Wrap indent: 0 columns".to_string());
+            editor.set_debug_message(format!("Wrap indent: 0 columns | Theme: {}", editor.current_theme));
         }
 
         // Info
@@ -318,7 +371,7 @@ fn render_status_and_help(f: &mut Frame, area: ratatui::layout::Rect, editor: &S
     let help_text = "🎨 SYNTAX HIGHLIGHTING DEMO\n\
 F5=Rust, F6=Python, F7=JavaScript, F8=Scheme\n\
 F1/F2=overflow modes, F3/F4=wrap indent\n\
-?=info, Ctrl+Q=quit";
+F9=cycle themes, ?=info, Ctrl+Q=quit";
 
     let help = Paragraph::new(help_text)
         .block(Block::default().borders(Borders::ALL).title("🚀 Help"))
