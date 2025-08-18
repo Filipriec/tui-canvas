@@ -101,3 +101,8 @@ path = "examples/textarea_vim.rs"
 name = "textarea_normal"
 required-features = ["gui", "cursor-style", "textarea", "textmode-normal"]
 path = "examples/textarea_normal.rs"
+
+[[example]]
+name = "textarea_syntax"
+required-features = ["gui", "cursor-style", "textarea", "textmode-normal", "syntect"]
+path = "examples/textarea_syntax.rs"
