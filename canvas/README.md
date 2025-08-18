@@ -1,337 +1,109 @@
-# Canvas 🎨
-
-A reusable, type-safe canvas system for building form-based TUI applications with vim-like modal editing.
-
-## ✨ Features
-
-- **Type-Safe Actions**: No more string-based action names - everything is compile-time checked
-- **Generic Design**: Implement `CanvasState` once, get navigation, editing, and suggestions for free
-- **Vim-Like Experience**: Modal editing with familiar keybindings
-- **Suggestion System**: Built-in suggestions dropdown support
-- **Framework Agnostic**: Works with any TUI framework or raw terminal handling
-- **Async Ready**: Full async/await support for modern Rust applications
-- **Batch Operations**: Execute multiple actions atomically
-- **Extensible**: Custom actions and feature-specific handling
-
-## 🚀 Quick Start
-
-Add to your `Cargo.toml`:
-
-```toml
-cargo add canvas
-```
-
-Implement the `CanvasState` trait:
-
-```rust
-use canvas::prelude::*;
-
-#[derive(Debug)]
-struct LoginForm {
-    current_field: usize,
-    cursor_pos: usize,
-    username: String,
-    password: String,
-    has_changes: bool,
-}
-
-impl CanvasState for LoginForm {
-    fn current_field(&self) -> usize { self.current_field }
-    fn current_cursor_pos(&self) -> usize { self.cursor_pos }
-    fn set_current_field(&mut self, index: usize) { self.current_field = index; }
-    fn set_current_cursor_pos(&mut self, pos: usize) { self.cursor_pos = pos; }
-
-    fn get_current_input(&self) -> &str {
-        match self.current_field {
-            0 => &self.username,
-            1 => &self.password,
-            _ => "",
-        }
-    }
-
-    fn get_current_input_mut(&mut self) -> &mut String {
-        match self.current_field {
-            0 => &mut self.username,
-            1 => &mut self.password,
-            _ => unreachable!(),
-        }
-    }
-
-    fn inputs(&self) -> Vec<&String> { vec![&self.username, &self.password] }
-    fn fields(&self) -> Vec<&str> { vec!["Username", "Password"] }
-    fn has_unsaved_changes(&self) -> bool { self.has_changes }
-    fn set_has_unsaved_changes(&mut self, changed: bool) { self.has_changes = changed; }
-}
-```
-
-Use the type-safe action dispatcher:
-
-```rust
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let mut form = LoginForm::new();
-    let mut ideal_cursor = 0;
-
-    // Type a character - compile-time safe!
-    ActionDispatcher::dispatch(
-        CanvasAction::InsertChar('h'),
-        &mut form,
-        &mut ideal_cursor,
-    ).await?;
-
-    // Move to next field
-    ActionDispatcher::dispatch(
-        CanvasAction::NextField,
-        &mut form,
-        &mut ideal_cursor,
-    ).await?;
-
-    // Batch operations
-    let actions = vec![
-        CanvasAction::InsertChar('p'),
-        CanvasAction::InsertChar('a'),
-        CanvasAction::InsertChar('s'),
-        CanvasAction::InsertChar('s'),
-    ];
-
-    ActionDispatcher::dispatch_batch(actions, &mut form, &mut ideal_cursor).await?;
-
-    Ok(())
-}
-```
-
-## 🎯 Type-Safe Actions
-
-The Canvas system uses strongly-typed actions instead of error-prone strings:
-
-```rust
-// ✅ Type-safe - impossible to make typos
-ActionDispatcher::dispatch(CanvasAction::MoveLeft, &mut form, &mut cursor).await?;
-
-// ❌ Old way - runtime errors waiting to happen
-execute_edit_action("move_left", key, &mut form, &mut cursor).await?;
-execute_edit_action("move_leftt", key, &mut form, &mut cursor).await?; // Oops!
-```
-
-### Available Actions
-
-```rust
-pub enum CanvasAction {
-    // Character input
-    InsertChar(char),
-    
-    // Deletion
-    DeleteBackward,
-    DeleteForward,
-    
-    // Movement
-    MoveLeft, MoveRight, MoveUp, MoveDown,
-    MoveLineStart, MoveLineEnd,
-    MoveWordNext, MoveWordPrev,
-    
-    // Navigation
-    NextField, PrevField,
-    MoveFirstLine, MoveLastLine,
-    
-    // Suggestions
-    SuggestionUp, SuggestionDown,
-    SelectSuggestion, ExitSuggestions,
-    
-    // Extensibility
-    Custom(String),
-}
-```
-
-## 🔧 Advanced Features
-
-### Suggestions Dropdown (not inline autocomplete)
-
-```rust
-impl CanvasState for MyForm {
-    fn get_suggestions(&self) -> Option<&[String]> {
-        if self.suggestions.is_active {
-            Some(&self.suggestions.suggestions)
-        } else {
-            None
-        }
-    }
-
-    fn handle_feature_action(&mut self, action: &CanvasAction, _context: &ActionContext) -> Option<String> {
-        match action {
-            CanvasAction::InsertChar('@') => {
-                // Trigger email suggestions
-                let suggestions = vec![
-                    format!("{}@gmail.com", self.username),
-                    format!("{}@company.com", self.username),
-                ];
-                self.activate_suggestions(suggestions);
-                None // Let generic handler insert the '@'
-            }
-            CanvasAction::SelectSuggestion => {
-                if let Some(suggestion) = self.suggestions.get_selected() {
-                    *self.get_current_input_mut() = suggestion.clone();
-                    self.deactivate_suggestions();
-                    Some("Applied suggestion".to_string())
-                }
-                None
-            }
-            _ => None,
-        }
-    }
-}
-```
-
-### Custom Actions
-
-```rust
-fn handle_feature_action(&mut self, action: &CanvasAction, _context: &ActionContext) -> Option<String> {
-    match action {
-        CanvasAction::Custom(cmd) => match cmd.as_str() {
-            "uppercase" => {
-                *self.get_current_input_mut() = self.get_current_input().to_uppercase();
-                Some("Converted to uppercase".to_string())
-            }
-            "validate_email" => {
-                if self.get_current_input().contains('@') {
-                    Some("Email is valid".to_string())
-                } else {
-                    Some("Invalid email format".to_string())
-                }
-            }
-            _ => None,
-        },
-        _ => None,
-    }
-}
-```
-
-### Integration with TUI Frameworks
-
-Canvas is framework-agnostic and works with any TUI library:
-
-```rust
-// Works with crossterm (see examples)
-// Works with termion
-// Works with ratatui/tui-rs
-// Works with cursive
-// Works with raw terminal I/O
-```
-
-## 🏗️ Architecture
-
-Canvas follows a clean, layered architecture:
-
-```
-┌─────────────────────────────────────┐
-│           Your Application          │
-├─────────────────────────────────────┤
-│         ActionDispatcher            │  ← High-level API
-├─────────────────────────────────────┤
-│     CanvasAction (Type-Safe)        │  ← Type safety layer
-├─────────────────────────────────────┤
-│        Action Handlers              │  ← Core logic
-├─────────────────────────────────────┤
-│        CanvasState Trait            │  ← Your implementation
-└─────────────────────────────────────┘
-```
-
-## 🤝 Why Canvas?
-
-### Before Canvas
-```rust
-// ❌ Error-prone string actions
-execute_action("move_left", key, state)?;
-execute_action("move_leftt", key, state)?; // Runtime error!
-
-// ❌ Duplicate navigation logic everywhere
-impl MyLoginForm { /* navigation code */ }
-impl MyConfigForm { /* same navigation code */ }
-impl MyDataForm { /* same navigation code again */ }
-
-// ❌ Manual cursor and field management
-if key == Key::Tab {
-    current_field = (current_field + 1) % fields.len();
-    cursor_pos = cursor_pos.min(current_input.len());
-}
-```
-
-### With Canvas
-```rust
-// ✅ Type-safe actions
-ActionDispatcher::dispatch(CanvasAction::MoveLeft, state, cursor)?;
-// Typos are impossible - won't compile!
-
-// ✅ Implement once, use everywhere
-impl CanvasState for MyForm { /* minimal implementation */ }
-// All navigation, editing, suggestions work automatically!
-
-// ✅ High-level operations
-ActionDispatcher::dispatch_batch(actions, state, cursor)?;
-```
-
-## 📖 Documentation
-
-- **API Docs**: `cargo doc --open`
-- **Examples**: See `examples/` directory
-- **Migration Guide**: See `CANVAS_MIGRATION.md`
-
-## 🔄 Migration from String-Based Actions
-
-Canvas provides backwards compatibility during migration:
-
-```rust
-// Legacy support (deprecated)
-execute_edit_action("move_left", key, state, cursor).await?;
-
-// New type-safe way
-ActionDispatcher::dispatch(CanvasAction::MoveLeft, state, cursor).await?;
-```
-
-## 🧪 Testing
-
-```bash
-# Run all tests
-cargo test
-
-# Run specific example
-cargo run --example simple_login
-
-# Check type safety
-cargo check
-```
-
-## 📋 Requirements
-
-- Rust 1.70+
-- Terminal with cursor support
-- Optional: async runtime (tokio) for examples
-
-## 🤔 FAQ
-
-**Q: Does Canvas work with [my TUI framework]?**  
-A: Yes! Canvas is framework-agnostic. Just implement `CanvasState` and handle the key events.
-
-**Q: Can I extend Canvas with custom actions?**  
-A: Absolutely! Use `CanvasAction::Custom("my_action")` or implement `handle_feature_action`.
-
-**Q: Is Canvas suitable for complex forms?**  
-A: Yes! See the `config_screen` example for validation, suggestions, and multi-field forms.
-
-**Q: How do I migrate from string-based actions?**  
-A: Canvas provides backwards compatibility. Migrate incrementally using the type-safe APIs.
-
-## 📄 License
-
-Licensed under either of:
-- Apache License, Version 2.0 ([LICENSE-APACHE](LICENSE-APACHE))
-- MIT License ([LICENSE-MIT](LICENSE-MIT))
-
-at your option.
-
-## 🙏 Contributing
-
-Will write here something later on, too busy rn
+# Canvas
+
+Canvas is a Rust library for building form‑based and textarea‑driven terminal user interfaces.  
+It provides the core logic for text editing, validation, suggestions, and cursor management.
+
+The library does not enforce a specific terminal UI framework:
+- Core functionality works without any rendering backend.
+- Terminal rendering support is available through the `gui` feature, which enables integration with `ratatui` and `crossterm`.
+- Applications may also integrate Canvas with other backends by handling input and rendering independently.
 
 ---
 
-Built with ❤️ for the Rust TUI community
+## Overview
+
+Canvas is designed for applications that require structured text input in a terminal environment.  
+It provides:
+
+- Text editing modes (Vim‑like or normal)  
+- Validation (regex, masks, limits, formatting)  
+- Suggestions (asynchronous dropdowns)  
+- Computed fields (derived values)  
+- Textarea widget with cursor management  
+- Extensible architecture for custom behaviors  
+
+---
+
+## Installation
+
+Add the dependency to your `Cargo.toml`:
+
+```toml
+[dependedsncies]
+canvas = { version = "0.x", features = ["gui", "cursor-style", "textarea", "validation"] }
+```
+
+---
+
+## Features
+
+The library is feature‑gated. Enable only what you need:
+
+- `gui` – terminal rendering support (ratatui + crossterm)  
+- `cursor-style` – styled cursor support  
+- `validation` – regex, masks, limits, formatting  
+- `suggestions` – asynchronous suggestions dropdowns  
+- `computed` – derived fields  
+- `textarea` – textarea widget  
+- `textmode-vim` – Vim‑like editing (default)  
+- `textmode-normal` – normal editing mode  
+
+**Note:** `textmode-vim` and `textmode-normal` are mutually exclusive. Enable exactly one.
+
+The default feature set is `["textmode-vim"]`.
+
+---
+
+## Running Examples
+
+The repository includes several examples. Each requires specific feature flags.  
+Use the following commands to run them:
+
+```bash
+# Textarea with Vim mode
+cargo run --example textarea_vim --features "gui cursor-style textarea textmode-vim"
+
+# Textarea with Normal mode
+cargo run --example textarea_normal --features "gui cursor-style textarea textmode-normal"
+
+# Validation examples
+cargo run --example validation_1 --features "gui validation cursor-style"
+cargo run --example validation_2 --features "gui validation cursor-style"
+cargo run --example validation_3 --features "gui validation cursor-style"
+cargo run --example validation_4 --features "gui validation cursor-style"
+cargo run --example validation_5 --features "gui validation cursor-style"
+
+# Suggestions
+cargo run --example suggestions --features "suggestions gui cursor-style"
+cargo run --example suggestions2 --features "suggestions gui cursor-style"
+
+# Cursor auto movement
+cargo run --example canvas_cursor_auto --features "gui cursor-style"
+
+# Computed fields
+cargo run --example computed_fields --features "gui computed"
+```
+
+---
+
+## Documentation
+
+- API documentation: `cargo doc --open`  
+- Migration notes: `CANVAS_MIGRATION.md`  
+
+---
+
+## License
+
+Licensed under either of:  
+- Apache License, Version 2.0  
+- MIT License  
+
+at your option.
+
+---
+
+## Contributing
+
+Contributions are welcome. Please follow the existing code structure and feature‑gating conventions.
+

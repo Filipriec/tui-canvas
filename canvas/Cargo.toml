@@ -10,7 +10,6 @@ repository.workspace = true
 categories.workspace = true
 
 [dependencies]
-common = { path = "../common" }
 ratatui = { workspace = true, optional = true }
 crossterm = { workspace = true, optional = true }
 anyhow.workspace = true
