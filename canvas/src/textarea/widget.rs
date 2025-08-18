@@ -112,7 +112,6 @@ fn clip_with_indicator(s: &str, width: u16, indicator: char) -> Line<'static> {
     Line::from(vec![Span::raw(out), Span::raw(indicator.to_string())])
 }
 
-// anchor: near other helpers
 #[cfg(feature = "gui")]
 fn slice_by_display_cols(s: &str, start_cols: u16, max_cols: u16) -> String {
     if max_cols == 0 {
@@ -299,6 +298,8 @@ impl<'a> StatefulWidget for TextArea<'a> {
             area
         };
 
+        let edited_now = state.take_edited_flag();
+
         let wrap_mode = matches!(state.overflow_mode, TextOverflowMode::Wrap);
         let provider = state.editor.data_provider();
         let total = provider.line_count();
@@ -338,22 +339,28 @@ impl<'a> StatefulWidget for TextArea<'a> {
                 match state.overflow_mode {
                     TextOverflowMode::Wrap => unreachable!(),
                     TextOverflowMode::Indicator { ch } => {
-                        // Same-frame h-scroll so text shifts immediately
+                        let fits = display_width(&s) <= inner.width;
+
                         let start_cols = if i == state.current_field() {
                             let col_idx = state.display_cursor_position();
-                            let cursor_cols = display_cols_up_to(s, col_idx);
+                            let cursor_cols = display_cols_up_to(&s, col_idx);
                             let (target_h, _left_cols) =
                                 compute_h_scroll_with_padding(cursor_cols, inner.width);
-                            target_h.max(state.h_scroll)
+
+                            if fits {
+                                if edited_now { target_h } else { 0 }
+                            } else {
+                                target_h.max(state.h_scroll)
+                            }
                         } else {
                             0
                         };
 
                         display_lines.push(clip_window_with_indicator_padded(
-                                s,
-                                inner.width, // full view width
-                                ch,
-                                start_cols,
+                            &s,
+                            inner.width,
+                            ch,
+                            start_cols,
                         ));
                     }
                 }

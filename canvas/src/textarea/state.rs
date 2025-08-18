@@ -61,7 +61,6 @@ pub(crate) fn compute_h_scroll_with_padding(
     cursor_cols: u16,
     width: u16,
 ) -> (u16, u16) {
-    // Returns (h_scroll, left_cols). left_cols = 1 if a left indicator is shown.
     let mut h = 0u16;
     for _ in 0..2 {
         let left_cols = if h > 0 { 1 } else { 0 };
@@ -78,11 +77,9 @@ pub(crate) fn compute_h_scroll_with_padding(
 
 #[cfg(feature = "gui")]
 fn normalize_indent(width: u16, indent: u16) -> u16 {
-    // Ensure continuation capacity stays >= 1
     indent.min(width.saturating_sub(1))
 }
 
-// Count visual rows for a single logical line using early-wrap and continuation indent
 #[cfg(feature = "gui")]
 pub(crate) fn count_wrapped_rows_indented(
     s: &str,
@@ -103,11 +100,10 @@ pub(crate) fn count_wrapped_rows_indented(
         let w = UnicodeWidthChar::width(ch).unwrap_or(0) as u16;
         let cap = if first { width } else { cont_cap };
 
-        // Early-wrap: avoid the "one char freeze" at the boundary
         if used > 0 && used.saturating_add(w) >= cap {
             rows = rows.saturating_add(1);
             first = false;
-            used = indent; // continuation indent occupies leading cells
+            used = indent;
         }
         used = used.saturating_add(w);
     }
@@ -115,7 +111,6 @@ pub(crate) fn count_wrapped_rows_indented(
     rows
 }
 
-// Compute caret (subrow, x) for a given cursor index with indent + early-wrap
 #[cfg(feature = "gui")]
 fn wrapped_rows_to_cursor_indented(
     s: &str,
@@ -143,12 +138,11 @@ fn wrapped_rows_to_cursor_indented(
         if used > 0 && used.saturating_add(w) >= cap {
             row = row.saturating_add(1);
             first = false;
-            used = indent; // place indent on continuation line
+            used = indent;
         }
         used = used.saturating_add(w);
     }
 
-    // 'used' already includes indent when on continuation rows
     (row, used.min(width.saturating_sub(1)))
 }
 
@@ -156,8 +150,8 @@ pub type TextAreaEditor = FormEditor<TextAreaProvider>;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TextOverflowMode {
-    Indicator { ch: char }, // show trailing indicator (default '$')
-    Wrap,                    // soft wrap lines
+    Indicator { ch: char },
+    Wrap,
 }
 
 pub struct TextAreaState {
@@ -166,9 +160,10 @@ pub struct TextAreaState {
     pub(crate) placeholder: Option<String>,
     pub(crate) overflow_mode: TextOverflowMode,
     pub(crate) h_scroll: u16,
-    // NEW: visual indentation for wrapped continuation rows (Vim-like)
     #[cfg(feature = "gui")]
     pub(crate) wrap_indent_cols: u16,
+    #[cfg(feature = "gui")]
+    pub(crate) edited_this_frame: bool,
 }
 
 impl Default for TextAreaState {
@@ -180,12 +175,13 @@ impl Default for TextAreaState {
             overflow_mode: TextOverflowMode::Indicator { ch: '$' },
             h_scroll: 0,
             #[cfg(feature = "gui")]
-            wrap_indent_cols: 0, // default: no continuation indent
+            wrap_indent_cols: 0,
+            #[cfg(feature = "gui")]
+            edited_this_frame: false,
         }
     }
 }
 
-// Expose the entire FormEditor API directly on TextAreaState
 impl Deref for TextAreaState {
     type Target = TextAreaEditor;
 
@@ -211,6 +207,8 @@ impl TextAreaState {
             h_scroll: 0,
             #[cfg(feature = "gui")]
             wrap_indent_cols: 0,
+            #[cfg(feature = "gui")]
+            edited_this_frame: false,
         }
     }
 
@@ -229,8 +227,6 @@ impl TextAreaState {
         self.placeholder = Some(s.into());
     }
 
-    // RUNTIME TOGGLES ----------------------------------------------------
-
     pub fn use_overflow_indicator(&mut self, ch: char) {
         self.overflow_mode = TextOverflowMode::Indicator { ch };
     }
@@ -239,7 +235,6 @@ impl TextAreaState {
         self.overflow_mode = TextOverflowMode::Wrap;
     }
 
-    // Optional: set continuation indent for wrap mode (e.g. 3 like Vim)
     pub fn set_wrap_indent_cols(&mut self, cols: u16) {
         #[cfg(feature = "gui")]
         {
@@ -247,8 +242,11 @@ impl TextAreaState {
         }
     }
 
-    // Textarea-specific primitive: split at cursor
     pub fn insert_newline(&mut self) {
+        #[cfg(feature = "gui")]
+        {
+            self.edited_this_frame = true;
+        }
         let line_idx = self.current_field();
         let col = self.cursor_position();
 
@@ -262,10 +260,13 @@ impl TextAreaState {
         self.enter_edit_mode();
     }
 
-    // Textarea-specific primitive: backspace with line join at start-of-line
     pub fn backspace(&mut self) {
         let col = self.cursor_position();
         if col > 0 {
+            #[cfg(feature = "gui")]
+            {
+                self.edited_this_frame = true;
+            }
             let _ = self.delete_backward();
             return;
         }
@@ -278,19 +279,26 @@ impl TextAreaState {
         if let Some((prev_idx, new_col)) =
             self.editor.data_provider_mut().join_with_prev(line_idx)
         {
+            #[cfg(feature = "gui")]
+            {
+                self.edited_this_frame = true;
+            }
             let _ = self.transition_to_field(prev_idx);
             self.set_cursor_position(new_col);
             self.enter_edit_mode();
         }
     }
 
-    // Textarea-specific primitive: delete or join with next line at EOL
     pub fn delete_forward_or_join(&mut self) {
         let line_idx = self.current_field();
         let line_len = self.current_text().chars().count();
         let col = self.cursor_position();
 
         if col < line_len {
+            #[cfg(feature = "gui")]
+            {
+                self.edited_this_frame = true;
+            }
             let _ = self.delete_forward();
             return;
         }
@@ -298,12 +306,15 @@ impl TextAreaState {
         if let Some(new_col) =
             self.editor.data_provider_mut().join_with_next(line_idx)
         {
+            #[cfg(feature = "gui")]
+            {
+                self.edited_this_frame = true;
+            }
             self.set_cursor_position(new_col);
             self.enter_edit_mode();
         }
     }
 
-    // Drive from KeyEvent; you can still call all FormEditor methods directly
     pub fn input(&mut self, key: KeyEvent) {
         if key.kind != KeyEventKind::Press {
             return;
@@ -336,20 +347,25 @@ impl TextAreaState {
                 self.move_line_end();
             }
 
-            // Optional: word motions (kept)
             (KeyCode::Char('b'), KeyModifiers::ALT) => self.move_word_prev(),
             (KeyCode::Char('f'), KeyModifiers::ALT) => self.move_word_next(),
             (KeyCode::Char('e'), KeyModifiers::ALT) => self.move_word_end(),
 
-            // Printable characters
             (KeyCode::Char(c), m) if m.is_empty() => {
                 self.enter_edit_mode();
+                #[cfg(feature = "gui")]
+                {
+                    self.edited_this_frame = true;
+                }
                 let _ = self.insert_char(c);
             }
 
-            // Simple Tab policy
             (KeyCode::Tab, _) => {
                 self.enter_edit_mode();
+                #[cfg(feature = "gui")]
+                {
+                    self.edited_this_frame = true;
+                }
                 for _ in 0..4 {
                     let _ = self.insert_char(' ');
                 }
@@ -359,12 +375,8 @@ impl TextAreaState {
         }
     }
 
-    // -----------------------------------------------------------------
-    // Cursor helpers for GUI
-    // -----------------------------------------------------------------
-
     #[cfg(feature = "gui")]
-    fn visual_rows_before_line_indented(
+    fn visual_rows_before_line_and_intra_indented(
         &self,
         width: u16,
         line_idx: usize,
@@ -392,13 +404,13 @@ impl TextAreaState {
                 let indent = self.wrap_indent_cols;
 
                 if width == 0 {
-                    let prefix = self.visual_rows_before_line_indented(1, line_idx);
+                    let prefix = self.visual_rows_before_line_and_intra_indented(1, line_idx);
                     let y = y_top.saturating_add(prefix.saturating_sub(self.scroll_y));
                     return (inner.x, y);
                 }
 
                 let prefix_rows =
-                    self.visual_rows_before_line_indented(width, line_idx);
+                    self.visual_rows_before_line_and_intra_indented(width, line_idx);
                 let current_line = self.current_text();
                 let col_chars = self.display_cursor_position();
 
@@ -419,14 +431,14 @@ impl TextAreaState {
                 let current_line = self.current_text();
                 let col = self.display_cursor_position();
 
-                // Display columns up to caret
                 let mut x_cols: u16 = 0;
+                let mut total_cols: u16 = 0;
                 for (i, ch) in current_line.chars().enumerate() {
-                    if i >= col {
-                        break;
+                    let w = UnicodeWidthChar::width(ch).unwrap_or(0) as u16;
+                    if i < col {
+                        x_cols = x_cols.saturating_add(w);
                     }
-                    x_cols = x_cols
-                        .saturating_add(UnicodeWidthChar::width(ch).unwrap_or(0) as u16);
+                    total_cols = total_cols.saturating_add(w);
                 }
 
                 let left_cols = if self.h_scroll > 0 { 1 } else { 0 };
@@ -436,6 +448,7 @@ impl TextAreaState {
                     .saturating_add(left_cols);
 
                 let limit = inner.width.saturating_sub(1 + RIGHT_PAD);
+
                 if x_off_visible > limit {
                     x_off_visible = limit;
                 }
@@ -455,7 +468,6 @@ impl TextAreaState {
 
         match self.overflow_mode {
             TextOverflowMode::Indicator { .. } => {
-                // Logical-line vertical scroll
                 let line_idx_u16 = self.current_field() as u16;
                 if line_idx_u16 < self.scroll_y {
                     self.scroll_y = line_idx_u16;
@@ -469,6 +481,16 @@ impl TextAreaState {
                 }
 
                 let current_line = self.current_text();
+                let mut total_cols: u16 = 0;
+                for ch in current_line.chars() {
+                    total_cols = total_cols
+                        .saturating_add(UnicodeWidthChar::width(ch).unwrap_or(0) as u16);
+                }
+                if total_cols <= width {
+                    self.h_scroll = 0;
+                    return;
+                }
+
                 let col = self.display_cursor_position();
                 let mut cursor_cols: u16 = 0;
                 for (i, ch) in current_line.chars().enumerate() {
@@ -499,7 +521,7 @@ impl TextAreaState {
                 let line_idx = self.current_field() as usize;
 
                 let prefix_rows =
-                    self.visual_rows_before_line_indented(width, line_idx);
+                    self.visual_rows_before_line_and_intra_indented(width, line_idx);
 
                 let current_line = self.current_text();
                 let col = self.display_cursor_position();
@@ -522,8 +544,15 @@ impl TextAreaState {
                     }
                 }
 
-                self.h_scroll = 0; // no horizontal scroll in wrap mode
+                self.h_scroll = 0;
             }
         }
+    }
+    
+    #[cfg(feature = "gui")]
+    pub(crate) fn take_edited_flag(&mut self) -> bool {
+        let v = self.edited_this_frame;
+        self.edited_this_frame = false;
+        v
     }
 }
