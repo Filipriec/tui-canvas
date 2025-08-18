@@ -233,17 +233,6 @@ fn render_canvas_with_highlight_and_options<T: CanvasTheme, D: DataProvider>(
     let current_field_idx = ui_state.current_field();
     let is_edit_mode = matches!(ui_state.mode(), crate::canvas::modes::AppMode::Edit);
 
-    #[cfg(feature = "suggestions")]
-    let active_completion = if ui_state.is_suggestions_active()
-        && ui_state.suggestions.active_field == Some(current_field_idx)
-    {
-        ui_state.suggestions.completion_text.clone()
-    } else {
-        None
-    };
-    #[cfg(not(feature = "suggestions"))]
-    let active_completion: Option<String> = None;
-
     render_canvas_fields_with_options(
         f,
         area,
@@ -270,13 +259,6 @@ fn render_canvas_with_highlight_and_options<T: CanvasTheme, D: DataProvider>(
         },
         #[cfg(not(feature = "validation"))]
         |_field_idx| false,
-        |field_idx| {
-            if field_idx == current_field_idx {
-                active_completion.clone()
-            } else {
-                None
-            }
-        },
         opts,
     )
 }
@@ -302,7 +284,7 @@ fn convert_selection_to_highlight(
 
 /// Core canvas field rendering with options
 #[cfg(feature = "gui")]
-fn render_canvas_fields_with_options<T: CanvasTheme, F1, F2, F3>(
+fn render_canvas_fields_with_options<T: CanvasTheme, F1, F2>(
     f: &mut Frame,
     area: Rect,
     fields: &[&str],
@@ -315,13 +297,11 @@ fn render_canvas_fields_with_options<T: CanvasTheme, F1, F2, F3>(
     has_unsaved_changes: bool,
     get_display_value: F1,
     has_display_override: F2,
-    get_completion: F3,
     opts: CanvasDisplayOptions,
 ) -> Option<Rect>
 where
     F1: Fn(usize) -> String,
     F2: Fn(usize) -> bool,
-    F3: Fn(usize) -> Option<String>,
 {
     let columns = Layout::default()
         .direction(Direction::Horizontal)

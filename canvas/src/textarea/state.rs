@@ -1,7 +1,6 @@
 // src/textarea/state.rs
 use std::ops::{Deref, DerefMut};
 
-use anyhow::Result;
 use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 
 use crate::editor::FormEditor;
@@ -13,45 +12,6 @@ use ratatui::{layout::Rect, widgets::Block};
 
 #[cfg(feature = "gui")]
 use unicode_width::UnicodeWidthChar;
-
-#[cfg(feature = "gui")]
-pub(crate) fn wrapped_rows(s: &str, width: u16) -> u16 {
-    if width == 0 {
-        return 1;
-    }
-    let mut rows: u16 = 1;
-    let mut cols: u16 = 0;
-    for ch in s.chars() {
-        let w = UnicodeWidthChar::width(ch).unwrap_or(0) as u16;
-        if cols.saturating_add(w) > width {
-            rows = rows.saturating_add(1);
-            cols = 0;
-        }
-        cols = cols.saturating_add(w);
-    }
-    rows
-}
-
-#[cfg(feature = "gui")]
-pub(crate) fn wrapped_rows_to_cursor(s: &str, width: u16, cursor_chars: usize) -> (u16, u16) {
-    if width == 0 {
-        return (0, 0);
-    }
-    let mut row: u16 = 0;
-    let mut cols: u16 = 0;
-    for (i, ch) in s.chars().enumerate() {
-        if i >= cursor_chars {
-            break;
-        }
-        let w = UnicodeWidthChar::width(ch).unwrap_or(0) as u16;
-        if cols.saturating_add(w) > width {
-            row = row.saturating_add(1);
-            cols = 0;
-        }
-        cols = cols.saturating_add(w);
-    }
-    (row, cols)
-}
 
 #[cfg(feature = "gui")]
 pub(crate) const RIGHT_PAD: u16 = 3;

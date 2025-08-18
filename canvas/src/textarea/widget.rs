@@ -6,7 +6,7 @@ use ratatui::{
     style::Style,
     text::{Line, Span},
     widgets::{
-        Block, BorderType, Borders, Paragraph, StatefulWidget, Widget, Wrap,
+        Block, BorderType, Borders, Paragraph, StatefulWidget, Widget,
     },
 };
 
@@ -85,31 +85,6 @@ fn display_cols_up_to(s: &str, char_count: usize) -> u16 {
         cols = cols.saturating_add(UnicodeWidthChar::width(ch).unwrap_or(0) as u16);
     }
     cols
-}
-
-#[cfg(feature = "gui")]
-fn clip_with_indicator(s: &str, width: u16, indicator: char) -> Line<'static> {
-    if width == 0 {
-        return Line::from("");
-    }
-
-    if display_width(s) <= width {
-        return Line::from(Span::raw(s.to_string()));
-    }
-
-    let budget = width.saturating_sub(1);
-    let mut out = String::new();
-    let mut used: u16 = 0;
-    for ch in s.chars() {
-        let w = UnicodeWidthChar::width(ch).unwrap_or(0) as u16;
-        if used + w > budget {
-            break;
-        }
-        out.push(ch);
-        used = used.saturating_add(w);
-    }
-
-    Line::from(vec![Span::raw(out), Span::raw(indicator.to_string())])
 }
 
 #[cfg(feature = "gui")]
