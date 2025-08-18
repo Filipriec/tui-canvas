@@ -1,5 +1,9 @@
 // src/canvas/gui.rs
 //! Canvas GUI updated to work with FormEditor
+//!
+//! This module provides rendering helpers for the canvas UI when the `gui`
+//! feature is enabled. It exposes high-level functions to render the canvas
+//! and convenience types for display options.
 
 #[cfg(feature = "gui")]
 use ratatui::{
@@ -22,14 +26,20 @@ use std::cmp::{max, min};
 
 #[cfg(feature = "gui")]
 #[derive(Debug, Clone, Copy)]
+/// How to handle overflow when rendering a field's content.
 pub enum OverflowMode {
-    Indicator(char), // default '$'
+    /// Show an indicator character at the left/right when text is truncated.
+    /// Common default is '$'.
+    Indicator(char),
+    /// Wrap content into multiple visual lines.
     Wrap,
 }
 
 #[cfg(feature = "gui")]
 #[derive(Debug, Clone, Copy)]
+/// Display options controlling canvas rendering behavior.
 pub struct CanvasDisplayOptions {
+    /// How to handle horizontal overflow for fields.
     pub overflow: OverflowMode,
 }
 
@@ -191,6 +201,9 @@ fn render_active_line_with_indicator<T: CanvasTheme>(
 }
 
 #[cfg(feature = "gui")]
+/// Render the canvas into the provided frame using default display options.
+///
+/// Returns the rectangle of the active input field if present.
 pub fn render_canvas<T: CanvasTheme, D: DataProvider>(
     f: &mut Frame,
     area: Rect,
@@ -202,6 +215,10 @@ pub fn render_canvas<T: CanvasTheme, D: DataProvider>(
 }
 
 #[cfg(feature = "gui")]
+/// Render the canvas into the provided frame with explicit display options.
+///
+/// This is the more configurable entrypoint for rendering and is useful for
+/// tests or when callers need to override overflow handling.
 pub fn render_canvas_with_options<T: CanvasTheme, D: DataProvider>(
     f: &mut Frame,
     area: Rect,

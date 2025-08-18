@@ -1,79 +1,121 @@
 // src/canvas/actions/types.rs
+//! Core action types and result handling for canvas operations.
 
-/// All available canvas actions
+/// All available canvas actions.
+///
+/// This enum lists high-level actions that can be performed on the canvas.
+/// Consumers can match on variants to implement custom handling or map input
+/// events to these canonical actions.
 #[non_exhaustive]
 #[derive(Debug, Clone, PartialEq)]
 pub enum CanvasAction {
     // Movement actions
+    /// Move the cursor left by one character (or logical unit).
     MoveLeft,
+    /// Move the cursor right by one character (or logical unit).
     MoveRight,
+    /// Move the cursor up a visual line/field.
     MoveUp,
+    /// Move the cursor down a visual line/field.
     MoveDown,
 
     // Word movement
+    /// Move to the start of the next word.
     MoveWordNext,
+    /// Move to the start of the previous word.
     MoveWordPrev,
+    /// Move to the end of the current/next word.
     MoveWordEnd,
+    /// Move to the previous word end (vim `ge`).
     MoveWordEndPrev,
 
     // Line movement
+    /// Move to the start of the current line.
     MoveLineStart,
+    /// Move to the end of the current line.
     MoveLineEnd,
 
     // Field movement
+    /// Move to the next field.
     NextField,
+    /// Move to the previous field.
     PrevField,
+    /// Move to the first field.
     MoveFirstLine,
+    /// Move to the last field.
     MoveLastLine,
 
     // Editing actions
+    /// Insert a character at the cursor.
     InsertChar(char),
+    /// Delete character before the cursor.
     DeleteBackward,
+    /// Delete character under/after the cursor.
     DeleteForward,
 
     // Suggestions actions
-        TriggerSuggestions,
-        SuggestionUp,
-        SuggestionDown,
-        SelectSuggestion,
-        ExitSuggestions,
+    /// Trigger suggestions dropdown (e.g. Tab).
+    TriggerSuggestions,
+    /// Move selection up in suggestions dropdown.
+    SuggestionUp,
+    /// Move selection down in suggestions dropdown.
+    SuggestionDown,
+    /// Accept the selected suggestion.
+    SelectSuggestion,
+    /// Exit suggestions UI.
+    ExitSuggestions,
 
     // Custom actions
+    /// Custom named action for application-specific behavior.
     Custom(String),
 }
 
-/// Result type for canvas actions
+/// Result type for canvas actions.
+///
+/// Action handlers return an ActionResult to indicate success, user-facing
+/// messages, or errors. The enum is non-exhaustive to allow extension.
 #[non_exhaustive]
 #[derive(Debug, Clone)]
 pub enum ActionResult {
+    /// Action completed successfully.
     Success,
+    /// Action completed with a user-facing message.
     Message(String),
+    /// Action was handled by the application with an associated message.
     HandledByApp(String),
+    /// Action was handled by a feature with an associated message.
     HandledByFeature(String), // Keep for compatibility
+    /// An error occurred while handling the action.
     Error(String),
 }
 
 impl ActionResult {
+    /// Convenience constructor for Success.
     pub fn success() -> Self {
         Self::Success
     }
 
+    /// Convenience constructor for Message.
     pub fn success_with_message(msg: &str) -> Self {
         Self::Message(msg.to_string())
     }
 
+    /// Convenience constructor for HandledByApp.
     pub fn handled_by_app(msg: &str) -> Self {
         Self::HandledByApp(msg.to_string())
     }
 
+    /// Convenience constructor for Error.
     pub fn error(msg: &str) -> Self {
         Self::Error(msg.to_string())
     }
 
+    /// Returns true for any variant representing a success-like outcome.
     pub fn is_success(&self) -> bool {
         matches!(self, Self::Success | Self::Message(_) | Self::HandledByApp(_) | Self::HandledByFeature(_))
     }
 
+    /// Extract a message from the result when present.
     pub fn message(&self) -> Option<&str> {
         match self {
             Self::Message(msg) | Self::HandledByApp(msg) | Self::HandledByFeature(msg) | Self::Error(msg) => Some(msg),
@@ -83,7 +125,7 @@ impl ActionResult {
 }
 
 impl CanvasAction {
-    /// Get a human-readable description of this action
+    /// Get a human-readable description of this action.
     pub fn description(&self) -> &'static str {
         match self {
             Self::MoveLeft => "move left",
@@ -112,7 +154,7 @@ impl CanvasAction {
         }
     }
 
-    /// Get all movement-related actions
+    /// Get all movement-related actions.
     pub fn movement_actions() -> Vec<CanvasAction> {
         vec![
             Self::MoveLeft,
@@ -132,7 +174,7 @@ impl CanvasAction {
         ]
     }
 
-    /// Get all editing-related actions
+    /// Get all editing-related actions.
     pub fn editing_actions() -> Vec<CanvasAction> {
         vec![
             Self::InsertChar(' '), // Example char
@@ -141,7 +183,7 @@ impl CanvasAction {
         ]
     }
 
-    /// Get all suggestions-related actions
+    /// Get all suggestions-related actions.
     pub fn suggestions_actions() -> Vec<CanvasAction> {
         vec![
             Self::TriggerSuggestions,
@@ -152,7 +194,7 @@ impl CanvasAction {
         ]
     }
 
-    /// Check if this action modifies text content
+    /// Check if this action modifies text content.
     pub fn is_editing_action(&self) -> bool {
         matches!(self,
             Self::InsertChar(_) |
@@ -161,7 +203,7 @@ impl CanvasAction {
         )
     }
 
-    /// Check if this action moves the cursor
+    /// Check if this action moves the cursor.
     pub fn is_movement_action(&self) -> bool {
         matches!(self,
             Self::MoveLeft | Self::MoveRight | Self::MoveUp | Self::MoveDown |

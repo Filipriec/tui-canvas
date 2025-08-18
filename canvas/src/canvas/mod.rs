@@ -1,4 +1,8 @@
 // src/canvas/mod.rs
+//! Top-level canvas module.
+//!
+//! Re-exports commonly used canvas types and modules so that downstream
+//! consumers can import them from `crate::canvas`.
 
 pub mod actions;
 pub mod state;

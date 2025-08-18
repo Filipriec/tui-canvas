@@ -1,4 +1,5 @@
 // src/canvas/actions/movement/char.rs
+//! Character-level cursor movement functions
 
 /// Calculate new position when moving left
 pub fn move_left(current_pos: usize) -> usize {

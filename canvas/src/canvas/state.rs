@@ -1,10 +1,20 @@
 // src/canvas/state.rs
 //! Library-owned UI state - user never directly modifies this
+//!
+//! This module exposes the EditorState type (and related selection and
+//! suggestions types) which represent the internal UI state maintained by the
+//! canvas library. These types are intended for read-only access by callers
+//! and are mutated only through the library's APIs.
 
 use crate::canvas::modes::AppMode;
 
 /// Library-owned UI state - user never directly modifies this
 #[derive(Debug, Clone)]
+/// Internal editor UI state managed by the canvas library.
+///
+/// The fields are `pub(crate)` because they should only be modified by the
+/// library's internal action handlers. Consumers can use the provided getter
+/// methods to observe the state.
 pub struct EditorState {
     // Navigation state
     pub(crate) current_field: usize,
@@ -32,6 +42,7 @@ pub struct EditorState {
 
 #[cfg(feature = "suggestions")]
 #[derive(Debug, Clone)]
+/// Internal suggestions UI state used to manage the suggestions dropdown.
 pub struct SuggestionsUIState {
     pub(crate) is_active: bool,
     pub(crate) is_loading: bool,
@@ -42,13 +53,19 @@ pub struct SuggestionsUIState {
 }
 
 #[derive(Debug, Clone)]
+/// SelectionState represents the current selection/visual mode state used by
+/// the canvas (for example, Vim-like visual modes).
 pub enum SelectionState {
+    /// No selection is active.
     None,
+    /// Characterwise selection: (field_index, char_position)
     Characterwise { anchor: (usize, usize) },
+    /// Linewise selection anchored at a field (field index).
     Linewise { anchor_field: usize },
 }
 
 impl EditorState {
+    /// Create a new EditorState with default initial values.
     pub fn new() -> Self {
         Self {
             current_field: 0,
@@ -139,6 +156,10 @@ impl EditorState {
     // INTERNAL MUTATIONS: Only library modifies these
     // ===================================================================
 
+    /// Move internal pointer to another field index.
+    ///
+    /// This method is intended for internal library use to change the current
+    /// field and reset the cursor to a safe value.
     pub(crate) fn move_to_field(&mut self, field_index: usize, field_count: usize) {
         if field_index < field_count {
             self.current_field = field_index;
@@ -147,6 +168,11 @@ impl EditorState {
         }
     }
 
+    /// Set the cursor position with appropriate clamping depending on mode.
+    ///
+    /// If `for_edit_mode` is true the cursor may be positioned at the end of
+    /// the text (allowing insertion); otherwise it will be kept within the
+    /// bounds of the existing text for read-only/highlight modes.
     pub(crate) fn set_cursor(
         &mut self,
         position: usize,

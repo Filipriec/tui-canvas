@@ -1,4 +1,5 @@
 // src/canvas/actions/movement/line.rs
+//! Line-level cursor movement and positioning
 
 /// Calculate cursor position for line start
 pub fn line_start_position() -> usize {

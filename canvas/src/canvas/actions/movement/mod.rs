@@ -1,4 +1,5 @@
 // src/canvas/actions/movement/mod.rs
+//! Movement utilities for character, word, and line navigation
 
 pub mod word;
 pub mod line;

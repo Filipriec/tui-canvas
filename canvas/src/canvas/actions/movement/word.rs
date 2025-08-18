@@ -1,5 +1,5 @@
 // src/canvas/actions/movement/word.rs
-// Replace the entire file with this corrected version:
+//! Word-based cursor movement with vim-like semantics
 
 #[derive(PartialEq, Copy, Clone)]
 enum CharType {
