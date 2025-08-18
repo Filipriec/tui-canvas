@@ -243,6 +243,17 @@ fn handle_key_press(
         (KeyCode::Delete, _) => editor.delete_char_forward(),
         (KeyCode::Backspace, _) => editor.delete_char_backward(),
 
+        (KeyCode::F(1), _) => {
+            // Switch to indicator mode
+            editor.textarea.use_overflow_indicator('$');
+            editor.set_debug_message("Overflow: indicator '$' (wrap OFF)".to_string());
+        }
+        (KeyCode::F(2), _) => {
+            // Switch to wrap mode
+            editor.textarea.use_wrap();
+            editor.set_debug_message("Overflow: wrap ON".to_string());
+        }
+
         // Debug/info
         (KeyCode::Char('?'), _) => {
             editor.set_debug_message(format!(

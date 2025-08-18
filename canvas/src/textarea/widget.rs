@@ -96,6 +96,86 @@ fn clip_with_indicator(s: &str, width: u16, indicator: char) -> Line<'static> {
 }
 
 #[cfg(feature = "gui")]
+fn slice_by_display_cols(s: &str, start_cols: u16, max_cols: u16) -> String {
+    if max_cols == 0 {
+        return String::new();
+    }
+    
+    let mut current_cols: u16 = 0;
+    let mut output = String::new();
+    let mut output_cols: u16 = 0;
+    let mut started = false;
+
+    for ch in s.chars() {
+        let char_width = UnicodeWidthChar::width(ch).unwrap_or(0) as u16;
+        
+        // Skip characters until we reach the start position
+        if !started {
+            if current_cols + char_width <= start_cols {
+                current_cols += char_width;
+                continue;
+            } else {
+                started = true;
+            }
+        }
+        
+        // Stop if adding this character would exceed our budget
+        if output_cols + char_width > max_cols {
+            break;
+        }
+        
+        output.push(ch);
+        output_cols += char_width;
+        current_cols += char_width;
+    }
+
+    output
+}
+
+#[cfg(feature = "gui")]
+fn clip_window_with_indicator(
+    text: &str,
+    width: u16,
+    indicator: char,
+    start_cols: u16,
+) -> Line<'static> {
+    if width == 0 {
+        return Line::from("");
+    }
+
+    let total_width = display_width(text);
+
+    // If the line fits entirely, show it as-is (no indicators, no windowing)
+    if total_width <= width {
+        return Line::from(Span::raw(text.to_string()));
+    }
+
+    // Left indicator only if there is real overflow and the window is shifted
+    let show_left_indicator = start_cols > 0 && total_width > width;
+    let left_indicator_width = if show_left_indicator { 1 } else { 0 };
+
+    // Will we overflow to the right from this start?
+    let remaining_after_start = total_width.saturating_sub(start_cols);
+    let content_budget = width.saturating_sub(left_indicator_width);
+    let show_right_indicator = remaining_after_start > content_budget;
+    let right_indicator_width = if show_right_indicator { 1 } else { 0 };
+
+    // Compute visible slice budget
+    let actual_content_width = content_budget.saturating_sub(right_indicator_width);
+    let visible_content = slice_by_display_cols(text, start_cols, actual_content_width);
+
+    let mut spans = Vec::new();
+    if show_left_indicator {
+        spans.push(Span::raw(indicator.to_string()));
+    }
+    spans.push(Span::raw(visible_content));
+    if show_right_indicator {
+        spans.push(Span::raw(indicator.to_string()));
+    }
+    Line::from(spans)
+}
+
+#[cfg(feature = "gui")]
 impl<'a> StatefulWidget for TextArea<'a> {
     type State = TextAreaState;
 
@@ -129,7 +209,19 @@ impl<'a> StatefulWidget for TextArea<'a> {
                         display_lines.push(Line::from(Span::raw(s.to_string())));
                     }
                     TextOverflowMode::Indicator { ch } => {
-                        display_lines.push(clip_with_indicator(s, inner.width, ch));
+                        // Use horizontal scroll for the active line, show full text for others
+                        let h_scroll_offset = if i == state.current_field() {
+                            state.h_scroll
+                        } else {
+                            0
+                        };
+
+                        display_lines.push(clip_window_with_indicator(
+                                s,
+                                inner.width,
+                                ch,
+                                h_scroll_offset,
+                        ));
                     }
                 }
             }

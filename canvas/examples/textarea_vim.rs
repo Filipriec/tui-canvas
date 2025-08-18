@@ -77,6 +77,7 @@ Press ? for help, F1/F2 for manual cursor control demo.";
 
         let mut textarea = TextAreaState::from_text(initial_text);
         textarea.set_placeholder("Start typing...");
+        textarea.use_wrap();
         
         Self {
             textarea,
