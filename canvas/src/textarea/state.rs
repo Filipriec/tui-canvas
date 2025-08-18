@@ -15,7 +15,7 @@ use ratatui::{layout::Rect, widgets::Block};
 use unicode_width::UnicodeWidthChar;
 
 #[cfg(feature = "gui")]
-fn wrapped_rows(s: &str, width: u16) -> u16 {
+pub(crate) fn wrapped_rows(s: &str, width: u16) -> u16 {
     if width == 0 {
         return 1;
     }
@@ -33,7 +33,7 @@ fn wrapped_rows(s: &str, width: u16) -> u16 {
 }
 
 #[cfg(feature = "gui")]
-fn wrapped_rows_to_cursor(s: &str, width: u16, cursor_chars: usize) -> (u16, u16) {
+pub(crate) fn wrapped_rows_to_cursor(s: &str, width: u16, cursor_chars: usize) -> (u16, u16) {
     if width == 0 {
         return (0, 0);
     }
@@ -53,6 +53,105 @@ fn wrapped_rows_to_cursor(s: &str, width: u16, cursor_chars: usize) -> (u16, u16
     (row, cols)
 }
 
+#[cfg(feature = "gui")]
+pub(crate) const RIGHT_PAD: u16 = 3;
+
+#[cfg(feature = "gui")]
+pub(crate) fn compute_h_scroll_with_padding(
+    cursor_cols: u16,
+    width: u16,
+) -> (u16, u16) {
+    // Returns (h_scroll, left_cols). left_cols = 1 if a left indicator is shown.
+    let mut h = 0u16;
+    for _ in 0..2 {
+        let left_cols = if h > 0 { 1 } else { 0 };
+        let max_x_visible = width.saturating_sub(1 + RIGHT_PAD + left_cols);
+        let needed = cursor_cols.saturating_sub(max_x_visible);
+        if needed <= h {
+            return (h, left_cols);
+        }
+        h = needed;
+    }
+    let left_cols = if h > 0 { 1 } else { 0 };
+    (h, left_cols)
+}
+
+#[cfg(feature = "gui")]
+fn normalize_indent(width: u16, indent: u16) -> u16 {
+    // Ensure continuation capacity stays >= 1
+    indent.min(width.saturating_sub(1))
+}
+
+// Count visual rows for a single logical line using early-wrap and continuation indent
+#[cfg(feature = "gui")]
+pub(crate) fn count_wrapped_rows_indented(
+    s: &str,
+    width: u16,
+    indent: u16,
+) -> u16 {
+    if width == 0 {
+        return 1;
+    }
+    let indent = normalize_indent(width, indent);
+    let cont_cap = width.saturating_sub(indent);
+
+    let mut rows: u16 = 1;
+    let mut used: u16 = 0;
+    let mut first = true;
+
+    for ch in s.chars() {
+        let w = UnicodeWidthChar::width(ch).unwrap_or(0) as u16;
+        let cap = if first { width } else { cont_cap };
+
+        // Early-wrap: avoid the "one char freeze" at the boundary
+        if used > 0 && used.saturating_add(w) >= cap {
+            rows = rows.saturating_add(1);
+            first = false;
+            used = indent; // continuation indent occupies leading cells
+        }
+        used = used.saturating_add(w);
+    }
+
+    rows
+}
+
+// Compute caret (subrow, x) for a given cursor index with indent + early-wrap
+#[cfg(feature = "gui")]
+fn wrapped_rows_to_cursor_indented(
+    s: &str,
+    width: u16,
+    indent: u16,
+    cursor_chars: usize,
+) -> (u16, u16) {
+    if width == 0 {
+        return (0, 0);
+    }
+    let indent = normalize_indent(width, indent);
+    let cont_cap = width.saturating_sub(indent);
+
+    let mut row: u16 = 0;
+    let mut used: u16 = 0;
+    let mut first = true;
+
+    for (i, ch) in s.chars().enumerate() {
+        if i >= cursor_chars {
+            break;
+        }
+        let w = UnicodeWidthChar::width(ch).unwrap_or(0) as u16;
+        let cap = if first { width } else { cont_cap };
+
+        if used > 0 && used.saturating_add(w) >= cap {
+            row = row.saturating_add(1);
+            first = false;
+            used = indent; // place indent on continuation line
+        }
+        used = used.saturating_add(w);
+    }
+
+    // 'used' already includes indent when on continuation rows
+    (row, used.min(width.saturating_sub(1)))
+}
+
 pub type TextAreaEditor = FormEditor<TextAreaProvider>;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -67,6 +166,9 @@ pub struct TextAreaState {
     pub(crate) placeholder: Option<String>,
     pub(crate) overflow_mode: TextOverflowMode,
     pub(crate) h_scroll: u16,
+    // NEW: visual indentation for wrapped continuation rows (Vim-like)
+    #[cfg(feature = "gui")]
+    pub(crate) wrap_indent_cols: u16,
 }
 
 impl Default for TextAreaState {
@@ -77,6 +179,8 @@ impl Default for TextAreaState {
             placeholder: None,
             overflow_mode: TextOverflowMode::Indicator { ch: '$' },
             h_scroll: 0,
+            #[cfg(feature = "gui")]
+            wrap_indent_cols: 0, // default: no continuation indent
         }
     }
 }
@@ -105,6 +209,8 @@ impl TextAreaState {
             placeholder: None,
             overflow_mode: TextOverflowMode::Indicator { ch: '$' },
             h_scroll: 0,
+            #[cfg(feature = "gui")]
+            wrap_indent_cols: 0,
         }
     }
 
@@ -131,6 +237,14 @@ impl TextAreaState {
 
     pub fn use_wrap(&mut self) {
         self.overflow_mode = TextOverflowMode::Wrap;
+    }
+
+    // Optional: set continuation indent for wrap mode (e.g. 3 like Vim)
+    pub fn set_wrap_indent_cols(&mut self, cols: u16) {
+        #[cfg(feature = "gui")]
+        {
+            self.wrap_indent_cols = cols;
+        }
     }
 
     // Textarea-specific primitive: split at cursor
@@ -245,7 +359,27 @@ impl TextAreaState {
         }
     }
 
+    // -----------------------------------------------------------------
     // Cursor helpers for GUI
+    // -----------------------------------------------------------------
+
+    #[cfg(feature = "gui")]
+    fn visual_rows_before_line_indented(
+        &self,
+        width: u16,
+        line_idx: usize,
+    ) -> u16 {
+        let provider = self.editor.data_provider();
+        let mut acc: u16 = 0;
+        let indent = self.wrap_indent_cols;
+
+        for i in 0..line_idx {
+            let s = provider.field_value(i);
+            acc = acc.saturating_add(count_wrapped_rows_indented(s, width, indent));
+        }
+        acc
+    }
+
     #[cfg(feature = "gui")]
     pub fn cursor(&self, area: Rect, block: Option<&Block<'_>>) -> (u16, u16) {
         let inner = if let Some(b) = block { b.inner(area) } else { area };
@@ -254,33 +388,38 @@ impl TextAreaState {
         match self.overflow_mode {
             TextOverflowMode::Wrap => {
                 let width = inner.width;
-                // Visual rows above the current line (from the first visible line)
-                let mut rows_above: u16 = 0;
-                for i in (self.scroll_y as usize)..line_idx {
-                    rows_above = rows_above
-                        .saturating_add(wrapped_rows(
-                            self.editor.data_provider().field_value(i),
-                            width,
-                        ));
+                let y_top = inner.y;
+                let indent = self.wrap_indent_cols;
+
+                if width == 0 {
+                    let prefix = self.visual_rows_before_line_indented(1, line_idx);
+                    let y = y_top.saturating_add(prefix.saturating_sub(self.scroll_y));
+                    return (inner.x, y);
                 }
 
+                let prefix_rows =
+                    self.visual_rows_before_line_indented(width, line_idx);
                 let current_line = self.current_text();
                 let col_chars = self.display_cursor_position();
-                let (row_in_line, col_in_row) =
-                    wrapped_rows_to_cursor(&current_line, width, col_chars);
 
-                let y = inner.y.saturating_add(rows_above).saturating_add(row_in_line);
-                let x = inner.x.saturating_add(col_in_row);
+                let (subrow, x_cols) = wrapped_rows_to_cursor_indented(
+                    &current_line,
+                    width,
+                    indent,
+                    col_chars,
+                );
+
+                let caret_vis_row = prefix_rows.saturating_add(subrow);
+                let y = y_top.saturating_add(caret_vis_row.saturating_sub(self.scroll_y));
+                let x = inner.x.saturating_add(x_cols);
                 (x, y)
             }
             TextOverflowMode::Indicator { .. } => {
-                // existing indicator path (with h_scroll)
-                let y = inner.y
-                    + (line_idx as u16)
-                        .saturating_sub(self.scroll_y);
+                let y = inner.y + (line_idx as u16).saturating_sub(self.scroll_y);
                 let current_line = self.current_text();
                 let col = self.display_cursor_position();
 
+                // Display columns up to caret
                 let mut x_cols: u16 = 0;
                 for (i, ch) in current_line.chars().enumerate() {
                     if i >= col {
@@ -289,7 +428,18 @@ impl TextAreaState {
                     x_cols = x_cols
                         .saturating_add(UnicodeWidthChar::width(ch).unwrap_or(0) as u16);
                 }
-                let x_off_visible = x_cols.saturating_sub(self.h_scroll);
+
+                let left_cols = if self.h_scroll > 0 { 1 } else { 0 };
+
+                let mut x_off_visible = x_cols
+                    .saturating_sub(self.h_scroll)
+                    .saturating_add(left_cols);
+
+                let limit = inner.width.saturating_sub(1 + RIGHT_PAD);
+                if x_off_visible > limit {
+                    x_off_visible = limit;
+                }
+
                 let x = inner.x.saturating_add(x_off_visible);
                 (x, y)
             }
@@ -303,34 +453,22 @@ impl TextAreaState {
             return;
         }
 
-        // Keep logical line within vertical window (coarse guard)
-        let line_idx_u16 = self.current_field() as u16;
-        if line_idx_u16 < self.scroll_y {
-            self.scroll_y = line_idx_u16;
-        } else if line_idx_u16 >= self.scroll_y + inner.height {
-            self.scroll_y = line_idx_u16.saturating_sub(inner.height - 1);
-        }
-
         match self.overflow_mode {
             TextOverflowMode::Indicator { .. } => {
+                // Logical-line vertical scroll
+                let line_idx_u16 = self.current_field() as u16;
+                if line_idx_u16 < self.scroll_y {
+                    self.scroll_y = line_idx_u16;
+                } else if line_idx_u16 >= self.scroll_y + inner.height {
+                    self.scroll_y = line_idx_u16.saturating_sub(inner.height - 1);
+                }
+
                 let width = inner.width;
                 if width == 0 {
                     return;
                 }
 
-                // If the line fits, drop any horizontal scroll
                 let current_line = self.current_text();
-                let mut total_cols: u16 = 0;
-                for ch in current_line.chars() {
-                    total_cols = total_cols
-                        .saturating_add(UnicodeWidthChar::width(ch).unwrap_or(0) as u16);
-                }
-                if total_cols <= width {
-                    self.h_scroll = 0;
-                    return;
-                }
-
-                // Follow caret with right padding reserved
                 let col = self.display_cursor_position();
                 let mut cursor_cols: u16 = 0;
                 for (i, ch) in current_line.chars().enumerate() {
@@ -341,59 +479,50 @@ impl TextAreaState {
                         .saturating_add(UnicodeWidthChar::width(ch).unwrap_or(0) as u16);
                 }
 
-                let right_padding: u16 = 3;
-                // reserve 1 column for a potential right indicator
-                let visible_limit = width.saturating_sub(1 + right_padding);
+                let (target_h, _left_cols) =
+                    compute_h_scroll_with_padding(cursor_cols, width);
 
-                if cursor_cols > self.h_scroll.saturating_add(visible_limit) {
-                    self.h_scroll = cursor_cols.saturating_sub(visible_limit);
+                if target_h > self.h_scroll {
+                    self.h_scroll = target_h;
                 } else if cursor_cols < self.h_scroll {
                     self.h_scroll = cursor_cols;
                 }
             }
             TextOverflowMode::Wrap => {
-                self.h_scroll = 0; // no horizontal scroll in wrap
-
                 let width = inner.width;
                 if width == 0 {
+                    self.h_scroll = 0;
                     return;
                 }
 
-                // Ensure the cursor's wrapped row is on screen
-                let current_idx = self.current_field();
-                // Visual rows above current line from current scroll_y
-                let mut rows_above: u16 = 0;
-                for i in (self.scroll_y as usize)..current_idx {
-                    rows_above = rows_above
-                        .saturating_add(wrapped_rows(
-                            self.editor.data_provider().field_value(i),
-                            width,
-                        ));
-                }
+                let indent = self.wrap_indent_cols;
+                let line_idx = self.current_field() as usize;
 
-                // Cursor's row within current line
-                let (row_in_line, _) = wrapped_rows_to_cursor(
-                    &self.current_text(),
-                    width,
-                    self.display_cursor_position(),
-                );
+                let prefix_rows =
+                    self.visual_rows_before_line_indented(width, line_idx);
 
-                // Scroll down if cursor row is below the visible window
-                while rows_above.saturating_add(row_in_line) >= inner.height {
-                    if self.scroll_y < current_idx as u16 {
-                        // subtract the rows of the line we're dropping from the top
-                        let dropped = wrapped_rows(
-                            self.editor
-                                .data_provider()
-                                .field_value(self.scroll_y as usize),
-                            width,
-                        );
-                        self.scroll_y = self.scroll_y.saturating_add(1);
-                        rows_above = rows_above.saturating_sub(dropped);
-                    } else {
-                        break;
+                let current_line = self.current_text();
+                let col = self.display_cursor_position();
+
+                let (subrow, _x_cols) =
+                    wrapped_rows_to_cursor_indented(&current_line, width, indent, col);
+
+                let caret_vis_row = prefix_rows.saturating_add(subrow);
+
+                let top = self.scroll_y;
+                let height = inner.height;
+
+                if caret_vis_row < top {
+                    self.scroll_y = caret_vis_row;
+                } else {
+                    let bottom = top.saturating_add(height.saturating_sub(1));
+                    if caret_vis_row > bottom {
+                        let shift = caret_vis_row.saturating_sub(bottom);
+                        self.scroll_y = top.saturating_add(shift);
                     }
                 }
+
+                self.h_scroll = 0; // no horizontal scroll in wrap mode
             }
         }
     }

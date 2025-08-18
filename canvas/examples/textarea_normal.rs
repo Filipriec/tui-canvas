@@ -254,6 +254,15 @@ fn handle_key_press(
             editor.set_debug_message("Overflow: wrap ON".to_string());
         }
 
+        (KeyCode::F(3), _) => {
+            editor.textarea.set_wrap_indent_cols(3);
+            editor.set_debug_message("Wrap indent: 3 columns".to_string());
+        }
+        (KeyCode::F(4), _) => {
+            editor.textarea.set_wrap_indent_cols(0);
+            editor.set_debug_message("Wrap indent: 0 columns".to_string());
+        }
+
         // Debug/info
         (KeyCode::Char('?'), _) => {
             editor.set_debug_message(format!(

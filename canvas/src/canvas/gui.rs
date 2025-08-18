@@ -73,6 +73,108 @@ fn clip_with_indicator_line<'a>(s: &'a str, width: u16, indicator: char) -> Line
     Line::from(vec![Span::raw(out), Span::raw(indicator.to_string())])
 }
 
+#[cfg(feature = "gui")]
+fn slice_by_display_cols(s: &str, start_cols: u16, max_cols: u16) -> String {
+    if max_cols == 0 {
+        return String::new();
+    }
+    let mut cols: u16 = 0;
+    let mut out = String::new();
+    let mut taken: u16 = 0;
+    let mut started = false;
+
+    for ch in s.chars() {
+        let w = UnicodeWidthChar::width(ch).unwrap_or(0) as u16;
+        let next = cols.saturating_add(w);
+
+        if !started {
+            if next <= start_cols {
+                cols = next;
+                continue;
+            } else {
+                started = true;
+            }
+        }
+
+        if taken.saturating_add(w) > max_cols {
+            break;
+        }
+        out.push(ch);
+        taken = taken.saturating_add(w);
+        cols = next;
+    }
+
+    out
+}
+
+#[cfg(feature = "gui")]
+const RIGHT_PAD: u16 = 3;
+
+#[cfg(feature = "gui")]
+fn compute_h_scroll_with_padding(cursor_cols: u16, width: u16) -> (u16, u16) {
+    // Returns (h_scroll, left_cols). left_cols = 1 if a left indicator is shown.
+    // We pre-emptively keep the caret out of the last RIGHT_PAD columns.
+    let mut h = 0u16;
+    // Two passes are enough to converge (second pass accounts for left indicator).
+    for _ in 0..2 {
+        let left_cols = if h > 0 { 1 } else { 0 };
+        let max_x_visible = width.saturating_sub(1 + RIGHT_PAD + left_cols);
+        let needed = cursor_cols.saturating_sub(max_x_visible);
+        if needed <= h {
+            return (h, left_cols);
+        }
+        h = needed;
+    }
+    let left_cols = if h > 0 { 1 } else { 0 };
+    (h, left_cols)
+}
+
+#[cfg(feature = "gui")]
+fn active_indicator_viewport(
+    s: &str,
+    width: u16,
+    indicator: char,
+    cursor_chars: usize,
+    _right_padding: u16, // kept for signature symmetry; we use RIGHT_PAD constant
+) -> (Line<'static>, u16, u16) {
+    if width == 0 {
+        return (Line::from(""), 0, 0);
+    }
+
+    // Total display width of the string and cursor display column
+    let total_cols = display_width(s);
+    let mut cursor_cols: u16 = 0;
+    for (i, ch) in s.chars().enumerate() {
+        if i >= cursor_chars {
+            break;
+        }
+        cursor_cols = cursor_cols
+            .saturating_add(UnicodeWidthChar::width(ch).unwrap_or(0) as u16);
+    }
+
+    // Pre-emptive scroll: never let caret enter the last RIGHT_PAD columns
+    let (h_scroll, left_cols) = compute_h_scroll_with_padding(cursor_cols, width);
+
+    // Right indicator if more content beyond the window start
+    let content_budget = width.saturating_sub(left_cols);
+    let show_right = total_cols.saturating_sub(h_scroll) > content_budget;
+    let right_cols: u16 = if show_right { 1 } else { 0 };
+
+    let visible_cols = width.saturating_sub(left_cols + right_cols);
+    let visible = slice_by_display_cols(s, h_scroll, visible_cols);
+
+    let mut spans: Vec<Span> = Vec::with_capacity(3);
+    if left_cols == 1 {
+        spans.push(Span::raw(indicator.to_string()));
+    }
+    spans.push(Span::raw(visible));
+    if show_right {
+        spans.push(Span::raw(indicator.to_string()));
+    }
+
+    (Line::from(spans), h_scroll, left_cols)
+}
+
 /// Default renderer: overflow indicator '$'
 #[cfg(feature = "gui")]
 pub fn render_canvas<T: CanvasTheme, D: DataProvider>(
@@ -268,16 +370,33 @@ where
         let typed_text = get_display_value(i);
         let inner_width = input_rows[i].width;
 
+        let mut h_scroll_for_cursor: u16 = 0;
+        let mut left_offset_for_cursor: u16 = 0;
+
         let line = match (opts.overflow, highlight_state) {
-            // No highlighting, just apply overflow mode
             (OverflowMode::Indicator(ind), HighlightState::Off) => {
-                clip_with_indicator_line(&typed_text, inner_width, ind)
+                if is_active {
+                    let (l, hs, left_cols) = active_indicator_viewport(
+                        &typed_text,
+                        inner_width,
+                        ind,
+                        current_cursor_pos,
+                        RIGHT_PAD,
+                    );
+                    h_scroll_for_cursor = hs;
+                    left_offset_for_cursor = left_cols;
+                    l
+                } else {
+                    if display_width(&typed_text) <= inner_width {
+                        Line::from(Span::raw(typed_text.clone()))
+                    } else {
+                        clip_with_indicator_line(&typed_text, inner_width, ind)
+                    }
+                }
             }
 
-            // Highlighting is active - need to handle both highlighting and overflow
+            // Existing highlighting paths (unchanged)
             (OverflowMode::Indicator(_ind), HighlightState::Characterwise { .. }) => {
-                // For now, prioritize highlighting over clipping to avoid mangling spans
-                // TODO: Could implement post-processing to clip highlighted spans if needed
                 apply_highlighting(
                     &typed_text,
                     i,
@@ -288,10 +407,7 @@ where
                     is_active,
                 )
             }
-
             (OverflowMode::Indicator(_ind), HighlightState::Linewise { .. }) => {
-                // For now, prioritize highlighting over clipping to avoid mangling spans  
-                // TODO: Could implement post-processing to clip highlighted spans if needed
                 apply_highlighting(
                     &typed_text,
                     i,
@@ -303,13 +419,9 @@ where
                 )
             }
 
-            // Wrap mode - just show text and let paragraph handle wrapping
-            (OverflowMode::Wrap, HighlightState::Off) => {
-                Line::from(Span::raw(typed_text.clone()))
-            }
-
+            // Wrap mode unchanged (Paragraph::wrap will handle it)
+            (OverflowMode::Wrap, HighlightState::Off) => Line::from(Span::raw(typed_text.clone())),
             (OverflowMode::Wrap, _) => {
-                // Apply highlighting and let wrapping handle overflow
                 apply_highlighting(
                     &typed_text,
                     i,
@@ -332,12 +444,14 @@ where
 
         if is_active {
             active_field_input_rect = Some(input_rows[i]);
-            set_cursor_position(
+            set_cursor_position_scrolled(
                 f,
                 input_rows[i],
                 &typed_text,
                 current_cursor_pos,
                 has_display_override(i),
+                h_scroll_for_cursor,
+                left_offset_for_cursor,
             );
         }
     }
@@ -544,12 +658,14 @@ fn apply_linewise_highlighting<'a, T: CanvasTheme>(
 
 /// Set cursor position (x clamp only; no Y offset with wrap in this version)
 #[cfg(feature = "gui")]
-fn set_cursor_position(
+fn set_cursor_position_scrolled(
     f: &mut Frame,
     field_rect: Rect,
     text: &str,
     current_cursor_pos: usize,
     _has_display_override: bool,
+    h_scroll: u16,
+    left_offset: u16,
 ) {
     let mut cols: u16 = 0;
     for (i, ch) in text.chars().enumerate() {
@@ -559,13 +675,18 @@ fn set_cursor_position(
         cols = cols.saturating_add(UnicodeWidthChar::width(ch).unwrap_or(0) as u16);
     }
 
-    let cursor_x = field_rect.x.saturating_add(cols);
+    // Visible x = (cursor columns - scroll) + left indicator column (if any)
+    let mut visible_x = cols.saturating_sub(h_scroll).saturating_add(left_offset);
+
+    // Hard clamp: keep RIGHT_PAD columns free at the right border
+    let limit = field_rect.width.saturating_sub(1 + RIGHT_PAD);
+    if visible_x > limit {
+        visible_x = limit;
+    }
+
+    let cursor_x = field_rect.x.saturating_add(visible_x);
     let cursor_y = field_rect.y;
-
-    let max_cursor_x = field_rect.x + field_rect.width.saturating_sub(1);
-    let safe_cursor_x = cursor_x.min(max_cursor_x);
-
-    f.set_cursor_position((safe_cursor_x, cursor_y));
+    f.set_cursor_position((cursor_x, cursor_y));
 }
 
 /// Default theme

@@ -14,7 +14,12 @@ use ratatui::{
 use crate::data_provider::DataProvider;
 
 #[cfg(feature = "gui")]
-use crate::textarea::state::{TextAreaState, TextOverflowMode};
+use crate::textarea::state::{
+    compute_h_scroll_with_padding,
+    count_wrapped_rows_indented,
+    TextAreaState,
+    TextOverflowMode,
+};
 
 #[cfg(feature = "gui")]
 use unicode_width::UnicodeWidthChar;
@@ -71,6 +76,18 @@ fn display_width(s: &str) -> u16 {
 }
 
 #[cfg(feature = "gui")]
+fn display_cols_up_to(s: &str, char_count: usize) -> u16 {
+    let mut cols: u16 = 0;
+    for (i, ch) in s.chars().enumerate() {
+        if i >= char_count {
+            break;
+        }
+        cols = cols.saturating_add(UnicodeWidthChar::width(ch).unwrap_or(0) as u16);
+    }
+    cols
+}
+
+#[cfg(feature = "gui")]
 fn clip_with_indicator(s: &str, width: u16, indicator: char) -> Line<'static> {
     if width == 0 {
         return Line::from("");
@@ -95,84 +112,177 @@ fn clip_with_indicator(s: &str, width: u16, indicator: char) -> Line<'static> {
     Line::from(vec![Span::raw(out), Span::raw(indicator.to_string())])
 }
 
+// anchor: near other helpers
 #[cfg(feature = "gui")]
 fn slice_by_display_cols(s: &str, start_cols: u16, max_cols: u16) -> String {
     if max_cols == 0 {
         return String::new();
     }
-    
+
     let mut current_cols: u16 = 0;
     let mut output = String::new();
-    let mut output_cols: u16 = 0;
+    let mut taken: u16 = 0;
     let mut started = false;
 
     for ch in s.chars() {
-        let char_width = UnicodeWidthChar::width(ch).unwrap_or(0) as u16;
-        
-        // Skip characters until we reach the start position
+        let w = UnicodeWidthChar::width(ch).unwrap_or(0) as u16;
+
         if !started {
-            if current_cols + char_width <= start_cols {
-                current_cols += char_width;
+            if current_cols.saturating_add(w) <= start_cols {
+                current_cols = current_cols.saturating_add(w);
                 continue;
             } else {
                 started = true;
             }
         }
-        
-        // Stop if adding this character would exceed our budget
-        if output_cols + char_width > max_cols {
+
+        if taken.saturating_add(w) > max_cols {
             break;
         }
-        
+
         output.push(ch);
-        output_cols += char_width;
-        current_cols += char_width;
+        taken = taken.saturating_add(w);
+        current_cols = current_cols.saturating_add(w);
     }
 
     output
 }
 
 #[cfg(feature = "gui")]
-fn clip_window_with_indicator(
+fn clip_window_with_indicator_padded(
     text: &str,
-    width: u16,
+    view_width: u16,
     indicator: char,
     start_cols: u16,
 ) -> Line<'static> {
-    if width == 0 {
+    if view_width == 0 {
         return Line::from("");
     }
 
-    let total_width = display_width(text);
+    let total = display_width(text);
 
-    // If the line fits entirely, show it as-is (no indicators, no windowing)
-    if total_width <= width {
-        return Line::from(Span::raw(text.to_string()));
-    }
+    // Left indicator if we scrolled
+    let show_left = start_cols > 0;
+    let left_cols: u16 = if show_left { 1 } else { 0 };
 
-    // Left indicator only if there is real overflow and the window is shifted
-    let show_left_indicator = start_cols > 0 && total_width > width;
-    let left_indicator_width = if show_left_indicator { 1 } else { 0 };
+    // Capacity for text if we also need a right indicator
+    let cap_with_right = view_width.saturating_sub(left_cols + 1);
 
-    // Will we overflow to the right from this start?
-    let remaining_after_start = total_width.saturating_sub(start_cols);
-    let content_budget = width.saturating_sub(left_indicator_width);
-    let show_right_indicator = remaining_after_start > content_budget;
-    let right_indicator_width = if show_right_indicator { 1 } else { 0 };
+    // Do we still have content beyond this window?
+    let remaining = total.saturating_sub(start_cols);
+    let show_right = remaining > cap_with_right;
 
-    // Compute visible slice budget
-    let actual_content_width = content_budget.saturating_sub(right_indicator_width);
-    let visible_content = slice_by_display_cols(text, start_cols, actual_content_width);
+    // Final capacity for visible text
+    let max_visible = if show_right {
+        cap_with_right
+    } else {
+        view_width.saturating_sub(left_cols)
+    };
 
-    let mut spans = Vec::new();
-    if show_left_indicator {
+    let visible = slice_by_display_cols(text, start_cols, max_visible);
+
+    let mut spans: Vec<Span> = Vec::new();
+    if show_left {
         spans.push(Span::raw(indicator.to_string()));
     }
-    spans.push(Span::raw(visible_content));
-    if show_right_indicator {
+
+    // Visible text
+    spans.push(Span::raw(visible.clone()));
+
+    // Place $ flush-right
+    if show_right {
+        let used_cols = left_cols + display_width(&visible);
+        let right_pos = view_width.saturating_sub(1);
+        let filler = right_pos.saturating_sub(used_cols);
+        if filler > 0 {
+            spans.push(Span::raw(" ".repeat(filler as usize)));
+        }
         spans.push(Span::raw(indicator.to_string()));
     }
+
     Line::from(spans)
+}
+
+#[cfg(feature = "gui")]
+fn wrap_segments_with_indent(
+    s: &str,
+    width: u16,
+    indent: u16,
+) -> Vec<String> {
+    let mut segments: Vec<String> = Vec::new();
+    if width == 0 {
+        segments.push(String::new());
+        return segments;
+    }
+
+    let indent = indent.min(width.saturating_sub(1));
+    let cont_cap = width.saturating_sub(indent);
+    let indent_str = " ".repeat(indent as usize);
+
+    let mut buf = String::new();
+    let mut used: u16 = 0;
+    let mut first = true;
+
+    for ch in s.chars() {
+        let w = UnicodeWidthChar::width(ch).unwrap_or(0) as u16;
+        let cap = if first { width } else { cont_cap };
+
+        // Early-wrap: wrap before filling the last cell (and avoid empty segment)
+        if used > 0 && used.saturating_add(w) >= cap {
+            segments.push(buf);
+            buf = String::new();
+            used = 0;
+            first = false;
+            if indent > 0 {
+                buf.push_str(&indent_str);
+                used = indent;
+            }
+        }
+
+        buf.push(ch);
+        used = used.saturating_add(w);
+    }
+
+    segments.push(buf);
+    segments
+}
+
+// Map visual row offset to (logical line, intra segment)
+#[cfg(feature = "gui")]
+fn resolve_start_line_and_intra_indented(
+    state: &TextAreaState,
+    inner: Rect,
+) -> (usize, u16) {
+    let provider = state.editor.data_provider();
+    let total = provider.line_count();
+
+    if total == 0 {
+        return (0, 0);
+    }
+
+    let wrap = matches!(state.overflow_mode, TextOverflowMode::Wrap);
+    let width = inner.width;
+    let target_vis = state.scroll_y;
+
+    if !wrap {
+        let start = (target_vis as usize).min(total);
+        return (start, 0);
+    }
+
+    let indent = state.wrap_indent_cols;
+
+    let mut acc: u16 = 0;
+    for i in 0..total {
+        let s = provider.field_value(i);
+        let rows = count_wrapped_rows_indented(s, width, indent);
+        if acc.saturating_add(rows) > target_vis {
+            let intra = target_vis.saturating_sub(acc);
+            return (i, intra);
+        }
+        acc = acc.saturating_add(rows);
+    }
+
+    (total.saturating_sub(1), 0)
 }
 
 #[cfg(feature = "gui")]
@@ -189,52 +299,72 @@ impl<'a> StatefulWidget for TextArea<'a> {
             area
         };
 
-        let total = state.editor.data_provider().line_count();
-        let start = state.scroll_y as usize;
-        let end = start
-            .saturating_add(inner.height as usize)
-            .min(total);
+        let wrap_mode = matches!(state.overflow_mode, TextOverflowMode::Wrap);
+        let provider = state.editor.data_provider();
+        let total = provider.line_count();
 
-        let mut display_lines: Vec<Line> = Vec::with_capacity(end - start);
+        let (start, intra) = resolve_start_line_and_intra_indented(state, inner);
 
-        if start >= end {
+        let mut display_lines: Vec<Line> = Vec::new();
+
+        if total == 0 || start >= total {
             if let Some(ph) = &state.placeholder {
                 display_lines.push(Line::from(Span::raw(ph.clone())));
             }
-        } else {
-            for i in start..end {
-                let s = state.editor.data_provider().field_value(i);
-                match state.overflow_mode {
-                    TextOverflowMode::Wrap => {
-                        display_lines.push(Line::from(Span::raw(s.to_string())));
+        } else if wrap_mode {
+            // manual pre-wrap path (unchanged)
+            let mut rows_left = inner.height;
+            let indent = state.wrap_indent_cols;
+            let mut i = start;
+            while i < total && rows_left > 0 {
+                let s = provider.field_value(i);
+                let segments = wrap_segments_with_indent(s, inner.width, indent);
+                let skip = if i == start { intra as usize } else { 0 };
+                for seg in segments.into_iter().skip(skip) {
+                    display_lines.push(Line::from(Span::raw(seg)));
+                    rows_left = rows_left.saturating_sub(1);
+                    if rows_left == 0 {
+                        break;
                     }
+                }
+                i += 1;
+            }
+        } else {
+            // Indicator mode: full inner width; RIGHT_PAD only affects cursor clamp and h-scroll
+            let end = (start.saturating_add(inner.height as usize)).min(total);
+
+            for i in start..end {
+                let s = provider.field_value(i);
+                match state.overflow_mode {
+                    TextOverflowMode::Wrap => unreachable!(),
                     TextOverflowMode::Indicator { ch } => {
-                        // Use horizontal scroll for the active line, show full text for others
-                        let h_scroll_offset = if i == state.current_field() {
-                            state.h_scroll
+                        // Same-frame h-scroll so text shifts immediately
+                        let start_cols = if i == state.current_field() {
+                            let col_idx = state.display_cursor_position();
+                            let cursor_cols = display_cols_up_to(s, col_idx);
+                            let (target_h, _left_cols) =
+                                compute_h_scroll_with_padding(cursor_cols, inner.width);
+                            target_h.max(state.h_scroll)
                         } else {
                             0
                         };
 
-                        display_lines.push(clip_window_with_indicator(
+                        display_lines.push(clip_window_with_indicator_padded(
                                 s,
-                                inner.width,
+                                inner.width, // full view width
                                 ch,
-                                h_scroll_offset,
+                                start_cols,
                         ));
                     }
                 }
             }
         }
 
-        let mut p = Paragraph::new(display_lines)
+        let p = Paragraph::new(display_lines)
             .alignment(Alignment::Left)
             .style(self.style);
 
-        if matches!(state.overflow_mode, TextOverflowMode::Wrap) {
-            p = p.wrap(Wrap { trim: false });
-        }
-
+        // No Paragraph::wrap/scroll in wrap mode — we pre-wrap.
         p.render(inner, buf);
     }
 }
