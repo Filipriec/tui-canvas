@@ -57,7 +57,7 @@ use canvas::canvas::CanvasState;
 use canvas::canvas::CanvasAction;
 use canvas::canvas::ActionContext;
 use canvas::canvas::HighlightState;
-use canvas::canvas::CanvasTheme;
+use canvas::CanvasTheme;
 use canvas::dispatcher::ActionDispatcher;
 use canvas::canvas::ActionResult;
 ```
@@ -153,7 +153,7 @@ if editor.is_suggestions_active() {
 **New rendering:**
 ```rust
 // Canvas handles everything
-use canvas::canvas::render_canvas;
+use canvas::render_canvas_default;
 
 let active_field_rect = render_canvas(f, area, form_state, theme, edit_mode, highlight_state);
 
