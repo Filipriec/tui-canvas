@@ -133,6 +133,21 @@ impl<D: DataProvider> FormEditor<D> {
         self.update_inline_completion();
     }
 
+    pub fn suggestions_prev(&mut self) {
+        if !self.ui_state.suggestions.is_active || self.suggestions.is_empty() {
+            return;
+        }
+
+        let current = self.ui_state.suggestions.selected_index.unwrap_or(0);
+        let prev = if current == 0 {
+            self.suggestions.len() - 1
+        } else {
+            current - 1
+        };
+        self.ui_state.suggestions.selected_index = Some(prev);
+        self.update_inline_completion();
+    }
+
     pub fn apply_suggestion(&mut self) -> Option<String> {
         if let Some(selected_index) = self.ui_state.suggestions.selected_index {
             if let Some(suggestion) = self.suggestions.get(selected_index).cloned()
