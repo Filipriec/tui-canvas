@@ -21,5 +21,8 @@ pub mod validation_helpers;
 #[cfg(feature = "computed")]
 pub mod computed_helpers;
 
+#[cfg(feature = "keymap")] 
+pub mod key_input;
+
 // Re-export the main type
 pub use core::FormEditor;

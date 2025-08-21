@@ -39,6 +39,7 @@ validation = ["regex"]
 computed = []
 textarea = ["dep:ropey","gui"]
 syntect = ["dep:syntect", "gui", "textarea"]
+keymap = ["gui"]
 
 # text modes (mutually exclusive; default to vim)
 textmode-vim = []
@@ -50,7 +51,8 @@ all-nontextmodes = [
     "cursor-style",
     "validation",
     "computed",
-    "textarea"
+    "textarea",
+    "keymap"
 ]
 
 [[example]]
@@ -106,3 +108,8 @@ path = "examples/textarea_normal.rs"
 name = "textarea_syntax"
 required-features = ["gui", "cursor-style", "textarea", "textmode-normal", "syntect"]
 path = "examples/textarea_syntax.rs"
+
+[[example]]
+name = "canvas_keymap"
+required-features = ["gui", "keymap", "cursor-style"]
+path = "examples/canvas_keymap.rs"

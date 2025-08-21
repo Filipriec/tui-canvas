@@ -9,6 +9,10 @@ use crate::DataProvider;
 #[cfg(feature = "suggestions")]
 use crate::SuggestionItem;
 
+// NEW: Import keymap types when keymap feature is enabled
+#[cfg(feature = "keymap")]
+use crate::keymap::{CanvasKeyMap, KeySequenceTracker};
+
 pub struct FormEditor<D: DataProvider> {
     pub(crate) ui_state: EditorState,
     pub(crate) data_provider: D,
@@ -23,6 +27,12 @@ pub struct FormEditor<D: DataProvider> {
                 + Sync,
         >,
     >,
+
+    // NEW: Injected keymap and sequence tracker (keymap feature only)
+    #[cfg(feature = "keymap")]
+    pub(crate) keymap: Option<CanvasKeyMap>,
+    #[cfg(feature = "keymap")]
+    pub(crate) seq_tracker: KeySequenceTracker,
 }
 
 impl<D: DataProvider> FormEditor<D> {
@@ -47,6 +57,11 @@ impl<D: DataProvider> FormEditor<D> {
             suggestions: Vec::new(),
             #[cfg(feature = "validation")]
             external_validation_callback: None,
+            // NEW: Initialize keymap fields
+            #[cfg(feature = "keymap")]
+            keymap: None,
+            #[cfg(feature = "keymap")]
+            seq_tracker: KeySequenceTracker::new(400), // 400ms default timeout
         };
 
         #[cfg(feature = "validation")]
@@ -68,6 +83,26 @@ impl<D: DataProvider> FormEditor<D> {
             }
             editor
         }
+    }
+
+    // NEW: Keymap management methods (keymap feature only)
+    
+    /// Set the keymap for this editor instance
+    #[cfg(feature = "keymap")]
+    pub fn set_keymap(&mut self, keymap: CanvasKeyMap) {
+        self.keymap = Some(keymap);
+    }
+
+    /// Check if this editor has a keymap configured
+    #[cfg(feature = "keymap")]
+    pub fn has_keymap(&self) -> bool {
+        self.keymap.is_some()
+    }
+
+    /// Set the timeout for multi-key sequences (in milliseconds)
+    #[cfg(feature = "keymap")]
+    pub fn set_key_sequence_timeout_ms(&mut self, timeout_ms: u64) {
+        self.seq_tracker = KeySequenceTracker::new(timeout_ms);
     }
 
     // Library-internal, used by multiple modules

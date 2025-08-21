@@ -4,21 +4,20 @@ pub mod canvas;
 pub mod editor;
 pub mod data_provider;
 
-// Only include suggestions module if feature is enabled
 #[cfg(feature = "suggestions")]
 pub mod suggestions;
 
-// Only include validation module if feature is enabled
 #[cfg(feature = "validation")]
 pub mod validation;
 
-// First-class textarea module and exports
 #[cfg(feature = "textarea")]
 pub mod textarea;
 
-// Only include computed module if feature is enabled
 #[cfg(feature = "computed")]
 pub mod computed;
+
+#[cfg(feature = "keymap")]
+pub mod keymap;
 
 #[cfg(feature = "cursor-style")]
 pub use canvas::CursorManager;
@@ -71,6 +70,8 @@ pub use canvas::gui::{CanvasDisplayOptions, OverflowMode};
 #[cfg(all(feature = "gui", feature = "suggestions"))]
 pub use suggestions::gui::render_suggestions_dropdown;
 
+#[cfg(feature = "keymap")]
+pub use keymap::{CanvasKeyMap, KeyEventOutcome};
 
 #[cfg(feature = "textarea")]
 pub use textarea::{TextArea, TextAreaProvider, TextAreaState, TextAreaEditor};
