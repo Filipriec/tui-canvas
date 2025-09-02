@@ -6,6 +6,49 @@ use crate::validation::{CharacterLimits, PatternFilters, DisplayMask};
 use crate::validation::{CustomFormatter, FormattingResult, PositionMapper};
 use std::sync::Arc;
 
+/// Whitelist of allowed exact values for a field.
+/// If configured, the field is valid when it is empty (by default) or when the
+/// content exactly matches one of the allowed values. This does not block field
+/// switching (unlike minimum length in CharacterLimits).
+#[derive(Clone, Debug)]
+pub struct AllowedValues {
+    allowed: Vec<String>,
+    allow_empty: bool,
+    case_insensitive: bool,
+}
+
+impl AllowedValues {
+    pub fn new(allowed: Vec<String>) -> Self {
+        Self {
+            allowed,
+            allow_empty: true,
+            case_insensitive: false,
+        }
+    }
+
+    /// Allow or disallow empty value to be considered valid (default: true).
+    pub fn allow_empty(mut self, allow: bool) -> Self {
+        self.allow_empty = allow;
+        self
+    }
+
+    /// Enable/disable ASCII case-insensitive matching (default: false).
+    pub fn case_insensitive(mut self, ci: bool) -> Self {
+        self.case_insensitive = ci;
+        self
+    }
+
+    fn matches(&self, text: &str) -> bool {
+        if self.case_insensitive {
+            self.allowed
+                .iter()
+                .any(|s| s.eq_ignore_ascii_case(text))
+        } else {
+            self.allowed.iter().any(|s| s == text)
+        }
+    }
+}
+
 /// Main validation configuration for a field
 #[derive(Clone, Default)]
 pub struct ValidationConfig {
@@ -21,6 +64,9 @@ pub struct ValidationConfig {
     /// Optional: user-provided custom formatter (feature 4)
     #[cfg(feature = "validation")]
     pub custom_formatter: Option<Arc<dyn CustomFormatter + Send + Sync>>,
+
+    /// Optional: restrict the field to one of exact allowed values (or empty)
+    pub allowed_values: Option<AllowedValues>,
 
     /// Enable external validation indicator UI (feature 5)
     pub external_validation_enabled: bool,
@@ -50,6 +96,7 @@ impl std::fmt::Debug for ValidationConfig {
                   }
               },
           )
+          .field("allowed_values", &self.allowed_values)
           .field("external_validation_enabled", &self.external_validation_enabled)
           .field("external_validation", &self.external_validation)
           .finish()
@@ -167,6 +214,18 @@ impl ValidationConfig {
             }
         }
 
+        // Allowed values (whitelist) validation
+        if let Some(ref allowed) = self.allowed_values {
+            // Empty value is allowed (default) or required (if allow_empty is false)
+            if text.is_empty() {
+                if !allowed.allow_empty {
+                    return ValidationResult::warning("Value required");
+                }
+            } else if !allowed.matches(text) {
+                return ValidationResult::error("Value must be one of the allowed options");
+            }
+        }
+
         // Future: Add other validation types here
 
         ValidationResult::Valid
@@ -183,6 +242,12 @@ impl ValidationConfig {
                 #[cfg(not(feature = "validation"))]
                 { false }
             }
+            || self.allowed_values.is_some()
+    }
+
+    /// Check if whitelist is configured
+    pub fn has_allowed_values(&self) -> bool {
+        self.allowed_values.is_some()
     }
 
     pub fn allows_field_switch(&self, text: &str) -> bool {
@@ -289,6 +354,41 @@ impl ValidationConfigBuilder {
         self
     }
 
+    /// Restrict content to one of the provided exact values (or empty).
+    /// - Empty is considered valid by default.
+    /// - Matching is case-sensitive by default.
+    pub fn with_allowed_values<S>(mut self, values: Vec<S>) -> Self
+    where
+        S: Into<String>,
+    {
+        let vals: Vec<String> = values.into_iter().map(Into::into).collect();
+        self.config.allowed_values = Some(AllowedValues::new(vals));
+        self
+    }
+
+    /// Same as with_allowed_values, but case-insensitive (ASCII).
+    pub fn with_allowed_values_ci<S>(mut self, values: Vec<S>) -> Self
+    where
+        S: Into<String>,
+    {
+        let vals: Vec<String> = values.into_iter().map(Into::into).collect();
+        self.config.allowed_values = Some(AllowedValues::new(vals).case_insensitive(true));
+        self
+    }
+
+    /// Configure whether empty value should be allowed when using AllowedValues.
+    pub fn with_allowed_values_allow_empty(mut self, allow_empty: bool) -> Self {
+        if let Some(av) = self.config.allowed_values.take() {
+            self.config.allowed_values = Some(AllowedValues {
+                allow_empty,
+                ..av
+            });
+        } else {
+            self.config.allowed_values = Some(AllowedValues::new(vec![]).allow_empty(allow_empty));
+        }
+        self
+    }
+
     /// Enable or disable external validation indicator UI (feature 5)
     pub fn with_external_validation_enabled(mut self, enabled: bool) -> Self {
         self.config.external_validation_enabled = enabled;
@@ -389,6 +489,47 @@ mod tests {
         assert!(config.has_validation());
         assert!(config.character_limits.is_some());
         assert!(config.display_mask.is_some());
+    }
+
+    #[test]
+    fn test_allowed_values() {
+        let config = ValidationConfigBuilder::new()
+            .with_allowed_values(vec!["alpha", "beta", "gamma", "delta", "epsilon"])
+            .build();
+
+        // Empty should be valid by default
+        let result = config.validate_content("");
+        assert!(result.is_acceptable());
+
+        // Exact allowed values are valid
+        assert!(config.validate_content("alpha").is_acceptable());
+        assert!(config.validate_content("beta").is_acceptable());
+
+        // Anything else is an error
+        let res = config.validate_content("alph");
+        assert!(res.is_error());
+        let res = config.validate_content("ALPHA");
+        assert!(res.is_error()); // case-sensitive by default
+    }
+
+    #[test]
+    fn test_allowed_values_case_insensitive_and_required() {
+        let config = ValidationConfigBuilder::new()
+            .with_allowed_values_ci(vec!["Yes", "No"])
+            .with_allowed_values_allow_empty(false)
+            .build();
+
+        // Empty is not allowed now (warning so it's still acceptable for typing)
+        let res = config.validate_content("");
+        assert!(res.is_acceptable());
+
+        // Case-insensitive matches
+        assert!(config.validate_content("yes").is_acceptable());
+        assert!(config.validate_content("NO").is_acceptable());
+
+        // Random text is an error
+        let res = config.validate_content("maybe");
+        assert!(res.is_error());
     }
 
     #[test]
