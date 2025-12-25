@@ -1,0 +1,17 @@
+To cat neccessary things, cat these:
+
+src/lib.rs
+src/data_provider.rs
+src/editor/core.rs
+src/canvas/mod.rs
+src/canvas/state.rs
+src/canvas/modes/mod.rs
+src/canvas/modes/manager.rs
+src/canvas/modes/highlight.rs
+src/canvas/gui.rs
+src/canvas/cursor.rs
+src/canvas/theme.rs
+src/canvas/actions/types.rs
+src/keymap/mod.rs
+examples/canvas_cursor_auto.rs
+examples/canvas_keymap.rs
