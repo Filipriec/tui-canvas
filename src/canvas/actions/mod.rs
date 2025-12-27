@@ -3,6 +3,7 @@
 
 pub mod types;
 pub mod movement;
+pub mod dispatch;
 
 // Re-export the main API
 pub use types::{CanvasAction, ActionResult};

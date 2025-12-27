@@ -7,7 +7,7 @@
 /// Consumers can match on variants to implement custom handling or map input
 /// events to these canonical actions.
 #[non_exhaustive]
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CanvasAction {
     // Movement actions
     /// Move the cursor left by one character (or logical unit).
@@ -68,6 +68,18 @@ pub enum CanvasAction {
     // Custom actions
     /// Custom named action for application-specific behavior.
     Custom(String),
+
+    // Mode transitions
+    EnterEditMode,
+    EnterEditModeAfter,
+    ExitEditMode,
+    EnterHighlightMode,
+    EnterHighlightModeLinewise,
+    ExitHighlightMode,
+
+    // Advanced editing
+    OpenLineBelow,
+    OpenLineAbove,
 }
 
 /// Result type for canvas actions.
@@ -151,6 +163,18 @@ impl CanvasAction {
             Self::SelectSuggestion => "select suggestion",
             Self::ExitSuggestions => "exit suggestions",
             Self::Custom(_name) => "custom action",
+
+            // Mode transitions
+            Self::EnterEditMode => "enter edit mode",
+            Self::EnterEditModeAfter => "enter append mode (a)",
+            Self::ExitEditMode => "exit edit mode",
+            Self::EnterHighlightMode => "enter visual mode",
+            Self::EnterHighlightModeLinewise => "enter linewise visual mode",
+            Self::ExitHighlightMode => "exit visual mode",
+
+            // Advanced editing
+            Self::OpenLineBelow => "open line below (o)",
+            Self::OpenLineAbove => "open line above (O)",
         }
     }
 
