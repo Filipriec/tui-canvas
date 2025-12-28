@@ -280,57 +280,62 @@ impl<D: DataProvider> FormEditor<D> {
     pub fn move_word_end(&mut self) {
         use crate::canvas::actions::movement::word::find_word_end;
         let current_text = self.current_text();
+        let char_len = current_text.chars().count();
+        let current_pos = self.ui_state.cursor_pos;
 
+        // 1. Handle starting in an empty field
         if current_text.is_empty() {
-            // Empty field - try to move to next field
             if self.move_down().is_ok() {
-                // Recursively call move_word_end in the new field
-                self.move_word_end();
+                // Land at the start of the new field and stop as requested
+                self.ui_state.cursor_pos = 0;
+                self.ui_state.ideal_cursor_column = 0;
             }
             return;
         }
 
-        let current_pos = self.ui_state.cursor_pos;
-        let char_len = current_text.chars().count();
-        let new_pos = find_word_end(current_text, current_pos);
+        // 2. Try to find a word end from the current or next position
+        // First, check if there is a word end further in the current line
+        let mut target_pos = find_word_end(current_text, current_pos);
 
-        // Check if we didn't move or hit the end of the field
-        if new_pos == current_pos && current_pos + 1 < char_len {
-            // Try next character and find word end from there
-            let next_pos = find_word_end(current_text, current_pos + 1);
-            if next_pos < char_len {
-                let is_edit_mode = self.ui_state.current_mode == AppMode::Edit;
-                let final_pos = if is_edit_mode {
-                    next_pos.min(char_len)
-                } else {
-                    next_pos.min(char_len.saturating_sub(1))
-                };
-                self.ui_state.cursor_pos = final_pos;
-                self.ui_state.ideal_cursor_column = final_pos;
-                return;
-            }
+        // If find_word_end returned the current position (meaning we are already at an end),
+        // try to find the NEXT word end on this same line.
+        if target_pos <= current_pos && current_pos + 1 < char_len {
+            target_pos = find_word_end(current_text, current_pos + 1);
         }
 
-        // If we're at or near the end of the field, try next field
-        if new_pos >= char_len.saturating_sub(1) {
+        // 3. If we found a valid target on the current line that is further than current pos
+        if target_pos > current_pos {
+            self.apply_word_end_cursor(target_pos, char_len);
+        } else {
+            // 4. No more word ends on this line, jump to the next field
             if self.move_down().is_ok() {
-                // Position at start and find first word end
+                // Reset to start of the new field
                 self.ui_state.cursor_pos = 0;
                 self.ui_state.ideal_cursor_column = 0;
-                self.move_word_end();
-            }
-        } else {
-            // Normal word end movement within current field
-            let is_edit_mode = self.ui_state.current_mode == AppMode::Edit;
-            let final_pos = if is_edit_mode {
-                new_pos.min(char_len)
-            } else {
-                new_pos.min(char_len.saturating_sub(1))
-            };
 
-            self.ui_state.cursor_pos = final_pos;
-            self.ui_state.ideal_cursor_column = final_pos;
+                let next_text = self.current_text();
+                if !next_text.is_empty() {
+                    // On the new line, find the FIRST word end. 
+                    // We DO NOT recurse here to prevent stack overflow and skipping.
+                    let first_word_end = find_word_end(next_text, 0);
+                    let next_char_len = next_text.chars().count();
+                    self.apply_word_end_cursor(first_word_end, next_char_len);
+                }
+                // If next_text is empty, we stay at pos 0 as requested.
+            }
         }
+    }
+
+    /// Internal helper to set cursor and ideal column based on mode boundaries
+    fn apply_word_end_cursor(&mut self, pos: usize, max_len: usize) {
+        let is_edit_mode = self.ui_state.current_mode == AppMode::Edit;
+        let final_pos = if is_edit_mode {
+            pos.min(max_len)
+        } else {
+            pos.min(max_len.saturating_sub(1))
+        };
+        self.ui_state.cursor_pos = final_pos;
+        self.ui_state.ideal_cursor_column = final_pos;
     }
 
     /// Move to end of previous word (vim ge) - can cross field boundaries
