@@ -31,6 +31,12 @@ pub enum KeyEventOutcome {
     Consumed(Option<String>),
     Pending,
     NotMatched,
+    // these are for logic of the outside of this crate to handle logic, if we are at the last row
+    // and want to move one below(impossible, we at the bottom already)
+    /// Moving upwards aint possible, cos we at the top
+    ExitTop,
+    /// Same but we at the bottom now
+    ExitBottom,
 }
 
 #[derive(Debug, Clone)]

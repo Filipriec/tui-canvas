@@ -136,7 +136,7 @@ impl<D: DataProvider> FormEditor<D> {
 
         if current_text.is_empty() {
             // Empty field - try to move to next field
-            if self.move_down().is_ok() {
+            if self.move_down() {
                 // Successfully moved to next field, try to find first word
                 let new_text = self.current_text();
                 if !new_text.is_empty() {
@@ -167,7 +167,7 @@ impl<D: DataProvider> FormEditor<D> {
         // Check if we've hit the end of the current field
         if new_pos >= current_text.chars().count() {
             // At end of field - jump to next field and start from beginning
-            if self.move_down().is_ok() {
+            if self.move_down() {
                 // Successfully moved to next field
                 let new_text = self.current_text();
                 if new_text.is_empty() {
@@ -218,7 +218,7 @@ impl<D: DataProvider> FormEditor<D> {
         if current_text.is_empty() {
             // Empty field - try to move to previous field and find last word
             let current_field = self.ui_state.current_field;
-            if self.move_up().is_ok() {
+            if self.move_up() {
                 // Check if we actually moved to a different field
                 if self.ui_state.current_field != current_field {
                     let new_text = self.current_text();
@@ -237,7 +237,7 @@ impl<D: DataProvider> FormEditor<D> {
         // Special case: if we're at position 0, jump to previous field
         if current_pos == 0 {
             let current_field = self.ui_state.current_field;
-            if self.move_up().is_ok() {
+            if self.move_up() {
                 // Check if we actually moved to a different field
                 if self.ui_state.current_field != current_field {
                     let new_text = self.current_text();
@@ -262,7 +262,7 @@ impl<D: DataProvider> FormEditor<D> {
         } else {
             // We didn't move (probably at start of first word), try previous field
             let current_field = self.ui_state.current_field;
-            if self.move_up().is_ok() {
+            if self.move_up() {
                 // Check if we actually moved to a different field
                 if self.ui_state.current_field != current_field {
                     let new_text = self.current_text();
@@ -285,7 +285,7 @@ impl<D: DataProvider> FormEditor<D> {
 
         // 1. Handle starting in an empty field
         if current_text.is_empty() {
-            if self.move_down().is_ok() {
+            if self.move_down() {
                 // Land at the start of the new field and stop as requested
                 self.ui_state.cursor_pos = 0;
                 self.ui_state.ideal_cursor_column = 0;
@@ -308,7 +308,7 @@ impl<D: DataProvider> FormEditor<D> {
             self.apply_word_end_cursor(target_pos, char_len);
         } else {
             // 4. No more word ends on this line, jump to the next field
-            if self.move_down().is_ok() {
+            if self.move_down() {
                 // Reset to start of the new field
                 self.ui_state.cursor_pos = 0;
                 self.ui_state.ideal_cursor_column = 0;
@@ -346,7 +346,7 @@ impl<D: DataProvider> FormEditor<D> {
         if current_text.is_empty() {
             // Empty field - try to move to previous field (but don't recurse)
             let current_field = self.ui_state.current_field;
-            if self.move_up().is_ok() {
+            if self.move_up() {
                 // Check if we actually moved to a different field
                 if self.ui_state.current_field != current_field {
                     let new_text = self.current_text();
@@ -366,7 +366,7 @@ impl<D: DataProvider> FormEditor<D> {
         // Special case: if we're at position 0, jump to previous field (but don't recurse)
         if current_pos == 0 {
             let current_field = self.ui_state.current_field;
-            if self.move_up().is_ok() {
+            if self.move_up() {
                 // Check if we actually moved to a different field
                 if self.ui_state.current_field != current_field {
                     let new_text = self.current_text();
@@ -386,7 +386,7 @@ impl<D: DataProvider> FormEditor<D> {
         if new_pos == current_pos {
             // We didn't move within the current field, try previous field
             let current_field = self.ui_state.current_field;
-            if self.move_up().is_ok() {
+            if self.move_up() {
                 // Check if we actually moved to a different field
                 if self.ui_state.current_field != current_field {
                     let new_text = self.current_text();
@@ -419,7 +419,7 @@ impl<D: DataProvider> FormEditor<D> {
 
         if current_text.is_empty() {
             // Empty field - try to move to next field
-            if self.move_down().is_ok() {
+            if self.move_down() {
                 // Successfully moved to next field, try to find first big_word
                 let new_text = self.current_text();
                 if !new_text.is_empty() {
@@ -450,7 +450,7 @@ impl<D: DataProvider> FormEditor<D> {
         // Check if we've hit the end of the current field
         if new_pos >= current_text.chars().count() {
             // At end of field - jump to next field and start from beginning
-            if self.move_down().is_ok() {
+            if self.move_down() {
                 // Successfully moved to next field
                 let new_text = self.current_text();
                 if new_text.is_empty() {
@@ -501,7 +501,7 @@ impl<D: DataProvider> FormEditor<D> {
         if current_text.is_empty() {
             // Empty field - try to move to previous field and find last big_word
             let current_field = self.ui_state.current_field;
-            if self.move_up().is_ok() {
+            if self.move_up() {
                 // Check if we actually moved to a different field
                 if self.ui_state.current_field != current_field {
                     let new_text = self.current_text();
@@ -520,7 +520,7 @@ impl<D: DataProvider> FormEditor<D> {
         // Special case: if we're at position 0, jump to previous field
         if current_pos == 0 {
             let current_field = self.ui_state.current_field;
-            if self.move_up().is_ok() {
+            if self.move_up() {
                 // Check if we actually moved to a different field
                 if self.ui_state.current_field != current_field {
                     let new_text = self.current_text();
@@ -545,7 +545,7 @@ impl<D: DataProvider> FormEditor<D> {
         } else {
             // We didn't move (probably at start of first big_word), try previous field
             let current_field = self.ui_state.current_field;
-            if self.move_up().is_ok() {
+            if self.move_up() {
                 // Check if we actually moved to a different field
                 if self.ui_state.current_field != current_field {
                     let new_text = self.current_text();
@@ -566,7 +566,7 @@ impl<D: DataProvider> FormEditor<D> {
 
         if current_text.is_empty() {
             // Empty field - try to move to next field (but don't recurse)
-            if self.move_down().is_ok() {
+            if self.move_down() {
                 let new_text = self.current_text();
                 if !new_text.is_empty() {
                     // Find first big_word end in new field
@@ -608,7 +608,7 @@ impl<D: DataProvider> FormEditor<D> {
 
         // If we're at or near the end of the field, try next field (but don't recurse)
         if new_pos >= char_len.saturating_sub(1) {
-            if self.move_down().is_ok() {
+            if self.move_down() {
                 // Find first big_word end in new field
                 let new_text = self.current_text();
                 if !new_text.is_empty() {
@@ -648,7 +648,7 @@ impl<D: DataProvider> FormEditor<D> {
 
         if current_text.is_empty() {
             let current_field = self.ui_state.current_field;
-            if self.move_up().is_ok()
+            if self.move_up()
                 && self.ui_state.current_field != current_field {
                     let new_text = self.current_text();
                     if !new_text.is_empty() {
@@ -667,7 +667,7 @@ impl<D: DataProvider> FormEditor<D> {
         // Only try to cross fields if we didn't move at all (stayed at same position)
         if new_pos == current_pos {
             let current_field = self.ui_state.current_field;
-            if self.move_up().is_ok()
+            if self.move_up()
                 && self.ui_state.current_field != current_field {
                     let new_text = self.current_text();
                     if !new_text.is_empty() {

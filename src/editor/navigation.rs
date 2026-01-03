@@ -144,16 +144,24 @@ impl<D: DataProvider> FormEditor<D> {
     }
 
     /// Move to previous field (vim k / up)
-    pub fn move_up(&mut self) -> anyhow::Result<()> {
-        let new_field = self.ui_state.current_field.saturating_sub(1);
-        self.transition_to_field(new_field)
+    /// Returns true if moved, false if already at top
+    pub fn move_up(&mut self) -> bool {
+        if self.ui_state.current_field == 0 {
+            return false;  // At top boundary
+        }
+        let new_field = self.ui_state.current_field - 1;
+        self.transition_to_field(new_field).is_ok()
     }
 
     /// Move to next field (vim j / down)
-    pub fn move_down(&mut self) -> anyhow::Result<()> {
-        let new_field = (self.ui_state.current_field + 1)
-            .min(self.data_provider.field_count().saturating_sub(1));
-        self.transition_to_field(new_field)
+    /// Returns true if moved, false if already at bottom
+    pub fn move_down(&mut self) -> bool {
+        let last = self.data_provider.field_count().saturating_sub(1);
+        if self.ui_state.current_field >= last {
+            return false;  // At bottom boundary
+        }
+        let new_field = self.ui_state.current_field + 1;
+        self.transition_to_field(new_field).is_ok()
     }
 
     /// Move to next field cyclic
@@ -167,11 +175,11 @@ impl<D: DataProvider> FormEditor<D> {
     }
 
     /// Aliases
-    pub fn prev_field(&mut self) -> anyhow::Result<()> {
+    pub fn prev_field(&mut self) -> bool {
         self.move_up()
     }
 
-    pub fn next_field(&mut self) -> anyhow::Result<()> {
+    pub fn next_field(&mut self) -> bool {
         self.move_down()
     }
 }

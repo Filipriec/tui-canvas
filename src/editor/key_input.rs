@@ -36,9 +36,9 @@ impl<D: DataProvider> FormEditor<D> {
         if let Some(action) = matched {
             // Clone the action string to avoid borrow checker issues
             let action_owned = action.to_string();
-            let msg = self.dispatch_canvas_action(&action_owned);
+            let outcome = self.dispatch_canvas_action(&action_owned);
             self.seq_tracker.reset();
-            return KeyEventOutcome::Consumed(msg);
+            return outcome;
         }
 
         if is_prefix {
@@ -67,100 +67,112 @@ impl<D: DataProvider> FormEditor<D> {
     }
 
     #[cfg(feature = "keymap")]
-    fn dispatch_canvas_action(&mut self, action: &str) -> Option<String> {
+    fn dispatch_canvas_action(&mut self, action: &str) -> KeyEventOutcome {
         match action {
             // Movement
             "move_left" => {
                 let _ = self.move_left();
-                None
+                KeyEventOutcome::Consumed(None)
             }
             "move_right" => {
                 let _ = self.move_right();
-                None
+                KeyEventOutcome::Consumed(None)
             }
             "move_up" => {
-                let _ = self.move_up();
-                None
+                if !self.move_up() {
+                    KeyEventOutcome::ExitTop
+                } else {
+                    KeyEventOutcome::Consumed(None)
+                }
             }
             "move_down" => {
-                let _ = self.move_down();
-                None
+                if !self.move_down() {
+                    KeyEventOutcome::ExitBottom
+                } else {
+                    KeyEventOutcome::Consumed(None)
+                }
             }
             "next_field" => {
-                let _ = self.next_field();
-                None
+                if !self.next_field() {
+                    KeyEventOutcome::ExitBottom
+                } else {
+                    KeyEventOutcome::Consumed(None)
+                }
             }
             "prev_field" => {
-                let _ = self.prev_field();
-                None
+                if !self.prev_field() {
+                    KeyEventOutcome::ExitTop
+                } else {
+                    KeyEventOutcome::Consumed(None)
+                }
             }
             "move_line_start" => {
                 self.move_line_start();
-                None
+                KeyEventOutcome::Consumed(None)
             }
             "move_line_end" => {
                 self.move_line_end();
-                None
+                KeyEventOutcome::Consumed(None)
             }
             "move_first_line" => {
                 let _ = self.move_first_line();
-                None
+                KeyEventOutcome::Consumed(None)
             }
             "move_last_line" => {
                 let _ = self.move_last_line();
-                None
+                KeyEventOutcome::Consumed(None)
             }
 
             // Word/big-word movement (cross-field aware)
             "move_word_next" => {
                 self.move_word_next();
-                None
+                KeyEventOutcome::Consumed(None)
             }
             "move_word_prev" => {
                 self.move_word_prev();
-                None
+                KeyEventOutcome::Consumed(None)
             }
             "move_word_end" => {
                 self.move_word_end();
-                None
+                KeyEventOutcome::Consumed(None)
             }
             "move_word_end_prev" => {
                 self.move_word_end_prev();
-                None
+                KeyEventOutcome::Consumed(None)
             }
             "move_big_word_next" => {
                 self.move_big_word_next();
-                None
+                KeyEventOutcome::Consumed(None)
             }
             "move_big_word_prev" => {
                 self.move_big_word_prev();
-                None
+                KeyEventOutcome::Consumed(None)
             }
             "move_big_word_end" => {
                 self.move_big_word_end();
-                None
+                KeyEventOutcome::Consumed(None)
             }
             "move_big_word_end_prev" => {
                 self.move_big_word_end_prev();
-                None
+                KeyEventOutcome::Consumed(None)
             }
 
             // Editing
             "delete_char_backward" => {
                 let _ = self.delete_backward();
-                None
+                KeyEventOutcome::Consumed(None)
             }
             "delete_char_forward" => {
                 let _ = self.delete_forward();
-                None
+                KeyEventOutcome::Consumed(None)
             }
             "open_line_below" => {
                 let _ = self.open_line_below();
-                None
+                KeyEventOutcome::Consumed(None)
             }
             "open_line_above" => {
                 let _ = self.open_line_above();
-                None
+                KeyEventOutcome::Consumed(None)
             }
 
             // Suggestions (only when feature is enabled)
@@ -168,31 +180,31 @@ impl<D: DataProvider> FormEditor<D> {
             "open_suggestions" => {
                 let idx = self.current_field();
                 self.open_suggestions(idx);
-                None
+                KeyEventOutcome::Consumed(None)
             }
             #[cfg(feature = "suggestions")]
             "apply_suggestion" | "enter_decider" => {
                 if let Some(_applied) = self.apply_suggestion() {
-                    None
+                    KeyEventOutcome::Consumed(None)
                 } else {
-                    None
+                    KeyEventOutcome::Consumed(None)
                 }
             }
             #[cfg(feature = "suggestions")]
             "suggestion_down" => {
                 self.suggestions_next();
-                None
+                KeyEventOutcome::Consumed(None)
             }
             #[cfg(feature = "suggestions")]
             "suggestion_up" => {
                 self.suggestions_prev();
-                None
+                KeyEventOutcome::Consumed(None)
             }
 
             // Mode transitions (vim-like)
             "enter_edit_mode_before" => {
                 self.enter_edit_mode();
-                None
+                KeyEventOutcome::Consumed(None)
             }
             "enter_edit_mode_after" => {
                 // Move forward 1 char if possible (vim 'a'), then enter insert
@@ -203,26 +215,26 @@ impl<D: DataProvider> FormEditor<D> {
                     self.ui_state.ideal_cursor_column = self.ui_state.cursor_pos;
                 }
                 self.enter_edit_mode();
-                None
+                KeyEventOutcome::Consumed(None)
             }
             "exit" | "exit_edit_mode" => {
                 let _ = self.exit_edit_mode();
-                None
+                KeyEventOutcome::Consumed(None)
             }
             "enter_highlight_mode" => {
                 self.enter_highlight_mode();
-                None
+                KeyEventOutcome::Consumed(None)
             }
             "enter_highlight_mode_linewise" => {
                 self.enter_highlight_line_mode();
-                None
+                KeyEventOutcome::Consumed(None)
             }
             "exit_highlight_mode" => {
                 self.exit_highlight_mode();
-                None
+                KeyEventOutcome::Consumed(None)
             }
 
-            _ => None,
+            _ => KeyEventOutcome::NotMatched,
         }
     }
 }
