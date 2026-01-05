@@ -8,11 +8,14 @@ use crate::canvas::state::EditorState;
 use crate::DataProvider;
 #[cfg(feature = "suggestions")]
 use crate::SuggestionItem;
+use derivative::Derivative;
 
 // NEW: Import keymap types when keymap feature is enabled
 #[cfg(feature = "keymap")]
 use crate::keymap::{CanvasKeyMap, KeySequenceTracker};
 
+#[derive(Derivative)]
+#[derivative(Debug, Default)]
 pub struct FormEditor<D: DataProvider> {
     pub(crate) ui_state: EditorState,
     pub(crate) data_provider: D,
@@ -20,6 +23,8 @@ pub struct FormEditor<D: DataProvider> {
     pub(crate) suggestions: Vec<SuggestionItem>,
 
     #[cfg(feature = "validation")]
+    #[derivative(Debug = "ignore")]
+    #[derivative(Default(value = "None"))]
     pub(crate) external_validation_callback: Option<
         Box<
             dyn FnMut(usize, &str) -> crate::validation::ExternalValidationState
@@ -27,11 +32,12 @@ pub struct FormEditor<D: DataProvider> {
                 + Sync,
         >,
     >,
-
-    // NEW: Injected keymap and sequence tracker (keymap feature only)
     #[cfg(feature = "keymap")]
+    #[derivative(Default(value = "None"))]
     pub(crate) keymap: Option<CanvasKeyMap>,
+
     #[cfg(feature = "keymap")]
+    #[derivative(Default(value = "KeySequenceTracker::new(400)"))]
     pub(crate) seq_tracker: KeySequenceTracker,
 }
 
