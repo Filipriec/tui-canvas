@@ -50,7 +50,7 @@ impl<D: DataProvider> FormEditor<D> {
 
             // Suggestions
             TriggerSuggestions | SuggestionUp | SuggestionDown |
-            SelectSuggestion | ExitSuggestions => ActionResult::HandledByApp("suggestion action".into()),
+            SelectSuggestion | ExitSuggestions => ActionResult::Message("suggestion action".into()),
 
             // Any actions that require arguments / not handled directly
             InsertChar(c) => Self::into_action_result(self.insert_char(c)),

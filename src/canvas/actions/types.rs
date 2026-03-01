@@ -93,10 +93,6 @@ pub enum ActionResult {
     Success,
     /// Action completed with a user-facing message.
     Message(String),
-    /// Action was handled by the application with an associated message.
-    HandledByApp(String),
-    /// Action was handled by a feature with an associated message.
-    HandledByFeature(String),
     /// An error occurred while handling the action.
     Error(String),
 }
@@ -112,9 +108,9 @@ impl ActionResult {
         Self::Message(msg.to_string())
     }
 
-    /// Convenience constructor for HandledByApp.
+    /// Convenience constructor for message-style handled outcomes.
     pub fn handled_by_app(msg: &str) -> Self {
-        Self::HandledByApp(msg.to_string())
+        Self::Message(msg.to_string())
     }
 
     /// Convenience constructor for Error.
@@ -124,13 +120,13 @@ impl ActionResult {
 
     /// Returns true for any variant representing a success-like outcome.
     pub fn is_success(&self) -> bool {
-        matches!(self, Self::Success | Self::Message(_) | Self::HandledByApp(_) | Self::HandledByFeature(_))
+        matches!(self, Self::Success | Self::Message(_))
     }
 
     /// Extract a message from the result when present.
     pub fn message(&self) -> Option<&str> {
         match self {
-            Self::Message(msg) | Self::HandledByApp(msg) | Self::HandledByFeature(msg) | Self::Error(msg) => Some(msg),
+            Self::Message(msg) | Self::Error(msg) => Some(msg),
             Self::Success => None,
         }
     }
