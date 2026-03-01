@@ -1,11 +1,10 @@
 // src/editor/navigation.rs
-
 use crate::canvas::modes::AppMode;
 use crate::editor::FormEditor;
 use crate::DataProvider;
 
 impl<D: DataProvider> FormEditor<D> {
-    /// Centralized field transition logic (unchanged).
+    /// Centralized field transition logic.
     pub fn transition_to_field(&mut self, new_field: usize) -> anyhow::Result<()> {
         let field_count = self.data_provider.field_count();
         if field_count == 0 {
@@ -107,11 +106,6 @@ impl<D: DataProvider> FormEditor<D> {
             }
         }
 
-        #[cfg(feature = "computed")]
-        {
-            // Placeholder for recompute hook if needed later
-        }
-
         self.ui_state.move_to_field(target_field, field_count);
 
         let current_text = self.current_text();
@@ -122,7 +116,6 @@ impl<D: DataProvider> FormEditor<D> {
             self.ui_state.current_mode == AppMode::Edit,
         );
 
-        // Automatically close suggestions on field switch
         #[cfg(feature = "suggestions")]
         {
             self.close_suggestions();
@@ -147,7 +140,7 @@ impl<D: DataProvider> FormEditor<D> {
     /// Returns true if moved, false if already at top
     pub fn move_up(&mut self) -> bool {
         if self.ui_state.current_field == 0 {
-            return false;  // At top boundary
+            return false;
         }
         let new_field = self.ui_state.current_field - 1;
         self.transition_to_field(new_field).is_ok()
@@ -158,7 +151,7 @@ impl<D: DataProvider> FormEditor<D> {
     pub fn move_down(&mut self) -> bool {
         let last = self.data_provider.field_count().saturating_sub(1);
         if self.ui_state.current_field >= last {
-            return false;  // At bottom boundary
+            return false;
         }
         let new_field = self.ui_state.current_field + 1;
         self.transition_to_field(new_field).is_ok()
@@ -174,7 +167,6 @@ impl<D: DataProvider> FormEditor<D> {
         self.transition_to_field(new_field)
     }
 
-    /// Aliases
     pub fn prev_field(&mut self) -> bool {
         self.move_up()
     }

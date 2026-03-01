@@ -1,3 +1,4 @@
+// src/computed/provider.rs
 //! Provider interface and context for computed/display-only fields.
 //!
 //! Implementors provide logic to compute a field's display value from the

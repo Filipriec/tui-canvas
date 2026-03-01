@@ -288,7 +288,6 @@ impl<'a> StatefulWidget for TextArea<'a> {
                 display_lines.push(Line::from(Span::raw(ph.clone())));
             }
         } else if wrap_mode {
-            // manual pre-wrap path (unchanged)
             let mut rows_left = inner.height;
             let indent = state.wrap_indent_cols;
             let mut i = start;

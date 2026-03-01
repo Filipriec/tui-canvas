@@ -1,3 +1,4 @@
+// src/computed/mod.rs
 //! Computed fields subsystem.
 //!
 //! This module exposes the provider trait and the internal state management

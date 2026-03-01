@@ -124,10 +124,6 @@ impl TextAreaProvider {
         s
     }
 
-    // --------------------------
-    // Editing helpers for TextAreaState (unchanged API)
-    // --------------------------
-
     /// Split line at a character offset (within that line).
     /// Returns the index of the newly created line (line_idx + 1).
     pub fn split_line_at(&mut self, line_idx: usize, at_char: usize) -> usize {
@@ -242,7 +238,6 @@ impl DataProvider for TextAreaProvider {
 
         self.resize_cache();
         if index < self.line_cache.len() {
-            // Replace this line’s cached string only; other lines unchanged
             let _ = self.line_cache[index].take();
             let _ = self.line_cache[index].set(clean);
         }

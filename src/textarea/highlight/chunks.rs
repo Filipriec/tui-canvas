@@ -131,7 +131,6 @@ pub fn wrap_chunks_indented(
     let mut used: u16 = 0;
     let mut first_line = true;
 
-    // Fixed: Restructure to avoid borrow checker issues
     for chunk in chunks {
         let mut buf = String::new();
         let mut buf_style = chunk.style;
@@ -150,7 +149,6 @@ pub fn wrap_chunks_indented(
                 first_line = false;
                 used = 0;
                 
-                // Add indent directly instead of using closure
                 if !first_line && indent > 0 {
                     current_spans.push(Span::raw(indent_str.clone()));
                     used = indent;
@@ -163,7 +161,6 @@ pub fn wrap_chunks_indented(
             }
             buf_style = chunk.style;
             
-            // Add indent if needed
             if used == 0 && !first_line && indent > 0 {
                 current_spans.push(Span::raw(indent_str.clone()));
                 used = indent;

@@ -1,4 +1,4 @@
-// canvas/src/gui/theme.rs
+// src/canvas/theme.rs
 
 #[cfg(feature = "gui")]
 use ratatui::style::Color;

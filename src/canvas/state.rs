@@ -95,10 +95,6 @@ impl EditorState {
         }
     }
 
-    // ===================================================================
-    // READ-ONLY ACCESS: User can fetch UI state for compatibility
-    // ===================================================================
-
     /// Get current field index (for user's business logic)
     pub fn current_field(&self) -> usize {
         self.current_field

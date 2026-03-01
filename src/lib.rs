@@ -1,5 +1,4 @@
 // src/lib.rs
-
 pub mod canvas;
 pub mod editor;
 pub mod data_provider;
@@ -23,39 +22,28 @@ pub mod keymap;
 #[cfg(feature = "cursor-style")]
 pub use canvas::CursorManager;
 
-// ===================================================================
-// NEW API: Library-owned state pattern
-// ===================================================================
-
-// Main API exports
 pub use editor::FormEditor;
 pub use data_provider::DataProvider;
 #[cfg(feature = "suggestions")]
 pub use data_provider::{SuggestionsProvider, SuggestionItem};
 
-// UI state (read-only access for users)
 pub use canvas::state::EditorState;
 pub use canvas::modes::AppMode;
 
-// Actions and results (for users who want to handle actions manually)
 pub use canvas::actions::{CanvasAction, ActionResult};
 
-// Validation exports (only when validation feature is enabled)
 #[cfg(feature = "validation")]
 pub use validation::{
     ValidationConfig, ValidationResult, ValidationError,
     CharacterLimits, ValidationConfigBuilder, ValidationState,
     ValidationSummary, PatternFilters, PositionFilter, PositionRange, CharacterFilter, 
-    DisplayMask,  // Simple display mask instead of complex ReservedCharacters
-    // Feature 4: custom formatting exports
+    DisplayMask,
     CustomFormatter, FormattingResult, PositionMapper, DefaultPositionMapper,
 };
 
-// Computed exports (only when computed feature is enabled)
 #[cfg(feature = "computed")]
 pub use computed::{ComputedProvider, ComputedContext, ComputedState};
 
-// Theming and GUI
 #[cfg(feature = "gui")]
 pub use canvas::theme::{CanvasTheme, DefaultCanvasTheme};
 

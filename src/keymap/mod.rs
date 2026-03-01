@@ -25,17 +25,14 @@ pub struct CanvasKeyMap {
     hl: Vec<Binding>,
 }
 
-// FIXED: Removed Copy because Option<String> is not Copy
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum KeyEventOutcome {
     Consumed(Option<String>),
     Pending,
     NotMatched,
-    // these are for logic of the outside of this crate to handle logic, if we are at the last row
-    // and want to move one below(impossible, we at the bottom already)
-    /// Moving upwards aint possible, cos we at the top
+    /// Reached top boundary while navigating upward.
     ExitTop,
-    /// Same but we at the bottom now
+    /// Reached bottom boundary while navigating downward.
     ExitBottom,
 }
 

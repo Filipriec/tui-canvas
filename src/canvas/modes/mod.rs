@@ -1,4 +1,4 @@
-// canvas/src/modes/mod.rs
+// src/canvas/modes/mod.rs
 
 pub mod highlight;
 pub mod manager;

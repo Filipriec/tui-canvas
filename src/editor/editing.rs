@@ -1,13 +1,10 @@
 // src/editor/editing.rs
-
 use crate::editor::FormEditor;
 use crate::DataProvider;
 
 impl<D: DataProvider> FormEditor<D> {
     /// Open new line below (vim o)
     pub fn open_line_below(&mut self) -> anyhow::Result<()> {
-        // paste the method body unchanged from editor.rs
-        // (exact code from your VIM COMMANDS: o and O section)
         let field_count = self.data_provider.field_count();
         if field_count == 0 {
             return Ok(());
@@ -33,7 +30,6 @@ impl<D: DataProvider> FormEditor<D> {
 
     /// Handle character insertion (mask/limit-aware)
     pub fn insert_char(&mut self, ch: char) -> anyhow::Result<()> {
-        // paste entire insert_char body unchanged
         if self.ui_state.current_mode != crate::canvas::modes::AppMode::Edit
         {
             return Ok(());
@@ -161,7 +157,6 @@ impl<D: DataProvider> FormEditor<D> {
 
     /// Delete backward (backspace)
     pub fn delete_backward(&mut self) -> anyhow::Result<()> {
-        // paste entire delete_backward body unchanged
         if self.ui_state.current_mode != crate::canvas::modes::AppMode::Edit
         {
             return Ok(());
@@ -225,7 +220,6 @@ impl<D: DataProvider> FormEditor<D> {
 
     /// Delete forward (Delete key)
     pub fn delete_forward(&mut self) -> anyhow::Result<()> {
-        // paste entire delete_forward body unchanged
         if self.ui_state.current_mode != crate::canvas::modes::AppMode::Edit
         {
             return Ok(());
@@ -289,7 +283,6 @@ impl<D: DataProvider> FormEditor<D> {
 
     /// Enter edit mode with cursor positioned for append (vim 'a')
     pub fn enter_append_mode(&mut self) {
-        // paste body unchanged
         let current_text = self.current_text();
 
         let char_len = current_text.chars().count();

@@ -71,8 +71,7 @@ pub struct ValidationConfig {
     /// Enable external validation indicator UI (feature 5)
     pub external_validation_enabled: bool,
 
-    /// Future: External validation
-    pub external_validation: Option<()>, // Placeholder for future implementation
+    pub external_validation: Option<()>,
 }
 
 /// Manual Debug to avoid requiring Debug on dyn CustomFormatter
@@ -103,7 +102,6 @@ impl std::fmt::Debug for ValidationConfig {
     }
 }
 
-// ✅ FIXED: Move function from struct definition to impl block
 impl ValidationConfig {
     /// If a custom formatter is configured, run it and return the formatted text,
     /// the position mapper and an optional warning message.
@@ -173,7 +171,6 @@ impl ValidationConfig {
     ) -> ValidationResult {
         // Character limits validation
         if let Some(ref limits) = self.character_limits {
-            // ✅ FIXED: Explicit return type annotation
             if let Some(result) = limits.validate_insertion(current_text, position, character) {
                 if !result.is_acceptable() {
                     return result;
@@ -183,13 +180,10 @@ impl ValidationConfig {
 
         // Pattern filters validation
         if let Some(ref patterns) = self.pattern_filters {
-            // ✅ FIXED: Explicit error handling
             if let Err(message) = patterns.validate_char_at_position(position, character) {
                 return ValidationResult::error(message);
             }
         }
-
-        // Future: Add other validation types here
 
         ValidationResult::Valid
     }
@@ -198,7 +192,6 @@ impl ValidationConfig {
     pub fn validate_content(&self, text: &str) -> ValidationResult {
         // Character limits validation
         if let Some(ref limits) = self.character_limits {
-            // ✅ FIXED: Explicit return type annotation
             if let Some(result) = limits.validate_content(text) {
                 if !result.is_acceptable() {
                     return result;
@@ -208,7 +201,6 @@ impl ValidationConfig {
 
         // Pattern filters validation
         if let Some(ref patterns) = self.pattern_filters {
-            // ✅ FIXED: Explicit error handling
             if let Err(message) = patterns.validate_text(text) {
                 return ValidationResult::error(message);
             }
@@ -225,8 +217,6 @@ impl ValidationConfig {
                 return ValidationResult::error("Value must be one of the allowed options");
             }
         }
-
-        // Future: Add other validation types here
 
         ValidationResult::Valid
     }
@@ -253,13 +243,10 @@ impl ValidationConfig {
     pub fn allows_field_switch(&self, text: &str) -> bool {
         // Character limits validation
         if let Some(ref limits) = self.character_limits {
-            // ✅ FIXED: Direct boolean return
             if !limits.allows_field_switch(text) {
                 return false;
             }
         }
-
-        // Future: Add other validation types here
 
         true
     }
@@ -268,13 +255,10 @@ impl ValidationConfig {
     pub fn field_switch_block_reason(&self, text: &str) -> Option<String> {
         // Character limits validation
         if let Some(ref limits) = self.character_limits {
-            // ✅ FIXED: Direct option return
             if let Some(reason) = limits.field_switch_block_reason(text) {
                 return Some(reason);
             }
         }
-
-        // Future: Add other validation types here
 
         None
     }

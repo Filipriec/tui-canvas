@@ -1,5 +1,4 @@
-// src/modes/handlers/mode_manager.rs
-// canvas/src/modes/manager.rs
+// src/canvas/modes/manager.rs
 //! Mode manager utilities and the AppMode enum.
 //!
 //! This module defines the available canvas modes and provides helper

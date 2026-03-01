@@ -96,7 +96,7 @@ pub enum ActionResult {
     /// Action was handled by the application with an associated message.
     HandledByApp(String),
     /// Action was handled by a feature with an associated message.
-    HandledByFeature(String), // Keep for compatibility
+    HandledByFeature(String),
     /// An error occurred while handling the action.
     Error(String),
 }

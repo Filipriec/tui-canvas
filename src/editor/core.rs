@@ -1,5 +1,4 @@
 // src/editor/core.rs
-
 #[cfg(feature = "cursor-style")]
 use crate::canvas::CursorManager;
 
@@ -10,7 +9,6 @@ use crate::DataProvider;
 use crate::SuggestionItem;
 use derivative::Derivative;
 
-// NEW: Import keymap types when keymap feature is enabled
 #[cfg(feature = "keymap")]
 use crate::keymap::{CanvasKeyMap, KeySequenceTracker};
 
@@ -42,7 +40,6 @@ pub struct FormEditor<D: DataProvider> {
 }
 
 impl<D: DataProvider> FormEditor<D> {
-    // Make helpers visible to sibling modules in this crate
     pub(crate) fn char_to_byte_index(s: &str, char_idx: usize) -> usize {
         s.char_indices()
             .nth(char_idx)
@@ -63,11 +60,10 @@ impl<D: DataProvider> FormEditor<D> {
             suggestions: Vec::new(),
             #[cfg(feature = "validation")]
             external_validation_callback: None,
-            // NEW: Initialize keymap fields
             #[cfg(feature = "keymap")]
             keymap: None,
             #[cfg(feature = "keymap")]
-            seq_tracker: KeySequenceTracker::new(400), // 400ms default timeout
+            seq_tracker: KeySequenceTracker::new(400),
         };
 
         #[cfg(feature = "validation")]
@@ -91,8 +87,6 @@ impl<D: DataProvider> FormEditor<D> {
         }
     }
 
-    // NEW: Keymap management methods (keymap feature only)
-    
     /// Set the keymap for this editor instance
     #[cfg(feature = "keymap")]
     pub fn set_keymap(&mut self, keymap: CanvasKeyMap) {
@@ -111,7 +105,6 @@ impl<D: DataProvider> FormEditor<D> {
         self.seq_tracker = KeySequenceTracker::new(timeout_ms);
     }
 
-    // Library-internal, used by multiple modules
     pub(crate) fn current_text(&self) -> &str {
         let field_index = self.ui_state.current_field;
         if field_index < self.data_provider.field_count() {
@@ -121,7 +114,6 @@ impl<D: DataProvider> FormEditor<D> {
         }
     }
 
-    // Read-only getters
     pub fn current_field(&self) -> usize {
         self.ui_state.current_field()
     }
@@ -154,7 +146,6 @@ impl<D: DataProvider> FormEditor<D> {
         self.ui_state.validation_state()
     }
 
-    // Cursor cleanup
     #[cfg(feature = "cursor-style")]
     pub fn cleanup_cursor(&self) -> std::io::Result<()> {
         CursorManager::reset()

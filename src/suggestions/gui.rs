@@ -5,7 +5,7 @@
 use ratatui::{
     layout::{Alignment, Rect},
     style::{Modifier, Style},
-    widgets::{Block, List, ListItem, ListState, Paragraph},  // Removed Borders
+    widgets::{Block, List, ListItem, ListState, Paragraph},
     Frame,
 };
 
@@ -76,7 +76,7 @@ fn render_suggestions_dropdown_list<T: CanvasTheme>(
     frame_area: Rect,
     input_rect: Rect,
     theme: &T,
-    suggestions: &[SuggestionItem],  // Fixed: Removed <String> generic parameter
+    suggestions: &[SuggestionItem],
     selected_index: Option<usize>,
 ) {
     let display_texts: Vec<&str> = suggestions

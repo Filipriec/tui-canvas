@@ -400,12 +400,10 @@ where
         let typed_text = get_display_value(i);
         let inner_width = input_rows[i].width;
 
-        // ---- BEGIN MODIFIED SECTION ----
         let mut h_scroll_for_cursor: u16 = 0;
         let mut left_offset_for_cursor: u16 = 0;
 
         let line = match highlight_state {
-            // Selection highlighting active: always use highlighting, even for the active field
             HighlightState::Characterwise { .. } | HighlightState::Linewise { .. } => {
                 apply_highlighting(
                     &typed_text,
@@ -418,9 +416,7 @@ where
                 )
             }
 
-            // No selection highlighting
             HighlightState::Off => match opts.overflow {
-                // Indicator mode: special-case the active field to preserve h-scroll + indicators
                 OverflowMode::Indicator(ind) => {
                     if is_active {
                         let (l, hs, left_cols) = render_active_line_with_indicator(
@@ -441,7 +437,6 @@ where
                     }
                 }
 
-                // Wrap mode: keep active completion for active line
                 OverflowMode::Wrap => {
                     if is_active {
                         let mut spans: Vec<Span> = Vec::new();
@@ -463,8 +458,7 @@ where
                     }
                 }
             },
-        };        
-        // ---- END MODIFIED SECTION ----
+        };
 
         let mut p = Paragraph::new(line).alignment(Alignment::Left);
 
@@ -559,7 +553,7 @@ fn apply_highlighting<'a, T: CanvasTheme>(
     }
 }
 
-/// Apply characterwise highlighting (unchanged)
+/// Apply characterwise highlighting.
 #[cfg(feature = "gui")]
 fn apply_characterwise_highlighting<'a, T: CanvasTheme>(
     text: &'a str,
@@ -659,7 +653,7 @@ fn apply_characterwise_highlighting<'a, T: CanvasTheme>(
     }
 }
 
-/// Apply linewise highlighting (unchanged)
+/// Apply linewise highlighting.
 #[cfg(feature = "gui")]
 fn apply_linewise_highlighting<'a, T: CanvasTheme>(
     text: &'a str,
@@ -717,7 +711,6 @@ fn set_cursor_position_scrolled(
     f.set_cursor_position((cursor_x, cursor_y));
 }
 
-/// Default theme
 #[cfg(feature = "gui")]
 pub fn render_canvas_default<D: DataProvider>(
     f: &mut Frame,
