@@ -14,7 +14,7 @@ pub struct KeyStroke {
 
 #[derive(Clone, Debug)]
 struct Binding {
-    action: String,
+    action: CanvasKeyAction,
     sequence: Vec<KeyStroke>,
 }
 
@@ -34,6 +34,127 @@ pub enum KeyEventOutcome {
     ExitTop,
     /// Reached bottom boundary while navigating downward.
     ExitBottom,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum CanvasKeyAction {
+    MoveLeft,
+    MoveRight,
+    MoveUp,
+    MoveDown,
+    NextField,
+    PrevField,
+    MoveLineStart,
+    MoveLineEnd,
+    MoveFirstLine,
+    MoveLastLine,
+    MoveWordNext,
+    MoveWordPrev,
+    MoveWordEnd,
+    MoveWordEndPrev,
+    MoveBigWordNext,
+    MoveBigWordPrev,
+    MoveBigWordEnd,
+    MoveBigWordEndPrev,
+    DeleteCharBackward,
+    DeleteCharForward,
+    OpenLineBelow,
+    OpenLineAbove,
+    OpenSuggestions,
+    ApplySuggestion,
+    EnterDecider,
+    SuggestionDown,
+    SuggestionUp,
+    EnterEditModeBefore,
+    EnterEditModeAfter,
+    Exit,
+    ExitEditMode,
+    EnterHighlightMode,
+    EnterHighlightModeLinewise,
+    ExitHighlightMode,
+    Unknown(String),
+}
+
+impl CanvasKeyAction {
+    pub fn from_name(name: &str) -> Self {
+        match name {
+            "move_left" => Self::MoveLeft,
+            "move_right" => Self::MoveRight,
+            "move_up" => Self::MoveUp,
+            "move_down" => Self::MoveDown,
+            "next_field" => Self::NextField,
+            "prev_field" => Self::PrevField,
+            "move_line_start" => Self::MoveLineStart,
+            "move_line_end" => Self::MoveLineEnd,
+            "move_first_line" => Self::MoveFirstLine,
+            "move_last_line" => Self::MoveLastLine,
+            "move_word_next" => Self::MoveWordNext,
+            "move_word_prev" => Self::MoveWordPrev,
+            "move_word_end" => Self::MoveWordEnd,
+            "move_word_end_prev" => Self::MoveWordEndPrev,
+            "move_big_word_next" => Self::MoveBigWordNext,
+            "move_big_word_prev" => Self::MoveBigWordPrev,
+            "move_big_word_end" => Self::MoveBigWordEnd,
+            "move_big_word_end_prev" => Self::MoveBigWordEndPrev,
+            "delete_char_backward" => Self::DeleteCharBackward,
+            "delete_char_forward" => Self::DeleteCharForward,
+            "open_line_below" => Self::OpenLineBelow,
+            "open_line_above" => Self::OpenLineAbove,
+            "open_suggestions" => Self::OpenSuggestions,
+            "apply_suggestion" => Self::ApplySuggestion,
+            "enter_decider" => Self::EnterDecider,
+            "suggestion_down" => Self::SuggestionDown,
+            "suggestion_up" => Self::SuggestionUp,
+            "enter_edit_mode_before" => Self::EnterEditModeBefore,
+            "enter_edit_mode_after" => Self::EnterEditModeAfter,
+            "exit" => Self::Exit,
+            "exit_edit_mode" => Self::ExitEditMode,
+            "enter_highlight_mode" => Self::EnterHighlightMode,
+            "enter_highlight_mode_linewise" => Self::EnterHighlightModeLinewise,
+            "exit_highlight_mode" => Self::ExitHighlightMode,
+            other => Self::Unknown(other.to_string()),
+        }
+    }
+
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::MoveLeft => "move_left",
+            Self::MoveRight => "move_right",
+            Self::MoveUp => "move_up",
+            Self::MoveDown => "move_down",
+            Self::NextField => "next_field",
+            Self::PrevField => "prev_field",
+            Self::MoveLineStart => "move_line_start",
+            Self::MoveLineEnd => "move_line_end",
+            Self::MoveFirstLine => "move_first_line",
+            Self::MoveLastLine => "move_last_line",
+            Self::MoveWordNext => "move_word_next",
+            Self::MoveWordPrev => "move_word_prev",
+            Self::MoveWordEnd => "move_word_end",
+            Self::MoveWordEndPrev => "move_word_end_prev",
+            Self::MoveBigWordNext => "move_big_word_next",
+            Self::MoveBigWordPrev => "move_big_word_prev",
+            Self::MoveBigWordEnd => "move_big_word_end",
+            Self::MoveBigWordEndPrev => "move_big_word_end_prev",
+            Self::DeleteCharBackward => "delete_char_backward",
+            Self::DeleteCharForward => "delete_char_forward",
+            Self::OpenLineBelow => "open_line_below",
+            Self::OpenLineAbove => "open_line_above",
+            Self::OpenSuggestions => "open_suggestions",
+            Self::ApplySuggestion => "apply_suggestion",
+            Self::EnterDecider => "enter_decider",
+            Self::SuggestionDown => "suggestion_down",
+            Self::SuggestionUp => "suggestion_up",
+            Self::EnterEditModeBefore => "enter_edit_mode_before",
+            Self::EnterEditModeAfter => "enter_edit_mode_after",
+            Self::Exit => "exit",
+            Self::ExitEditMode => "exit_edit_mode",
+            Self::EnterHighlightMode => "enter_highlight_mode",
+            Self::EnterHighlightModeLinewise => "enter_highlight_mode_linewise",
+            Self::ExitHighlightMode => "exit_highlight_mode",
+            Self::Unknown(other) => other.as_str(),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -110,11 +231,11 @@ impl CanvasKeyMap {
         km
     }
 
-    pub fn lookup(
+    pub fn lookup_action(
         &self,
         mode: AppMode,
         seq: &[KeyStroke],
-    ) -> (Option<&str>, bool) {
+    ) -> (Option<&CanvasKeyAction>, bool) {
         let bindings = match mode {
             AppMode::ReadOnly => &self.ro,
             AppMode::Edit => &self.edit,
@@ -129,7 +250,7 @@ impl CanvasKeyMap {
         // Exact match
         for b in bindings {
             if sequences_equal(&b.sequence, seq) {
-                return (Some(b.action.as_str()), false);
+                return (Some(&b.action), false);
             }
         }
 
@@ -141,6 +262,15 @@ impl CanvasKeyMap {
         }
 
         (None, false)
+    }
+
+    pub fn lookup(
+        &self,
+        mode: AppMode,
+        seq: &[KeyStroke],
+    ) -> (Option<&str>, bool) {
+        let (action, is_prefix) = self.lookup_action(mode, seq);
+        (action.map(|a| a.as_str()), is_prefix)
     }
 }
 
@@ -174,7 +304,7 @@ fn collect_bindings(
         for binding_str in list {
             if let Some(seq) = parse_binding_to_sequence(binding_str) {
                 out.push(Binding {
-                    action: action.to_string(),
+                    action: CanvasKeyAction::from_name(action),
                     sequence: seq,
                 });
             }
