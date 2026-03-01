@@ -1,5 +1,5 @@
 // src/suggestions/gui.rs
-//! Suggestions dropdown GUI (not inline autocomplete) updated to work with FormEditor
+//! Suggestions dropdown rendering helpers.
 
 #[cfg(feature = "gui")]
 use ratatui::{

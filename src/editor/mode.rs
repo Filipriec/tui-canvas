@@ -160,7 +160,7 @@ impl<D: DataProvider> FormEditor<D> {
         self.set_mode(AppMode::Edit);
     }
 
-    // -------------------- Highlight/Visual mode -------------------------
+    // Highlight/Visual mode
 
     pub fn enter_highlight_mode(&mut self) {
         // NORMALMODE: ignore request (stay in Edit)

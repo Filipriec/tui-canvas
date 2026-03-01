@@ -1,9 +1,5 @@
 // src/canvas/gui.rs
-//! Canvas GUI updated to work with FormEditor
-//!
-//! This module provides rendering helpers for the canvas UI when the `gui`
-//! feature is enabled. It exposes high-level functions to render the canvas
-//! and convenience types for display options.
+//! Canvas GUI rendering helpers.
 
 #[cfg(feature = "gui")]
 use ratatui::{

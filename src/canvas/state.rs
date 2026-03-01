@@ -148,9 +148,7 @@ impl EditorState {
         &self.validation
     }
 
-    // ===================================================================
-    // INTERNAL MUTATIONS: Only library modifies these
-    // ===================================================================
+    // Internal mutations: only library modifies these
 
     /// Move internal pointer to another field index.
     ///

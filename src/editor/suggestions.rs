@@ -41,7 +41,7 @@ impl<D: DataProvider> FormEditor<D> {
         }
     }
 
-    // ----------------- Non-blocking suggestions API --------------------
+    // Non-blocking suggestions API
 
     #[cfg(feature = "suggestions")]
     pub fn start_suggestions(&mut self, field_index: usize) -> Option<String> {
