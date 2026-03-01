@@ -3,6 +3,7 @@
 pub mod canvas;
 pub mod editor;
 pub mod data_provider;
+pub mod integration;
 
 #[cfg(feature = "suggestions")]
 pub mod suggestions;

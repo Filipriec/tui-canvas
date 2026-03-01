@@ -56,6 +56,39 @@ The default feature set is `["textmode-vim"]`.
 
 ---
 
+## Host Focus Handoff
+
+If your app has its own focus manager (buttons, panes, overlays), use:
+
+- `canvas::integration::focus_handoff`
+
+This module centralizes boundary handoff (`top` / `bottom`) so host apps can
+connect canvas navigation to outer focus movement without matching on internal
+details.
+
+Typical flow:
+
+```rust
+use canvas::integration::focus_handoff::{
+    BoundaryExit, HostKeyEventOutcome, handle_key_event_for_host,
+};
+
+match handle_key_event_for_host(&mut editor, key_event) {
+    HostKeyEventOutcome::ExitCanvas(BoundaryExit::Bottom) => {
+        // move host focus to the next non-canvas control
+    }
+    HostKeyEventOutcome::ExitCanvas(BoundaryExit::Top) => {
+        // move host focus to the previous non-canvas control
+    }
+    _ => {}
+}
+```
+
+For typed action pipelines, use:
+- `execute_action_for_host`
+
+---
+
 ## Running Examples
 
 The repository includes several examples. Each requires specific feature flags.

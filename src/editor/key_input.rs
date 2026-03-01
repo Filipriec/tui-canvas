@@ -7,6 +7,10 @@ use crate::DataProvider;
 
 #[cfg(feature = "keymap")]
 use crate::keymap::{KeyEventOutcome, KeyStroke};
+#[cfg(feature = "keymap")]
+use crate::integration::focus_handoff::{
+    BoundaryExit, key_outcome_for_vertical_navigation,
+};
 
 impl<D: DataProvider> FormEditor<D> {
     #[cfg(feature = "keymap")]
@@ -79,32 +83,28 @@ impl<D: DataProvider> FormEditor<D> {
                 KeyEventOutcome::Consumed(None)
             }
             "move_up" => {
-                if !self.move_up() {
-                    KeyEventOutcome::ExitTop
-                } else {
-                    KeyEventOutcome::Consumed(None)
-                }
+                key_outcome_for_vertical_navigation(
+                    self.move_up(),
+                    BoundaryExit::Top,
+                )
             }
             "move_down" => {
-                if !self.move_down() {
-                    KeyEventOutcome::ExitBottom
-                } else {
-                    KeyEventOutcome::Consumed(None)
-                }
+                key_outcome_for_vertical_navigation(
+                    self.move_down(),
+                    BoundaryExit::Bottom,
+                )
             }
             "next_field" => {
-                if !self.next_field() {
-                    KeyEventOutcome::ExitBottom
-                } else {
-                    KeyEventOutcome::Consumed(None)
-                }
+                key_outcome_for_vertical_navigation(
+                    self.next_field(),
+                    BoundaryExit::Bottom,
+                )
             }
             "prev_field" => {
-                if !self.prev_field() {
-                    KeyEventOutcome::ExitTop
-                } else {
-                    KeyEventOutcome::Consumed(None)
-                }
+                key_outcome_for_vertical_navigation(
+                    self.prev_field(),
+                    BoundaryExit::Top,
+                )
             }
             "move_line_start" => {
                 self.move_line_start();
