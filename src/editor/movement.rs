@@ -33,13 +33,10 @@ impl<D: DataProvider> FormEditor<D> {
                         let raw_pos =
                             mask.display_pos_to_raw_pos(prev_input);
                         let max_pos = self.current_text().chars().count();
-                        self.ui_state.cursor_pos = raw_pos.min(max_pos);
-                        self.ui_state.ideal_cursor_column =
-                            self.ui_state.cursor_pos;
+                        self.set_cursor_raw(raw_pos.min(max_pos));
                         moved = true;
                     } else {
-                        self.ui_state.cursor_pos = 0;
-                        self.ui_state.ideal_cursor_column = 0;
+                        self.set_cursor_raw(0);
                         moved = true;
                     }
                 }
@@ -48,8 +45,7 @@ impl<D: DataProvider> FormEditor<D> {
 
         if !moved
             && self.ui_state.cursor_pos > 0 {
-                self.ui_state.cursor_pos -= 1;
-                self.ui_state.ideal_cursor_column = self.ui_state.cursor_pos;
+                self.set_cursor_raw(self.ui_state.cursor_pos - 1);
             }
         Ok(())
     }
@@ -74,9 +70,7 @@ impl<D: DataProvider> FormEditor<D> {
                     let next_pos =
                         mask.display_pos_to_raw_pos(next_display_pos);
                     let max_pos = self.current_text().chars().count();
-                    self.ui_state.cursor_pos = next_pos.min(max_pos);
-                    self.ui_state.ideal_cursor_column =
-                        self.ui_state.cursor_pos;
+                    self.set_cursor_raw(next_pos.min(max_pos));
                     moved = true;
                 }
             }
@@ -85,8 +79,7 @@ impl<D: DataProvider> FormEditor<D> {
         if !moved {
             let max_pos = self.current_text().chars().count();
             if self.ui_state.cursor_pos < max_pos {
-                self.ui_state.cursor_pos += 1;
-                self.ui_state.ideal_cursor_column = self.ui_state.cursor_pos;
+                self.set_cursor_raw(self.ui_state.cursor_pos + 1);
             }
         }
         Ok(())
@@ -95,8 +88,7 @@ impl<D: DataProvider> FormEditor<D> {
     /// Move to start of current field (vim 0)
     pub fn move_line_start(&mut self) {
         let new_pos = line_start_position();
-        self.ui_state.cursor_pos = new_pos;
-        self.ui_state.ideal_cursor_column = new_pos;
+        self.set_cursor_raw(new_pos);
     }
 
     /// Move to end of current field (vim $)
@@ -105,45 +97,19 @@ impl<D: DataProvider> FormEditor<D> {
         let is_edit_mode = self.ui_state.current_mode == AppMode::Edit;
 
         let new_pos = line_end_position(current_text, is_edit_mode);
-        self.ui_state.cursor_pos = new_pos;
-        self.ui_state.ideal_cursor_column = new_pos;
+        self.set_cursor_raw(new_pos);
     }
 
     /// Set cursor to exact position (for f/F/t/T etc.)
     pub fn set_cursor_position(&mut self, position: usize) {
         let current_text = self.current_text();
-        let is_edit_mode = self.ui_state.current_mode == AppMode::Edit;
-
         let char_len = current_text.chars().count();
-        let max_pos = if is_edit_mode {
-            char_len
-        } else {
-            char_len.saturating_sub(1)
-        };
-
-        let clamped_pos = position.min(max_pos);
-        self.ui_state.cursor_pos = clamped_pos;
-        self.ui_state.ideal_cursor_column = clamped_pos;
+        self.set_cursor_for_mode(position, char_len);
     }
 }
 
 
 impl<D: DataProvider> FormEditor<D> {
-    fn set_cursor_raw(&mut self, pos: usize) {
-        self.ui_state.cursor_pos = pos;
-        self.ui_state.ideal_cursor_column = pos;
-    }
-
-    fn set_cursor_for_mode(&mut self, pos: usize, max_len: usize) {
-        let is_edit_mode = self.ui_state.current_mode == AppMode::Edit;
-        let final_pos = if is_edit_mode {
-            pos.min(max_len)
-        } else {
-            pos.min(max_len.saturating_sub(1))
-        };
-        self.set_cursor_raw(final_pos);
-    }
-
     fn move_up_to_previous_field_and_set_last<F>(
         &mut self,
         mut position_for_field: F,

@@ -1,5 +1,4 @@
 // src/editor/navigation.rs
-use crate::canvas::modes::AppMode;
 use crate::editor::FormEditor;
 use crate::DataProvider;
 
@@ -110,11 +109,7 @@ impl<D: DataProvider> FormEditor<D> {
 
         let current_text = self.current_text();
         let max_pos = current_text.chars().count();
-        self.ui_state.set_cursor(
-            self.ui_state.ideal_cursor_column,
-            max_pos,
-            self.ui_state.current_mode == AppMode::Edit,
-        );
+        self.set_cursor_for_mode(self.ui_state.ideal_cursor_column, max_pos);
 
         #[cfg(feature = "suggestions")]
         {

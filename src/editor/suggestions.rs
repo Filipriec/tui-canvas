@@ -159,8 +159,7 @@ impl<D: DataProvider> FormEditor<D> {
                     suggestion.value_to_store.clone(),
                 );
 
-                self.ui_state.cursor_pos = suggestion.value_to_store.chars().count();
-                self.ui_state.ideal_cursor_column = self.ui_state.cursor_pos;
+                self.set_cursor_raw(suggestion.value_to_store.chars().count());
 
                 self.close_suggestions();
                 self.suggestions.clear();

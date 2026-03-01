@@ -82,8 +82,7 @@ impl<D: DataProvider> FormEditor<D> {
             let max_normal_pos =
                 current_text.chars().count().saturating_sub(1);
             if self.ui_state.cursor_pos > max_normal_pos {
-                self.ui_state.cursor_pos = max_normal_pos;
-                self.ui_state.ideal_cursor_column = self.ui_state.cursor_pos;
+                self.set_cursor_raw(max_normal_pos);
             }
         }
 

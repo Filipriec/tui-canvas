@@ -179,8 +179,7 @@ impl TextAreaState {
     pub fn set_text<S: Into<String>>(&mut self, text: S) {
         self.editor.data_provider_mut().set_text(text);
         self.editor.ui_state.current_field = 0;
-        self.editor.ui_state.cursor_pos = 0;
-        self.editor.ui_state.ideal_cursor_column = 0;
+        self.editor.set_cursor_raw(0);
     }
 
     pub fn set_placeholder<S: Into<String>>(&mut self, s: S) {

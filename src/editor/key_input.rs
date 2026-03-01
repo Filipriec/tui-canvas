@@ -207,8 +207,7 @@ impl<D: DataProvider> FormEditor<D> {
                 let txt_len = self.current_text().chars().count();
                 let pos = self.ui_state.cursor_pos;
                 if pos < txt_len {
-                    self.ui_state.cursor_pos = pos + 1;
-                    self.ui_state.ideal_cursor_column = self.ui_state.cursor_pos;
+                    self.set_cursor_raw(pos + 1);
                 }
                 self.enter_edit_mode();
                 KeyEventOutcome::Consumed(None)

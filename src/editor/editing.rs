@@ -12,8 +12,7 @@ impl<D: DataProvider> FormEditor<D> {
         let next_field = (self.ui_state.current_field + 1)
             .min(field_count.saturating_sub(1));
         self.transition_to_field(next_field)?;
-        self.ui_state.cursor_pos = 0;
-        self.ui_state.ideal_cursor_column = 0;
+        self.set_cursor_raw(0);
         self.enter_edit_mode();
         Ok(())
     }
@@ -22,8 +21,7 @@ impl<D: DataProvider> FormEditor<D> {
     pub fn open_line_above(&mut self) -> anyhow::Result<()> {
         let prev_field = self.ui_state.current_field.saturating_sub(1);
         self.transition_to_field(prev_field)?;
-        self.ui_state.cursor_pos = 0;
-        self.ui_state.ideal_cursor_column = 0;
+        self.set_cursor_raw(0);
         self.enter_edit_mode();
         Ok(())
     }
@@ -142,16 +140,13 @@ impl<D: DataProvider> FormEditor<D> {
                         mask.display_pos_to_raw_pos(next_input_display);
                     let max_raw = new_raw_text.chars().count();
 
-                    self.ui_state.cursor_pos = next_raw_pos.min(max_raw);
-                    self.ui_state.ideal_cursor_column =
-                        self.ui_state.cursor_pos;
+                    self.set_cursor_raw(next_raw_pos.min(max_raw));
                     return Ok(());
                 }
             }
         }
 
-        self.ui_state.cursor_pos = raw_cursor_pos + 1;
-        self.ui_state.ideal_cursor_column = self.ui_state.cursor_pos;
+        self.set_cursor_raw(raw_cursor_pos + 1);
         Ok(())
     }
 
@@ -204,8 +199,7 @@ impl<D: DataProvider> FormEditor<D> {
             }
         }
 
-        self.ui_state.cursor_pos = target_cursor;
-        self.ui_state.ideal_cursor_column = target_cursor;
+        self.set_cursor_raw(target_cursor);
 
         #[cfg(feature = "validation")]
         {
@@ -266,8 +260,7 @@ impl<D: DataProvider> FormEditor<D> {
                 }
             }
 
-            self.ui_state.cursor_pos = target_cursor;
-            self.ui_state.ideal_cursor_column = target_cursor;
+            self.set_cursor_raw(target_cursor);
 
             #[cfg(feature = "validation")]
             {
@@ -292,8 +285,7 @@ impl<D: DataProvider> FormEditor<D> {
             (self.ui_state.cursor_pos + 1).min(char_len)
         };
 
-        self.ui_state.cursor_pos = append_pos;
-        self.ui_state.ideal_cursor_column = append_pos;
+        self.set_cursor_raw(append_pos);
 
         self.set_mode(crate::canvas::modes::AppMode::Edit);
     }
@@ -302,8 +294,7 @@ impl<D: DataProvider> FormEditor<D> {
     pub fn set_current_field_value(&mut self, value: String) {
         let field_index = self.ui_state.current_field;
         self.data_provider.set_field_value(field_index, value.clone());
-        self.ui_state.cursor_pos = 0;
-        self.ui_state.ideal_cursor_column = 0;
+        self.set_cursor_raw(0);
 
         #[cfg(feature = "validation")]
         {
@@ -320,8 +311,7 @@ impl<D: DataProvider> FormEditor<D> {
             self.data_provider
                 .set_field_value(field_index, value.clone());
             if field_index == self.ui_state.current_field {
-                self.ui_state.cursor_pos = 0;
-                self.ui_state.ideal_cursor_column = 0;
+                self.set_cursor_raw(0);
             }
 
             #[cfg(feature = "validation")]

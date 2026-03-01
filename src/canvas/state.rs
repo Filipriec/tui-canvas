@@ -160,7 +160,7 @@ impl EditorState {
         if field_index < field_count {
             self.current_field = field_index;
             // Reset cursor to safe position - will be clamped by movement logic
-            self.cursor_pos = 0;
+            self.set_cursor(0, 0, true);
         }
     }
 
