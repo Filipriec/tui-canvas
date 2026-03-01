@@ -18,29 +18,53 @@ fn get_char_type(c: char) -> CharType {
     }
 }
 
+fn last_non_whitespace_index(text: &str) -> Option<usize> {
+    let len = text.chars().count();
+    for (rev_idx, ch) in text.chars().rev().enumerate() {
+        if !ch.is_whitespace() {
+            return Some(len - 1 - rev_idx);
+        }
+    }
+    None
+}
+
 /// Find the start of the next word from the current position
 pub fn find_next_word_start(text: &str, current_pos: usize) -> usize {
-    let chars: Vec<char> = text.chars().collect();
-    if chars.is_empty() {
+    let len = text.chars().count();
+    if len == 0 {
         return 0;
     }
-    let current_pos = current_pos.min(chars.len());
+    let current_pos = current_pos.min(len);
 
-    if current_pos == chars.len() {
+    if current_pos == len {
         return current_pos;
     }
 
     let mut pos = current_pos;
-    let initial_type = get_char_type(chars[pos]);
+    let initial_type = match text.chars().nth(pos) {
+        Some(ch) => get_char_type(ch),
+        None => return pos,
+    };
+    let mut skipping_whitespace = false;
 
-    // Skip current word/token
-    while pos < chars.len() && get_char_type(chars[pos]) == initial_type {
-        pos += 1;
-    }
-
-    // Skip whitespace
-    while pos < chars.len() && get_char_type(chars[pos]) == CharType::Whitespace {
-        pos += 1;
+    for ch in text.chars().skip(current_pos) {
+        let ch_type = get_char_type(ch);
+        if !skipping_whitespace {
+            if ch_type == initial_type {
+                pos += 1;
+                continue;
+            }
+            if ch_type == CharType::Whitespace {
+                skipping_whitespace = true;
+                pos += 1;
+                continue;
+            }
+            break;
+        } else if ch_type == CharType::Whitespace {
+            pos += 1;
+        } else {
+            break;
+        }
     }
 
     pos
@@ -48,32 +72,43 @@ pub fn find_next_word_start(text: &str, current_pos: usize) -> usize {
 
 /// Find the end of the current or next word
 pub fn find_word_end(text: &str, current_pos: usize) -> usize {
-    let chars: Vec<char> = text.chars().collect();
-    let len = chars.len();
+    let len = text.chars().count();
     if len == 0 {
         return 0;
     }
 
     let mut pos = current_pos.min(len - 1);
-    let current_type = get_char_type(chars[pos]);
+    let current_type = match text.chars().nth(pos) {
+        Some(ch) => get_char_type(ch),
+        None => return len.saturating_sub(1),
+    };
 
-    // If we're not on whitespace, move to end of current word
     if current_type != CharType::Whitespace {
-        while pos < len && get_char_type(chars[pos]) == current_type {
-            pos += 1;
+        for ch in text.chars().skip(pos) {
+            if get_char_type(ch) == current_type {
+                pos += 1;
+            } else {
+                break;
+            }
         }
         return pos.saturating_sub(1);
     }
 
-    // If we're on whitespace, find next word and go to its end
     pos = find_next_word_start(text, pos);
     if pos >= len {
         return len.saturating_sub(1);
     }
 
-    let word_type = get_char_type(chars[pos]);
-    while pos < len && get_char_type(chars[pos]) == word_type {
-        pos += 1;
+    let word_type = match text.chars().nth(pos) {
+        Some(ch) => get_char_type(ch),
+        None => return len.saturating_sub(1),
+    };
+    for ch in text.chars().skip(pos) {
+        if get_char_type(ch) == word_type {
+            pos += 1;
+        } else {
+            break;
+        }
     }
 
     pos.saturating_sub(1).min(len.saturating_sub(1))
@@ -81,63 +116,87 @@ pub fn find_word_end(text: &str, current_pos: usize) -> usize {
 
 /// Find the start of the previous word
 pub fn find_prev_word_start(text: &str, current_pos: usize) -> usize {
-    let chars: Vec<char> = text.chars().collect();
-    if chars.is_empty() || current_pos == 0 {
+    let len = text.chars().count();
+    if len == 0 || current_pos == 0 {
         return 0;
     }
 
-    let mut pos = current_pos.saturating_sub(1);
+    let start = current_pos.min(len).saturating_sub(1);
+    let mut pos = 0usize;
+    let mut ch_at_pos = '\0';
+    let mut found = false;
 
-    // Skip whitespace backwards
-    while pos > 0 && get_char_type(chars[pos]) == CharType::Whitespace {
-        pos -= 1;
+    for (rev_idx, ch) in text.chars().rev().enumerate() {
+        let idx = len - 1 - rev_idx;
+        if idx > start {
+            continue;
+        }
+        if idx > 0 && ch.is_whitespace() {
+            continue;
+        }
+        pos = idx;
+        ch_at_pos = ch;
+        found = true;
+        break;
     }
 
-    // Move to start of word
-    if get_char_type(chars[pos]) != CharType::Whitespace {
-        let word_type = get_char_type(chars[pos]);
-        while pos > 0 && get_char_type(chars[pos - 1]) == word_type {
-            pos -= 1;
+    if !found {
+        return 0;
+    }
+
+    if !ch_at_pos.is_whitespace() {
+        let word_type = get_char_type(ch_at_pos);
+        for (rev_idx, prev_ch) in text.chars().rev().enumerate() {
+            let idx = len - 1 - rev_idx;
+            if idx >= pos {
+                continue;
+            }
+            if get_char_type(prev_ch) == word_type {
+                pos = idx;
+            } else {
+                break;
+            }
         }
     }
 
-    if pos == 0 && get_char_type(chars[0]) == CharType::Whitespace {
-        0
-    } else {
-        pos
-    }
+    pos
 }
 
-/// Find the end of the previous word (CORRECTED VERSION for vim's ge command)
+/// Find the end of the previous word (vim `ge`)
 pub fn find_prev_word_end(text: &str, current_pos: usize) -> usize {
-    let chars: Vec<char> = text.chars().collect();
-    if chars.is_empty() || current_pos == 0 {
+    let len = text.chars().count();
+    if len == 0 || current_pos == 0 {
         return 0;
     }
 
-    // Find all word end positions using boundary detection
-    let mut word_ends = Vec::new();
     let mut in_word = false;
     let mut current_word_type: Option<CharType> = None;
+    let mut last_end_before_current = 0usize;
+    let mut found = false;
 
-    for (i, &ch) in chars.iter().enumerate() {
+    for (i, ch) in text.chars().enumerate() {
         let char_type = get_char_type(ch);
-        
+
         match char_type {
             CharType::Whitespace => {
                 if in_word {
-                    // End of a word
-                    word_ends.push(i - 1);
+                    let end = i - 1;
+                    if end < current_pos {
+                        last_end_before_current = end;
+                        found = true;
+                    }
                     in_word = false;
                     current_word_type = None;
                 }
             }
             _ => {
                 if !in_word || current_word_type != Some(char_type) {
-                    // Start of a new word (or word type change)
                     if in_word {
-                        // End the previous word first
-                        word_ends.push(i - 1);
+                        let end = i - 1;
+                        if end < current_pos {
+                            last_end_before_current = end;
+                            found = true;
+                        }
                     }
                     in_word = true;
                     current_word_type = Some(char_type);
@@ -146,38 +205,44 @@ pub fn find_prev_word_end(text: &str, current_pos: usize) -> usize {
         }
     }
 
-    // Add the final word end if text doesn't end with whitespace
-    if in_word && !chars.is_empty() {
-        word_ends.push(chars.len() - 1);
-    }
-
-    // Find the largest word end position that's before current_pos
-    for &end_pos in word_ends.iter().rev() {
-        if end_pos < current_pos {
-            return end_pos;
+    if in_word {
+        let end = len - 1;
+        if end < current_pos {
+            last_end_before_current = end;
+            found = true;
         }
     }
 
-    0
+    if found {
+        last_end_before_current
+    } else {
+        0
+    }
 }
 
 /// Find the start of the next big_word (whitespace-separated)
 pub fn find_next_big_word_start(text: &str, current_pos: usize) -> usize {
-    let chars: Vec<char> = text.chars().collect();
-    if chars.is_empty() || current_pos >= chars.len() {
-        return text.chars().count();
+    let len = text.chars().count();
+    if len == 0 || current_pos >= len {
+        return len;
     }
 
     let mut pos = current_pos;
+    let mut skipping_whitespace = false;
 
-    // If we're on non-whitespace, skip to end of current big_word
-    while pos < chars.len() && !chars[pos].is_whitespace() {
-        pos += 1;
-    }
-
-    // Skip whitespace to find start of next big_word
-    while pos < chars.len() && chars[pos].is_whitespace() {
-        pos += 1;
+    for ch in text.chars().skip(current_pos) {
+        if !skipping_whitespace {
+            if !ch.is_whitespace() {
+                pos += 1;
+            } else {
+                skipping_whitespace = true;
+                pos += 1;
+            }
+        } else if ch.is_whitespace() {
+            pos += 1;
+        } else {
+            break;
+        }
     }
 
     pos
@@ -185,21 +250,42 @@ pub fn find_next_big_word_start(text: &str, current_pos: usize) -> usize {
 
 /// Find the start of the previous big_word (whitespace-separated)
 pub fn find_prev_big_word_start(text: &str, current_pos: usize) -> usize {
-    let chars: Vec<char> = text.chars().collect();
-    if chars.is_empty() || current_pos == 0 {
+    let len = text.chars().count();
+    if len == 0 || current_pos == 0 {
         return 0;
     }
 
-    let mut pos = current_pos.saturating_sub(1);
+    let start = current_pos.min(len).saturating_sub(1);
+    let mut pos = 0usize;
+    let mut found = false;
 
-    // Skip whitespace backwards
-    while pos > 0 && chars[pos].is_whitespace() {
-        pos -= 1;
+    for (rev_idx, ch) in text.chars().rev().enumerate() {
+        let idx = len - 1 - rev_idx;
+        if idx > start {
+            continue;
+        }
+        if idx > 0 && ch.is_whitespace() {
+            continue;
+        }
+        pos = idx;
+        found = true;
+        break;
     }
 
-    // Find start of current big_word by going back while non-whitespace
-    while pos > 0 && !chars[pos - 1].is_whitespace() {
-        pos -= 1;
+    if !found {
+        return 0;
+    }
+
+    for (rev_idx, prev_ch) in text.chars().rev().enumerate() {
+        let idx = len - 1 - rev_idx;
+        if idx >= pos {
+            continue;
+        }
+        if !prev_ch.is_whitespace() {
+            pos = idx;
+        } else {
+            break;
+        }
     }
 
     pos
@@ -207,111 +293,126 @@ pub fn find_prev_big_word_start(text: &str, current_pos: usize) -> usize {
 
 /// Find the end of the current/next big_word (whitespace-separated)
 pub fn find_big_word_end(text: &str, current_pos: usize) -> usize {
-    let chars: Vec<char> = text.chars().collect();
-    if chars.is_empty() {
+    let len = text.chars().count();
+    if len == 0 {
         return 0;
     }
 
     let mut pos = current_pos;
+    let mut in_word = false;
 
-    // If we're on whitespace, skip to start of next big_word
-    while pos < chars.len() && chars[pos].is_whitespace() {
-        pos += 1;
+    for ch in text.chars().skip(current_pos) {
+        if !in_word {
+            if ch.is_whitespace() {
+                pos += 1;
+            } else {
+                in_word = true;
+                pos += 1;
+            }
+        } else if ch.is_whitespace() {
+            break;
+        } else {
+            pos += 1;
+        }
     }
 
-    // If we reached end, return it
-    if pos >= chars.len() {
-        return chars.len();
+    if !in_word {
+        return len;
     }
 
-    // Find end of current big_word (last non-whitespace char)
-    while pos < chars.len() && !chars[pos].is_whitespace() {
-        pos += 1;
-    }
-
-    // Return position of last character in big_word
     pos.saturating_sub(1)
 }
 
 /// Find the end of the previous big_word (whitespace-separated)
 pub fn find_prev_big_word_end(text: &str, current_pos: usize) -> usize {
-    let chars: Vec<char> = text.chars().collect();
-    if chars.is_empty() || current_pos == 0 {
+    let len = text.chars().count();
+    if len == 0 || current_pos == 0 {
         return 0;
     }
 
-    let mut pos = current_pos.saturating_sub(1);
+    let start = current_pos.min(len).saturating_sub(1);
+    let mut word_start_idx = 0usize;
+    let mut ch_at_pos = '\0';
+    let mut found = false;
 
-    // Skip whitespace backwards
-    while pos > 0 && chars[pos].is_whitespace() {
-        pos -= 1;
+    for (rev_idx, ch) in text.chars().rev().enumerate() {
+        let idx = len - 1 - rev_idx;
+        if idx > start {
+            continue;
+        }
+        if idx > 0 && ch.is_whitespace() {
+            continue;
+        }
+        word_start_idx = idx;
+        ch_at_pos = ch;
+        found = true;
+        break;
     }
 
-    // If we hit start of text and it's whitespace, return 0
-    if pos == 0 && chars[0].is_whitespace() {
+    if !found {
         return 0;
     }
 
-    // Skip back to start of current big_word, then forward to end
-    while pos > 0 && !chars[pos - 1].is_whitespace() {
-        pos -= 1;
+    if word_start_idx == 0 && ch_at_pos.is_whitespace() {
+        return 0;
     }
 
-    // Now find end of this big_word
-    while pos < chars.len() && !chars[pos].is_whitespace() {
-        pos += 1;
+    for (rev_idx, prev_ch) in text.chars().rev().enumerate() {
+        let idx = len - 1 - rev_idx;
+        if idx >= word_start_idx {
+            continue;
+        }
+        if !prev_ch.is_whitespace() {
+            word_start_idx = idx;
+        } else {
+            break;
+        }
     }
 
-    // Return position of last character in big_word
+    let mut pos = word_start_idx;
+    for ch in text.chars().skip(word_start_idx) {
+        if !ch.is_whitespace() {
+            pos += 1;
+        } else {
+            break;
+        }
+    }
+
     pos.saturating_sub(1)
 }
 
-// ============================================================================
-// FIELD BOUNDARY HELPER FUNCTIONS (for cross-field movement)
-// ============================================================================
-
 /// Find the start of the last word in a field (for cross-field 'b' movement)
 pub fn find_last_word_start_in_field(text: &str) -> usize {
-    if text.is_empty() {
+    let len = text.chars().count();
+    let mut pos = 0usize;
+    let mut ch_at_pos = '\0';
+    let mut found = false;
+
+    for (rev_idx, ch) in text.chars().rev().enumerate() {
+        if ch.is_whitespace() {
+            continue;
+        }
+        pos = len - 1 - rev_idx;
+        ch_at_pos = ch;
+        found = true;
+        break;
+    }
+
+    if !found {
         return 0;
     }
+    let char_type = get_char_type(ch_at_pos);
 
-    let chars: Vec<char> = text.chars().collect();
-    if chars.is_empty() {
-        return 0;
-    }
-
-    let mut pos = chars.len().saturating_sub(1);
-
-    // Skip trailing whitespace
-    while pos > 0 && chars[pos].is_whitespace() {
-        pos -= 1;
-    }
-
-    // If the whole field is whitespace, return 0
-    if pos == 0 && chars[0].is_whitespace() {
-        return 0;
-    }
-
-    // Now we're on a non-whitespace character
-    // Find the start of this word by going backwards while chars are the same type
-    let char_type = if chars[pos].is_alphanumeric() { "alnum" } else { "punct" };
-
-    while pos > 0 {
-        let prev_char = chars[pos - 1];
-        let prev_type = if prev_char.is_alphanumeric() {
-            "alnum"
-        } else if prev_char.is_whitespace() {
-            "space"
+    for (rev_idx, prev_char) in text.chars().rev().enumerate() {
+        let idx = len - 1 - rev_idx;
+        if idx >= pos {
+            continue;
+        }
+        if get_char_type(prev_char) == char_type {
+            pos = idx;
         } else {
-            "punct"
-        };
-
-        // Stop if we hit whitespace or different word type
-        if prev_type == "space" || prev_type != char_type {
             break;
         }
-        pos -= 1;
     }
 
     pos
@@ -319,61 +420,37 @@ pub fn find_last_word_start_in_field(text: &str) -> usize {
 
 /// Find the end of the last word in a field (for cross-field 'ge' movement)
 pub fn find_last_word_end_in_field(text: &str) -> usize {
-    let chars: Vec<char> = text.chars().collect();
-    if chars.is_empty() {
-        return 0;
-    }
-
-    // Start from the end and find the last non-whitespace character
-    let mut pos = chars.len() - 1;
-    
-    // Skip trailing whitespace
-    while pos > 0 && chars[pos].is_whitespace() {
-        pos -= 1;
-    }
-
-    // If the whole field is whitespace, return 0
-    if chars[pos].is_whitespace() {
-        return 0;
-    }
-
-    // We're now at the end of the last word
-    pos
+    last_non_whitespace_index(text).unwrap_or(0)
 }
 
 /// Find the start of the last big_word in a field (for cross-field 'B' movement)
 pub fn find_last_big_word_start_in_field(text: &str) -> usize {
-    if text.is_empty() {
+    let len = text.chars().count();
+    let mut pos = 0usize;
+    let mut found = false;
+
+    for (rev_idx, ch) in text.chars().rev().enumerate() {
+        if ch.is_whitespace() {
+            continue;
+        }
+        pos = len - 1 - rev_idx;
+        found = true;
+        break;
+    }
+
+    if !found {
         return 0;
     }
 
-    let chars: Vec<char> = text.chars().collect();
-    if chars.is_empty() {
-        return 0;
-    }
-
-    let mut pos = chars.len().saturating_sub(1);
-
-    // Skip trailing whitespace
-    while pos > 0 && chars[pos].is_whitespace() {
-        pos -= 1;
-    }
-
-    // If the whole field is whitespace, return 0
-    if pos == 0 && chars[0].is_whitespace() {
-        return 0;
-    }
-
-    // Now we're on a non-whitespace character
-    // Find the start of this big_word by going backwards while chars are non-whitespace
-    while pos > 0 {
-        let prev_char = chars[pos - 1];
-
-        // Stop if we hit whitespace (big_word boundary)
+    for (rev_idx, prev_char) in text.chars().rev().enumerate() {
+        let idx = len - 1 - rev_idx;
+        if idx >= pos {
+            continue;
+        }
         if prev_char.is_whitespace() {
             break;
         }
-        pos -= 1;
+        pos = idx;
     }
 
     pos
@@ -381,23 +458,5 @@ pub fn find_last_big_word_start_in_field(text: &str) -> usize {
 
 /// Find the end of the last big_word in a field (for cross-field 'gE' movement)
 pub fn find_last_big_word_end_in_field(text: &str) -> usize {
-    let chars: Vec<char> = text.chars().collect();
-    if chars.is_empty() {
-        return 0;
-    }
-
-    let mut pos = chars.len().saturating_sub(1);
-
-    // Skip trailing whitespace
-    while pos > 0 && chars[pos].is_whitespace() {
-        pos -= 1;
-    }
-
-    // If the whole field is whitespace, return 0
-    if pos == 0 && chars[0].is_whitespace() {
-        return 0;
-    }
-
-    // We're now at the end of the last big_word
-    pos
+    last_non_whitespace_index(text).unwrap_or(0)
 }
