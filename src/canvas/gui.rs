@@ -170,7 +170,7 @@ fn render_active_line_with_indicator<T: CanvasTheme>(
     let visible_typed = slice_by_display_cols(typed_text, h_scroll, visible_cols);
 
     let used_typed_cols = display_width(&visible_typed);
-    let mut remaining_cols = visible_cols.saturating_sub(used_typed_cols);
+    let remaining_cols = visible_cols.saturating_sub(used_typed_cols);
     let mut visible_completion = String::new();
 
     if let Some(comp) = completion {
