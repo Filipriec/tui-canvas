@@ -16,8 +16,7 @@ pub mod theme;
 #[cfg(feature = "cursor-style")]
 pub mod cursor;
 
-// Keep these exports for current functionality
-pub use modes::{AppMode, ModeManager, HighlightState};
+pub use modes::{AppMode, HighlightState};
 
 #[cfg(feature = "cursor-style")]
 pub use cursor::CursorManager;

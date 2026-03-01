@@ -4,4 +4,4 @@ pub mod highlight;
 pub mod manager;
 
 pub use highlight::HighlightState;
-pub use manager::{AppMode, ModeManager};
+pub use manager::AppMode;
