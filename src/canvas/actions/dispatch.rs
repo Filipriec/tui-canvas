@@ -35,6 +35,10 @@ impl<D: DataProvider> FormEditor<D> {
             MoveWordPrev => { self.move_word_prev(); ActionResult::Success }
             MoveWordEnd => { self.move_word_end(); ActionResult::Success }
             MoveWordEndPrev => { self.move_word_end_prev(); ActionResult::Success }
+            MoveBigWordNext => { self.move_big_word_next(); ActionResult::Success }
+            MoveBigWordPrev => { self.move_big_word_prev(); ActionResult::Success }
+            MoveBigWordEnd => { self.move_big_word_end(); ActionResult::Success }
+            MoveBigWordEndPrev => { self.move_big_word_end_prev(); ActionResult::Success }
             MoveFirstLine => Self::into_action_result(self.move_first_line()),
             MoveLastLine => Self::into_action_result(self.move_last_line()),
             MoveLineStart => { self.move_line_start(); ActionResult::Success }
@@ -49,14 +53,45 @@ impl<D: DataProvider> FormEditor<D> {
             OpenLineAbove => Self::into_action_result(self.open_line_above()),
 
             // Suggestions
-            TriggerSuggestions | SuggestionUp | SuggestionDown |
-            SelectSuggestion | ExitSuggestions => ActionResult::Message("suggestion action".into()),
+            #[cfg(feature = "suggestions")]
+            TriggerSuggestions => {
+                let idx = self.current_field();
+                self.open_suggestions(idx);
+                ActionResult::Success
+            }
+            #[cfg(feature = "suggestions")]
+            SuggestionUp => {
+                self.suggestions_prev();
+                ActionResult::Success
+            }
+            #[cfg(feature = "suggestions")]
+            SuggestionDown => {
+                self.suggestions_next();
+                ActionResult::Success
+            }
+            #[cfg(feature = "suggestions")]
+            SelectSuggestion => {
+                let _ = self.apply_suggestion();
+                ActionResult::Success
+            }
+            #[cfg(feature = "suggestions")]
+            ExitSuggestions => {
+                self.close_suggestions();
+                ActionResult::Success
+            }
+            #[cfg(not(feature = "suggestions"))]
+            TriggerSuggestions | SuggestionUp | SuggestionDown | SelectSuggestion
+            | ExitSuggestions => ActionResult::Message(
+                "suggestions feature is disabled".into(),
+            ),
 
             // Any actions that require arguments / not handled directly
             InsertChar(c) => Self::into_action_result(self.insert_char(c)),
 
             // Fallback: custom or unhandled
-            Custom(name) => ActionResult::Message(format!("Unhandled custom action: {}", name)),
+            Custom(name) => {
+                ActionResult::Message(format!("Unhandled custom action: {name}"))
+            }
         }
     }
 }

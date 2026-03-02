@@ -28,6 +28,14 @@ pub enum CanvasAction {
     MoveWordEnd,
     /// Move to the previous word end (vim `ge`).
     MoveWordEndPrev,
+    /// Move to the start of the next big word.
+    MoveBigWordNext,
+    /// Move to the start of the previous big word.
+    MoveBigWordPrev,
+    /// Move to the end of the current/next big word.
+    MoveBigWordEnd,
+    /// Move to the previous big word end (vim `gE`).
+    MoveBigWordEndPrev,
 
     // Line movement
     /// Move to the start of the current line.
@@ -144,6 +152,10 @@ impl CanvasAction {
             Self::MoveWordPrev => "previous word",
             Self::MoveWordEnd => "word end",
             Self::MoveWordEndPrev => "previous word end",
+            Self::MoveBigWordNext => "next big word",
+            Self::MoveBigWordPrev => "previous big word",
+            Self::MoveBigWordEnd => "big word end",
+            Self::MoveBigWordEndPrev => "previous big word end",
             Self::MoveLineStart => "line start",
             Self::MoveLineEnd => "line end",
             Self::NextField => "next field",
@@ -185,6 +197,10 @@ impl CanvasAction {
             Self::MoveWordPrev,
             Self::MoveWordEnd,
             Self::MoveWordEndPrev,
+            Self::MoveBigWordNext,
+            Self::MoveBigWordPrev,
+            Self::MoveBigWordEnd,
+            Self::MoveBigWordEndPrev,
             Self::MoveLineStart,
             Self::MoveLineEnd,
             Self::NextField,
@@ -228,6 +244,7 @@ impl CanvasAction {
         matches!(self,
             Self::MoveLeft | Self::MoveRight | Self::MoveUp | Self::MoveDown |
             Self::MoveWordNext | Self::MoveWordPrev | Self::MoveWordEnd | Self::MoveWordEndPrev |
+            Self::MoveBigWordNext | Self::MoveBigWordPrev | Self::MoveBigWordEnd | Self::MoveBigWordEndPrev |
             Self::MoveLineStart | Self::MoveLineEnd | Self::NextField | Self::PrevField |
             Self::MoveFirstLine | Self::MoveLastLine
         )

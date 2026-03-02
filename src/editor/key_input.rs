@@ -2,6 +2,8 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 use crate::canvas::modes::AppMode;
+#[cfg(feature = "keymap")]
+use crate::canvas::actions::{ActionResult, CanvasAction};
 use crate::editor::FormEditor;
 use crate::DataProvider;
 
@@ -15,11 +17,6 @@ use crate::integration::focus_handoff::{
 impl<D: DataProvider> FormEditor<D> {
     #[cfg(feature = "keymap")]
     pub fn handle_key_event(&mut self, evt: KeyEvent) -> KeyEventOutcome {
-        // Check if keymap exists first
-        if self.keymap.is_none() {
-            return KeyEventOutcome::NotMatched;
-        }
-
         let mode = self.ui_state.current_mode;
 
         // Convert event to normalized stroke
@@ -32,10 +29,12 @@ impl<D: DataProvider> FormEditor<D> {
         self.seq_tracker.add_key(stroke);
 
         // Look up the action in keymap
-        let (matched, is_prefix) = {
-            let km = self.keymap.as_ref().unwrap();
-            km.lookup_action(mode, self.seq_tracker.sequence())
+        // Check if keymap exists first
+        let Some(km) = self.keymap.as_ref() else {
+            return KeyEventOutcome::NotMatched;
         };
+        let (matched, is_prefix) =
+            km.lookup_action(mode, self.seq_tracker.sequence());
 
         if let Some(action) = matched.cloned() {
             let outcome = self.dispatch_canvas_action(&action);
@@ -73,169 +72,126 @@ impl<D: DataProvider> FormEditor<D> {
         &mut self,
         action: &CanvasKeyAction,
     ) -> KeyEventOutcome {
-        match action {
-            CanvasKeyAction::MoveLeft => {
-                let _ = self.move_left();
-                KeyEventOutcome::Consumed(None)
-            }
-            CanvasKeyAction::MoveRight => {
-                let _ = self.move_right();
-                KeyEventOutcome::Consumed(None)
-            }
-            CanvasKeyAction::MoveUp => {
-                key_outcome_for_vertical_navigation(
-                    self.move_up(),
-                    BoundaryExit::Top,
-                )
-            }
-            CanvasKeyAction::MoveDown => {
-                key_outcome_for_vertical_navigation(
-                    self.move_down(),
-                    BoundaryExit::Bottom,
-                )
-            }
-            CanvasKeyAction::NextField => {
-                key_outcome_for_vertical_navigation(
-                    self.next_field(),
-                    BoundaryExit::Bottom,
-                )
-            }
-            CanvasKeyAction::PrevField => {
-                key_outcome_for_vertical_navigation(
-                    self.prev_field(),
-                    BoundaryExit::Top,
-                )
-            }
-            CanvasKeyAction::MoveLineStart => {
-                self.move_line_start();
-                KeyEventOutcome::Consumed(None)
-            }
-            CanvasKeyAction::MoveLineEnd => {
-                self.move_line_end();
-                KeyEventOutcome::Consumed(None)
-            }
-            CanvasKeyAction::MoveFirstLine => {
-                let _ = self.move_first_line();
-                KeyEventOutcome::Consumed(None)
-            }
-            CanvasKeyAction::MoveLastLine => {
-                let _ = self.move_last_line();
-                KeyEventOutcome::Consumed(None)
-            }
+        let Some(canvas_action) = Self::canvas_action_for_key_action(action)
+        else {
+            return KeyEventOutcome::NotMatched;
+        };
 
-            CanvasKeyAction::MoveWordNext => {
-                self.move_word_next();
-                KeyEventOutcome::Consumed(None)
-            }
-            CanvasKeyAction::MoveWordPrev => {
-                self.move_word_prev();
-                KeyEventOutcome::Consumed(None)
-            }
-            CanvasKeyAction::MoveWordEnd => {
-                self.move_word_end();
-                KeyEventOutcome::Consumed(None)
-            }
+        let vertical_boundary = Self::vertical_boundary_for_key_action(action);
+        let before_field = self.current_field();
+        let result = self.execute(canvas_action);
+
+        if let Some(boundary) = vertical_boundary {
+            let moved = self.current_field() != before_field;
+            return key_outcome_for_vertical_navigation(moved, boundary);
+        }
+
+        Self::key_outcome_for_action_result(result)
+    }
+
+    #[cfg(feature = "keymap")]
+    fn canvas_action_for_key_action(
+        action: &CanvasKeyAction,
+    ) -> Option<CanvasAction> {
+        match action {
+            CanvasKeyAction::MoveLeft => Some(CanvasAction::MoveLeft),
+            CanvasKeyAction::MoveRight => Some(CanvasAction::MoveRight),
+            CanvasKeyAction::MoveUp => Some(CanvasAction::MoveUp),
+            CanvasKeyAction::MoveDown => Some(CanvasAction::MoveDown),
+            CanvasKeyAction::NextField => Some(CanvasAction::NextField),
+            CanvasKeyAction::PrevField => Some(CanvasAction::PrevField),
+            CanvasKeyAction::MoveLineStart => Some(CanvasAction::MoveLineStart),
+            CanvasKeyAction::MoveLineEnd => Some(CanvasAction::MoveLineEnd),
+            CanvasKeyAction::MoveFirstLine => Some(CanvasAction::MoveFirstLine),
+            CanvasKeyAction::MoveLastLine => Some(CanvasAction::MoveLastLine),
+            CanvasKeyAction::MoveWordNext => Some(CanvasAction::MoveWordNext),
+            CanvasKeyAction::MoveWordPrev => Some(CanvasAction::MoveWordPrev),
+            CanvasKeyAction::MoveWordEnd => Some(CanvasAction::MoveWordEnd),
             CanvasKeyAction::MoveWordEndPrev => {
-                self.move_word_end_prev();
-                KeyEventOutcome::Consumed(None)
+                Some(CanvasAction::MoveWordEndPrev)
             }
             CanvasKeyAction::MoveBigWordNext => {
-                self.move_big_word_next();
-                KeyEventOutcome::Consumed(None)
+                Some(CanvasAction::MoveBigWordNext)
             }
             CanvasKeyAction::MoveBigWordPrev => {
-                self.move_big_word_prev();
-                KeyEventOutcome::Consumed(None)
+                Some(CanvasAction::MoveBigWordPrev)
             }
-            CanvasKeyAction::MoveBigWordEnd => {
-                self.move_big_word_end();
-                KeyEventOutcome::Consumed(None)
-            }
+            CanvasKeyAction::MoveBigWordEnd => Some(CanvasAction::MoveBigWordEnd),
             CanvasKeyAction::MoveBigWordEndPrev => {
-                self.move_big_word_end_prev();
-                KeyEventOutcome::Consumed(None)
+                Some(CanvasAction::MoveBigWordEndPrev)
             }
-
             CanvasKeyAction::DeleteCharBackward => {
-                let _ = self.delete_backward();
-                KeyEventOutcome::Consumed(None)
+                Some(CanvasAction::DeleteBackward)
             }
             CanvasKeyAction::DeleteCharForward => {
-                let _ = self.delete_forward();
-                KeyEventOutcome::Consumed(None)
+                Some(CanvasAction::DeleteForward)
             }
-            CanvasKeyAction::OpenLineBelow => {
-                let _ = self.open_line_below();
-                KeyEventOutcome::Consumed(None)
+            CanvasKeyAction::OpenLineBelow => Some(CanvasAction::OpenLineBelow),
+            CanvasKeyAction::OpenLineAbove => Some(CanvasAction::OpenLineAbove),
+            CanvasKeyAction::EnterEditModeBefore => {
+                Some(CanvasAction::EnterEditMode)
             }
-            CanvasKeyAction::OpenLineAbove => {
-                let _ = self.open_line_above();
-                KeyEventOutcome::Consumed(None)
+            CanvasKeyAction::EnterEditModeAfter => {
+                Some(CanvasAction::EnterEditModeAfter)
             }
-
+            CanvasKeyAction::Exit | CanvasKeyAction::ExitEditMode => {
+                Some(CanvasAction::ExitEditMode)
+            }
+            CanvasKeyAction::EnterHighlightMode => {
+                Some(CanvasAction::EnterHighlightMode)
+            }
+            CanvasKeyAction::EnterHighlightModeLinewise => {
+                Some(CanvasAction::EnterHighlightModeLinewise)
+            }
+            CanvasKeyAction::ExitHighlightMode => {
+                Some(CanvasAction::ExitHighlightMode)
+            }
             #[cfg(feature = "suggestions")]
             CanvasKeyAction::OpenSuggestions => {
-                let idx = self.current_field();
-                self.open_suggestions(idx);
-                KeyEventOutcome::Consumed(None)
+                Some(CanvasAction::TriggerSuggestions)
             }
             #[cfg(feature = "suggestions")]
             CanvasKeyAction::ApplySuggestion | CanvasKeyAction::EnterDecider => {
-                if let Some(_applied) = self.apply_suggestion() {
-                    KeyEventOutcome::Consumed(None)
-                } else {
-                    KeyEventOutcome::Consumed(None)
-                }
+                Some(CanvasAction::SelectSuggestion)
             }
             #[cfg(feature = "suggestions")]
             CanvasKeyAction::SuggestionDown => {
-                self.suggestions_next();
-                KeyEventOutcome::Consumed(None)
+                Some(CanvasAction::SuggestionDown)
             }
             #[cfg(feature = "suggestions")]
-            CanvasKeyAction::SuggestionUp => {
-                self.suggestions_prev();
-                KeyEventOutcome::Consumed(None)
-            }
-
-            CanvasKeyAction::EnterEditModeBefore => {
-                self.enter_edit_mode();
-                KeyEventOutcome::Consumed(None)
-            }
-            CanvasKeyAction::EnterEditModeAfter => {
-                // Move forward 1 char if possible (vim 'a'), then enter insert
-                let txt_len = self.current_text().chars().count();
-                let pos = self.ui_state.cursor_pos;
-                if pos < txt_len {
-                    self.set_cursor_raw(pos + 1);
-                }
-                self.enter_edit_mode();
-                KeyEventOutcome::Consumed(None)
-            }
-            CanvasKeyAction::Exit | CanvasKeyAction::ExitEditMode => {
-                let _ = self.exit_edit_mode();
-                KeyEventOutcome::Consumed(None)
-            }
-            CanvasKeyAction::EnterHighlightMode => {
-                self.enter_highlight_mode();
-                KeyEventOutcome::Consumed(None)
-            }
-            CanvasKeyAction::EnterHighlightModeLinewise => {
-                self.enter_highlight_line_mode();
-                KeyEventOutcome::Consumed(None)
-            }
-            CanvasKeyAction::ExitHighlightMode => {
-                self.exit_highlight_mode();
-                KeyEventOutcome::Consumed(None)
-            }
-
-            CanvasKeyAction::Unknown(_) => KeyEventOutcome::NotMatched,
+            CanvasKeyAction::SuggestionUp => Some(CanvasAction::SuggestionUp),
+            CanvasKeyAction::Unknown(_) => None,
             #[cfg(not(feature = "suggestions"))]
             CanvasKeyAction::OpenSuggestions
             | CanvasKeyAction::ApplySuggestion
             | CanvasKeyAction::EnterDecider
             | CanvasKeyAction::SuggestionDown
-            | CanvasKeyAction::SuggestionUp => KeyEventOutcome::NotMatched,
+            | CanvasKeyAction::SuggestionUp => None,
+        }
+    }
+
+    #[cfg(feature = "keymap")]
+    fn vertical_boundary_for_key_action(
+        action: &CanvasKeyAction,
+    ) -> Option<BoundaryExit> {
+        match action {
+            CanvasKeyAction::MoveUp | CanvasKeyAction::PrevField => {
+                Some(BoundaryExit::Top)
+            }
+            CanvasKeyAction::MoveDown | CanvasKeyAction::NextField => {
+                Some(BoundaryExit::Bottom)
+            }
+            _ => None,
+        }
+    }
+
+    #[cfg(feature = "keymap")]
+    fn key_outcome_for_action_result(result: ActionResult) -> KeyEventOutcome {
+        match result {
+            ActionResult::Success => KeyEventOutcome::Consumed(None),
+            ActionResult::Message(msg) | ActionResult::Error(msg) => {
+                KeyEventOutcome::Consumed(Some(msg))
+            }
         }
     }
 }
