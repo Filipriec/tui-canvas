@@ -3,7 +3,6 @@ use crate::editor::FormEditor;
 use crate::DataProvider;
 
 impl<D: DataProvider> FormEditor<D> {
-    /// Centralized field transition logic.
     pub fn transition_to_field(&mut self, new_field: usize) -> anyhow::Result<()> {
         let field_count = self.data_provider.field_count();
         if field_count == 0 {

@@ -49,7 +49,7 @@ use canvas::{
 use async_trait::async_trait;
 use anyhow::Result;
 
-// Enhanced FormEditor that demonstrates professional suggestions architecture
+// FormEditor wrapper for suggestions demo
 struct AutoCursorFormEditor<D: DataProvider> {
     editor: FormEditor<D>,
     has_unsaved_changes: bool,
@@ -71,7 +71,7 @@ impl<D: DataProvider> AutoCursorFormEditor<D> {
         self.editor.close_suggestions();
     }
 
-    // === COMMAND BUFFER HANDLING ===
+    // Command buffer handling
 
     fn clear_command_buffer(&mut self) {
         self.command_buffer.clear();
@@ -89,7 +89,7 @@ impl<D: DataProvider> AutoCursorFormEditor<D> {
         !self.command_buffer.is_empty()
     }
 
-    // === VISUAL/HIGHLIGHT MODE SUPPORT ===
+    // Visual highlight mode support
 
     fn enter_visual_mode(&mut self) {
         self.editor.enter_highlight_mode();
@@ -130,7 +130,7 @@ impl<D: DataProvider> AutoCursorFormEditor<D> {
         }
     }
 
-    // === ENHANCED MOVEMENT WITH VISUAL UPDATES ===
+    // Movement with visual updates
 
     fn move_left(&mut self) {
         let _ = self.editor.move_left();
@@ -202,7 +202,7 @@ impl<D: DataProvider> AutoCursorFormEditor<D> {
         self.update_visual_selection();
     }
 
-    // === DELETE OPERATIONS ===
+    // Delete operations
 
     fn delete_backward(&mut self) -> anyhow::Result<()> {
         let result = self.editor.delete_backward();
@@ -222,13 +222,13 @@ impl<D: DataProvider> AutoCursorFormEditor<D> {
         result
     }
 
-    // === SUGGESTIONS CONTROL WRAPPERS ===
+    // Suggestions control wrappers
 
     fn open_suggestions(&mut self, field_index: usize) {
         self.editor.open_suggestions(field_index);
     }
 
-    // === MODE TRANSITIONS WITH AUTOMATIC CURSOR MANAGEMENT ===
+    // Mode transitions with automatic cursor management
 
     fn enter_edit_mode(&mut self) {
         self.editor.enter_edit_mode(); // 🎯 Library automatically sets cursor to bar |
@@ -254,12 +254,9 @@ impl<D: DataProvider> AutoCursorFormEditor<D> {
         result
     }
 
-    // === PRODUCTION-READY NON-BLOCKING SUGGESTIONS ===
+    // Nonblocking suggestions
 
-    /// Trigger suggestions with non-blocking approach (production pattern)
-    ///
-    /// This method demonstrates the proper way to integrate suggestions with
-    /// real APIs, databases, or any async data source without blocking the UI.
+    /// Trigger suggestions asynchronously without blocking the UI.
     async fn trigger_suggestions_async(
         &mut self,
         provider: &mut ProductionSuggestionsProvider,
@@ -309,7 +306,7 @@ impl<D: DataProvider> AutoCursorFormEditor<D> {
         self.editor.update_inline_completion();
     }
 
-    // === MANUAL CURSOR OVERRIDE DEMONSTRATION ===
+    // Manual cursor override demonstration
 
     fn demo_manual_cursor_control(&mut self) -> std::io::Result<()> {
         CursorManager::update_for_mode(AppMode::Command)?;
@@ -323,7 +320,7 @@ impl<D: DataProvider> AutoCursorFormEditor<D> {
         Ok(())
     }
 
-    // === DELEGATE TO ORIGINAL EDITOR ===
+    // Delegate to original editor
 
     fn current_field(&self) -> usize {
         self.editor.current_field()
@@ -357,7 +354,7 @@ impl<D: DataProvider> AutoCursorFormEditor<D> {
         }
     }
 
-    // === STATUS AND DEBUG ===
+    // Status and debug
 
     fn set_debug_message(&mut self, msg: String) {
         self.debug_message = msg;
@@ -372,9 +369,7 @@ impl<D: DataProvider> AutoCursorFormEditor<D> {
     }
 }
 
-// ===================================================================
-// PRODUCTION DATA MODEL - Copy this pattern for your application
-// ===================================================================
+// Production data model
 
 struct ApplicationData {
     fields: Vec<(String, String)>,
@@ -421,13 +416,11 @@ impl DataProvider for ApplicationData {
     }
 }
 
-// ===================================================================
-// PRODUCTION SUGGESTIONS PROVIDER - Copy this pattern for your APIs
-// ===================================================================
+// Production suggestions provider
 
-/// Production-ready suggestions provider
+/// Suggestions provider
 ///
-/// Replace the data sources below with your actual:
+/// Replace the data sources below with your implementation:
 /// - REST API calls (reqwest, hyper)
 /// - Database queries (sqlx, diesel)
 /// - Search engines (elasticsearch, algolia)
@@ -435,7 +428,7 @@ impl DataProvider for ApplicationData {
 /// - GraphQL queries
 /// - gRPC services
 ///
-/// The non-blocking architecture works with any async data source.
+/// Works with any async data source.
 struct ProductionSuggestionsProvider {
     // Add your API clients, database connections, cache clients here
     // Example:
@@ -614,14 +607,14 @@ async fn handle_key_press(
     }
 
     match (mode, key, modifiers) {
-        // === TAB-TRIGGERED SUGGESTIONS HANDLING ===
+        // Tab triggered suggestions handling
         (_, KeyCode::Tab, _) => {
             if editor.is_suggestions_active() {
                 // Cycle through suggestions
                 editor.suggestions_next();
                 editor.set_debug_message("📍 Next suggestion".to_string());
             } else if editor.data_provider().supports_suggestions(editor.current_field()) {
-                // Trigger non-blocking suggestions
+                // Trigger suggestions
                 let field_index = editor.current_field();
                 editor.trigger_suggestions_async(suggestions_provider, field_index).await;
             } else {
@@ -666,7 +659,7 @@ async fn handle_key_press(
             }
         }
 
-        // === MODE TRANSITIONS (NO AUTO-SUGGESTIONS) ===
+        // Mode transitions no autosuggestions
         (AppMode::ReadOnly, KeyCode::Char('i'), _) => {
             editor.enter_edit_mode();
             editor.clear_command_buffer();
@@ -694,7 +687,7 @@ async fn handle_key_press(
             editor.clear_command_buffer();
         }
 
-        // === CURSOR MANAGEMENT DEMONSTRATION ===
+        // Cursor management demonstration
         (AppMode::ReadOnly, KeyCode::F(1), _) => {
             editor.demo_manual_cursor_control()?;
         }
@@ -702,7 +695,7 @@ async fn handle_key_press(
             editor.restore_automatic_cursor()?;
         }
 
-        // === MOVEMENT: VIM-STYLE NAVIGATION ===
+        // Movement vim style navigation
 
         // Basic movement (hjkl and arrows)
         (AppMode::ReadOnly | AppMode::Highlight, KeyCode::Char('h'), _)
@@ -781,7 +774,7 @@ async fn handle_key_press(
             editor.clear_command_buffer();
         }
 
-        // === EDIT MODE MOVEMENT ===
+        // Edit mode movement
         (AppMode::Edit, KeyCode::Left, m) if m.contains(KeyModifiers::CONTROL) => {
             editor.move_word_prev();
             editor.set_debug_message("Ctrl+← word back".to_string());
@@ -809,7 +802,7 @@ async fn handle_key_press(
             editor.move_line_end();
         }
 
-        // === DELETE OPERATIONS (AUTO-FETCH WHEN SUGGESTIONS ACTIVE) ===
+        // Delete operations autofetch when suggestions active
         (AppMode::Edit, KeyCode::Backspace, _) => {
             editor.delete_backward()?;
             // Auto-fetch only if suggestions are already active (triggered by Tab)
@@ -839,7 +832,7 @@ async fn handle_key_press(
             editor.set_debug_message("X: deleted character backward".to_string());
         }
 
-        // === CHARACTER INPUT (AUTO-FETCH WHEN SUGGESTIONS ACTIVE) ===
+        // Character input autofetch when suggestions active
         (AppMode::Edit, KeyCode::Char(c), m) if !m.contains(KeyModifiers::CONTROL) => {
             editor.insert_char(c)?;
             // Auto-fetch only if suggestions are already active (triggered by Tab)
@@ -850,7 +843,7 @@ async fn handle_key_press(
             }
         }
 
-        // === DEBUG/INFO COMMANDS ===
+        // Debug info commands
         (AppMode::ReadOnly, KeyCode::Char('?'), _) => {
             let field_names = ["Fruit🍎", "Job💼", "Language💻", "Country🌍", "Color🎨"];
             let current_field_name = field_names.get(editor.current_field()).unwrap_or(&"Unknown");
@@ -1017,7 +1010,7 @@ fn render_status_and_help(
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Print production-ready information
+    // Print demo information
     println!("🚀 Production-Ready Tab-Triggered Suggestions Demo");
     println!("✅ Press Tab to activate suggestions, then type to filter in real-time");
     println!("✅ Professional autocomplete architecture");
@@ -1052,13 +1045,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Initialize with normal mode - library automatically sets block cursor
     editor.set_mode(AppMode::ReadOnly);
 
-    // Demonstrate that CursorManager is available and working
     CursorManager::update_for_mode(AppMode::ReadOnly)?;
 
     let res = run_app(&mut terminal, editor).await;
 
-    // Library automatically resets cursor on FormEditor::drop()
-    // But we can also manually reset if needed
     CursorManager::reset()?;
 
     disable_raw_mode()?;

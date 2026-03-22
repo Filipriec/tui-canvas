@@ -177,7 +177,7 @@ Press ? for help, Ctrl+Q to quit.";
         )
     }
 
-    // === BIG WORD MOVEMENTS ===
+    // Big word movements
 
     fn move_big_word_next(&mut self) {
         self.textarea.move_big_word_next();

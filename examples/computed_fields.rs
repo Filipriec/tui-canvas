@@ -80,8 +80,6 @@ impl DataProvider for InvoiceData {
     }
 
     fn set_field_value(&mut self, index: usize, value: String) {
-        // 🔥 FIXED: Allow computed fields to be updated for display purposes
-        // The editing protection happens at the editor level, not here
         self.fields[index].1 = value;
     }
 
@@ -183,7 +181,7 @@ impl ComputedProvider for InvoiceCalculator {
     }
 }
 
-/// Enhanced editor with computed fields
+/// Editor with computed fields
 struct ComputedFieldsEditor<D: DataProvider> {
     editor: FormEditor<D>,
     calculator: InvoiceCalculator,
@@ -212,16 +210,13 @@ impl<D: DataProvider> ComputedFieldsEditor<D> {
     }
 
     fn update_computed_fields(&mut self) {
-        // Trigger recomputation of all computed fields
         self.editor.recompute_all_fields(&mut self.calculator);
 
-        // 🔥 CRITICAL FIX: Sync computed values to DataProvider so GUI shows them!
         for i in [4, 5, 6] { // Computed field indices  
             let computed_value = self.editor.effective_field_value(i);
             self.editor.data_provider_mut().set_field_value(i, computed_value.clone());
         }
 
-        // Check if values changed to show feedback
         let mut changed = false;
         let mut has_calculations = false;
         

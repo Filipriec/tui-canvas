@@ -44,9 +44,7 @@ struct SyntaxTextAreaDemo {
 impl SyntaxTextAreaDemo {
     fn new() -> Self {
         let initial_text = r#"// Multi-language Syntax Highlighting Demo
-// ==========================
 // Rust
-// ==========================
 fn main() {
     println!("Hello, Rust 🦀");
     let nums = vec![1, 2, 3, 4, 5];
@@ -55,9 +53,7 @@ fn main() {
     }
 }
 
-// ==========================
 // Python
-// ==========================
 # 🐍 Python example
 def fib(n):
     if n <= 1:
@@ -68,16 +64,13 @@ print([fib(i) for i in range(6)])
 
 # ==========================
 // JavaScript
-// ==========================
- // JavaScript example
+// JavaScript example
 function greet(name) {
     console.log(`Hello, ${name}!`);
 }
 greet("World");
 
-// ==========================
 // Scheme
-// ==========================
 ;; Scheme example
 (define (square x) (* x x))
 (display (square 5))

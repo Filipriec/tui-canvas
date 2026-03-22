@@ -44,7 +44,7 @@ use canvas::{
     DataProvider, FormEditor,
 };
 
-// Enhanced FormEditor that demonstrates automatic cursor management
+// FormEditor wrapper for automatic cursor demo
 struct AutoCursorFormEditor<D: DataProvider> {
     editor: FormEditor<D>,
     has_unsaved_changes: bool,
@@ -62,7 +62,7 @@ impl<D: DataProvider> AutoCursorFormEditor<D> {
         }
     }
 
-    // === COMMAND BUFFER HANDLING ===
+    // Command buffer handling
 
     fn clear_command_buffer(&mut self) {
         self.command_buffer.clear();
@@ -80,7 +80,7 @@ impl<D: DataProvider> AutoCursorFormEditor<D> {
         !self.command_buffer.is_empty()
     }
 
-    // === VISUAL/HIGHLIGHT MODE SUPPORT ===
+    // Visual highlight mode support
 
 
     fn enter_visual_mode(&mut self) {
@@ -125,7 +125,7 @@ impl<D: DataProvider> AutoCursorFormEditor<D> {
         }
     }
 
-    // === ENHANCED MOVEMENT WITH VISUAL UPDATES ===
+    // Movement with visual updates
 
     fn move_left(&mut self) {
         self.editor.move_left();
@@ -197,7 +197,7 @@ impl<D: DataProvider> AutoCursorFormEditor<D> {
         self.update_visual_selection();
     }
 
-    // === DELETE OPERATIONS ===
+    // Delete operations
 
     fn delete_backward(&mut self) -> anyhow::Result<()> {
         let result = self.editor.delete_backward();
@@ -217,7 +217,7 @@ impl<D: DataProvider> AutoCursorFormEditor<D> {
         result
     }
 
-    // === MODE TRANSITIONS WITH AUTOMATIC CURSOR MANAGEMENT ===
+    // Mode transitions with automatic cursor management
 
     fn enter_edit_mode(&mut self) {
         self.editor.enter_edit_mode(); // 🎯 Library automatically sets cursor to bar |
@@ -243,9 +243,9 @@ impl<D: DataProvider> AutoCursorFormEditor<D> {
         result
     }
 
-    // === MANUAL CURSOR OVERRIDE DEMONSTRATION ===
+    // Manual cursor override demonstration
     
-    /// Demonstrate manual cursor control (for advanced users)
+    /// Demonstrate manual cursor control.
     fn demo_manual_cursor_control(&mut self) -> std::io::Result<()> {
         // Users can still manually control cursor if needed
         CursorManager::update_for_mode(AppMode::Command)?;
@@ -260,7 +260,7 @@ impl<D: DataProvider> AutoCursorFormEditor<D> {
         Ok(())
     }
 
-    // === DELEGATE TO ORIGINAL EDITOR ===
+    // Delegate to original editor
 
     fn current_field(&self) -> usize {
         self.editor.current_field()
@@ -294,7 +294,7 @@ impl<D: DataProvider> AutoCursorFormEditor<D> {
         }
     }
 
-    // === STATUS AND DEBUG ===
+    // Status and debug
 
     fn set_debug_message(&mut self, msg: String) {
         self.debug_message = msg;
@@ -410,7 +410,7 @@ fn handle_key_press(
     }
 
     match (mode, key, modifiers) {
-        // === MODE TRANSITIONS WITH AUTOMATIC CURSOR MANAGEMENT ===
+        // Mode transitions with automatic cursor management
         (AppMode::ReadOnly, KeyCode::Char('i'), _) => {
             editor.enter_edit_mode(); // 🎯 Automatic: cursor becomes bar |
             editor.clear_command_buffer();
@@ -503,7 +503,7 @@ fn handle_key_press(
             }
         }
 
-        // === CURSOR MANAGEMENT DEMONSTRATION ===
+        // Cursor management demonstration
         (AppMode::ReadOnly, KeyCode::F(1), _) => {
             editor.demo_manual_cursor_control()?;
         }
@@ -511,7 +511,7 @@ fn handle_key_press(
             editor.restore_automatic_cursor()?;
         }
 
-        // === MOVEMENT: VIM-STYLE NAVIGATION ===
+        // Movement vim style navigation
 
         // Basic movement (hjkl and arrows)
         (AppMode::ReadOnly | AppMode::Highlight, KeyCode::Char('h'), _)
@@ -616,7 +616,7 @@ fn handle_key_press(
             editor.clear_command_buffer();
         }
 
-        // === EDIT MODE MOVEMENT ===
+        // Edit mode movement
         (AppMode::Edit, KeyCode::Left, m) if m.contains(KeyModifiers::CONTROL) => {
             editor.move_word_prev();
             editor.set_debug_message("Ctrl+← word back".to_string());
@@ -644,7 +644,7 @@ fn handle_key_press(
             editor.move_line_end();
         }
 
-        // === DELETE OPERATIONS ===
+        // Delete operations
         (AppMode::Edit, KeyCode::Backspace, _) => {
             editor.delete_backward()?;
         }
@@ -662,7 +662,7 @@ fn handle_key_press(
             editor.set_debug_message("X: deleted character backward".to_string());
         }
 
-        // === TAB NAVIGATION ===
+        // Tab navigation
         (_, KeyCode::Tab, _) => {
             editor.next_field();
             editor.set_debug_message("Tab: next field".to_string());
@@ -672,12 +672,12 @@ fn handle_key_press(
             editor.set_debug_message("Shift+Tab: previous field".to_string());
         }
 
-        // === CHARACTER INPUT ===
+        // Character input
         (AppMode::Edit, KeyCode::Char(c), m) if !m.contains(KeyModifiers::CONTROL) => {
             editor.insert_char(c)?;
         }
 
-        // === DEBUG/INFO COMMANDS ===
+        // Debug info commands
         (AppMode::ReadOnly, KeyCode::Char('?'), _) => {
             editor.set_debug_message(format!(
                 "Field {}/{}, Pos {}, Mode: {:?} - Cursor managed automatically!",
@@ -755,7 +755,6 @@ fn render_status_and_help(
         .constraints([Constraint::Length(3), Constraint::Length(7)])
         .split(area);
 
-    // Status bar with cursor information - FIXED VERSION
     let mode_text = match editor.mode() {
         AppMode::Edit => "INSERT | (bar cursor)",
         AppMode::ReadOnly => "NORMAL █ (block cursor)",
@@ -784,7 +783,6 @@ fn render_status_and_help(
 
     f.render_widget(status, chunks[0]);
 
-    // Enhanced help text (no changes needed here)
     let help_text = match editor.mode() {
         AppMode::ReadOnly => {
             if editor.has_pending_command() {
@@ -839,13 +837,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Initialize with normal mode - library automatically sets block cursor
     editor.set_mode(AppMode::ReadOnly);
 
-    // Demonstrate that CursorManager is available and working
     CursorManager::update_for_mode(AppMode::ReadOnly)?;
 
     let res = run_app(&mut terminal, editor);
 
-    // Library automatically resets cursor on FormEditor::drop()
-    // But we can also manually reset if needed
     CursorManager::reset()?;
 
     disable_raw_mode()?;

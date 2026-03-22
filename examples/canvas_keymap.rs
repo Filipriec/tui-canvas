@@ -59,13 +59,13 @@ impl KeymapDemoApp {
         }
     }
 
-    /// Build a comprehensive keymap configuration
+    /// Build a keymap configuration
     fn build_demo_keymap() -> CanvasKeyMap {
         let mut read_only = HashMap::new();
         let mut edit = HashMap::new();
         let mut highlight = HashMap::new();
 
-        // === READ-ONLY MODE KEYBINDINGS ===
+        // Read only mode keybindings
         
         // Basic movement
         read_only.insert("move_left".to_string(), vec!["h".to_string(), "Left".to_string()]);
@@ -107,7 +107,7 @@ impl KeymapDemoApp {
         read_only.insert("open_line_below".to_string(), vec!["o".to_string()]);
         read_only.insert("open_line_above".to_string(), vec!["O".to_string()]);
 
-        // === EDIT MODE KEYBINDINGS ===
+        // Edit mode keybindings
         
         edit.insert("exit_edit_mode".to_string(), vec!["esc".to_string()]);
         edit.insert("move_left".to_string(), vec!["Left".to_string()]);
@@ -123,7 +123,7 @@ impl KeymapDemoApp {
         edit.insert("delete_char_backward".to_string(), vec!["Backspace".to_string()]);
         edit.insert("delete_char_forward".to_string(), vec!["Delete".to_string()]);
 
-        // === HIGHLIGHT MODE KEYBINDINGS ===
+        // Highlight mode keybindings
         
         highlight.insert("exit_highlight_mode".to_string(), vec!["esc".to_string()]);
         highlight.insert("enter_highlight_mode_linewise".to_string(), vec!["V".to_string()]);

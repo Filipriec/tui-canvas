@@ -44,7 +44,6 @@ use canvas::{
     ValidationConfig, ValidationConfigBuilder, PatternFilters, PositionFilter, PositionRange, CharacterFilter,
 };
 
-// Enhanced FormEditor wrapper (keeping the same structure as before)
 struct AdvancedPatternFormEditor<D: DataProvider> {
     editor: FormEditor<D>,
     debug_message: String,
@@ -68,9 +67,6 @@ impl<D: DataProvider> AdvancedPatternFormEditor<D> {
             block_reason: None,
         }
     }
-
-    // ... (keeping all the same methods as before for brevity)
-    // [All the previous methods: clear_command_buffer, add_to_command_buffer, etc.]
 
     fn clear_command_buffer(&mut self) { self.command_buffer.clear(); }
     fn add_to_command_buffer(&mut self, ch: char) { self.command_buffer.push(ch); }
@@ -108,19 +104,16 @@ impl<D: DataProvider> AdvancedPatternFormEditor<D> {
     fn move_line_end(&mut self) { self.editor.move_line_end(); }
 
     fn enter_edit_mode(&mut self) {
-        // Library will automatically update cursor to bar | in insert mode
         self.editor.enter_edit_mode();
         self.debug_message = "✏️  INSERT MODE - Cursor: Steady Bar | - Testing advanced pattern validation".to_string();
     }
 
     fn enter_append_mode(&mut self) {
-        // Library will automatically update cursor to bar | in insert mode
         self.editor.enter_append_mode();
         self.debug_message = "✏️  INSERT (append) - Cursor: Steady Bar | - Advanced patterns active".to_string();
     }
 
     fn exit_edit_mode(&mut self) {
-        // Library will automatically update cursor to block █ in normal mode
         self.editor.exit_edit_mode();
         self.debug_message = "🔒 NORMAL MODE - Cursor: Steady Block █".to_string();
         self.update_field_validation_status();
@@ -540,7 +533,7 @@ fn render_advanced_validation_status(
 
     f.render_widget(status, chunks[0]);
 
-    // Enhanced validation summary
+    // Validation summary
     let summary = editor.editor.validation_summary();
     let field_info = match editor.current_field() {
         0 => "Time format (HH:MM) - Tests exact chars + numeric ranges",
@@ -587,7 +580,7 @@ fn render_advanced_validation_status(
 
     f.render_widget(validation_summary, chunks[1]);
 
-    // Enhanced help text
+    // Help text
     let help_text = match editor.mode() {
         AppMode::ReadOnly => {
             "🚀 ADVANCED PATTERN SHOWCASE - Each field demonstrates different edge cases!\n\
@@ -636,13 +629,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Initialize with normal mode - library automatically sets block cursor
     editor.set_mode(AppMode::ReadOnly);
 
-    // Demonstrate that CursorManager is available and working
     CursorManager::update_for_mode(AppMode::ReadOnly)?;
 
     let res = run_app(&mut terminal, editor);
 
-    // Library automatically resets cursor on FormEditor::drop()
-    // But we can also manually reset if needed
     CursorManager::reset()?;
 
     disable_raw_mode()?;

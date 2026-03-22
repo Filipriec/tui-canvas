@@ -1,5 +1,5 @@
 /* examples/validation_4.rs
-   Enhanced Feature 4 Demo: Multiple custom formatters with comprehensive edge cases
+   Feature 4 demo: multiple custom formatters with edge cases
 
    Demonstrates:
    - Multiple formatter types: PSC, Phone, Credit Card, Date
@@ -194,7 +194,7 @@ impl CustomFormatter for DateFormatter {
     }
 }
 
-// Enhanced demo data with multiple formatter types
+// Demo data with multiple formatter types
 struct MultiFormatterDemoData {
     fields: Vec<(String, String)>,
 }
@@ -258,7 +258,7 @@ impl DataProvider for MultiFormatterDemoData {
     }
 }
 
-// Enhanced demo editor with comprehensive status tracking
+// Demo editor with status tracking
 struct EnhancedDemoEditor<D: DataProvider> {
     editor: FormEditor<D>,
     debug_message: String,
@@ -334,7 +334,7 @@ impl<D: DataProvider> EnhancedDemoEditor<D> {
         self.debug_message = format!("📋 Loaded: {}", mode_names[self.example_mode]);
     }
 
-    // Enhanced status methods
+    // Status methods
     fn toggle_validation(&mut self) {
         self.validation_enabled = !self.validation_enabled;
         self.editor.set_validation_enabled(self.validation_enabled);
@@ -404,7 +404,6 @@ impl<D: DataProvider> EnhancedDemoEditor<D> {
 
     // Delegate methods with enhanced feedback
     fn enter_edit_mode(&mut self) {
-        // Library will automatically update cursor to bar | in insert mode
         self.editor.enter_edit_mode();
         let field_type = self.current_field_type();
         let rules = self.get_input_rules();
@@ -412,7 +411,6 @@ impl<D: DataProvider> EnhancedDemoEditor<D> {
     }
 
     fn exit_edit_mode(&mut self) {
-        // Library will automatically update cursor to block █ in normal mode
         self.editor.exit_edit_mode();
         let (raw, display, _, warning) = self.get_current_field_analysis();
         if let Some(warn) = warning {
@@ -481,7 +479,7 @@ impl<D: DataProvider> EnhancedDemoEditor<D> {
     fn prev_field(&mut self) { let _ = self.editor.prev_field(); }
 }
 
-// Enhanced key handling
+// Key handling
 fn handle_key_press(
     key: KeyCode,
     modifiers: KeyModifiers,
@@ -505,7 +503,7 @@ fn handle_key_press(
         },
         (_, KeyCode::Esc, _) => editor.exit_edit_mode(),
 
-        // Enhanced demo features
+        // Demo features
         (AppMode::ReadOnly, KeyCode::Char('e'), _) => editor.cycle_example_data(),
         (AppMode::ReadOnly, KeyCode::Char('r'), _) => editor.toggle_raw_data_view(),
         (AppMode::ReadOnly, KeyCode::Char('c'), _) => editor.toggle_cursor_details(),
@@ -661,7 +659,7 @@ fn render_enhanced_status(
 
     f.render_widget(analysis, chunks[1]);
 
-    // Enhanced help
+    // Help
     let help_text = match editor.mode() {
         AppMode::ReadOnly => {
             "🎯 CURSOR-STYLE: Normal █ | Insert |\n\
@@ -728,7 +726,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Initialize with normal mode - library automatically sets block cursor
     editor.editor.set_mode(AppMode::ReadOnly);
 
-    // Demonstrate that CursorManager is available and working
     CursorManager::update_for_mode(AppMode::ReadOnly)?;
 
     let res = run_app(&mut terminal, editor);
@@ -737,8 +734,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     execute!(terminal.backend_mut(), LeaveAlternateScreen, DisableMouseCapture)?;
     terminal.show_cursor()?;
 
-    // Library automatically resets cursor on FormEditor::drop()
-    // But we can also manually reset if needed
     CursorManager::reset()?;
 
     if let Err(err) = res {

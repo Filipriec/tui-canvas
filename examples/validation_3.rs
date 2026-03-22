@@ -1,22 +1,11 @@
 // examples/validation_3.rs
-//! Comprehensive Display Mask Features Demo
+//! Display mask demo.
 //!
-//! This example showcases the full power of the display mask system (Feature 3)
-//! demonstrating visual formatting that keeps business logic clean.
+//! Shows dynamic and template display modes, custom patterns, custom input
+//! characters, placeholder characters, and cursor movement through formatted
+//! displays.
 //!
-//! Key Features Demonstrated:
-//! - Dynamic vs Template display modes
-//! - Custom patterns for different data types
-//! - Custom input characters and separators
-//! - Custom placeholder characters
-//! - Real-time visual formatting with clean raw data
-//! - Cursor movement through formatted displays
-//! - 🔥 CRITICAL: Perfect mask/character-limit coordination to prevent invisible character bugs
-//!
-//! ⚠️  IMPORTANT BUG PREVENTION:
-//! This example demonstrates the CORRECT way to configure masks with character limits.
-//! Each mask's input position count EXACTLY matches its character limit to prevent
-//! the critical bug where users can type more characters than they can see.
+//! Mask input positions must match the configured character limit.
 //!
 //! Run with: cargo run --example validation_3 --features "gui,validation,cursor-style"
 
@@ -56,7 +45,7 @@ use canvas::{
     ValidationConfig, ValidationConfigBuilder, DisplayMask,
 };
 
-// Enhanced FormEditor wrapper for mask demonstration
+// FormEditor wrapper for mask demo
 struct MaskDemoFormEditor<D: DataProvider> {
     editor: FormEditor<D>,
     debug_message: String,
@@ -79,13 +68,13 @@ impl<D: DataProvider> MaskDemoFormEditor<D> {
         }
     }
 
-    // === COMMAND BUFFER HANDLING ===
+    // Command buffer handling
     fn clear_command_buffer(&mut self) { self.command_buffer.clear(); }
     fn add_to_command_buffer(&mut self, ch: char) { self.command_buffer.push(ch); }
     fn get_command_buffer(&self) -> &str { &self.command_buffer }
     fn has_pending_command(&self) -> bool { !self.command_buffer.is_empty() }
 
-    // === MASK CONTROL ===
+    // Mask control
     fn toggle_validation(&mut self) {
         self.validation_enabled = !self.validation_enabled;
         self.editor.set_validation_enabled(self.validation_enabled);
@@ -129,7 +118,7 @@ impl<D: DataProvider> MaskDemoFormEditor<D> {
         (raw_data.to_string(), display_data, mask_info)
     }
 
-    // === ENHANCED MOVEMENT WITH MASK AWARENESS ===
+    // Movement with mask awareness
     fn move_left(&mut self) {
         self.editor.move_left();
         self.update_cursor_info();
@@ -181,21 +170,18 @@ impl<D: DataProvider> MaskDemoFormEditor<D> {
         self.debug_message = format!("📝 Switched to: {field_name}");
     }
 
-    // === MODE TRANSITIONS ===
+    // Mode transitions
     fn enter_edit_mode(&mut self) {
-        // Library will automatically update cursor to bar | in insert mode
         self.editor.enter_edit_mode();
         self.debug_message = "✏️ INSERT MODE - Cursor: Steady Bar | - Type to see mask formatting in real-time".to_string();
     }
 
     fn enter_append_mode(&mut self) {
-        // Library will automatically update cursor to bar | in insert mode
         self.editor.enter_append_mode();
         self.debug_message = "✏️ INSERT (append) - Cursor: Steady Bar | - Mask formatting active".to_string();
     }
 
     fn exit_edit_mode(&mut self) {
-        // Library will automatically update cursor to block █ in normal mode
         self.editor.exit_edit_mode();
         self.debug_message = "🔒 NORMAL MODE - Cursor: Steady Block █ - Press 'r' to see raw data, 'm' for mask info".to_string();
     }
@@ -213,7 +199,7 @@ impl<D: DataProvider> MaskDemoFormEditor<D> {
         result
     }
 
-    // === DELETE OPERATIONS ===
+    // Delete operations
     fn delete_backward(&mut self) -> anyhow::Result<()> {
         let result = self.editor.delete_backward();
         if result.is_ok() {
@@ -232,7 +218,7 @@ impl<D: DataProvider> MaskDemoFormEditor<D> {
         result
     }
 
-    // === DELEGATE TO ORIGINAL EDITOR ===
+    // Delegate to original editor
     fn current_field(&self) -> usize { self.editor.current_field() }
     fn cursor_position(&self) -> usize { self.editor.cursor_position() }
     fn mode(&self) -> AppMode { self.editor.mode() }
@@ -261,7 +247,7 @@ impl<D: DataProvider> MaskDemoFormEditor<D> {
         }
     }
 
-    // === STATUS AND DEBUG ===
+    // Status and debug
     fn set_debug_message(&mut self, msg: String) { self.debug_message = msg; }
     fn debug_message(&self) -> &str { &self.debug_message }
 
@@ -290,7 +276,7 @@ impl<D: DataProvider> MaskDemoFormEditor<D> {
     }
 }
 
-// Demo data with comprehensive mask examples
+// Demo data with mask examples
 struct MaskDemoData {
     fields: Vec<(String, String)>,
 }
@@ -325,20 +311,20 @@ impl DataProvider for MaskDemoData {
     fn validation_config(&self, field_index: usize) -> Option<ValidationConfig> {
         match field_index {
             0 => {
-                // 📞 Phone (Dynamic) - FIXED: Perfect mask/limit coordination
+                // Phone dynamic
                 let phone_mask = DisplayMask::new("(###) ###-####", '#');
                 Some(ValidationConfigBuilder::new()
                     .with_display_mask(phone_mask)
-                    .with_max_length(10)  // ✅ CRITICAL: Exactly matches 10 input positions
+                    .with_max_length(10)  // Matches 10 input positions
                     .build())
             }
             1 => {
-                // 📞 Phone (Template) - FIXED: Perfect mask/limit coordination
+                // Phone template
                 let phone_template = DisplayMask::new("(###) ###-####", '#')
                     .with_template('_');
                 Some(ValidationConfigBuilder::new()
                     .with_display_mask(phone_template)
-                    .with_max_length(10)  // ✅ CRITICAL: Exactly matches 10 input positions
+                    .with_max_length(10)  // Matches 10 input positions
                     .build())
             }
             2 => {
@@ -359,20 +345,20 @@ impl DataProvider for MaskDemoData {
                 Some(ValidationConfig::with_mask(iso_date))
             }
             5 => {
-                // 🏛️ SSN using custom input character 'X' - FIXED: Perfect coordination
+                // SSN with custom input character
                 let ssn_mask = DisplayMask::new("XXX-XX-XXXX", 'X');
                 Some(ValidationConfigBuilder::new()
                     .with_display_mask(ssn_mask)
-                    .with_max_length(9)  // ✅ CRITICAL: Exactly matches 9 input positions
+                    .with_max_length(9)  // Matches 9 input positions
                     .build())
             }
             6 => {
-                // 💳 Credit Card (16 digits with spaces) - FIXED: Perfect coordination
+                // Credit card
                 let cc_mask = DisplayMask::new("#### #### #### ####", '#')
                     .with_template('•');
                 Some(ValidationConfigBuilder::new()
                     .with_display_mask(cc_mask)
-                    .with_max_length(16)  // ✅ CRITICAL: Exactly matches 16 input positions
+                    .with_max_length(16)  // Matches 16 input positions
                     .build())
             }
             7 => {
@@ -407,7 +393,7 @@ impl DataProvider for MaskDemoData {
     }
 }
 
-// Enhanced key handling with mask-specific commands
+// Key handling with mask specific commands
 fn handle_key_press(
     key: KeyCode,
     modifiers: KeyModifiers,
@@ -424,7 +410,7 @@ fn handle_key_press(
     }
 
     match (mode, key, modifiers) {
-        // === MODE TRANSITIONS ===
+        // Mode transitions
         (AppMode::ReadOnly, KeyCode::Char('i'), _) => {
             editor.enter_edit_mode();
             editor.clear_command_buffer();
@@ -448,7 +434,7 @@ fn handle_key_press(
             }
         }
 
-        // === MASK SPECIFIC COMMANDS ===
+        // Mask specific commands
         (AppMode::ReadOnly, KeyCode::Char('m'), _) => {
             editor.show_mask_details();
             editor.clear_command_buffer();
@@ -461,7 +447,7 @@ fn handle_key_press(
             editor.toggle_validation();
         }
 
-        // === MOVEMENT ===
+        // Movement
         (AppMode::ReadOnly, KeyCode::Char('h'), _) | (AppMode::ReadOnly, KeyCode::Left, _) => {
             editor.move_left();
             editor.clear_command_buffer();
@@ -489,26 +475,26 @@ fn handle_key_press(
             editor.clear_command_buffer();
         }
 
-        // === EDIT MODE MOVEMENT ===
+        // Edit mode movement
         (AppMode::Edit, KeyCode::Left, _) => { editor.move_left(); }
         (AppMode::Edit, KeyCode::Right, _) => { editor.move_right(); }
         (AppMode::Edit, KeyCode::Up, _) => { editor.move_up(); }
         (AppMode::Edit, KeyCode::Down, _) => { editor.move_down(); }
 
-        // === DELETE OPERATIONS ===
+        // Delete operations
         (AppMode::Edit, KeyCode::Backspace, _) => { editor.delete_backward()?; }
         (AppMode::Edit, KeyCode::Delete, _) => { editor.delete_forward()?; }
 
-        // === TAB NAVIGATION ===
+        // Tab navigation
         (_, KeyCode::Tab, _) => { editor.next_field(); }
         (_, KeyCode::BackTab, _) => { editor.prev_field(); }
 
-        // === CHARACTER INPUT ===
+        // Character input
         (AppMode::Edit, KeyCode::Char(c), m) if !m.contains(KeyModifiers::CONTROL) => {
             editor.insert_char(c)?;
         }
 
-        // === DEBUG/INFO COMMANDS ===
+        // Debug info commands
         (AppMode::ReadOnly, KeyCode::Char('?'), _) => {
             let (raw, display, mask_info) = editor.get_current_field_info();
             editor.set_debug_message(format!(
@@ -640,7 +626,7 @@ fn render_mask_status(
 
     f.render_widget(data_comparison, chunks[1]);
 
-    // Enhanced help text
+    // Help text
     let help_text = match editor.mode() {
         AppMode::ReadOnly => {
             "🎯 CURSOR-STYLE: Normal █ | Insert |\n\
@@ -707,7 +693,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Initialize with normal mode - library automatically sets block cursor
     editor.set_mode(AppMode::ReadOnly);
 
-    // Demonstrate that CursorManager is available and working
     CursorManager::update_for_mode(AppMode::ReadOnly)?;
 
     let res = run_app(&mut terminal, editor);
@@ -720,8 +705,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?;
     terminal.show_cursor()?;
 
-    // Library automatically resets cursor on FormEditor::drop()
-    // But we can also manually reset if needed
     CursorManager::reset()?;
 
     if let Err(err) = res {

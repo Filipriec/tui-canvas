@@ -47,8 +47,7 @@ use canvas::{
     textarea::{TextArea, TextAreaState},
 };
 
-/// Enhanced TextArea that demonstrates automatic cursor management
-/// Now uses direct FormEditor method calls via Deref!
+/// TextArea demo with automatic cursor management.
 struct AutoCursorTextArea {
     textarea: TextAreaState,
     has_unsaved_changes: bool,
@@ -91,7 +90,7 @@ Terminal cursor changes automatically!
         }
     }
 
-    // === MODE TRANSITIONS WITH AUTOMATIC CURSOR MANAGEMENT ===
+    // Mode transitions with automatic cursor management
 
     fn enter_insert_mode(&mut self) -> std::io::Result<()> {
         self.textarea.enter_edit_mode(); // Direct FormEditor method call via Deref!
@@ -114,7 +113,7 @@ Terminal cursor changes automatically!
         Ok(())
     }
 
-    // === MANUAL CURSOR OVERRIDE DEMONSTRATION ===
+    // Manual cursor override demonstration
 
     fn demo_manual_cursor_control(&mut self) -> std::io::Result<()> {
         // Users can still manually control cursor if needed
@@ -130,14 +129,14 @@ Terminal cursor changes automatically!
         Ok(())
     }
 
-    // === TEXTAREA OPERATIONS ===
+    // Textarea operations
 
     fn handle_textarea_input(&mut self, key: KeyEvent) {
         self.textarea.input(key);
         self.has_unsaved_changes = true;
     }
 
-    // === MOVEMENT OPERATIONS (using direct FormEditor methods!) ===
+    // Movement operations using direct FormEditor methods
 
     fn move_left(&mut self) {
         self.textarea.move_left();
@@ -199,7 +198,7 @@ Terminal cursor changes automatically!
         self.update_debug_for_movement("G: last line");
     }
 
-    // === BIG WORD MOVEMENTS ===
+    // Big word movements
 
     fn move_big_word_next(&mut self) {
         self.textarea.move_big_word_next();
@@ -225,7 +224,7 @@ Terminal cursor changes automatically!
         self.debug_message = action.to_string();
     }
 
-    // === DELETE OPERATIONS ===
+    // Delete operations
 
     fn delete_char_forward(&mut self) {
         if let Ok(_) = self.textarea.delete_forward() {
@@ -241,7 +240,7 @@ Terminal cursor changes automatically!
         }
     }
 
-    // === VIM-STYLE EDITING ===
+    // Vim style editing
 
     fn open_line_below(&mut self) -> anyhow::Result<()> {
         let result = self.textarea.open_line_below();
@@ -263,7 +262,7 @@ Terminal cursor changes automatically!
         result
     }
 
-    // === COMMAND BUFFER HANDLING ===
+    // Command buffer handling
 
     fn clear_command_buffer(&mut self) {
         self.command_buffer.clear();
@@ -281,7 +280,7 @@ Terminal cursor changes automatically!
         !self.command_buffer.is_empty()
     }
 
-    // === GETTERS ===
+    // Getters
 
     fn mode(&self) -> AppMode {
         self.textarea.mode()
@@ -325,7 +324,7 @@ fn handle_key_press(
     }
 
     match (mode, key, modifiers) {
-        // === MODE TRANSITIONS WITH AUTOMATIC CURSOR MANAGEMENT ===
+        // Mode transitions with automatic cursor management
         (AppMode::ReadOnly, KeyCode::Char('i'), _) => {
             editor.enter_insert_mode()?;
             editor.clear_command_buffer();
@@ -359,12 +358,12 @@ fn handle_key_press(
             editor.exit_to_normal_mode()?;
         }
 
-        // === INSERT MODE: Pass to textarea ===
+        // Insert mode pass to textarea
         (AppMode::Edit, _, _) => {
             editor.handle_textarea_input(key_event);
         }
 
-        // === CURSOR MANAGEMENT DEMONSTRATION ===
+        // Cursor management demonstration
         (AppMode::ReadOnly, KeyCode::F(1), _) => {
             editor.demo_manual_cursor_control()?;
         }
@@ -372,7 +371,7 @@ fn handle_key_press(
             editor.restore_automatic_cursor()?;
         }
 
-        // === MOVEMENT: VIM-STYLE NAVIGATION (Normal mode) ===
+        // Movement vim style navigation normal mode
         (AppMode::ReadOnly, KeyCode::Char('h'), _)
         | (AppMode::ReadOnly, KeyCode::Left, _) => {
             editor.move_left();
@@ -460,7 +459,7 @@ fn handle_key_press(
             editor.clear_command_buffer();
         }
 
-        // === DELETE OPERATIONS (Normal mode) ===
+        // Delete operations normal mode
         (AppMode::ReadOnly, KeyCode::Char('x'), _) => {
             editor.delete_char_forward();
             editor.clear_command_buffer();
@@ -470,7 +469,7 @@ fn handle_key_press(
             editor.clear_command_buffer();
         }
 
-        // === DEBUG/INFO COMMANDS ===
+        // Debug info commands
         (AppMode::ReadOnly, KeyCode::Char('?'), _) => {
             editor.set_debug_message(format!(
                 "{}, Mode: {:?} - Cursor managed automatically",

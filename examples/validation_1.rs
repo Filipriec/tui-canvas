@@ -47,7 +47,7 @@ use canvas::{
 // Import CountMode from the validation module directly
 use canvas::validation::limits::CountMode;
 
-// Enhanced FormEditor that demonstrates validation functionality
+// FormEditor wrapper for validation demo
 struct ValidationFormEditor<D: DataProvider> {
     editor: FormEditor<D>,
     has_unsaved_changes: bool,
@@ -74,7 +74,7 @@ impl<D: DataProvider> ValidationFormEditor<D> {
         }
     }
 
-    // === COMMAND BUFFER HANDLING ===
+    // Command buffer handling
     fn clear_command_buffer(&mut self) {
         self.command_buffer.clear();
     }
@@ -91,7 +91,7 @@ impl<D: DataProvider> ValidationFormEditor<D> {
         !self.command_buffer.is_empty()
     }
 
-    // === VALIDATION CONTROL ===
+    // Validation control
     fn toggle_validation(&mut self) {
         self.validation_enabled = !self.validation_enabled;
         self.editor.set_validation_enabled(self.validation_enabled);
@@ -166,7 +166,7 @@ impl<D: DataProvider> ValidationFormEditor<D> {
         self.debug_message = "🧹 Cleared all validation results".to_string();
     }
 
-    // === ENHANCED MOVEMENT WITH VALIDATION ===
+    // Movement with validation
     fn move_left(&mut self) {
         self.editor.move_left();
         self.field_switch_blocked = false;
@@ -255,21 +255,18 @@ impl<D: DataProvider> ValidationFormEditor<D> {
         }
     }
 
-    // === MODE TRANSITIONS ===
+    // Mode transitions
     fn enter_edit_mode(&mut self) {
-        // Library will automatically update cursor to bar | in insert mode
         self.editor.enter_edit_mode();
         self.debug_message = "✏️  INSERT MODE - Cursor: Steady Bar | - Type to test validation".to_string();
     }
 
     fn enter_append_mode(&mut self) {
-        // Library will automatically update cursor to bar | in insert mode
         self.editor.enter_append_mode();
         self.debug_message = "✏️  INSERT (append) - Cursor: Steady Bar | - Validation active".to_string();
     }
 
     fn exit_edit_mode(&mut self) {
-        // Library will automatically update cursor to block █ in normal mode
         self.editor.exit_edit_mode();
         self.debug_message = "🔒 NORMAL MODE - Cursor: Steady Block █ - Press 'v' to validate current field".to_string();
         self.update_field_validation_status();
@@ -310,7 +307,7 @@ impl<D: DataProvider> ValidationFormEditor<D> {
         config.character_limits.as_ref()
     }
 
-    // === DELETE OPERATIONS ===
+    // Delete operations
     fn delete_backward(&mut self) -> anyhow::Result<()> {
         let result = self.editor.delete_backward();
         if result.is_ok() {
@@ -329,7 +326,7 @@ impl<D: DataProvider> ValidationFormEditor<D> {
         result
     }
 
-    // === DELEGATE TO ORIGINAL EDITOR ===
+    // Delegate to original editor
     fn current_field(&self) -> usize {
         self.editor.current_field()
     }
@@ -390,7 +387,7 @@ impl<D: DataProvider> ValidationFormEditor<D> {
         }
     }
 
-    // === STATUS AND DEBUG ===
+    // Status and debug
     fn set_debug_message(&mut self, msg: String) {
         self.debug_message = msg;
     }
@@ -450,7 +447,7 @@ impl DataProvider for ValidationDemoData {
         None
     }
 
-    // 🎯 NEW: Validation configuration per field
+    // Validation configuration per field
     fn validation_config(&self, field_index: usize) -> Option<ValidationConfig> {
         match field_index {
             0 => Some(ValidationConfig::with_max_length(20)), // Name: simple 20 char limit
@@ -512,7 +509,7 @@ fn handle_key_press(
     }
 
     match (mode, key, modifiers) {
-        // === MODE TRANSITIONS ===
+        // Mode transitions
         (AppMode::ReadOnly, KeyCode::Char('i'), _) => {
             editor.enter_edit_mode();
             editor.clear_command_buffer();
@@ -535,7 +532,7 @@ fn handle_key_press(
             }
         }
 
-        // === VALIDATION COMMANDS ===
+        // Validation commands
         (AppMode::ReadOnly, KeyCode::Char('v'), _) => {
             editor.validate_current_field();
             editor.clear_command_buffer();
@@ -552,7 +549,7 @@ fn handle_key_press(
             editor.toggle_validation();
         }
 
-        // === MOVEMENT ===
+        // Movement
         (AppMode::ReadOnly, KeyCode::Char('h'), _) | (AppMode::ReadOnly, KeyCode::Left, _) => {
             editor.move_left();
             editor.clear_command_buffer();
@@ -570,7 +567,7 @@ fn handle_key_press(
             editor.clear_command_buffer();
         }
 
-        // === EDIT MODE MOVEMENT ===
+        // Edit mode movement
         (AppMode::Edit, KeyCode::Left, _) => {
             editor.move_left();
         }
@@ -584,7 +581,7 @@ fn handle_key_press(
             editor.move_down();
         }
 
-        // === DELETE OPERATIONS ===
+        // Delete operations
         (AppMode::Edit, KeyCode::Backspace, _) => {
             editor.delete_backward()?;
         }
@@ -592,7 +589,7 @@ fn handle_key_press(
             editor.delete_forward()?;
         }
 
-        // === TAB NAVIGATION ===
+        // Tab navigation
         (_, KeyCode::Tab, _) => {
             editor.next_field();
         }
@@ -600,12 +597,12 @@ fn handle_key_press(
             editor.prev_field();
         }
 
-        // === CHARACTER INPUT ===
+        // Character input
         (AppMode::Edit, KeyCode::Char(c), m) if !m.contains(KeyModifiers::CONTROL) => {
             editor.insert_char(c)?;
         }
 
-        // === DEBUG/INFO COMMANDS ===
+        // Debug info commands
         (AppMode::ReadOnly, KeyCode::Char('?'), _) => {
             let summary = editor.editor.validation_summary();
             editor.set_debug_message(format!(
@@ -753,7 +750,7 @@ fn render_validation_status(
         .wrap(Wrap { trim: true });
     f.render_widget(validation_summary, chunks[1]);
 
-    // Enhanced help text
+    // Help text
     let help_text = match editor.mode() {
         AppMode::ReadOnly => {
             "🎯 CURSOR-STYLE: Normal █ | Insert |\n\
@@ -805,13 +802,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Initialize with normal mode - library automatically sets block cursor
     editor.set_mode(AppMode::ReadOnly);
     
-    // Demonstrate that CursorManager is available and working
     CursorManager::update_for_mode(AppMode::ReadOnly)?;
 
     let res = run_app(&mut terminal, editor);
 
-    // Library automatically resets cursor on FormEditor::drop()
-    // But we can also manually reset if needed
     CursorManager::reset()?;
 
     disable_raw_mode()?;

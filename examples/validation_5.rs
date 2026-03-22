@@ -1,5 +1,5 @@
 // examples/validation_5.rs
-//! Enhanced Feature 5: Comprehensive external validation (UI-only) demo with automatic validation
+//! Feature 5 external validation demo with automatic validation.
 //!
 //! Demonstrates:
 //! - Multiple external validation types: PSC lookup, email domain check, username availability,
@@ -67,7 +67,7 @@ use canvas::{
     validation::ExternalValidationState,
 };
 
-/// Enhanced external validation state with timing and context
+/// External validation state with timing and context
 #[derive(Debug, Clone)]
 struct ValidationResult {
     state: ExternalValidationState,
@@ -548,7 +548,7 @@ impl DataProvider for ValidationDemoData {
     }
 }
 
-/// Enhanced editor with automatic external validation management
+/// Editor with automatic external validation management
 struct ValidationDemoEditor<D: DataProvider> {
     editor: FormEditor<D>,
     services: Arc<Mutex<ValidationServices>>,
@@ -1146,7 +1146,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Initialize with normal mode - library automatically sets block cursor
     editor.editor.set_mode(AppMode::ReadOnly);
 
-    // Demonstrate that CursorManager is available and working
     CursorManager::update_for_mode(AppMode::ReadOnly)?;
 
     let res = run_app(&mut terminal, editor);
@@ -1155,8 +1154,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     execute!(terminal.backend_mut(), LeaveAlternateScreen, DisableMouseCapture)?;
     terminal.show_cursor()?;
 
-    // Library automatically resets cursor on FormEditor::drop()
-    // But we can also manually reset if needed
     CursorManager::reset()?;
 
     if let Err(err) = res {
