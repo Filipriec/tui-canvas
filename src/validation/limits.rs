@@ -122,15 +122,9 @@ impl CharacterLimits {
         position: usize,
         character: char,
     ) -> Option<ValidationResult> {
-        // FIX: Actually simulate the insertion at the specified position
-        // This makes the `position` parameter essential to the logic
-        
-        // 1. Create the new string by inserting the character at the correct position
         let mut new_text = String::with_capacity(current_text.len() + character.len_utf8());
         let mut chars = current_text.chars();
 
-        // Append characters from the original string that come before the insertion point
-        // We clamp the position to be safe
         let clamped_pos = position.min(current_text.chars().count());
         for _ in 0..clamped_pos {
             if let Some(ch) = chars.next() {
@@ -138,19 +132,15 @@ impl CharacterLimits {
             }
         }
 
-        // Insert the new character
         new_text.push(character);
 
-        // Append the rest of the original string
         for ch in chars {
             new_text.push(ch);
         }
 
-        // 2. Now perform all validation on the *actual* resulting text
         let new_count = self.count(&new_text);
         let current_count = self.count(current_text);
 
-        // Check max length
         if let Some(max) = self.max_length {
             if new_count > max {
                 return Some(ValidationResult::error(format!(
@@ -158,7 +148,6 @@ impl CharacterLimits {
                 )));
             }
 
-            // Check warning threshold
             if let Some(warning_threshold) = self.warning_threshold {
                 if new_count >= warning_threshold && current_count < warning_threshold {
                     return Some(ValidationResult::warning(format!(
@@ -174,8 +163,7 @@ impl CharacterLimits {
     /// Validate the current content
     pub fn validate_content(&self, text: &str) -> Option<ValidationResult> {
         let count = self.count(text);
-        
-        // Check minimum length
+
         if let Some(min) = self.min_length {
             if count < min {
                 return Some(ValidationResult::warning(format!(
@@ -183,16 +171,14 @@ impl CharacterLimits {
                 )));
             }
         }
-        
-        // Check maximum length
+
         if let Some(max) = self.max_length {
             if count > max {
                 return Some(ValidationResult::error(format!(
                     "Character limit exceeded: {count}/{max}"
                 )));
             }
-            
-            // Check warning threshold
+
             if let Some(warning_threshold) = self.warning_threshold {
                 if count >= warning_threshold {
                     return Some(ValidationResult::warning(format!(
@@ -208,14 +194,12 @@ impl CharacterLimits {
     /// Get the current status of the text against limits
     pub fn check_limits(&self, text: &str) -> LimitCheckResult {
         let count = self.count(text);
-        
-        // Check max length first
+
         if let Some(max) = self.max_length {
             if count > max {
                 return LimitCheckResult::Exceeded { current: count, max };
             }
-            
-            // Check warning threshold
+
             if let Some(warning_threshold) = self.warning_threshold {
                 if count >= warning_threshold {
                     return LimitCheckResult::Warning { current: count, max };

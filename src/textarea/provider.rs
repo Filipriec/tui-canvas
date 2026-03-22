@@ -5,7 +5,7 @@ use ropey::Rope;
 use std::io::{self, BufReader, Read};
 use std::path::Path;
 
-#[derive(Debug)] // Clone removed: OnceCell<String> is not Clone
+#[derive(Debug)]
 pub struct TextAreaProvider {
     rope: Rope,
     name: String,
@@ -134,7 +134,7 @@ impl TextAreaProvider {
         let at = at_char.min(line_len);
 
         let insert_at = start + at;
-        self.rope.insert(insert_at, "\n"); // rope insert at char index
+        self.rope.insert(insert_at, "\n");
 
         self.resize_cache();
         self.invalidate_cache_from(clamped_line);
@@ -147,9 +147,9 @@ impl TextAreaProvider {
         if line_idx + 1 >= self.line_count() {
             return None;
         }
-        let newline_pos = self.rope.line_to_char(line_idx + 1) - 1; // index of '\n'
+        let newline_pos = self.rope.line_to_char(line_idx + 1) - 1;
         let left_len = self.line_content_len_chars(line_idx);
-        self.rope.remove(newline_pos..newline_pos + 1); // remove the newline
+        self.rope.remove(newline_pos..newline_pos + 1);
 
         self.resize_cache();
         self.invalidate_cache_from(line_idx);
@@ -164,7 +164,7 @@ impl TextAreaProvider {
         }
         let prev_idx = line_idx - 1;
         let prev_len = self.line_content_len_chars(prev_idx);
-        let newline_pos = self.rope.line_to_char(line_idx) - 1; // index of '\n' before current line
+        let newline_pos = self.rope.line_to_char(line_idx) - 1;
         self.rope.remove(newline_pos..newline_pos + 1);
 
         self.resize_cache();
@@ -220,7 +220,6 @@ impl DataProvider for TextAreaProvider {
             return "";
         }
         let cell = &self.line_cache[index];
-        // Fill lazily on first read, from &self (no &mut needed).
         let s_ref = cell.get_or_init(|| self.compute_line_string(index));
         s_ref.as_str()
     }
@@ -229,7 +228,6 @@ impl DataProvider for TextAreaProvider {
         if index >= self.line_count() {
             return;
         }
-        // Enforce single-line invariant: strip embedded newlines
         let clean = value.replace('\n', "");
 
         let (start, end) = self.line_bounds_chars(index);

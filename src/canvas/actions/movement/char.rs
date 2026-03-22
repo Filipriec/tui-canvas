@@ -13,7 +13,7 @@ pub fn move_right(current_pos: usize, text: &str, for_edit_mode: bool) -> usize 
     }
 
     if for_edit_mode {
-        // Edit mode: can move past end of text
+        // Can move past end of text
         (current_pos + 1).min(text.len())
     } else {
         // Read-only/highlight mode: stays within text bounds

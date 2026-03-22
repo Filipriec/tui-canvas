@@ -183,20 +183,13 @@ impl SyntectEngine {
         let start = self.parse_after.len();
         for i in start..line_idx {
             let s = provider.field_value(i);
-            
-            // Fix: parse_line takes 2 arguments: line and &SyntaxSet
             let ops = ps.parse_line(s, &self.ps).unwrap_or_default();
-            
-            // Fix: HighlightState::new requires &Highlighter and ScopeStack
             let mut highlight_state = HighlightState::new(&highlighter, stack.clone());
-            
-            // Fix: HighlightIterator::new expects &mut HighlightState as first parameter
             let it = HighlightIterator::new(&mut highlight_state, &ops[..], s, &highlighter);
             for (_style, _text) in it {
+                // TODO wtf is this?
                 // Iterate to apply ops; we don't need the tokens here.
             }
-            
-            // Update the stack from the highlight state
             stack = highlight_state.path.clone();
 
             let h = Self::hash_line(s);
@@ -243,13 +236,8 @@ impl SyntectEngine {
             ScopeStack::new()
         };
 
-        // Fix: parse_line takes 2 arguments: line and &SyntaxSet
         let ops = ps.parse_line(line, &self.ps).unwrap_or_default();
-        
-        // Fix: HighlightState::new requires &Highlighter and ScopeStack
         let mut highlight_state = HighlightState::new(&highlighter, stack);
-        
-        // Fix: HighlightIterator::new expects &mut HighlightState as first parameter
         let iter = HighlightIterator::new(&mut highlight_state, &ops[..], line, &highlighter);
 
         let mut out: Vec<StyledChunk> = Vec::new();

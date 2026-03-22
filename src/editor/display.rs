@@ -6,7 +6,6 @@ use crate::DataProvider;
 
 impl<D: DataProvider> FormEditor<D> {
     /// Get current field text for display.
-    /// Policies documented in original file.
     #[cfg(feature = "validation")]
     pub fn current_display_text(&self) -> String {
         let field_index = self.ui_state.current_field;

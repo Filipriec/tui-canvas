@@ -4,7 +4,6 @@ use std::ops::{Deref, DerefMut};
 use super::engine::SyntectEngine;
 use crate::textarea::state::TextAreaState;
 
-// Remove Debug derive since TextAreaState doesn't implement Debug
 #[derive(Default)]
 pub struct TextAreaSyntaxState {
     pub textarea: TextAreaState,
@@ -18,7 +17,6 @@ impl TextAreaSyntaxState {
         s
     }
 
-    // Optional: convenience setters
     pub fn set_syntax_theme(&mut self, theme: &str) -> bool {
         self.engine.set_theme(theme)
     }
@@ -42,4 +40,3 @@ impl DerefMut for TextAreaSyntaxState {
         &mut self.textarea
     }
 }
-

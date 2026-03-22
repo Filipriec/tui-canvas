@@ -9,7 +9,6 @@ pub mod char;
 pub use word::{
     find_next_word_start, find_word_end, find_prev_word_start, find_prev_word_end,
     find_next_big_word_start, find_prev_big_word_start, find_big_word_end, find_prev_big_word_end,
-    // Add these new exports:
     find_last_word_start_in_field, find_last_word_end_in_field,
     find_last_big_word_start_in_field, find_last_big_word_end_in_field,
 };

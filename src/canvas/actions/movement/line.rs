@@ -11,7 +11,7 @@ pub fn line_end_position(text: &str, for_edit_mode: bool) -> usize {
     if text.is_empty() {
         0
     } else if for_edit_mode {
-        // Edit mode: cursor can go past end of text
+        // Cursor can go past end of text
         text.len()
     } else {
         // Read-only/highlight mode: cursor stays on last character
@@ -24,7 +24,7 @@ pub fn safe_cursor_position(text: &str, ideal_column: usize, for_edit_mode: bool
     if text.is_empty() {
         0
     } else if for_edit_mode {
-        // Edit mode: cursor can go past end
+        // Cursor can go past end
         ideal_column.min(text.len())
     } else {
         // Read-only/highlight mode: cursor stays within text
