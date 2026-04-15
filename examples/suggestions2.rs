@@ -43,11 +43,8 @@ use canvas::{
         CursorManager, // This import only exists when cursor-style feature is enabled
     },
     suggestions::gui::render_suggestions_dropdown,
-    DataProvider, FormEditor, SuggestionsProvider, SuggestionItem,
+    DataProvider, FormEditor, SuggestionItem,
 };
-
-use async_trait::async_trait;
-use anyhow::Result;
 
 // FormEditor wrapper for suggestions demo
 struct AutoCursorFormEditor<D: DataProvider> {
@@ -67,8 +64,16 @@ impl<D: DataProvider> AutoCursorFormEditor<D> {
         }
     }
 
-    fn close_suggestions(&mut self) {
-        self.editor.close_suggestions();
+    fn dismiss_suggestions(&mut self) {
+        self.editor.dismiss_suggestions();
+    }
+
+    fn trigger_suggestions(&mut self) -> Option<(usize, String)> {
+        self.editor.trigger_suggestions()
+    }
+
+    fn apply_suggestions(&mut self, items: Vec<SuggestionItem>) {
+        self.editor.apply_suggestions(items);
     }
 
     // Command buffer handling
@@ -254,34 +259,21 @@ impl<D: DataProvider> AutoCursorFormEditor<D> {
         result
     }
 
-    // Nonblocking suggestions
+    // Suggestions
 
-    /// Trigger suggestions asynchronously without blocking the UI.
-    async fn trigger_suggestions_async(
+    /// Trigger suggestions and fetch results synchronously.
+    fn trigger_and_fetch_suggestions(
         &mut self,
         provider: &mut ProductionSuggestionsProvider,
-        field_index: usize,
     ) {
-        // Step 1: Start loading immediately (UI updates instantly)
-        if let Some(query) = self.editor.start_suggestions(field_index) {
-            // Step 2: Fetch from your data source (API, database, etc.)
-            match provider.fetch_suggestions(field_index, &query).await {
-                Ok(results) => {
-                    // Step 3: Apply results with built-in stale protection
-                    let applied = self.editor.apply_suggestions_result(field_index, &query, results);
-                    if applied {
-                        self.editor.update_inline_completion();
-                        if self.editor.suggestions().is_empty() {
-                            self.set_debug_message(format!("🔍 No matches for '{query}'"));
-                        } else {
-                            self.set_debug_message(format!("✨ {} matches for '{}'", self.editor.suggestions().len(), query));
-                        }
-                    }
-                    // If not applied, results were stale (user kept typing)
-                }
-                Err(e) => {
-                    self.set_debug_message(format!("❌ Suggestion error: {e}"));
-                }
+        if let Some((field_index, query)) = self.editor.trigger_suggestions() {
+            let results = provider.fetch_suggestions(field_index, &query);
+            self.editor.apply_suggestions(results);
+            self.editor.update_inline_completion();
+            if self.editor.suggestions().is_empty() {
+                self.set_debug_message(format!("🔍 No matches for '{query}'"));
+            } else {
+                self.set_debug_message(format!("✨ {} matches for '{}'", self.editor.suggestions().len(), query));
             }
         }
     }
@@ -416,73 +408,45 @@ impl DataProvider for ApplicationData {
     }
 }
 
-// Production suggestions provider
+// Production suggestions provider (sync)
 
-/// Suggestions provider
+/// Suggestions provider (sync)
 ///
 /// Replace the data sources below with your implementation:
-/// - REST API calls (reqwest, hyper)
+/// - REST API calls (reqwest, ureq)
 /// - Database queries (sqlx, diesel)
 /// - Search engines (elasticsearch, algolia)
 /// - Cache lookups (redis, memcached)
 /// - GraphQL queries
 /// - gRPC services
 ///
-/// Works with any async data source.
-struct ProductionSuggestionsProvider {
-    // Add your API clients, database connections, cache clients here
-    // Example:
-    // api_client: reqwest::Client,
-    // db_pool: sqlx::PgPool,
-    // cache: redis::Client,
-}
+/// For async data sources: fetch externally and call editor.apply_suggestions() later
+struct ProductionSuggestionsProvider {}
 
 impl ProductionSuggestionsProvider {
     fn new() -> Self {
-        Self {
-            // Initialize your clients here
-            // api_client: reqwest::Client::new(),
-            // db_pool: create_db_pool().await,
-            // cache: redis::Client::open("redis://localhost").unwrap(),
-        }
+        Self {}
     }
 
     /// Get fruit suggestions (replace with your API call)
-    async fn get_fruit_suggestions(&self, query: &str) -> Result<Vec<SuggestionItem>> {
-        // Example: Replace with actual API call
-        // let response = self.api_client
-        //     .get(&format!("https://api.example.com/fruits?q={}", query))
-        //     .send()
-        //     .await?;
-        // let fruits: Vec<Fruit> = response.json().await?;
-
+    fn get_fruit_suggestions(&self, query: &str) -> Vec<SuggestionItem> {
         let fruits = vec![
             ("Apple", "🍎 Crisp and sweet"),
             ("Banana", "🍌 Rich in potassium"),
             ("Cherry", "🍒 Small and tart"),
             ("Date", "📅 Sweet and chewy"),
-            ("Ananas", "🍎 Crisp and sweet"),
             ("Elderberry", "🫐 Dark purple berry"),
             ("Fig", "🍇 Sweet Mediterranean fruit"),
             ("Grape", "🍇 Perfect for wine"),
             ("Honeydew", "🍈 Sweet melon"),
-            ("avocado", "🍎 Crisp and sweet"),
+            ("Avocado", "🥑 Creamy and nutritious"),
         ];
 
-        Ok(self.filter_suggestions(fruits, query))
+        self.filter_suggestions(fruits, query)
     }
 
     /// Get job suggestions (replace with your database query)
-    async fn get_job_suggestions(&self, query: &str) -> Result<Vec<SuggestionItem>> {
-        // Example: Replace with actual database query
-        // let jobs = sqlx::query_as!(
-        //     JobRow,
-        //     "SELECT title, description FROM jobs WHERE title ILIKE $1 LIMIT 10",
-        //     format!("%{}%", query)
-        // )
-        // .fetch_all(&self.db_pool)
-        // .await?;
-
+    fn get_job_suggestions(&self, query: &str) -> Vec<SuggestionItem> {
         let jobs = vec![
             ("Software Engineer", "👨‍💻 Build applications"),
             ("Product Manager", "📋 Manage product roadmap"),
@@ -494,17 +458,11 @@ impl ProductionSuggestionsProvider {
             ("Accountant", "💼 Manage finances"),
         ];
 
-        Ok(self.filter_suggestions(jobs, query))
+        self.filter_suggestions(jobs, query)
     }
 
     /// Get language suggestions (replace with your cache lookup)
-    async fn get_language_suggestions(&self, query: &str) -> Result<Vec<SuggestionItem>> {
-        // Example: Replace with cache lookup + fallback to API
-        // let cached = self.cache.get(&format!("langs:{}", query)).await?;
-        // if let Some(cached_result) = cached {
-        //     return Ok(serde_json::from_str(&cached_result)?);
-        // }
-
+    fn get_language_suggestions(&self, query: &str) -> Vec<SuggestionItem> {
         let languages = vec![
             ("Rust", "🦀 Systems programming"),
             ("Python", "🐍 Versatile and popular"),
@@ -516,18 +474,11 @@ impl ProductionSuggestionsProvider {
             ("Swift", "🍎 iOS development"),
         ];
 
-        Ok(self.filter_suggestions(languages, query))
+        self.filter_suggestions(languages, query)
     }
 
     /// Get country suggestions (replace with your geographic API)
-    async fn get_country_suggestions(&self, query: &str) -> Result<Vec<SuggestionItem>> {
-        // Example: Replace with geographic API call
-        // let response = self.api_client
-        //     .get(&format!("https://restcountries.com/v3.1/name/{}", query))
-        //     .send()
-        //     .await?;
-        // let countries: Vec<Country> = response.json().await?;
-
+    fn get_country_suggestions(&self, query: &str) -> Vec<SuggestionItem> {
         let countries = vec![
             ("United States", "🇺🇸 North America"),
             ("Canada", "🇨🇦 Great neighbors"),
@@ -539,11 +490,11 @@ impl ProductionSuggestionsProvider {
             ("Brazil", "🇧🇷 Carnival country"),
         ];
 
-        Ok(self.filter_suggestions(countries, query))
+        self.filter_suggestions(countries, query)
     }
 
     /// Get color suggestions (local data)
-    async fn get_color_suggestions(&self, query: &str) -> Result<Vec<SuggestionItem>> {
+    fn get_color_suggestions(&self, query: &str) -> Vec<SuggestionItem> {
         let colors = vec![
             ("Red", "🔴 Bold and energetic"),
             ("Blue", "🔵 Calm and trustworthy"),
@@ -555,42 +506,37 @@ impl ProductionSuggestionsProvider {
             ("Black", "⚫ Classic and elegant"),
         ];
 
-        Ok(self.filter_suggestions(colors, query))
+        self.filter_suggestions(colors, query)
+    }
+
+    /// Main suggestions entry point - route to appropriate data source
+    fn fetch_suggestions(&mut self, field_index: usize, query: &str) -> Vec<SuggestionItem> {
+        match field_index {
+            0 => self.get_fruit_suggestions(query),
+            1 => self.get_job_suggestions(query),
+            2 => self.get_language_suggestions(query),
+            3 => self.get_country_suggestions(query),
+            4 => self.get_color_suggestions(query),
+            _ => Vec::new(),
+        }
     }
 
     /// Generic filtering helper (reusable for any data source)
     fn filter_suggestions(&self, items: Vec<(&str, &str)>, query: &str) -> Vec<SuggestionItem> {
         let query_lower = query.to_lowercase();
 
-        items.iter()
+        items
+            .iter()
             .filter(|(item, _)| {
                 query.is_empty() || item.to_lowercase().starts_with(&query_lower)
             })
-            .map(|(item, description)| SuggestionItem {
-                display_text: format!("{item} - {description}"),
-                value_to_store: item.to_string(),
-            })
+            .map(|(item, description)| SuggestionItem::new(format!("{item} - {description}"), *item))
             .collect()
     }
 }
 
-#[async_trait]
-impl SuggestionsProvider for ProductionSuggestionsProvider {
-    /// Main suggestions entry point - route to appropriate data source
-    async fn fetch_suggestions(&mut self, field_index: usize, query: &str) -> Result<Vec<SuggestionItem>> {
-        match field_index {
-            0 => self.get_fruit_suggestions(query).await,      // API call
-            1 => self.get_job_suggestions(query).await,        // Database query
-            2 => self.get_language_suggestions(query).await,   // Cache + API
-            3 => self.get_country_suggestions(query).await,    // Geographic API
-            4 => self.get_color_suggestions(query).await,      // Local data
-            _ => Ok(Vec::new()),
-        }
-    }
-}
-
 /// Production-ready key handling with Tab-triggered suggestions
-async fn handle_key_press(
+fn handle_key_press(
     key: KeyCode,
     modifiers: KeyModifiers,
     editor: &mut AutoCursorFormEditor<ApplicationData>,
@@ -615,8 +561,7 @@ async fn handle_key_press(
                 editor.set_debug_message("📍 Next suggestion".to_string());
             } else if editor.data_provider().supports_suggestions(editor.current_field()) {
                 // Trigger suggestions
-                let field_index = editor.current_field();
-                editor.trigger_suggestions_async(suggestions_provider, field_index).await;
+                editor.trigger_and_fetch_suggestions(suggestions_provider);
             } else {
                 editor.next_field();
                 editor.set_debug_message("Tab: next field".to_string());
@@ -639,10 +584,10 @@ async fn handle_key_press(
             }
         }
 
-        // Escape: Close suggestions or exit mode
+        // Escape: Dismiss suggestions or exit mode
         (_, KeyCode::Esc, _) => {
             if editor.is_suggestions_active() {
-                editor.close_suggestions();
+                editor.dismiss_suggestions();
                 editor.set_debug_message("❌ Suggestions closed".to_string());
             } else {
                 match mode {
@@ -805,20 +750,14 @@ async fn handle_key_press(
         // Delete operations autofetch when suggestions active
         (AppMode::Edit, KeyCode::Backspace, _) => {
             editor.delete_backward()?;
-            // Auto-fetch only if suggestions are already active (triggered by Tab)
-            // For full auto-triggering: remove the `if` check below
             if editor.is_suggestions_active() {
-                let field_index = editor.current_field();
-                editor.trigger_suggestions_async(suggestions_provider, field_index).await;
+                editor.trigger_and_fetch_suggestions(suggestions_provider);
             }
         }
         (AppMode::Edit, KeyCode::Delete, _) => {
             editor.delete_forward()?;
-            // Auto-fetch only if suggestions are already active (triggered by Tab)
-            // For full auto-triggering: remove the `if` check below
             if editor.is_suggestions_active() {
-                let field_index = editor.current_field();
-                editor.trigger_suggestions_async(suggestions_provider, field_index).await;
+                editor.trigger_and_fetch_suggestions(suggestions_provider);
             }
         }
 
@@ -835,11 +774,8 @@ async fn handle_key_press(
         // Character input autofetch when suggestions active
         (AppMode::Edit, KeyCode::Char(c), m) if !m.contains(KeyModifiers::CONTROL) => {
             editor.insert_char(c)?;
-            // Auto-fetch only if suggestions are already active (triggered by Tab)
-            // For full auto-triggering: remove the `if` check below
             if editor.is_suggestions_active() {
-                let field_index = editor.current_field();
-                editor.trigger_suggestions_async(suggestions_provider, field_index).await;
+                editor.trigger_and_fetch_suggestions(suggestions_provider);
             }
         }
 
@@ -874,7 +810,7 @@ async fn handle_key_press(
     Ok(true)
 }
 
-async fn run_app<B: Backend>(
+fn run_app<B: Backend>(
     terminal: &mut Terminal<B>,
     mut editor: AutoCursorFormEditor<ApplicationData>,
 ) -> io::Result<()> {
@@ -884,7 +820,7 @@ async fn run_app<B: Backend>(
         terminal.draw(|f| ui(f, &editor))?;
 
         if let Event::Key(key) = event::read()? {
-            match handle_key_press(key.code, key.modifiers, &mut editor, &mut suggestions_provider).await {
+            match handle_key_press(key.code, key.modifiers, &mut editor, &mut suggestions_provider) {
                 Ok(should_continue) => {
                     if !should_continue {
                         break;
@@ -1008,8 +944,7 @@ fn render_status_and_help(
     f.render_widget(help, chunks[1]);
 }
 
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Print demo information
     println!("🚀 Production-Ready Tab-Triggered Suggestions Demo");
     println!("✅ Press Tab to activate suggestions, then type to filter in real-time");
@@ -1017,7 +952,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("✅ Copy this pattern for your production application!");
     println!();
     println!("🏗️  Integration Ready For:");
-    println!("   📡 REST APIs (reqwest, hyper)");
+    println!("   📡 REST APIs (reqwest, ureq)");
     println!("   🗄️  Databases (sqlx, diesel, mongodb)");
     println!("   🔍 Search Engines (elasticsearch, algolia, typesense)");
     println!("   💾 Caches (redis, memcached)");
@@ -1027,10 +962,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("⚡ Key Features:");
     println!("   • Press Tab to activate suggestions dropdown");
     println!("   • Real-time filtering while suggestions are active");
-    println!("   • Built-in stale result protection");
     println!("   • Tab cycles through suggestions");
     println!("   • Professional-grade user experience");
-    println!("   • Easy to integrate with any async data source");
+    println!("   • Easy to integrate with any data source");
     println!();
 
     enable_raw_mode()?;
@@ -1047,7 +981,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     CursorManager::update_for_mode(AppMode::ReadOnly)?;
 
-    let res = run_app(&mut terminal, editor).await;
+    let res = run_app(&mut terminal, editor);
 
     CursorManager::reset()?;
 
