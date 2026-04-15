@@ -1,10 +1,7 @@
 // src/data_provider.rs
 //! Simplified user interface - only business data, no UI state
 
-#[cfg(feature = "suggestions")]
-use anyhow::Result;
-#[cfg(feature = "suggestions")]
-use async_trait::async_trait;
+
 
 /// Defines when suggestions should be shown for a field
 #[cfg(feature = "suggestions")]
@@ -76,15 +73,6 @@ pub trait DataProvider {
     fn computed_field_value(&self, _field_index: usize) -> Option<String> {
         None
     }
-}
-
-/// Optional: User implements this for suggestions data
-#[cfg(feature = "suggestions")]
-#[async_trait]
-pub trait SuggestionsProvider {
-    /// Fetch suggestions (user's business logic)
-    async fn fetch_suggestions(&mut self, field_index: usize, query: &str)
-        -> Result<Vec<SuggestionItem>>;
 }
 
 #[cfg(feature = "suggestions")]

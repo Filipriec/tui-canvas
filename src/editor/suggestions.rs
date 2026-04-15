@@ -28,13 +28,6 @@ impl<D: DataProvider> FormEditor<D> {
         self.ui_state.open_suggestions(field_index);
     }
 
-    /// Close suggestions UI and clear current suggestion results
-    #[deprecated(since = "0.6", note = "Use dismiss_suggestions instead")]
-    pub fn close_suggestions(&mut self) {
-        self.ui_state.close_suggestions();
-        self.suggestions.clear();
-    }
-
     /// Trigger suggestions - opens UI and returns request info for client to fetch data.
     /// Client should fetch data and call apply_suggestions().
     /// Returns Some((field_index, query)) if suggestions can be triggered, None otherwise.
@@ -144,85 +137,6 @@ impl<D: DataProvider> FormEditor<D> {
         }
     }
 
-    // Non-blocking suggestions API
-
-    #[cfg(feature = "suggestions")]
-    #[deprecated(since = "0.6", note = "Use trigger_suggestions instead")]
-    pub fn start_suggestions(&mut self, field_index: usize) -> Option<String> {
-        if !self.data_provider.supports_suggestions(field_index) {
-            return None;
-        }
-
-        let query = self.current_text().to_string();
-        self.ui_state.open_suggestions(field_index);
-        self.ui_state.suggestions.is_loading = true;
-        self.ui_state.suggestions.active_query = Some(query.clone());
-        self.suggestions.clear();
-        Some(query)
-    }
-
-    #[cfg(not(feature = "suggestions"))]
-    pub fn start_suggestions(&mut self, _field_index: usize) -> Option<String> {
-        None
-    }
-
-    #[cfg(feature = "suggestions")]
-    #[deprecated(since = "0.6", note = "Use apply_suggestions instead")]
-    pub fn apply_suggestions_result(
-        &mut self,
-        field_index: usize,
-        query: &str,
-        results: Vec<SuggestionItem>,
-    ) -> bool {
-        if self.ui_state.suggestions.active_field != Some(field_index) {
-            return false;
-        }
-        if self.ui_state.suggestions.active_query.as_deref() != Some(query) {
-            return false;
-        }
-
-        self.ui_state.suggestions.is_loading = false;
-        self.suggestions = results;
-
-        if !self.suggestions.is_empty() {
-            self.ui_state.suggestions.selected_index = Some(0);
-            self.update_inline_completion();
-        } else {
-            self.ui_state.suggestions.selected_index = None;
-            self.ui_state.suggestions.completion_text = None;
-        }
-        true
-    }
-
-    #[cfg(not(feature = "suggestions"))]
-    pub fn apply_suggestions_result(
-        &mut self,
-        _field_index: usize,
-        _query: &str,
-        _results: Vec<SuggestionItem>,
-    ) -> bool {
-        false
-    }
-
-    #[cfg(feature = "suggestions")]
-    #[deprecated(since = "0.6", note = "Client now controls suggestion timing - no pending state needed")]
-    pub fn pending_suggestions_query(&self) -> Option<(usize, String)> {
-        if self.ui_state.suggestions.is_loading {
-            if let (Some(field), Some(query)) = (
-                self.ui_state.suggestions.active_field,
-                &self.ui_state.suggestions.active_query,
-            ) {
-                return Some((field, query.clone()));
-            }
-        }
-        None
-    }
-
-    #[cfg(not(feature = "suggestions"))]
-    pub fn pending_suggestions_query(&self) -> Option<(usize, String)> {
-        None
-    }
-
     pub fn cancel_suggestions(&mut self) {
         self.dismiss_suggestions();
     }
@@ -267,7 +181,7 @@ impl<D: DataProvider> FormEditor<D> {
 
                 self.set_cursor_raw(suggestion.value_to_store.chars().count());
 
-                self.close_suggestions();
+                self.dismiss_suggestions();
                 self.suggestions.clear();
 
                 #[cfg(feature = "validation")]

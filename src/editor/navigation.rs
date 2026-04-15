@@ -112,7 +112,7 @@ impl<D: DataProvider> FormEditor<D> {
 
         #[cfg(feature = "suggestions")]
         {
-            self.close_suggestions();
+            self.dismiss_suggestions();
         }
 
         Ok(())

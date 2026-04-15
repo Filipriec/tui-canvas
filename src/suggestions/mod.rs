@@ -8,7 +8,7 @@ pub mod state;
 #[cfg(feature = "gui")]
 pub mod gui;
 
-pub use state::{SuggestionsProvider, SuggestionItem};
+pub use state::SuggestionItem;
 
 #[cfg(feature = "gui")]
 pub use gui::render_suggestions_dropdown;

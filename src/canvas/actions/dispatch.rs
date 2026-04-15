@@ -76,7 +76,7 @@ impl<D: DataProvider> FormEditor<D> {
             }
             #[cfg(feature = "suggestions")]
             ExitSuggestions => {
-                self.close_suggestions();
+                self.dismiss_suggestions();
                 ActionResult::Success
             }
             #[cfg(not(feature = "suggestions"))]
