@@ -29,21 +29,85 @@ impl<D: DataProvider> FormEditor<D> {
     }
 
     /// Close suggestions UI and clear current suggestion results
+    #[deprecated(since = "0.6", note = "Use dismiss_suggestions instead")]
     pub fn close_suggestions(&mut self) {
         self.ui_state.close_suggestions();
         self.suggestions.clear();
     }
 
+    /// Trigger suggestions - opens UI and returns request info for client to fetch data.
+    /// Client should fetch data and call apply_suggestions().
+    /// Returns Some((field_index, query)) if suggestions can be triggered, None otherwise.
+    #[cfg(feature = "suggestions")]
+    pub fn trigger_suggestions(&mut self) -> Option<(usize, String)> {
+        let idx = self.current_field();
+        if !self.data_provider.supports_suggestions(idx) {
+            return None;
+        }
+
+        let query = self.current_text().to_string();
+        self.ui_state.open_suggestions(idx);
+        self.ui_state.suggestions.active_query = Some(query.clone());
+        self.suggestions.clear();
+        self.ui_state.suggestions.selected_index = None;
+
+        Some((idx, query))
+    }
+
+    /// Apply fetched suggestions from client - opens UI with the provided items.
+    #[cfg(feature = "suggestions")]
+    pub fn apply_suggestions(&mut self, items: Vec<SuggestionItem>) {
+        self.ui_state.suggestions.is_loading = false;
+        self.suggestions = items;
+
+        if !self.suggestions.is_empty() {
+            self.ui_state.suggestions.selected_index = Some(0);
+            self.update_inline_completion();
+        } else {
+            self.ui_state.suggestions.selected_index = None;
+            self.ui_state.suggestions.completion_text = None;
+        }
+    }
+
+    /// Update suggestions with new query results - adjusts selection if needed.
+    #[cfg(feature = "suggestions")]
+    pub fn update_suggestions(&mut self, items: Vec<SuggestionItem>) {
+        self.ui_state.suggestions.is_loading = false;
+        self.suggestions = items;
+
+        if !self.suggestions.is_empty() {
+            // Keep selected_index if valid, else reset
+            let current_idx = self.ui_state.suggestions.selected_index.unwrap_or(0);
+            if current_idx >= self.suggestions.len() {
+                self.ui_state.suggestions.selected_index = Some(0);
+            }
+            self.update_inline_completion();
+        } else {
+            self.ui_state.suggestions.selected_index = None;
+            self.ui_state.suggestions.completion_text = None;
+        }
+    }
+
+    /// Dismiss suggestions - closes UI and clears data.
+    #[cfg(feature = "suggestions")]
+    pub fn dismiss_suggestions(&mut self) {
+        self.ui_state.close_suggestions();
+        self.suggestions.clear();
+        self.ui_state.suggestions.selected_index = None;
+        self.ui_state.suggestions.completion_text = None;
+    }
+
     /// Handle Escape key in ReadOnly mode (closes suggestions if active)
     pub fn handle_escape_readonly(&mut self) {
         if self.ui_state.suggestions.is_active {
-            self.close_suggestions();
+            self.dismiss_suggestions();
         }
     }
 
     // Non-blocking suggestions API
 
     #[cfg(feature = "suggestions")]
+    #[deprecated(since = "0.6", note = "Use trigger_suggestions instead")]
     pub fn start_suggestions(&mut self, field_index: usize) -> Option<String> {
         if !self.data_provider.supports_suggestions(field_index) {
             return None;
@@ -63,6 +127,7 @@ impl<D: DataProvider> FormEditor<D> {
     }
 
     #[cfg(feature = "suggestions")]
+    #[deprecated(since = "0.6", note = "Use apply_suggestions instead")]
     pub fn apply_suggestions_result(
         &mut self,
         field_index: usize,
@@ -100,6 +165,7 @@ impl<D: DataProvider> FormEditor<D> {
     }
 
     #[cfg(feature = "suggestions")]
+    #[deprecated(since = "0.6", note = "Client now controls suggestion timing - no pending state needed")]
     pub fn pending_suggestions_query(&self) -> Option<(usize, String)> {
         if self.ui_state.suggestions.is_loading {
             if let (Some(field), Some(query)) = (
@@ -118,7 +184,7 @@ impl<D: DataProvider> FormEditor<D> {
     }
 
     pub fn cancel_suggestions(&mut self) {
-        self.close_suggestions();
+        self.dismiss_suggestions();
     }
 
     pub fn suggestions_next(&mut self) {

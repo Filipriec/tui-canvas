@@ -105,7 +105,7 @@ impl<D: DataProvider> FormEditor<D> {
         self.seq_tracker = KeySequenceTracker::new(timeout_ms);
     }
 
-    pub(crate) fn current_text(&self) -> &str {
+    pub fn current_text(&self) -> &str {
         let field_index = self.ui_state.current_field;
         if field_index < self.data_provider.field_count() {
             self.data_provider.field_value(field_index)
