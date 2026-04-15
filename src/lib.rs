@@ -25,7 +25,7 @@ pub use canvas::CursorManager;
 pub use editor::FormEditor;
 pub use data_provider::DataProvider;
 #[cfg(feature = "suggestions")]
-pub use data_provider::{SuggestionsProvider, SuggestionItem};
+pub use data_provider::{SuggestionsProvider, SuggestionItem, SuggestionTrigger};
 
 pub use canvas::state::EditorState;
 pub use canvas::modes::AppMode;

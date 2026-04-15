@@ -158,6 +158,10 @@ impl<D: DataProvider> FormEditor<D> {
         // Default (not normal): vim behavior
         #[cfg(not(feature = "textmode-normal"))]
         self.set_mode(AppMode::Edit);
+
+        // Check if suggestions should be shown based on trigger
+        #[cfg(feature = "suggestions")]
+        self.check_suggestion_trigger();
     }
 
     // Highlight/Visual mode

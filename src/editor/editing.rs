@@ -147,6 +147,10 @@ impl<D: DataProvider> FormEditor<D> {
         }
 
         self.set_cursor_raw(raw_cursor_pos + 1);
+
+        #[cfg(feature = "suggestions")]
+        self.check_suggestion_trigger();
+
         Ok(())
     }
 
@@ -209,6 +213,9 @@ impl<D: DataProvider> FormEditor<D> {
             );
         }
 
+        #[cfg(feature = "suggestions")]
+        self.check_suggestion_trigger();
+
         Ok(())
     }
 
@@ -269,6 +276,9 @@ impl<D: DataProvider> FormEditor<D> {
                     &current_text,
                 );
             }
+
+            #[cfg(feature = "suggestions")]
+            self.check_suggestion_trigger();
         }
 
         Ok(())

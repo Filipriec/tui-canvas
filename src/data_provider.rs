@@ -6,6 +6,18 @@ use anyhow::Result;
 #[cfg(feature = "suggestions")]
 use async_trait::async_trait;
 
+/// Defines when suggestions should be shown for a field
+#[cfg(feature = "suggestions")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SuggestionTrigger {
+    /// No suggestions for this field
+    None,
+    /// Show suggestions when field starts (becomes non-empty)
+    WhenFieldStarts,
+    /// Show suggestions when field starts with this special character
+    SpecialChar(char),
+}
+
 /// User implements this - only business data, no UI state
 pub trait DataProvider {
     /// How many fields in the form
@@ -23,6 +35,20 @@ pub trait DataProvider {
     /// Check if field supports suggestions (optional)
     fn supports_suggestions(&self, _field_index: usize) -> bool {
         false
+    }
+
+    /// When should suggestions be triggered for a field? (optional)
+    /// Only used when suggestions feature is enabled
+    #[cfg(feature = "suggestions")]
+    fn suggestion_trigger(&self, _field_index: usize) -> SuggestionTrigger {
+        SuggestionTrigger::None
+    }
+
+    /// Fetch suggestions synchronously (for auto-trigger feature)
+    /// Returns empty vec by default. Override to enable auto-trigger.
+    #[cfg(feature = "suggestions")]
+    fn fetch_suggestions_sync(&self, _field_index: usize, _query: &str) -> Vec<SuggestionItem> {
+        Vec::new()
     }
 
     /// Get display value (for password masking, etc.) - optional
@@ -66,4 +92,14 @@ pub trait SuggestionsProvider {
 pub struct SuggestionItem {
     pub display_text: String,
     pub value_to_store: String,
+}
+
+#[cfg(feature = "suggestions")]
+impl SuggestionItem {
+    pub fn new(display: impl Into<String>, value: impl Into<String>) -> Self {
+        Self {
+            display_text: display.into(),
+            value_to_store: value.into(),
+        }
+    }
 }
