@@ -6,7 +6,7 @@ use crate::DataProvider;
 
 impl<D: DataProvider> FormEditor<D> {
     #[cfg(feature = "computed")]
-    pub fn set_computed_provider<C>(&mut self, mut provider: C)
+    pub fn register_computed_provider<C>(&mut self, provider: &C)
     where
         C: ComputedProvider,
     {
@@ -21,7 +21,14 @@ impl<D: DataProvider> FormEditor<D> {
                 }
             }
         }
+    }
 
+    #[cfg(feature = "computed")]
+    pub fn set_computed_provider<C>(&mut self, mut provider: C)
+    where
+        C: ComputedProvider,
+    {
+        self.register_computed_provider(&provider);
         self.recompute_all_fields(&mut provider);
     }
 
