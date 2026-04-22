@@ -3,6 +3,7 @@ use crate::editor::FormEditor;
 use crate::DataProvider;
 
 impl<D: DataProvider> FormEditor<D> {
+    /// Resolves the target field, skipping those computed by scripts rather than human input.
     #[cfg(feature = "computed")]
     fn resolved_navigable_field(
         &self,
