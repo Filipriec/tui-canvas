@@ -3,6 +3,46 @@ use crate::editor::FormEditor;
 use crate::DataProvider;
 
 impl<D: DataProvider> FormEditor<D> {
+    #[cfg(feature = "computed")]
+    fn resolved_navigable_field(
+        &self,
+        requested_field: usize,
+        prev_field: usize,
+        field_count: usize,
+    ) -> usize {
+        let target_field = requested_field.min(field_count - 1);
+
+        let Some(computed_state) = &self.ui_state.computed else {
+            return target_field;
+        };
+
+        if !computed_state.is_computed_field(target_field) {
+            return target_field;
+        }
+
+        let search_forward_first = target_field >= prev_field;
+
+        let mut search_forward = || {
+            ((target_field + 1)..field_count)
+                .find(|&i| !computed_state.is_computed_field(i))
+        };
+        let mut search_backward = || {
+            (0..target_field)
+                .rev()
+                .find(|&i| !computed_state.is_computed_field(i))
+        };
+
+        if search_forward_first {
+            search_forward()
+                .or_else(&mut search_backward)
+                .unwrap_or(prev_field)
+        } else {
+            search_backward()
+                .or_else(&mut search_forward)
+                .unwrap_or(prev_field)
+        }
+    }
+
     pub fn transition_to_field(&mut self, new_field: usize) -> anyhow::Result<()> {
         let field_count = self.data_provider.field_count();
         if field_count == 0 {
@@ -12,37 +52,10 @@ impl<D: DataProvider> FormEditor<D> {
         let prev_field = self.ui_state.current_field;
 
         #[cfg(feature = "computed")]
-        let mut target_field = new_field.min(field_count - 1);
+        let target_field =
+            self.resolved_navigable_field(new_field, prev_field, field_count);
         #[cfg(not(feature = "computed"))]
         let target_field = new_field.min(field_count - 1);
-
-        #[cfg(feature = "computed")]
-        {
-            if let Some(computed_state) = &self.ui_state.computed {
-                if computed_state.is_computed_field(target_field) {
-                    if target_field >= prev_field {
-                        for i in (target_field + 1)..field_count {
-                            if !computed_state.is_computed_field(i) {
-                                target_field = i;
-                                break;
-                            }
-                        }
-                    } else {
-                        let mut i = target_field;
-                        loop {
-                            if !computed_state.is_computed_field(i) {
-                                target_field = i;
-                                break;
-                            }
-                            if i == 0 {
-                                break;
-                            }
-                            i -= 1;
-                        }
-                    }
-                }
-            }
-        }
 
         if target_field == prev_field {
             return Ok(());
@@ -136,8 +149,10 @@ impl<D: DataProvider> FormEditor<D> {
         if self.ui_state.current_field == 0 {
             return false;
         }
+        let before = self.ui_state.current_field;
         let new_field = self.ui_state.current_field - 1;
         self.transition_to_field(new_field).is_ok()
+            && self.ui_state.current_field != before
     }
 
     /// Move to next field (vim j / down)
@@ -147,8 +162,10 @@ impl<D: DataProvider> FormEditor<D> {
         if self.ui_state.current_field >= last {
             return false;
         }
+        let before = self.ui_state.current_field;
         let new_field = self.ui_state.current_field + 1;
         self.transition_to_field(new_field).is_ok()
+            && self.ui_state.current_field != before
     }
 
     /// Move to next field cyclic
@@ -167,5 +184,84 @@ impl<D: DataProvider> FormEditor<D> {
 
     pub fn next_field(&mut self) -> bool {
         self.move_down()
+    }
+}
+
+#[cfg(all(test, feature = "computed"))]
+mod tests {
+    use super::*;
+    use crate::computed::{ComputedContext, ComputedProvider};
+
+    #[derive(Clone, Default)]
+    struct TestProvider {
+        fields: Vec<(&'static str, String)>,
+    }
+
+    impl TestProvider {
+        fn new(names: &[&'static str]) -> Self {
+            Self {
+                fields: names
+                    .iter()
+                    .map(|name| (*name, String::new()))
+                    .collect(),
+            }
+        }
+    }
+
+    impl DataProvider for TestProvider {
+        fn field_count(&self) -> usize {
+            self.fields.len()
+        }
+
+        fn field_name(&self, index: usize) -> &str {
+            self.fields[index].0
+        }
+
+        fn field_value(&self, index: usize) -> &str {
+            &self.fields[index].1
+        }
+
+        fn set_field_value(&mut self, index: usize, value: String) {
+            self.fields[index].1 = value;
+        }
+    }
+
+    struct TestComputedProvider;
+
+    impl ComputedProvider for TestComputedProvider {
+        fn handles_field(&self, field_index: usize) -> bool {
+            matches!(field_index, 2 | 3 | 4)
+        }
+
+        fn field_dependencies(&self, _field_index: usize) -> Vec<usize> {
+            vec![0]
+        }
+
+        fn compute_field(&mut self, _context: ComputedContext) -> String {
+            String::new()
+        }
+    }
+
+    #[test]
+    fn move_down_skips_trailing_computed_fields() {
+        let provider = TestProvider::new(&["a", "b", "c", "d", "e"]);
+        let mut editor = FormEditor::new(provider);
+        editor.register_computed_provider(&TestComputedProvider);
+
+        assert!(editor.transition_to_field(1).is_ok());
+        assert_eq!(editor.current_field(), 1);
+
+        assert!(!editor.move_down());
+        assert_eq!(editor.current_field(), 1);
+    }
+
+    #[test]
+    fn move_last_line_lands_on_last_editable_field() {
+        let provider = TestProvider::new(&["a", "b", "c", "d", "e"]);
+        let mut editor = FormEditor::new(provider);
+        editor.register_computed_provider(&TestComputedProvider);
+
+        assert!(editor.move_last_line().is_ok());
+        assert_eq!(editor.current_field(), 1);
     }
 }
