@@ -1,12 +1,58 @@
 // src/editor/suggestions.rs
 
 use crate::editor::FormEditor;
-use crate::{DataProvider, SuggestionItem};
+use crate::{DataProvider, SuggestionItem, SuggestionQuery};
 
 impl<D: DataProvider> FormEditor<D> {
+    #[cfg(feature = "suggestions")]
+    fn current_suggestion_query(&self) -> Option<SuggestionQuery> {
+        let idx = self.current_field();
+        if !self.data_provider.supports_suggestions(idx) {
+            return None;
+        }
+
+        self.data_provider
+            .suggestion_query(idx, self.cursor_position())
+    }
+
+    #[cfg(feature = "suggestions")]
+    fn set_active_suggestion_query(
+        &mut self,
+        field_index: usize,
+        query: &SuggestionQuery,
+    ) {
+        self.ui_state.open_suggestions(field_index);
+        self.ui_state.suggestions.active_query = Some(query.query.clone());
+        self.ui_state.suggestions.replace_range = query.replace_range;
+        self.suggestions.clear();
+        self.ui_state.suggestions.selected_index = None;
+        self.ui_state.suggestions.completion_text = None;
+    }
+
+    #[cfg(feature = "suggestions")]
+    fn fetch_and_open_suggestions(&mut self) -> bool {
+        let Some((idx, query)) = self.trigger_suggestions() else {
+            return false;
+        };
+
+        let items = self.data_provider.fetch_suggestions_sync(idx, &query);
+        if items.is_empty() {
+            self.dismiss_suggestions();
+            return false;
+        }
+
+        self.apply_suggestions(items);
+        true
+    }
+
     /// Compute inline completion for current selection and text
     fn compute_current_completion(&self) -> Option<String> {
-        let typed = self.current_text();
+        let typed = self
+            .ui_state
+            .suggestions
+            .active_query
+            .as_deref()
+            .unwrap_or_else(|| self.current_text());
         let idx = self.ui_state.suggestions.selected_index?;
         let sugg = self.suggestions.get(idx)?;
         if let Some(rest) = sugg.value_to_store.strip_prefix(typed) {
@@ -34,17 +80,10 @@ impl<D: DataProvider> FormEditor<D> {
     #[cfg(feature = "suggestions")]
     pub fn trigger_suggestions(&mut self) -> Option<(usize, String)> {
         let idx = self.current_field();
-        if !self.data_provider.supports_suggestions(idx) {
-            return None;
-        }
-
-        let query = self.current_text().to_string();
-        self.ui_state.open_suggestions(idx);
-        self.ui_state.suggestions.active_query = Some(query.clone());
-        self.suggestions.clear();
-        self.ui_state.suggestions.selected_index = None;
-
-        Some((idx, query))
+        let query = self.current_suggestion_query()?;
+        let query_text = query.query.clone();
+        self.set_active_suggestion_query(idx, &query);
+        Some((idx, query_text))
     }
 
     /// Apply fetched suggestions from client - opens UI with the provided items.
@@ -103,23 +142,32 @@ impl<D: DataProvider> FormEditor<D> {
         }
 
         let trigger = self.data_provider.suggestion_trigger(idx);
-        let current_text = self.current_text();
+        let Some(query) = self.current_suggestion_query() else {
+            if self.ui_state.suggestions.is_active {
+                self.dismiss_suggestions();
+            }
+            return;
+        };
+        let query_text = query.query.as_str();
         let should_show = match trigger {
             crate::SuggestionTrigger::None => false,
             // WhenFieldStarts: show when in edit mode (empty shows all, typed filters)
             crate::SuggestionTrigger::WhenFieldStarts => true,
-            crate::SuggestionTrigger::SpecialChar(ch) => current_text.starts_with(ch),
+            crate::SuggestionTrigger::SpecialChar(ch) => query_text.starts_with(ch),
         };
 
         if should_show {
-            let items = self.data_provider.fetch_suggestions_sync(idx, &current_text);
+            let items = self.data_provider.fetch_suggestions_sync(idx, query_text);
             if items.is_empty() {
                 if self.ui_state.suggestions.is_active {
                     self.dismiss_suggestions();
                 }
             } else {
                 if !self.ui_state.suggestions.is_active {
-                    let _ = self.trigger_suggestions();
+                    self.set_active_suggestion_query(idx, &query);
+                } else {
+                    self.ui_state.suggestions.active_query = Some(query.query.clone());
+                    self.ui_state.suggestions.replace_range = query.replace_range;
                 }
                 self.apply_suggestions(items);
             }
@@ -142,8 +190,8 @@ impl<D: DataProvider> FormEditor<D> {
     }
 
     pub fn suggestions_next(&mut self) {
-        if !self.ui_state.suggestions.is_active || self.suggestions.is_empty()
-        {
+        if !self.ui_state.suggestions.is_active || self.suggestions.is_empty() {
+            let _ = self.fetch_and_open_suggestions();
             return;
         }
 
@@ -155,6 +203,11 @@ impl<D: DataProvider> FormEditor<D> {
 
     pub fn suggestions_prev(&mut self) {
         if !self.ui_state.suggestions.is_active || self.suggestions.is_empty() {
+            if self.fetch_and_open_suggestions() {
+                self.ui_state.suggestions.selected_index =
+                    Some(self.suggestions.len().saturating_sub(1));
+                self.update_inline_completion();
+            }
             return;
         }
 
@@ -173,22 +226,33 @@ impl<D: DataProvider> FormEditor<D> {
             if let Some(suggestion) = self.suggestions.get(selected_index).cloned()
             {
                 let field_index = self.ui_state.current_field;
-
-                self.data_provider.set_field_value(
+                let query = SuggestionQuery {
+                    query: self
+                        .ui_state
+                        .suggestions
+                        .active_query
+                        .clone()
+                        .unwrap_or_else(|| self.current_text().to_string()),
+                    replace_range: self.ui_state.suggestions.replace_range,
+                };
+                let cursor = self.data_provider.accept_suggestion(
                     field_index,
-                    suggestion.value_to_store.clone(),
+                    self.cursor_position(),
+                    &suggestion,
+                    &query,
                 );
 
-                self.set_cursor_raw(suggestion.value_to_store.chars().count());
+                self.set_cursor_raw(cursor);
 
                 self.dismiss_suggestions();
                 self.suggestions.clear();
 
                 #[cfg(feature = "validation")]
                 {
+                    let text = self.data_provider.field_value(field_index).to_string();
                     let _ = self.ui_state.validation.validate_field_content(
                         field_index,
-                        &suggestion.value_to_store,
+                        &text,
                     );
                 }
 

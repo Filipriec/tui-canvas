@@ -4,8 +4,7 @@ use std::ops::{Deref, DerefMut};
 use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 
 use crate::editor::FormEditor;
-use crate::textarea::provider::TextAreaProvider;
-use crate::data_provider::DataProvider;
+use crate::textarea::provider::{TextAreaDataProvider, TextAreaProvider};
 
 #[cfg(feature = "gui")]
 use ratatui::{layout::Rect, widgets::Block};
@@ -106,7 +105,7 @@ fn wrapped_rows_to_cursor_indented(
     (row, used.min(width.saturating_sub(1)))
 }
 
-pub type TextAreaEditor = FormEditor<TextAreaProvider>;
+pub type TextAreaEditor<P = TextAreaProvider> = FormEditor<P>;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TextOverflowMode {
@@ -114,8 +113,8 @@ pub enum TextOverflowMode {
     Wrap,
 }
 
-pub struct TextAreaState {
-    pub(crate) editor: TextAreaEditor,
+pub struct TextAreaState<P: TextAreaDataProvider = TextAreaProvider> {
+    pub(crate) editor: TextAreaEditor<P>,
     pub(crate) scroll_y: u16,
     pub(crate) placeholder: Option<String>,
     pub(crate) overflow_mode: TextOverflowMode,
@@ -126,10 +125,10 @@ pub struct TextAreaState {
     pub(crate) edited_this_frame: bool,
 }
 
-impl Default for TextAreaState {
+impl<P: TextAreaDataProvider + Default> Default for TextAreaState<P> {
     fn default() -> Self {
         Self {
-            editor: FormEditor::new(TextAreaProvider::default()),
+            editor: FormEditor::new(P::default()),
             scroll_y: 0,
             placeholder: None,
             overflow_mode: TextOverflowMode::Indicator { ch: '$' },
@@ -142,23 +141,22 @@ impl Default for TextAreaState {
     }
 }
 
-impl Deref for TextAreaState {
-    type Target = TextAreaEditor;
+impl<P: TextAreaDataProvider> Deref for TextAreaState<P> {
+    type Target = TextAreaEditor<P>;
 
     fn deref(&self) -> &Self::Target {
         &self.editor
     }
 }
 
-impl DerefMut for TextAreaState {
+impl<P: TextAreaDataProvider> DerefMut for TextAreaState<P> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.editor
     }
 }
 
-impl TextAreaState {
-    pub fn from_text<S: Into<String>>(text: S) -> Self {
-        let provider = TextAreaProvider::from_text(text);
+impl<P: TextAreaDataProvider> TextAreaState<P> {
+    pub fn with_provider(provider: P) -> Self {
         Self {
             editor: FormEditor::new(provider),
             scroll_y: 0,
@@ -172,12 +170,16 @@ impl TextAreaState {
         }
     }
 
+    pub fn from_text<S: Into<String>>(text: S) -> Self {
+        Self::with_provider(P::from_text(text.into()))
+    }
+
     pub fn text(&self) -> String {
         self.editor.data_provider().to_text()
     }
 
     pub fn set_text<S: Into<String>>(&mut self, text: S) {
-        self.editor.data_provider_mut().set_text(text);
+        self.editor.data_provider_mut().set_text(text.into());
         self.editor.ui_state.current_field = 0;
         self.editor.set_cursor_raw(0);
     }

@@ -49,6 +49,7 @@ pub struct SuggestionsUIState {
     pub(crate) selected_index: Option<usize>,
     pub(crate) active_field: Option<usize>,
     pub(crate) active_query: Option<String>,
+    pub(crate) replace_range: Option<(usize, usize)>,
     pub(crate) completion_text: Option<String>,
 }
 
@@ -85,6 +86,7 @@ impl EditorState {
                 selected_index: None,
                 active_field: None,
                 active_query: None,
+                replace_range: None,
                 completion_text: None,
             },
             selection: SelectionState::None,
@@ -190,6 +192,7 @@ impl EditorState {
         self.suggestions.is_loading = true;
         self.suggestions.active_field = Some(field_index);
         self.suggestions.active_query = None;
+        self.suggestions.replace_range = None;
         self.suggestions.selected_index = None;
         self.suggestions.completion_text = None;
     }
@@ -201,6 +204,7 @@ impl EditorState {
         self.suggestions.is_loading = false;
         self.suggestions.active_field = None;
         self.suggestions.active_query = None;
+        self.suggestions.replace_range = None;
         self.suggestions.selected_index = None;
         self.suggestions.completion_text = None;
     }

@@ -11,7 +11,7 @@ use ratatui::{
 };
 
 #[cfg(feature = "gui")]
-use crate::data_provider::DataProvider;
+use crate::textarea::provider::{TextAreaDataProvider, TextAreaProvider};
 
 #[cfg(feature = "gui")]
 use crate::textarea::state::{
@@ -26,14 +26,15 @@ use unicode_width::UnicodeWidthChar;
 
 #[cfg(feature = "gui")]
 #[derive(Debug, Clone)]
-pub struct TextArea<'a> {
+pub struct TextArea<'a, P: TextAreaDataProvider = TextAreaProvider> {
     pub(crate) block: Option<Block<'a>>,
     pub(crate) style: Style,
     pub(crate) border_type: BorderType,
+    pub(crate) _provider: std::marker::PhantomData<P>,
 }
 
 #[cfg(feature = "gui")]
-impl<'a> Default for TextArea<'a> {
+impl<'a, P: TextAreaDataProvider> Default for TextArea<'a, P> {
     fn default() -> Self {
         Self {
             block: Some(
@@ -43,12 +44,13 @@ impl<'a> Default for TextArea<'a> {
             ),
             style: Style::default(),
             border_type: BorderType::Rounded,
+            _provider: std::marker::PhantomData,
         }
     }
 }
 
 #[cfg(feature = "gui")]
-impl<'a> TextArea<'a> {
+impl<'a, P: TextAreaDataProvider> TextArea<'a, P> {
     pub fn block(mut self, block: Block<'a>) -> Self {
         self.block = Some(block);
         self
@@ -224,7 +226,7 @@ fn wrap_segments_with_indent(
 // Map visual row offset to (logical line, intra segment)
 #[cfg(feature = "gui")]
 fn resolve_start_line_and_intra_indented(
-    state: &TextAreaState,
+    state: &TextAreaState<impl TextAreaDataProvider>,
     inner: Rect,
 ) -> (usize, u16) {
     let provider = state.editor.data_provider();
@@ -260,8 +262,8 @@ fn resolve_start_line_and_intra_indented(
 }
 
 #[cfg(feature = "gui")]
-impl<'a> StatefulWidget for TextArea<'a> {
-    type State = TextAreaState;
+impl<'a, P: TextAreaDataProvider> StatefulWidget for TextArea<'a, P> {
+    type State = TextAreaState<P>;
 
     fn render(self, area: Rect, buf: &mut Buffer, state: &mut Self::State) {
         state.ensure_visible(area, self.block.as_ref());

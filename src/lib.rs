@@ -25,7 +25,9 @@ pub use canvas::CursorManager;
 pub use editor::FormEditor;
 pub use data_provider::DataProvider;
 #[cfg(feature = "suggestions")]
-pub use data_provider::{SuggestionItem, SuggestionTrigger};
+pub use data_provider::{
+    SuggestionItem, SuggestionQuery, SuggestionTrigger,
+};
 
 pub use canvas::state::EditorState;
 pub use canvas::modes::AppMode;
@@ -63,4 +65,7 @@ pub use suggestions::gui::render_suggestions_dropdown;
 pub use keymap::{CanvasKeyMap, KeyEventOutcome};
 
 #[cfg(feature = "textarea")]
-pub use textarea::{TextArea, TextAreaProvider, TextAreaState, TextAreaEditor};
+pub use textarea::{
+    TextArea, TextAreaDataProvider, TextAreaEditor, TextAreaProvider,
+    TextAreaState,
+};

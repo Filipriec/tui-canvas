@@ -55,8 +55,14 @@ impl<D: DataProvider> FormEditor<D> {
             // Suggestions
             #[cfg(feature = "suggestions")]
             TriggerSuggestions => {
-                let idx = self.current_field();
-                self.open_suggestions(idx);
+                let _ = self.trigger_suggestions().map(|(idx, query)| {
+                    let items = self.data_provider.fetch_suggestions_sync(idx, &query);
+                    if items.is_empty() {
+                        self.dismiss_suggestions();
+                    } else {
+                        self.apply_suggestions(items);
+                    }
+                });
                 ActionResult::Success
             }
             #[cfg(feature = "suggestions")]

@@ -10,7 +10,7 @@ pub mod widget;
 #[cfg(all(feature = "syntect", feature = "gui"))]
 pub mod highlight;
 
-pub use provider::TextAreaProvider;
+pub use provider::{TextAreaDataProvider, TextAreaProvider};
 pub use state::{TextAreaEditor, TextAreaState, TextOverflowMode};
 
 #[cfg(feature = "gui")]

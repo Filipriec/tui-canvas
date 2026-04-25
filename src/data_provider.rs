@@ -15,6 +15,33 @@ pub enum SuggestionTrigger {
     SpecialChar(char),
 }
 
+#[cfg(feature = "suggestions")]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SuggestionQuery {
+    pub query: String,
+    pub replace_range: Option<(usize, usize)>,
+}
+
+#[cfg(feature = "suggestions")]
+impl SuggestionQuery {
+    pub fn whole_field(query: impl Into<String>) -> Self {
+        Self {
+            query: query.into(),
+            replace_range: None,
+        }
+    }
+
+    pub fn with_replace_range(
+        query: impl Into<String>,
+        replace_range: (usize, usize),
+    ) -> Self {
+        Self {
+            query: query.into(),
+            replace_range: Some(replace_range),
+        }
+    }
+}
+
 /// User implements this - only business data, no UI state
 pub trait DataProvider {
     /// How many fields in the form
@@ -41,11 +68,41 @@ pub trait DataProvider {
         SuggestionTrigger::None
     }
 
+    /// Build the active suggestion query for the current field/cursor.
+    ///
+    /// Default behavior uses the whole current field value and replaces the
+    /// whole field on accept. More advanced editors can return a token-local
+    /// query and replace range.
+    #[cfg(feature = "suggestions")]
+    fn suggestion_query(
+        &self,
+        field_index: usize,
+        _cursor_char: usize,
+    ) -> Option<SuggestionQuery> {
+        Some(SuggestionQuery::whole_field(self.field_value(field_index)))
+    }
+
     /// Fetch suggestions synchronously (for auto-trigger feature)
     /// Returns empty vec by default. Override to enable auto-trigger.
     #[cfg(feature = "suggestions")]
     fn fetch_suggestions_sync(&self, _field_index: usize, _query: &str) -> Vec<SuggestionItem> {
         Vec::new()
+    }
+
+    /// Apply the selected suggestion to the underlying field content and
+    /// return the desired cursor character position after insertion.
+    #[cfg(feature = "suggestions")]
+    fn accept_suggestion(
+        &mut self,
+        field_index: usize,
+        _cursor_char: usize,
+        suggestion: &SuggestionItem,
+        _query: &SuggestionQuery,
+    ) -> usize {
+        let value = suggestion.value_to_store.clone();
+        let cursor = value.chars().count();
+        self.set_field_value(field_index, value);
+        cursor
     }
 
     /// Get display value (for password masking, etc.) - optional

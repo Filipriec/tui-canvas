@@ -5,6 +5,21 @@ use ropey::Rope;
 use std::io::{self, BufReader, Read};
 use std::path::Path;
 
+pub trait TextAreaDataProvider: DataProvider {
+    fn from_text(text: String) -> Self
+    where
+        Self: Sized;
+
+    fn to_text(&self) -> String;
+    fn set_text(&mut self, text: String);
+    fn line_count(&self) -> usize;
+    fn split_line_at(&mut self, line_idx: usize, at_char: usize) -> usize;
+    fn join_with_next(&mut self, line_idx: usize) -> Option<usize>;
+    fn join_with_prev(&mut self, line_idx: usize) -> Option<(usize, usize)>;
+    fn insert_blank_line_after(&mut self, line_idx: usize) -> usize;
+    fn insert_blank_line_before(&mut self, line_idx: usize) -> usize;
+}
+
 #[derive(Debug)]
 pub struct TextAreaProvider {
     rope: Rope,
@@ -239,5 +254,46 @@ impl DataProvider for TextAreaProvider {
             let _ = self.line_cache[index].take();
             let _ = self.line_cache[index].set(clean);
         }
+    }
+}
+
+impl TextAreaDataProvider for TextAreaProvider {
+    fn from_text(text: String) -> Self
+    where
+        Self: Sized,
+    {
+        Self::from_text(text)
+    }
+
+    fn to_text(&self) -> String {
+        TextAreaProvider::to_text(self)
+    }
+
+    fn set_text(&mut self, text: String) {
+        TextAreaProvider::set_text(self, text);
+    }
+
+    fn line_count(&self) -> usize {
+        TextAreaProvider::line_count(self)
+    }
+
+    fn split_line_at(&mut self, line_idx: usize, at_char: usize) -> usize {
+        TextAreaProvider::split_line_at(self, line_idx, at_char)
+    }
+
+    fn join_with_next(&mut self, line_idx: usize) -> Option<usize> {
+        TextAreaProvider::join_with_next(self, line_idx)
+    }
+
+    fn join_with_prev(&mut self, line_idx: usize) -> Option<(usize, usize)> {
+        TextAreaProvider::join_with_prev(self, line_idx)
+    }
+
+    fn insert_blank_line_after(&mut self, line_idx: usize) -> usize {
+        TextAreaProvider::insert_blank_line_after(self, line_idx)
+    }
+
+    fn insert_blank_line_before(&mut self, line_idx: usize) -> usize {
+        TextAreaProvider::insert_blank_line_before(self, line_idx)
     }
 }
