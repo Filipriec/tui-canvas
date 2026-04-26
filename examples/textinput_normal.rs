@@ -15,15 +15,8 @@ compile_error!(
      Run with: cargo run --example textinput_normal --features \"gui,cursor-style,textinput,textmode-normal\""
 );
 
-use std::io;
-
 use crossterm::{
-    event::{
-        self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode,
-        KeyEvent, KeyModifiers,
-    },
-    execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    event::{Event, KeyCode, KeyEvent, KeyModifiers},
 };
 use ratatui::{
     backend::{Backend, CrosstermBackend},
@@ -35,7 +28,9 @@ use ratatui::{
 };
 
 use canvas::{
-    integration::crossterm_input::CrosstermInputGuard,
+    integration::crossterm_input::{
+        CrosstermInputOptions, CrosstermInputSession,
+    },
     textinput::{TextInput, TextInputEventOutcome, TextInputState},
     CursorManager,
 };
@@ -115,13 +110,16 @@ fn ui(f: &mut Frame, app: &mut TextInputDemo) {
     f.render_widget(status, chunks[1]);
 }
 
-fn run_app<B: Backend>(terminal: &mut Terminal<B>) -> anyhow::Result<()> {
+fn run_app<B: Backend>(
+    terminal: &mut Terminal<B>,
+    session: &CrosstermInputSession,
+) -> anyhow::Result<()> {
     let mut app = TextInputDemo::new();
 
     loop {
         terminal.draw(|f| ui(f, &mut app))?;
 
-        match event::read()? {
+        match session.read_event()? {
             Event::Key(key) => {
                 if !handle_key_press(key, &mut app) {
                     return Ok(());
@@ -133,22 +131,15 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>) -> anyhow::Result<()> {
 }
 
 fn main() -> anyhow::Result<()> {
-    enable_raw_mode()?;
-    let mut stdout = io::stdout();
-    execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
-    let backend = CrosstermBackend::new(stdout);
-    let mut terminal = Terminal::new(backend)?;
-    let _input_guard = CrosstermInputGuard::install()?;
-
-    let result = run_app(&mut terminal);
-    let _ = CursorManager::reset();
-
-    disable_raw_mode()?;
-    execute!(
-        terminal.backend_mut(),
-        LeaveAlternateScreen,
-        DisableMouseCapture
+    let mut session = CrosstermInputSession::install_with_options(
+        CrosstermInputOptions::tui_defaults(),
     )?;
+    let backend = CrosstermBackend::new(std::io::stdout());
+    let mut terminal = Terminal::new(backend)?;
+
+    let result = run_app(&mut terminal, &session);
+    let _ = CursorManager::reset();
+    let _ = session.uninstall();
     terminal.show_cursor()?;
 
     result
