@@ -8,6 +8,8 @@
 pub mod core;
 pub mod display;
 pub mod editing;
+#[cfg(feature = "crossterm")]
+pub mod event_input;
 pub mod movement;
 pub mod navigation;
 pub mod mode;

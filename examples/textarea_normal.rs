@@ -19,11 +19,8 @@ compile_error!(
      Run with: cargo run --example canvas_textarea_cursor_auto_normal --features \"gui,cursor-style,textarea,textmode-normal\""
 );
 
-use std::io;
 use crossterm::{
-    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEvent, KeyModifiers},
-    execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    event::{Event, KeyCode, KeyEvent, KeyModifiers},
 };
 use ratatui::{
     backend::{Backend, CrosstermBackend},
@@ -36,6 +33,9 @@ use ratatui::{
 
 use canvas::{
     canvas::CursorManager,
+    integration::crossterm_input::{
+        CrosstermInputOptions, CrosstermInputSession,
+    },
     textarea::{TextArea, TextAreaState},
 };
 
@@ -279,12 +279,16 @@ fn handle_key_press(
     Ok(true)
 }
 
-fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut editor: AutoCursorTextArea) -> io::Result<()> {
+fn run_app<B: Backend>(
+    terminal: &mut Terminal<B>,
+    session: &CrosstermInputSession,
+    mut editor: AutoCursorTextArea,
+) -> std::io::Result<()> {
     loop {
         terminal.draw(|f| ui(f, &mut editor))?;
 
-        if let Event::Key(key) = event::read()? {
-            match handle_key_press(key, &mut editor) {
+        match session.read_event()? {
+            Event::Key(key) => match handle_key_press(key, &mut editor) {
                 Ok(should_continue) => {
                     if !should_continue {
                         break;
@@ -293,7 +297,8 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut editor: AutoCursorTextAre
                 Err(e) => {
                     editor.set_debug_message(format!("Error: {e}"));
                 }
-            }
+            },
+            other => editor.textarea.handle_event(other),
         }
     }
     Ok(())
@@ -372,20 +377,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("🚀 Always editing, underscore cursor active");
     println!();
 
-    enable_raw_mode()?;
-    let mut stdout = io::stdout();
-    execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
-    let backend = CrosstermBackend::new(stdout);
+    let mut session = CrosstermInputSession::install_with_options(
+        CrosstermInputOptions::tui_defaults(),
+    )?;
+    let backend = CrosstermBackend::new(std::io::stdout());
     let mut terminal = Terminal::new(backend)?;
 
     let editor = AutoCursorTextArea::new();
 
-    let res = run_app(&mut terminal, editor);
+    let res = run_app(&mut terminal, &session, editor);
 
     CursorManager::reset()?;
-
-    disable_raw_mode()?;
-    execute!(terminal.backend_mut(), LeaveAlternateScreen, DisableMouseCapture)?;
+    let _ = session.uninstall();
     terminal.show_cursor()?;
 
     if let Err(err) = res {

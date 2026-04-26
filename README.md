@@ -132,7 +132,9 @@ For terminal paste support with `crossterm`, the smoothest path is to install
 through it. That enables raw mode and bracketed paste by default, and you can
 opt into alternate screen and mouse capture with
 `CrosstermInputOptions::tui_defaults()`. The current event helpers are
-intentionally `crossterm`-specific.
+intentionally `crossterm`-specific. For the simple path, bind those events to
+`FormEditor::handle_event(...)`, `TextAreaState::handle_event(...)`, or
+`TextInputState::handle_event(...)`.
 
 ---
 

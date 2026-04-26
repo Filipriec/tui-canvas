@@ -29,6 +29,8 @@ pub mod keymap;
 pub use canvas::CursorManager;
 
 pub use editor::FormEditor;
+#[cfg(feature = "crossterm")]
+pub use editor::event_input::FormInputEventOutcome;
 pub use data_provider::DataProvider;
 #[cfg(feature = "suggestions")]
 pub use data_provider::{
