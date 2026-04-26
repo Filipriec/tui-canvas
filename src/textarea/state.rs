@@ -4,6 +4,8 @@ use std::ops::{Deref, DerefMut};
 use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 
 use crate::editor::FormEditor;
+#[cfg(feature = "gui")]
+use crate::gui_utils::{compute_h_scroll_with_padding, RIGHT_PAD};
 use crate::textarea::provider::{TextAreaDataProvider, TextAreaProvider};
 
 #[cfg(feature = "gui")]
@@ -11,28 +13,6 @@ use ratatui::{layout::Rect, widgets::Block};
 
 #[cfg(feature = "gui")]
 use unicode_width::UnicodeWidthChar;
-
-#[cfg(feature = "gui")]
-pub(crate) const RIGHT_PAD: u16 = 3;
-
-#[cfg(feature = "gui")]
-pub(crate) fn compute_h_scroll_with_padding(
-    cursor_cols: u16,
-    width: u16,
-) -> (u16, u16) {
-    let mut h = 0u16;
-    for _ in 0..2 {
-        let left_cols = if h > 0 { 1 } else { 0 };
-        let max_x_visible = width.saturating_sub(1 + RIGHT_PAD + left_cols);
-        let needed = cursor_cols.saturating_sub(max_x_visible);
-        if needed <= h {
-            return (h, left_cols);
-        }
-        h = needed;
-    }
-    let left_cols = if h > 0 { 1 } else { 0 };
-    (h, left_cols)
-}
 
 #[cfg(feature = "gui")]
 fn normalize_indent(width: u16, indent: u16) -> u16 {

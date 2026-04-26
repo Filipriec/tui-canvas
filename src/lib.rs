@@ -4,6 +4,9 @@ pub mod editor;
 pub mod data_provider;
 pub mod integration;
 
+#[cfg(feature = "gui")]
+mod gui_utils;
+
 #[cfg(feature = "suggestions")]
 pub mod suggestions;
 
@@ -12,6 +15,9 @@ pub mod validation;
 
 #[cfg(feature = "textarea")]
 pub mod textarea;
+
+#[cfg(feature = "textinput")]
+pub mod textinput;
 
 #[cfg(feature = "computed")]
 pub mod computed;
@@ -68,4 +74,10 @@ pub use keymap::{CanvasKeyMap, KeyEventOutcome};
 pub use textarea::{
     TextArea, TextAreaDataProvider, TextAreaEditor, TextAreaProvider,
     TextAreaState,
+};
+
+#[cfg(feature = "textinput")]
+pub use textinput::{
+    TextInput, TextInputDataProvider, TextInputEditor, TextInputEventOutcome,
+    TextInputProvider, TextInputState,
 };

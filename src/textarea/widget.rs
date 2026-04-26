@@ -11,11 +11,15 @@ use ratatui::{
 };
 
 #[cfg(feature = "gui")]
+use crate::gui_utils::{
+    clip_window_with_indicator_padded, compute_h_scroll_with_padding,
+    display_cols_up_to, display_width,
+};
+#[cfg(feature = "gui")]
 use crate::textarea::provider::{TextAreaDataProvider, TextAreaProvider};
 
 #[cfg(feature = "gui")]
 use crate::textarea::state::{
-    compute_h_scroll_with_padding,
     count_wrapped_rows_indented,
     TextAreaState,
     TextOverflowMode,
@@ -68,115 +72,6 @@ impl<'a, P: TextAreaDataProvider> TextArea<'a, P> {
         }
         self
     }
-}
-
-#[cfg(feature = "gui")]
-fn display_width(s: &str) -> u16 {
-    s.chars()
-        .map(|c| UnicodeWidthChar::width(c).unwrap_or(0) as u16)
-        .sum()
-}
-
-#[cfg(feature = "gui")]
-fn display_cols_up_to(s: &str, char_count: usize) -> u16 {
-    let mut cols: u16 = 0;
-    for (i, ch) in s.chars().enumerate() {
-        if i >= char_count {
-            break;
-        }
-        cols = cols.saturating_add(UnicodeWidthChar::width(ch).unwrap_or(0) as u16);
-    }
-    cols
-}
-
-#[cfg(feature = "gui")]
-fn slice_by_display_cols(s: &str, start_cols: u16, max_cols: u16) -> String {
-    if max_cols == 0 {
-        return String::new();
-    }
-
-    let mut current_cols: u16 = 0;
-    let mut output = String::new();
-    let mut taken: u16 = 0;
-    let mut started = false;
-
-    for ch in s.chars() {
-        let w = UnicodeWidthChar::width(ch).unwrap_or(0) as u16;
-
-        if !started {
-            if current_cols.saturating_add(w) <= start_cols {
-                current_cols = current_cols.saturating_add(w);
-                continue;
-            } else {
-                started = true;
-            }
-        }
-
-        if taken.saturating_add(w) > max_cols {
-            break;
-        }
-
-        output.push(ch);
-        taken = taken.saturating_add(w);
-        current_cols = current_cols.saturating_add(w);
-    }
-
-    output
-}
-
-#[cfg(feature = "gui")]
-fn clip_window_with_indicator_padded(
-    text: &str,
-    view_width: u16,
-    indicator: char,
-    start_cols: u16,
-) -> Line<'static> {
-    if view_width == 0 {
-        return Line::from("");
-    }
-
-    let total = display_width(text);
-
-    // Left indicator if we scrolled
-    let show_left = start_cols > 0;
-    let left_cols: u16 = if show_left { 1 } else { 0 };
-
-    // Capacity for text if we also need a right indicator
-    let cap_with_right = view_width.saturating_sub(left_cols + 1);
-
-    // Do we still have content beyond this window?
-    let remaining = total.saturating_sub(start_cols);
-    let show_right = remaining > cap_with_right;
-
-    // Final capacity for visible text
-    let max_visible = if show_right {
-        cap_with_right
-    } else {
-        view_width.saturating_sub(left_cols)
-    };
-
-    let visible = slice_by_display_cols(text, start_cols, max_visible);
-
-    let mut spans: Vec<Span> = Vec::new();
-    if show_left {
-        spans.push(Span::raw(indicator.to_string()));
-    }
-
-    // Visible text
-    spans.push(Span::raw(visible.clone()));
-
-    // Place $ flush-right
-    if show_right {
-        let used_cols = left_cols + display_width(&visible);
-        let right_pos = view_width.saturating_sub(1);
-        let filler = right_pos.saturating_sub(used_cols);
-        if filler > 0 {
-            spans.push(Span::raw(" ".repeat(filler as usize)));
-        }
-        spans.push(Span::raw(indicator.to_string()));
-    }
-
-    Line::from(spans)
 }
 
 #[cfg(feature = "gui")]

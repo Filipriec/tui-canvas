@@ -1,6 +1,6 @@
 # Canvas
 
-Canvas is a Rust library for building form‑based and textarea‑driven terminal user interfaces.
+Canvas is a Rust library for building form‑based, single-line input, and textarea‑driven terminal user interfaces.
 It provides the core logic for text editing, validation, suggestions, and cursor management.
 
 The library does not enforce a specific terminal UI framework:
@@ -19,6 +19,7 @@ It provides:
 - Validation (regex, masks, limits, formatting)
 - Suggestions (asynchronous dropdowns)
 - Computed fields (derived values)
+- Single-line text input widget
 - Textarea widget with cursor management
 - Syntax highlighting (via syntect)
 - Extensible architecture for custom behaviors
@@ -45,6 +46,7 @@ The library is feature‑gated. Enable only what you need:
 - `validation` – regex, masks, limits, formatting
 - `suggestions` – asynchronous suggestions dropdowns
 - `computed` – derived fields
+- `textinput` – single-line text input widget
 - `textarea` – textarea widget
 - `syntect` – syntax highlighting support
 - `textmode-vim` – Vim‑like editing (default)
@@ -100,6 +102,9 @@ cargo run --example textarea_vim --features "gui cursor-style textarea textmode-
 
 # Textarea with Normal mode
 cargo run --example textarea_normal --features "gui cursor-style textarea textmode-normal"
+
+# Single-line text input
+cargo run --example textinput_normal --features "gui cursor-style textinput textmode-normal"
 
 # Textarea with syntax highlighting
 cargo run --example textarea_syntax --features "gui cursor-style textarea syntect textmode-normal"

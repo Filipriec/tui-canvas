@@ -16,8 +16,11 @@ use super::chunks::{
 use super::state::TextAreaSyntaxState;
 
 use crate::data_provider::DataProvider;
+use crate::gui_utils::{
+    compute_h_scroll_with_padding, display_cols_up_to, display_width,
+};
 use crate::textarea::state::{
-    compute_h_scroll_with_padding, count_wrapped_rows_indented, TextOverflowMode,
+    count_wrapped_rows_indented, TextOverflowMode,
 };
 
 #[derive(Debug, Clone)]
@@ -57,23 +60,6 @@ impl<'a> TextAreaSyntax<'a> {
         }
         self
     }
-}
-
-fn display_width(s: &str) -> u16 {
-    s.chars()
-        .map(|c| UnicodeWidthChar::width(c).unwrap_or(0) as u16)
-        .sum()
-}
-
-fn display_cols_up_to(s: &str, char_count: usize) -> u16 {
-    let mut cols: u16 = 0;
-    for (i, ch) in s.chars().enumerate() {
-        if i >= char_count {
-            break;
-        }
-        cols = cols.saturating_add(UnicodeWidthChar::width(ch).unwrap_or(0) as u16);
-    }
-    cols
 }
 
 fn resolve_start_line_and_intra_indented(

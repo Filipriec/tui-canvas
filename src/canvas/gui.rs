@@ -12,9 +12,15 @@ use ratatui::{
 
 #[cfg(feature = "gui")]
 use crate::canvas::theme::{CanvasTheme, DefaultCanvasTheme};
+#[cfg(feature = "gui")]
+use crate::gui_utils::{
+    compute_h_scroll_with_padding, display_width, slice_by_display_cols,
+    RIGHT_PAD,
+};
 use crate::canvas::modes::HighlightState;
 use crate::data_provider::DataProvider;
 use crate::editor::FormEditor;
+#[cfg(feature = "gui")]
 use unicode_width::UnicodeWidthChar;
 
 #[cfg(feature = "gui")]
@@ -48,14 +54,6 @@ impl Default for CanvasDisplayOptions {
     }
 }
 
-/// Utility: measure display width of a string
-#[cfg(feature = "gui")]
-fn display_width(s: &str) -> u16 {
-    s.chars()
-        .map(|c| UnicodeWidthChar::width(c).unwrap_or(0) as u16)
-        .sum()
-}
-
 /// Utility: clip a string to fit width, append indicator if overflow
 #[cfg(feature = "gui")]
 fn clip_with_indicator_line<'a>(s: &'a str, width: u16, indicator: char) -> Line<'a> {
@@ -77,59 +75,6 @@ fn clip_with_indicator_line<'a>(s: &'a str, width: u16, indicator: char) -> Line
         used = used.saturating_add(w);
     }
     Line::from(vec![Span::raw(out), Span::raw(indicator.to_string())])
-}
-
-#[cfg(feature = "gui")]
-const RIGHT_PAD: u16 = 3;
-
-#[cfg(feature = "gui")]
-fn slice_by_display_cols(s: &str, start_cols: u16, max_cols: u16) -> String {
-    if max_cols == 0 {
-        return String::new();
-    }
-    let mut cols: u16 = 0;
-    let mut out = String::new();
-    let mut taken: u16 = 0;
-    let mut started = false;
-
-    for ch in s.chars() {
-        let w = UnicodeWidthChar::width(ch).unwrap_or(0) as u16;
-        let next = cols.saturating_add(w);
-
-        if !started {
-            if next <= start_cols {
-                cols = next;
-                continue;
-            } else {
-                started = true;
-            }
-        }
-
-        if taken.saturating_add(w) > max_cols {
-            break;
-        }
-        out.push(ch);
-        taken = taken.saturating_add(w);
-        cols = next;
-    }
-
-    out
-}
-
-#[cfg(feature = "gui")]
-fn compute_h_scroll_with_padding(cursor_cols: u16, width: u16) -> (u16, u16) {
-    let mut h = 0u16;
-    for _ in 0..2 {
-        let left_cols = if h > 0 { 1 } else { 0 };
-        let max_x_visible = width.saturating_sub(1 + RIGHT_PAD + left_cols);
-        let needed = cursor_cols.saturating_sub(max_x_visible);
-        if needed <= h {
-            return (h, left_cols);
-        }
-        h = needed;
-    }
-    let left_cols = if h > 0 { 1 } else { 0 };
-    (h, left_cols)
 }
 
 #[cfg(feature = "gui")]

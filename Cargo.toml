@@ -39,6 +39,7 @@ cursor-style = ["crossterm"]
 validation = ["regex"]
 computed = []
 textarea = ["dep:ropey","gui"]
+textinput = ["gui"]
 syntect = ["dep:syntect", "gui", "textarea"]
 keymap = ["gui"]
 
@@ -53,6 +54,7 @@ all-nontextmodes = [
     "validation",
     "computed",
     "textarea",
+    "textinput",
     "keymap"
 ]
 
@@ -109,6 +111,11 @@ path = "examples/textarea_normal.rs"
 name = "textarea_syntax"
 required-features = ["gui", "cursor-style", "textarea", "textmode-normal", "syntect"]
 path = "examples/textarea_syntax.rs"
+
+[[example]]
+name = "textinput_normal"
+required-features = ["gui", "cursor-style", "textinput", "textmode-normal"]
+path = "examples/textinput_normal.rs"
 
 [[example]]
 name = "canvas_keymap"
