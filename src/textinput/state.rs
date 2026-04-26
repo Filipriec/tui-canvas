@@ -30,6 +30,7 @@ pub enum TextInputEventOutcome {
 pub struct TextInputState<P: TextInputDataProvider = TextInputProvider> {
     pub(crate) editor: TextInputEditor<P>,
     pub(crate) placeholder: Option<String>,
+    pub(crate) suggestion_suffix: Option<String>,
     pub(crate) overflow_indicator: char,
     pub(crate) h_scroll: u16,
     #[cfg(feature = "gui")]
@@ -41,6 +42,7 @@ impl<P: TextInputDataProvider + Default> Default for TextInputState<P> {
         Self {
             editor: FormEditor::new(P::default()),
             placeholder: None,
+            suggestion_suffix: None,
             overflow_indicator: '$',
             h_scroll: 0,
             #[cfg(feature = "gui")]
@@ -68,6 +70,7 @@ impl<P: TextInputDataProvider> TextInputState<P> {
         Self {
             editor: FormEditor::new(provider),
             placeholder: None,
+            suggestion_suffix: None,
             overflow_indicator: '$',
             h_scroll: 0,
             #[cfg(feature = "gui")]
@@ -87,11 +90,49 @@ impl<P: TextInputDataProvider> TextInputState<P> {
         self.editor.data_provider_mut().set_text(text.into());
         self.editor.ui_state.current_field = 0;
         self.editor.set_cursor_raw(self.current_text().chars().count());
+        self.clear_suggestion_suffix();
         self.h_scroll = 0;
     }
 
     pub fn set_placeholder<S: Into<String>>(&mut self, s: S) {
         self.placeholder = Some(s.into());
+    }
+
+    pub fn suggestion_suffix(&self) -> Option<&str> {
+        self.suggestion_suffix.as_deref()
+    }
+
+    pub fn set_suggestion_suffix<S: Into<String>>(&mut self, suffix: S) {
+        let suffix = suffix.into();
+        self.suggestion_suffix = if suffix.is_empty() {
+            None
+        } else {
+            Some(suffix)
+        };
+    }
+
+    pub fn clear_suggestion_suffix(&mut self) {
+        self.suggestion_suffix = None;
+    }
+
+    pub fn accept_suggestion_suffix(&mut self) -> TextInputEventOutcome {
+        let Some(suffix) = self.suggestion_suffix.clone() else {
+            return TextInputEventOutcome::Ignored;
+        };
+
+        if suffix.is_empty() {
+            self.clear_suggestion_suffix();
+            return TextInputEventOutcome::Ignored;
+        }
+
+        self.enter_edit_mode();
+        #[cfg(feature = "gui")]
+        {
+            self.edited_this_frame = true;
+        }
+        self.clear_suggestion_suffix();
+        let _ = self.insert_text(&suffix);
+        TextInputEventOutcome::Handled
     }
 
     pub fn set_overflow_indicator(&mut self, ch: char) {
@@ -109,6 +150,7 @@ impl<P: TextInputDataProvider> TextInputState<P> {
         }
 
         self.enter_edit_mode();
+        self.clear_suggestion_suffix();
         #[cfg(feature = "gui")]
         {
             self.edited_this_frame = true;
@@ -150,7 +192,11 @@ impl<P: TextInputDataProvider> TextInputState<P> {
 
         match (key.code, key.modifiers) {
             (KeyCode::Enter, _) => TextInputEventOutcome::Submitted,
+            (KeyCode::Tab, KeyModifiers::NONE) => {
+                self.accept_suggestion_suffix()
+            }
             (KeyCode::Backspace, _) => {
+                self.clear_suggestion_suffix();
                 #[cfg(feature = "gui")]
                 {
                     self.edited_this_frame = true;
@@ -159,6 +205,7 @@ impl<P: TextInputDataProvider> TextInputState<P> {
                 TextInputEventOutcome::Handled
             }
             (KeyCode::Delete, _) => {
+                self.clear_suggestion_suffix();
                 #[cfg(feature = "gui")]
                 {
                     self.edited_this_frame = true;
@@ -201,6 +248,7 @@ impl<P: TextInputDataProvider> TextInputState<P> {
             }
             (KeyCode::Char(c), m) if m.is_empty() => {
                 self.enter_edit_mode();
+                self.clear_suggestion_suffix();
                 #[cfg(feature = "gui")]
                 {
                     self.edited_this_frame = true;
@@ -320,6 +368,21 @@ mod tests {
 
         assert_eq!(outcome, TextInputEventOutcome::Handled);
         assert_eq!(input.text(), "abcdef");
+    }
+
+    #[test]
+    fn tab_accepts_inline_suggestion_suffix() {
+        let mut input =
+            TextInputState::<TextInputProvider>::from_text("ad");
+        input.enter_edit_mode();
+        input.set_cursor_position(2);
+        input.set_suggestion_suffix("min");
+
+        let outcome = input.input(KeyEvent::new(KeyCode::Tab, KeyModifiers::NONE));
+
+        assert_eq!(outcome, TextInputEventOutcome::Handled);
+        assert_eq!(input.text(), "admin");
+        assert_eq!(input.suggestion_suffix(), None);
     }
 
     #[cfg(feature = "crossterm")]

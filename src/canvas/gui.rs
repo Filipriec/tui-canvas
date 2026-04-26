@@ -14,8 +14,8 @@ use ratatui::{
 use crate::canvas::theme::{CanvasTheme, DefaultCanvasTheme};
 #[cfg(feature = "gui")]
 use crate::gui_utils::{
-    compute_h_scroll_with_padding, display_width, slice_by_display_cols,
-    RIGHT_PAD,
+    clip_inline_completion_with_indicator_padded,
+    compute_h_scroll_with_padding, display_width, RIGHT_PAD,
 };
 use crate::canvas::modes::HighlightState;
 use crate::data_provider::DataProvider;
@@ -102,43 +102,19 @@ fn render_active_line_with_indicator<T: CanvasTheme>(
 
     let (h_scroll, left_cols) = compute_h_scroll_with_padding(cursor_cols, width);
 
-    let total_cols = display_width(typed_text);
-    let content_budget = width.saturating_sub(left_cols);
-    let show_right = total_cols.saturating_sub(h_scroll) > content_budget;
-    let right_cols: u16 = if show_right { 1 } else { 0 };
-
-    let visible_cols = width.saturating_sub(left_cols + right_cols);
-    let visible_typed = slice_by_display_cols(typed_text, h_scroll, visible_cols);
-
-    let used_typed_cols = display_width(&visible_typed);
-    let remaining_cols = visible_cols.saturating_sub(used_typed_cols);
-    let mut visible_completion = String::new();
-
-    if let Some(comp) = completion {
-        if !comp.is_empty() && remaining_cols > 0 {
-            visible_completion = slice_by_display_cols(comp, 0, remaining_cols);
-        }
-    }
-
-    let mut spans: Vec<Span> = Vec::with_capacity(3);
-    if left_cols == 1 {
-        spans.push(Span::raw(indicator.to_string()));
-    }
-    spans.push(Span::styled(
-        visible_typed,
-        Style::default().fg(theme.fg()),
-    ));
-    if !visible_completion.is_empty() {
-        spans.push(Span::styled(
-            visible_completion,
+    (
+        clip_inline_completion_with_indicator_padded(
+            typed_text,
+            completion,
+            width,
+            indicator,
+            h_scroll,
+            Style::default().fg(theme.fg()),
             Style::default().fg(theme.suggestion_gray()),
-        ));
-    }
-    if show_right {
-        spans.push(Span::raw(indicator.to_string()));
-    }
-
-    (Line::from(spans), h_scroll, left_cols)
+        ),
+        h_scroll,
+        left_cols,
+    )
 }
 
 #[cfg(feature = "gui")]

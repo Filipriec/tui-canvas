@@ -2,13 +2,14 @@
 use ratatui::{
     buffer::Buffer,
     layout::{Alignment, Rect},
-    style::Style,
+    style::{Color, Style},
     text::{Line, Span},
     widgets::{Block, BorderType, Borders, Paragraph, StatefulWidget, Widget},
 };
 
 #[cfg(feature = "gui")]
 use crate::gui_utils::{
+    clip_inline_completion_with_indicator_padded,
     clip_window_with_indicator_padded, compute_h_scroll_with_padding,
     display_cols_up_to, display_width,
 };
@@ -23,6 +24,7 @@ use crate::textinput::state::TextInputState;
 pub struct TextInput<'a, P: TextInputDataProvider = TextInputProvider> {
     pub(crate) block: Option<Block<'a>>,
     pub(crate) style: Style,
+    pub(crate) suggestion_style: Style,
     pub(crate) border_type: BorderType,
     pub(crate) _provider: std::marker::PhantomData<P>,
 }
@@ -37,6 +39,7 @@ impl<'a, P: TextInputDataProvider> Default for TextInput<'a, P> {
                     .border_type(BorderType::Rounded),
             ),
             style: Style::default(),
+            suggestion_style: Style::default().fg(Color::DarkGray),
             border_type: BorderType::Rounded,
             _provider: std::marker::PhantomData,
         }
@@ -52,6 +55,11 @@ impl<'a, P: TextInputDataProvider> TextInput<'a, P> {
 
     pub fn style(mut self, style: Style) -> Self {
         self.style = style;
+        self
+    }
+
+    pub fn suggestion_style(mut self, style: Style) -> Self {
+        self.suggestion_style = style;
         self
     }
 
@@ -80,8 +88,9 @@ impl<'a, P: TextInputDataProvider> StatefulWidget for TextInput<'a, P> {
 
         let edited_now = state.take_edited_flag();
         let text = state.current_display_text_for_render();
+        let suggestion = state.suggestion_suffix();
 
-        let line = if text.is_empty() {
+        let line = if text.is_empty() && suggestion.is_none() {
             Line::from(Span::raw(
                 state.placeholder.clone().unwrap_or_default(),
             ))
@@ -99,12 +108,24 @@ impl<'a, P: TextInputDataProvider> StatefulWidget for TextInput<'a, P> {
                 target_h.max(state.h_scroll)
             };
 
-            clip_window_with_indicator_padded(
-                &text,
-                inner.width,
-                state.overflow_indicator,
-                start_cols,
-            )
+            if suggestion.is_some() {
+                clip_inline_completion_with_indicator_padded(
+                    &text,
+                    suggestion,
+                    inner.width,
+                    state.overflow_indicator,
+                    start_cols,
+                    self.style,
+                    self.suggestion_style,
+                )
+            } else {
+                clip_window_with_indicator_padded(
+                    &text,
+                    inner.width,
+                    state.overflow_indicator,
+                    start_cols,
+                )
+            }
         };
 
         let p = Paragraph::new(vec![line])
