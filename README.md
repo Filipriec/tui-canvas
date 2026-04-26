@@ -127,6 +127,11 @@ cargo run --example canvas_cursor_auto --features "gui cursor-style"
 cargo run --example computed_fields --features "gui computed"
 ```
 
+For terminal paste support with `crossterm`, install
+`canvas::integration::crossterm_input::CrosstermInputGuard` once during app
+startup and pass `Event::Paste(text)` to the widget's `handle_event(...)`
+method. The current event helpers are intentionally `crossterm`-specific.
+
 ---
 
 ## Documentation

@@ -154,6 +154,18 @@ impl<D: DataProvider> FormEditor<D> {
         Ok(())
     }
 
+    /// Insert plain text at the current cursor position.
+    ///
+    /// This intentionally treats the input as a character stream and reuses
+    /// `insert_char` so validation, masking, and suggestions continue to flow
+    /// through the existing editing logic.
+    pub fn insert_text(&mut self, text: &str) -> anyhow::Result<()> {
+        for ch in text.chars() {
+            self.insert_char(ch)?;
+        }
+        Ok(())
+    }
+
     /// Delete backward (backspace)
     pub fn delete_backward(&mut self) -> anyhow::Result<()> {
         if self.ui_state.current_mode != crate::canvas::modes::AppMode::Edit

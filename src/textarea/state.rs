@@ -1,7 +1,8 @@
 // src/textarea/state.rs
 use std::ops::{Deref, DerefMut};
 
-use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
+#[cfg(feature = "crossterm")]
+use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 
 use crate::editor::FormEditor;
 #[cfg(feature = "gui")]
@@ -256,6 +257,36 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         }
     }
 
+    pub fn paste(&mut self, text: &str) {
+        self.enter_edit_mode();
+        #[cfg(feature = "gui")]
+        {
+            self.edited_this_frame = true;
+        }
+
+        for ch in text.chars() {
+            match ch {
+                '\r' => {}
+                '\n' => self.insert_newline(),
+                other => {
+                    let _ = self.insert_char(other);
+                }
+            }
+        }
+    }
+
+    // TODO: Replace direct crossterm event coupling with a backend-agnostic
+    // input abstraction so terminal input backends can be swapped cleanly.
+    #[cfg(feature = "crossterm")]
+    pub fn handle_event(&mut self, event: Event) {
+        match event {
+            Event::Key(key) => self.input(key),
+            Event::Paste(text) => self.paste(&text),
+            _ => {}
+        }
+    }
+
+    #[cfg(feature = "crossterm")]
     pub fn input(&mut self, key: KeyEvent) {
         if key.kind != KeyEventKind::Press {
             return;
@@ -495,5 +526,23 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         let v = self.edited_this_frame;
         self.edited_this_frame = false;
         v
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::TextAreaState;
+    use crate::textarea::provider::TextAreaProvider;
+
+    #[test]
+    fn paste_splits_lines() {
+        let mut textarea =
+            TextAreaState::<TextAreaProvider>::from_text("ab");
+        textarea.enter_edit_mode();
+        textarea.set_cursor_position(2);
+
+        textarea.paste("c\r\nd\nef");
+
+        assert_eq!(textarea.text(), "abc\nd\nef");
     }
 }

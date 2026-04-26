@@ -18,7 +18,10 @@ compile_error!(
 use std::io;
 
 use crossterm::{
-    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEvent, KeyModifiers},
+    event::{
+        self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode,
+        KeyEvent, KeyModifiers,
+    },
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
@@ -32,6 +35,7 @@ use ratatui::{
 };
 
 use canvas::{
+    integration::crossterm_input::CrosstermInputGuard,
     textinput::{TextInput, TextInputEventOutcome, TextInputState},
     CursorManager,
 };
@@ -54,6 +58,15 @@ impl TextInputDemo {
 
     fn handle_input(&mut self, key: KeyEvent) {
         match self.input.input(key) {
+            TextInputEventOutcome::Submitted => {
+                self.status = format!("Submitted: {}", self.input.text());
+            }
+            TextInputEventOutcome::Handled | TextInputEventOutcome::Ignored => {}
+        }
+    }
+
+    fn handle_event(&mut self, event: Event) {
+        match self.input.handle_event(event) {
             TextInputEventOutcome::Submitted => {
                 self.status = format!("Submitted: {}", self.input.text());
             }
@@ -108,10 +121,13 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>) -> anyhow::Result<()> {
     loop {
         terminal.draw(|f| ui(f, &mut app))?;
 
-        if let Event::Key(key) = event::read()? {
-            if !handle_key_press(key, &mut app) {
-                return Ok(());
+        match event::read()? {
+            Event::Key(key) => {
+                if !handle_key_press(key, &mut app) {
+                    return Ok(());
+                }
             }
+            other => app.handle_event(other),
         }
     }
 }
@@ -122,6 +138,7 @@ fn main() -> anyhow::Result<()> {
     execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
+    let _input_guard = CrosstermInputGuard::install()?;
 
     let result = run_app(&mut terminal);
     let _ = CursorManager::reset();

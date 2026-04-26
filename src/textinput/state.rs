@@ -1,6 +1,7 @@
 use std::ops::{Deref, DerefMut};
 
-use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
+#[cfg(feature = "crossterm")]
+use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 
 use crate::editor::FormEditor;
 #[cfg(feature = "gui")]
@@ -93,6 +94,37 @@ impl<P: TextInputDataProvider> TextInputState<P> {
         self.overflow_indicator = ch;
     }
 
+    pub fn paste(&mut self, text: &str) -> TextInputEventOutcome {
+        let filtered: String = text
+            .chars()
+            .filter(|&ch| ch != '\n' && ch != '\r')
+            .collect();
+
+        if filtered.is_empty() {
+            return TextInputEventOutcome::Ignored;
+        }
+
+        self.enter_edit_mode();
+        #[cfg(feature = "gui")]
+        {
+            self.edited_this_frame = true;
+        }
+        let _ = self.insert_text(&filtered);
+        TextInputEventOutcome::Handled
+    }
+
+    // TODO: Replace direct crossterm event coupling with a backend-agnostic
+    // input abstraction so terminal input backends can be swapped cleanly.
+    #[cfg(feature = "crossterm")]
+    pub fn handle_event(&mut self, event: Event) -> TextInputEventOutcome {
+        match event {
+            Event::Key(key) => self.input(key),
+            Event::Paste(text) => self.paste(&text),
+            _ => TextInputEventOutcome::Ignored,
+        }
+    }
+
+    #[cfg(feature = "crossterm")]
     pub fn input(&mut self, key: KeyEvent) -> TextInputEventOutcome {
         if key.kind != KeyEventKind::Press {
             return TextInputEventOutcome::Ignored;
@@ -232,6 +264,8 @@ impl<P: TextInputDataProvider> TextInputState<P> {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(feature = "crossterm")]
+    use crossterm::event::Event;
     use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
     use super::{TextInputEventOutcome, TextInputState};
@@ -255,5 +289,32 @@ mod tests {
 
         assert_eq!(outcome, TextInputEventOutcome::Ignored);
         assert_eq!(input.current_field(), 0);
+    }
+
+    #[test]
+    fn paste_filters_line_breaks_for_single_line_input() {
+        let mut input =
+            TextInputState::<TextInputProvider>::from_text("ab");
+        input.enter_edit_mode();
+        input.set_cursor_position(2);
+
+        let outcome = input.paste("c\r\nd\nef");
+
+        assert_eq!(outcome, TextInputEventOutcome::Handled);
+        assert_eq!(input.text(), "abcdef");
+    }
+
+    #[cfg(feature = "crossterm")]
+    #[test]
+    fn handle_event_routes_paste_events() {
+        let mut input =
+            TextInputState::<TextInputProvider>::from_text("hi");
+        input.enter_edit_mode();
+        input.set_cursor_position(2);
+
+        let outcome = input.handle_event(Event::Paste(" there".to_string()));
+
+        assert_eq!(outcome, TextInputEventOutcome::Handled);
+        assert_eq!(input.text(), "hi there");
     }
 }
