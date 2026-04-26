@@ -2,7 +2,11 @@ use std::ops::{Deref, DerefMut};
 
 #[cfg(feature = "crossterm")]
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
+#[cfg(feature = "cursor-style")]
+use std::io;
 
+#[cfg(feature = "cursor-style")]
+use crate::canvas::{CursorManager, modes::AppMode};
 use crate::editor::FormEditor;
 #[cfg(feature = "gui")]
 use crate::gui_utils::{
@@ -111,6 +115,20 @@ impl<P: TextInputDataProvider> TextInputState<P> {
         }
         let _ = self.insert_text(&filtered);
         TextInputEventOutcome::Handled
+    }
+
+    /// Update terminal cursor style for this single-line input.
+    ///
+    /// Text input is treated as insert-style editing, so this reuses the
+    /// Canvas cursor policy for `AppMode::Edit`.
+    #[cfg(feature = "cursor-style")]
+    pub fn update_cursor_style(&self) -> io::Result<()> {
+        CursorManager::update_for_mode(AppMode::Edit)
+    }
+
+    #[cfg(not(feature = "cursor-style"))]
+    pub fn update_cursor_style(&self) -> std::io::Result<()> {
+        Ok(())
     }
 
     // TODO: Replace direct crossterm event coupling with a backend-agnostic
