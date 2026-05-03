@@ -24,6 +24,29 @@ It provides:
 - Syntax highlighting (via syntect)
 - Extensible architecture for custom behaviors
 
+### Server-Stored Validation
+
+Canvas validation types are structured in a way that maps cleanly to a
+server-owned validation schema.
+
+Recommended integration model:
+
+- The server stores one validation document per field.
+- Clients fetch all validation documents for a table in one batch.
+- Clients translate the fetched data into `canvas::ValidationConfig`.
+- Raw stored values remain unmasked; masks are display metadata only.
+
+Typical mapping:
+
+- server `limits` -> `canvas::validation::CharacterLimits`
+- server `pattern` -> `canvas::validation::PatternFilters`
+- server `allowed_values` -> canvas allowed-values config
+- server `mask` -> `canvas::validation::DisplayMask`
+- server formatter metadata -> client formatter registry
+
+This keeps validation definition centralized on the server while still letting
+Canvas handle local editing, masking, and feedback.
+
 ---
 
 ## Installation
