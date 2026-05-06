@@ -48,8 +48,7 @@ pub use validation::{
     CharacterLimits, ValidationConfigBuilder, ValidationState,
     ValidationSummary, PatternFilters, PositionFilter, PositionRange, CharacterFilter, 
     DisplayMask,
-    AppliedValidation, PackageId, PackageRequirement, RecipeId, RecipeReference,
-    ValidationPackage, ValidationRecipe, ValidationSettings,
+    AppliedValidation, ValidationRule, ValidationSet, ValidationSettings,
     CustomFormatter, FormattingResult, PositionMapper, DefaultPositionMapper,
 };
 

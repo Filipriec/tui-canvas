@@ -31,8 +31,7 @@ pub use patterns::{PatternFilters, PositionFilter, PositionRange, CharacterFilte
 pub use mask::DisplayMask;
 pub use formatting::{CustomFormatter, FormattingResult, PositionMapper, DefaultPositionMapper};
 pub use validation_core::{
-    AppliedValidation, PackageId, PackageRequirement, RecipeId, RecipeReference,
-    ValidationPackage, ValidationRecipe, ValidationSettings,
+    AppliedValidation, ValidationRule, ValidationSet, ValidationSettings,
 };
 
 /// External validation UI state.
