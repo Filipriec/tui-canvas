@@ -1,6 +1,6 @@
 // src/textarea/highlight/chunks.rs
-use ratatui::text::{Line, Span};
 use ratatui::style::Style;
+use ratatui::text::{Line, Span};
 use unicode_width::UnicodeWidthChar;
 
 #[derive(Debug, Clone)]
@@ -114,11 +114,7 @@ pub fn clip_chunks_window_with_indicator_padded(
     Line::from(spans)
 }
 
-pub fn wrap_chunks_indented(
-    chunks: &[StyledChunk],
-    width: u16,
-    indent: u16,
-) -> Vec<Line<'static>> {
+pub fn wrap_chunks_indented(chunks: &[StyledChunk], width: u16, indent: u16) -> Vec<Line<'static>> {
     if width == 0 {
         return vec![Line::from("")];
     }
@@ -148,7 +144,7 @@ pub fn wrap_chunks_indented(
                 current_spans = Vec::new();
                 first_line = false;
                 used = 0;
-                
+
                 if !first_line && indent > 0 {
                     current_spans.push(Span::raw(indent_str.clone()));
                     used = indent;
@@ -160,12 +156,12 @@ pub fn wrap_chunks_indented(
                 buf.clear();
             }
             buf_style = chunk.style;
-            
+
             if used == 0 && !first_line && indent > 0 {
                 current_spans.push(Span::raw(indent_str.clone()));
                 used = indent;
             }
-            
+
             buf.push(ch);
             used = used.saturating_add(w);
         }

@@ -16,15 +16,10 @@ compile_error!(
      Run with: cargo run --example validation_3 --features \"gui,validation,cursor-style\""
 );
 
-use std::io;
 use crossterm::{
-    event::{
-        self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyModifiers,
-    },
+    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyModifiers},
     execute,
-    terminal::{
-        disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
-    },
+    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use ratatui::{
     backend::{Backend, CrosstermBackend},
@@ -34,15 +29,11 @@ use ratatui::{
     widgets::{Block, Borders, Paragraph, Wrap},
     Frame, Terminal,
 };
+use std::io;
 
 use canvas::{
-    canvas::{
-        gui::render_canvas_default,
-        modes::AppMode,
-        CursorManager,
-    },
-    DataProvider, FormEditor,
-    ValidationConfig, ValidationConfigBuilder, DisplayMask,
+    canvas::{gui::render_canvas_default, modes::AppMode, CursorManager},
+    DataProvider, DisplayMask, FormEditor, ValidationConfig, ValidationConfigBuilder,
 };
 
 // FormEditor wrapper for mask demo
@@ -61,7 +52,8 @@ impl<D: DataProvider> MaskDemoFormEditor<D> {
 
         Self {
             editor,
-            debug_message: "🎭 Display Mask Demo - Visual formatting with clean business logic!".to_string(),
+            debug_message: "🎭 Display Mask Demo - Visual formatting with clean business logic!"
+                .to_string(),
             command_buffer: String::new(),
             validation_enabled: true,
             show_raw_data: false,
@@ -69,17 +61,26 @@ impl<D: DataProvider> MaskDemoFormEditor<D> {
     }
 
     // Command buffer handling
-    fn clear_command_buffer(&mut self) { self.command_buffer.clear(); }
-    fn add_to_command_buffer(&mut self, ch: char) { self.command_buffer.push(ch); }
-    fn get_command_buffer(&self) -> &str { &self.command_buffer }
-    fn has_pending_command(&self) -> bool { !self.command_buffer.is_empty() }
+    fn clear_command_buffer(&mut self) {
+        self.command_buffer.clear();
+    }
+    fn add_to_command_buffer(&mut self, ch: char) {
+        self.command_buffer.push(ch);
+    }
+    fn get_command_buffer(&self) -> &str {
+        &self.command_buffer
+    }
+    fn has_pending_command(&self) -> bool {
+        !self.command_buffer.is_empty()
+    }
 
     // Mask control
     fn toggle_validation(&mut self) {
         self.validation_enabled = !self.validation_enabled;
         self.editor.set_validation_enabled(self.validation_enabled);
         if self.validation_enabled {
-            self.debug_message = "✅ Display Masks ENABLED - See visual formatting in action!".to_string();
+            self.debug_message =
+                "✅ Display Masks ENABLED - See visual formatting in action!".to_string();
         } else {
             self.debug_message = "❌ Display Masks DISABLED - Raw text only".to_string();
         }
@@ -88,7 +89,8 @@ impl<D: DataProvider> MaskDemoFormEditor<D> {
     fn toggle_raw_data_view(&mut self) {
         self.show_raw_data = !self.show_raw_data;
         if self.show_raw_data {
-            self.debug_message = "👁️ Showing RAW business data (what's actually stored)".to_string();
+            self.debug_message =
+                "👁️ Showing RAW business data (what's actually stored)".to_string();
         } else {
             self.debug_message = "🎭 Showing FORMATTED display (what users see)".to_string();
         }
@@ -103,17 +105,20 @@ impl<D: DataProvider> MaskDemoFormEditor<D> {
             raw_data.to_string()
         };
 
-        let mask_info = if let Some(config) = self.editor.validation_state().get_field_config(field_index) {
-            if let Some(mask) = &config.display_mask {
-                format!("Pattern: '{}', Mode: {:?}",
-                       mask.pattern(),
-                       mask.display_mode())
+        let mask_info =
+            if let Some(config) = self.editor.validation_state().get_field_config(field_index) {
+                if let Some(mask) = &config.display_mask {
+                    format!(
+                        "Pattern: '{}', Mode: {:?}",
+                        mask.pattern(),
+                        mask.display_mode()
+                    )
+                } else {
+                    "No mask configured".to_string()
+                }
             } else {
-                "No mask configured".to_string()
-            }
-        } else {
-            "No validation config".to_string()
-        };
+                "No validation config".to_string()
+            };
 
         (raw_data.to_string(), display_data, mask_info)
     }
@@ -131,15 +136,23 @@ impl<D: DataProvider> MaskDemoFormEditor<D> {
 
     fn move_up(&mut self) {
         match self.editor.move_up() {
-            Ok(()) => { self.update_field_info(); }
-            Err(e) => { self.debug_message = format!("🚫 Field switch blocked: {e}"); }
+            Ok(()) => {
+                self.update_field_info();
+            }
+            Err(e) => {
+                self.debug_message = format!("🚫 Field switch blocked: {e}");
+            }
         }
     }
 
     fn move_down(&mut self) {
         match self.editor.move_down() {
-            Ok(()) => { self.update_field_info(); }
-            Err(e) => { self.debug_message = format!("🚫 Field switch blocked: {e}"); }
+            Ok(()) => {
+                self.update_field_info();
+            }
+            Err(e) => {
+                self.debug_message = format!("🚫 Field switch blocked: {e}");
+            }
         }
     }
 
@@ -158,7 +171,9 @@ impl<D: DataProvider> MaskDemoFormEditor<D> {
             let raw_pos = self.editor.cursor_position();
             let display_pos = self.editor.display_cursor_position();
             if raw_pos != display_pos {
-                self.debug_message = format!("📍 Cursor: Raw pos {raw_pos} → Display pos {display_pos} (mask active)");
+                self.debug_message = format!(
+                    "📍 Cursor: Raw pos {raw_pos} → Display pos {display_pos} (mask active)"
+                );
             } else {
                 self.debug_message = format!("📍 Cursor at position {raw_pos} (no mask offset)");
             }
@@ -166,19 +181,25 @@ impl<D: DataProvider> MaskDemoFormEditor<D> {
     }
 
     fn update_field_info(&mut self) {
-        let field_name = self.editor.data_provider().field_name(self.editor.current_field());
+        let field_name = self
+            .editor
+            .data_provider()
+            .field_name(self.editor.current_field());
         self.debug_message = format!("📝 Switched to: {field_name}");
     }
 
     // Mode transitions
     fn enter_edit_mode(&mut self) {
         self.editor.enter_edit_mode();
-        self.debug_message = "✏️ INSERT MODE - Cursor: Steady Bar | - Type to see mask formatting in real-time".to_string();
+        self.debug_message =
+            "✏️ INSERT MODE - Cursor: Steady Bar | - Type to see mask formatting in real-time"
+                .to_string();
     }
 
     fn enter_append_mode(&mut self) {
         self.editor.enter_append_mode();
-        self.debug_message = "✏️ INSERT (append) - Cursor: Steady Bar | - Mask formatting active".to_string();
+        self.debug_message =
+            "✏️ INSERT (append) - Cursor: Steady Bar | - Mask formatting active".to_string();
     }
 
     fn exit_edit_mode(&mut self) {
@@ -219,15 +240,25 @@ impl<D: DataProvider> MaskDemoFormEditor<D> {
     }
 
     // Delegate to original editor
-    fn current_field(&self) -> usize { self.editor.current_field() }
-    fn cursor_position(&self) -> usize { self.editor.cursor_position() }
-    fn mode(&self) -> AppMode { self.editor.mode() }
+    fn current_field(&self) -> usize {
+        self.editor.current_field()
+    }
+    fn cursor_position(&self) -> usize {
+        self.editor.cursor_position()
+    }
+    fn mode(&self) -> AppMode {
+        self.editor.mode()
+    }
     fn current_text(&self) -> &str {
         let field_index = self.editor.current_field();
         self.editor.data_provider().field_value(field_index)
     }
-    fn data_provider(&self) -> &D { self.editor.data_provider() }
-    fn ui_state(&self) -> &canvas::EditorState { self.editor.ui_state() }
+    fn data_provider(&self) -> &D {
+        self.editor.data_provider()
+    }
+    fn ui_state(&self) -> &canvas::EditorState {
+        self.editor.ui_state()
+    }
     fn set_mode(&mut self, mode: AppMode) {
         // Library automatically updates cursor for the mode
         self.editor.set_mode(mode);
@@ -235,26 +266,43 @@ impl<D: DataProvider> MaskDemoFormEditor<D> {
 
     fn next_field(&mut self) {
         match self.editor.next_field() {
-            Ok(()) => { self.update_field_info(); }
-            Err(e) => { self.debug_message = format!("🚫 Cannot move to next field: {e}"); }
+            Ok(()) => {
+                self.update_field_info();
+            }
+            Err(e) => {
+                self.debug_message = format!("🚫 Cannot move to next field: {e}");
+            }
         }
     }
 
     fn prev_field(&mut self) {
         match self.editor.prev_field() {
-            Ok(()) => { self.update_field_info(); }
-            Err(e) => { self.debug_message = format!("🚫 Cannot move to previous field: {e}"); }
+            Ok(()) => {
+                self.update_field_info();
+            }
+            Err(e) => {
+                self.debug_message = format!("🚫 Cannot move to previous field: {e}");
+            }
         }
     }
 
     // Status and debug
-    fn set_debug_message(&mut self, msg: String) { self.debug_message = msg; }
-    fn debug_message(&self) -> &str { &self.debug_message }
+    fn set_debug_message(&mut self, msg: String) {
+        self.debug_message = msg;
+    }
+    fn debug_message(&self) -> &str {
+        &self.debug_message
+    }
 
     fn show_mask_details(&mut self) {
         let (raw, display, mask_info) = self.get_current_field_info();
-        self.debug_message = format!("🔍 Field {}: {} | Raw: '{}' Display: '{}'",
-                                   self.current_field() + 1, mask_info, raw, display);
+        self.debug_message = format!(
+            "🔍 Field {}: {} | Raw: '{}' Display: '{}'",
+            self.current_field() + 1,
+            mask_info,
+            raw,
+            display
+        );
     }
 
     fn get_mask_status(&self) -> String {
@@ -303,29 +351,40 @@ impl MaskDemoData {
 }
 
 impl DataProvider for MaskDemoData {
-    fn field_count(&self) -> usize { self.fields.len() }
-    fn field_name(&self, index: usize) -> &str { &self.fields[index].0 }
-    fn field_value(&self, index: usize) -> &str { &self.fields[index].1 }
-    fn set_field_value(&mut self, index: usize, value: String) { self.fields[index].1 = value; }
+    fn field_count(&self) -> usize {
+        self.fields.len()
+    }
+    fn field_name(&self, index: usize) -> &str {
+        &self.fields[index].0
+    }
+    fn field_value(&self, index: usize) -> &str {
+        &self.fields[index].1
+    }
+    fn set_field_value(&mut self, index: usize, value: String) {
+        self.fields[index].1 = value;
+    }
 
     fn validation_config(&self, field_index: usize) -> Option<ValidationConfig> {
         match field_index {
             0 => {
                 // Phone dynamic
                 let phone_mask = DisplayMask::new("(###) ###-####", '#');
-                Some(ValidationConfigBuilder::new()
-                    .with_display_mask(phone_mask)
-                    .with_max_length(10)  // Matches 10 input positions
-                    .build())
+                Some(
+                    ValidationConfigBuilder::new()
+                        .with_display_mask(phone_mask)
+                        .with_max_length(10) // Matches 10 input positions
+                        .build(),
+                )
             }
             1 => {
                 // Phone template
-                let phone_template = DisplayMask::new("(###) ###-####", '#')
-                    .with_template('_');
-                Some(ValidationConfigBuilder::new()
-                    .with_display_mask(phone_template)
-                    .with_max_length(10)  // Matches 10 input positions
-                    .build())
+                let phone_template = DisplayMask::new("(###) ###-####", '#').with_template('_');
+                Some(
+                    ValidationConfigBuilder::new()
+                        .with_display_mask(phone_template)
+                        .with_max_length(10) // Matches 10 input positions
+                        .build(),
+                )
             }
             2 => {
                 // 📅 Date US (MM/DD/YYYY) - American date format
@@ -334,32 +393,33 @@ impl DataProvider for MaskDemoData {
             }
             3 => {
                 // 📅 Date EU (DD.MM.YYYY) - European date format with dots
-                let eu_date = DisplayMask::new("##.##.####", '#')
-                    .with_template('•');
+                let eu_date = DisplayMask::new("##.##.####", '#').with_template('•');
                 Some(ValidationConfig::with_mask(eu_date))
             }
             4 => {
                 // 📅 Date ISO (YYYY-MM-DD) - ISO date format
-                let iso_date = DisplayMask::new("####-##-##", '#')
-                    .with_template('-');
+                let iso_date = DisplayMask::new("####-##-##", '#').with_template('-');
                 Some(ValidationConfig::with_mask(iso_date))
             }
             5 => {
                 // SSN with custom input character
                 let ssn_mask = DisplayMask::new("XXX-XX-XXXX", 'X');
-                Some(ValidationConfigBuilder::new()
-                    .with_display_mask(ssn_mask)
-                    .with_max_length(9)  // Matches 9 input positions
-                    .build())
+                Some(
+                    ValidationConfigBuilder::new()
+                        .with_display_mask(ssn_mask)
+                        .with_max_length(9) // Matches 9 input positions
+                        .build(),
+                )
             }
             6 => {
                 // Credit card
-                let cc_mask = DisplayMask::new("#### #### #### ####", '#')
-                    .with_template('•');
-                Some(ValidationConfigBuilder::new()
-                    .with_display_mask(cc_mask)
-                    .with_max_length(16)  // Matches 16 input positions
-                    .build())
+                let cc_mask = DisplayMask::new("#### #### #### ####", '#').with_template('•');
+                Some(
+                    ValidationConfigBuilder::new()
+                        .with_display_mask(cc_mask)
+                        .with_max_length(16) // Matches 16 input positions
+                        .build(),
+                )
             }
             7 => {
                 // 🏢 Employee ID with business prefix
@@ -373,14 +433,12 @@ impl DataProvider for MaskDemoData {
             }
             9 => {
                 // 🌈 Custom Separators - Using | and ~ as separators
-                let custom_sep = DisplayMask::new("##|##~####", '#')
-                    .with_template('?');
+                let custom_sep = DisplayMask::new("##|##~####", '#').with_template('?');
                 Some(ValidationConfig::with_mask(custom_sep))
             }
             10 => {
                 // ⭐ Custom Placeholders - Using different placeholder characters
-                let custom_placeholder = DisplayMask::new("##-##-##", '#')
-                    .with_template('★');
+                let custom_placeholder = DisplayMask::new("##-##-##", '#').with_template('★');
                 Some(ValidationConfig::with_mask(custom_placeholder))
             }
             11 => {
@@ -476,18 +534,34 @@ fn handle_key_press(
         }
 
         // Edit mode movement
-        (AppMode::Edit, KeyCode::Left, _) => { editor.move_left(); }
-        (AppMode::Edit, KeyCode::Right, _) => { editor.move_right(); }
-        (AppMode::Edit, KeyCode::Up, _) => { editor.move_up(); }
-        (AppMode::Edit, KeyCode::Down, _) => { editor.move_down(); }
+        (AppMode::Edit, KeyCode::Left, _) => {
+            editor.move_left();
+        }
+        (AppMode::Edit, KeyCode::Right, _) => {
+            editor.move_right();
+        }
+        (AppMode::Edit, KeyCode::Up, _) => {
+            editor.move_up();
+        }
+        (AppMode::Edit, KeyCode::Down, _) => {
+            editor.move_down();
+        }
 
         // Delete operations
-        (AppMode::Edit, KeyCode::Backspace, _) => { editor.delete_backward()?; }
-        (AppMode::Edit, KeyCode::Delete, _) => { editor.delete_forward()?; }
+        (AppMode::Edit, KeyCode::Backspace, _) => {
+            editor.delete_backward()?;
+        }
+        (AppMode::Edit, KeyCode::Delete, _) => {
+            editor.delete_forward()?;
+        }
 
         // Tab navigation
-        (_, KeyCode::Tab, _) => { editor.next_field(); }
-        (_, KeyCode::BackTab, _) => { editor.prev_field(); }
+        (_, KeyCode::Tab, _) => {
+            editor.next_field();
+        }
+        (_, KeyCode::BackTab, _) => {
+            editor.prev_field();
+        }
 
         // Character input
         (AppMode::Edit, KeyCode::Char(c), m) if !m.contains(KeyModifiers::CONTROL) => {
@@ -553,19 +627,11 @@ fn ui(f: &mut Frame, editor: &MaskDemoFormEditor<MaskDemoData>) {
     render_mask_status(f, chunks[1], editor);
 }
 
-fn render_enhanced_canvas(
-    f: &mut Frame,
-    area: Rect,
-    editor: &MaskDemoFormEditor<MaskDemoData>,
-) {
+fn render_enhanced_canvas(f: &mut Frame, area: Rect, editor: &MaskDemoFormEditor<MaskDemoData>) {
     render_canvas_default(f, area, &editor.editor);
 }
 
-fn render_mask_status(
-    f: &mut Frame,
-    area: Rect,
-    editor: &MaskDemoFormEditor<MaskDemoData>,
-) {
+fn render_mask_status(f: &mut Frame, area: Rect, editor: &MaskDemoFormEditor<MaskDemoData>) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
@@ -583,14 +649,23 @@ fn render_mask_status(
     };
 
     let mask_status = editor.get_mask_status();
-    let status_text = format!("-- {} -- {} | Masks: {} | View: {}",
-                             mode_text,
-                             editor.debug_message(),
-                             mask_status,
-                             if editor.show_raw_data { "RAW" } else { "FORMATTED" });
+    let status_text = format!(
+        "-- {} -- {} | Masks: {} | View: {}",
+        mode_text,
+        editor.debug_message(),
+        mask_status,
+        if editor.show_raw_data {
+            "RAW"
+        } else {
+            "FORMATTED"
+        }
+    );
 
-    let status = Paragraph::new(Line::from(Span::raw(status_text)))
-        .block(Block::default().borders(Borders::ALL).title("🎭 Display Mask Demo"));
+    let status = Paragraph::new(Line::from(Span::raw(status_text))).block(
+        Block::default()
+            .borders(Borders::ALL)
+            .title("🎭 Display Mask Demo"),
+    );
 
     f.render_widget(status, chunks[0]);
 
@@ -620,7 +695,11 @@ fn render_mask_status(
     };
 
     let data_comparison = Paragraph::new(comparison_text)
-        .block(Block::default().borders(Borders::ALL).title("📊 Raw Data vs Display Formatting"))
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title("📊 Raw Data vs Display Formatting"),
+        )
         .style(comparison_style)
         .wrap(Wrap { trim: true });
 
@@ -650,11 +729,15 @@ fn render_mask_status(
              arrows=move through mask, Backspace/Del=delete, Esc=normal, Tab=next field\n\
              Notice how cursor position maps between raw data and display!"
         }
-        _ => "🎭 Display Mask Demo Active!"
+        _ => "🎭 Display Mask Demo Active!",
     };
 
     let help = Paragraph::new(help_text)
-        .block(Block::default().borders(Borders::ALL).title("🚀 Mask Features & Commands"))
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title("🚀 Mask Features & Commands"),
+        )
         .style(Style::default().fg(Color::Gray))
         .wrap(Wrap { trim: true });
 

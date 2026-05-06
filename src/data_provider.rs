@@ -1,8 +1,6 @@
 // src/data_provider.rs
 //! Simplified user interface - only business data, no UI state
 
-
-
 /// Defines when suggestions should be shown for a field
 #[cfg(feature = "suggestions")]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -31,10 +29,7 @@ impl SuggestionQuery {
         }
     }
 
-    pub fn with_replace_range(
-        query: impl Into<String>,
-        replace_range: (usize, usize),
-    ) -> Self {
+    pub fn with_replace_range(query: impl Into<String>, replace_range: (usize, usize)) -> Self {
         Self {
             query: query.into(),
             replace_range: Some(replace_range),
@@ -74,11 +69,7 @@ pub trait DataProvider {
     /// whole field on accept. More advanced editors can return a token-local
     /// query and replace range.
     #[cfg(feature = "suggestions")]
-    fn suggestion_query(
-        &self,
-        field_index: usize,
-        _cursor_char: usize,
-    ) -> Option<SuggestionQuery> {
+    fn suggestion_query(&self, field_index: usize, _cursor_char: usize) -> Option<SuggestionQuery> {
         Some(SuggestionQuery::whole_field(self.field_value(field_index)))
     }
 
@@ -113,7 +104,10 @@ pub trait DataProvider {
     /// Get validation configuration for a field (optional)
     /// Only available when the 'validation' feature is enabled
     #[cfg(feature = "validation")]
-    fn validation_config(&self, _field_index: usize) -> Option<crate::validation::ValidationConfig> {
+    fn validation_config(
+        &self,
+        _field_index: usize,
+    ) -> Option<crate::validation::ValidationConfig> {
         None
     }
 

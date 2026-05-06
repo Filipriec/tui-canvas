@@ -54,33 +54,27 @@ impl<D: DataProvider> FormEditor<D> {
         #[cfg(feature = "validation")]
         {
             let current_text = self.current_text();
-            if !self.ui_state.validation.allows_field_switch(
-                self.ui_state.current_field,
-                current_text,
-            ) {
+            if !self
+                .ui_state
+                .validation
+                .allows_field_switch(self.ui_state.current_field, current_text)
+            {
                 if let Some(reason) = self
                     .ui_state
                     .validation
-                    .field_switch_block_reason(
-                        self.ui_state.current_field,
-                        current_text,
-                    )
+                    .field_switch_block_reason(self.ui_state.current_field, current_text)
                 {
                     self.ui_state
                         .validation
                         .set_last_switch_block(reason.clone());
-                    return Err(anyhow::anyhow!(
-                        "Cannot exit edit mode: {}",
-                        reason
-                    ));
+                    return Err(anyhow::anyhow!("Cannot exit edit mode: {}", reason));
                 }
             }
         }
 
         let current_text = self.current_text();
         if !current_text.is_empty() {
-            let max_normal_pos =
-                current_text.chars().count().saturating_sub(1);
+            let max_normal_pos = current_text.chars().count().saturating_sub(1);
             if self.ui_state.cursor_pos > max_normal_pos {
                 self.set_cursor_raw(max_normal_pos);
             }
@@ -89,9 +83,7 @@ impl<D: DataProvider> FormEditor<D> {
         #[cfg(feature = "validation")]
         {
             let field_index = self.ui_state.current_field;
-            if let Some(cfg) =
-                self.ui_state.validation.get_field_config(field_index)
-            {
+            if let Some(cfg) = self.ui_state.validation.get_field_config(field_index) {
                 if cfg.external_validation_enabled {
                     let text = self.current_text().to_string();
                     if !text.is_empty() {
@@ -99,9 +91,7 @@ impl<D: DataProvider> FormEditor<D> {
                             field_index,
                             crate::validation::ExternalValidationState::Validating,
                         );
-                        if let Some(cb) =
-                            self.external_validation_callback.as_mut()
-                        {
+                        if let Some(cb) = self.external_validation_callback.as_mut() {
                             let final_state = cb(field_index, &text);
                             self.set_external_validation(field_index, final_state);
                         }
@@ -137,8 +127,7 @@ impl<D: DataProvider> FormEditor<D> {
         #[cfg(feature = "computed")]
         {
             if let Some(computed_state) = &self.ui_state.computed {
-                if computed_state.is_computed_field(self.ui_state.current_field)
-                {
+                if computed_state.is_computed_field(self.ui_state.current_field) {
                     return;
                 }
             }
@@ -169,8 +158,7 @@ impl<D: DataProvider> FormEditor<D> {
     pub fn enter_highlight_mode(&mut self) {
         // NORMALMODE: ignore request (stay in Edit)
         #[cfg(feature = "textmode-normal")]
-        {
-        }
+        {}
 
         // Default (not normal): original vim
         #[cfg(not(feature = "textmode-normal"))]
@@ -192,16 +180,16 @@ impl<D: DataProvider> FormEditor<D> {
     pub fn enter_highlight_line_mode(&mut self) {
         // NORMALMODE: ignore
         #[cfg(feature = "textmode-normal")]
-        {
-        }
+        {}
 
         // Default (not normal): original vim
         #[cfg(not(feature = "textmode-normal"))]
         {
             if self.ui_state.current_mode == AppMode::ReadOnly {
                 self.ui_state.current_mode = AppMode::Highlight;
-                self.ui_state.selection =
-                    SelectionState::Linewise { anchor_field: self.ui_state.current_field };
+                self.ui_state.selection = SelectionState::Linewise {
+                    anchor_field: self.ui_state.current_field,
+                };
 
                 #[cfg(feature = "cursor-style")]
                 {
@@ -214,8 +202,7 @@ impl<D: DataProvider> FormEditor<D> {
     pub fn exit_highlight_mode(&mut self) {
         // NORMALMODE: ignore
         #[cfg(feature = "textmode-normal")]
-        {
-        }
+        {}
 
         // Default (not normal): original vim
         #[cfg(not(feature = "textmode-normal"))]

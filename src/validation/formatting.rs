@@ -103,9 +103,7 @@ pub enum FormattingResult {
         mapper: Arc<dyn PositionMapper>,
     },
     /// Failed to produce a formatted display. The library will typically fall back to raw.
-    Error {
-        message: String,
-    },
+    Error { message: String },
 }
 
 impl FormattingResult {

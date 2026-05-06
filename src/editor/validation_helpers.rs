@@ -31,9 +31,7 @@ impl<D: DataProvider> FormEditor<D> {
     }
 
     #[cfg(feature = "validation")]
-    pub fn validate_current_field(
-        &mut self,
-    ) -> crate::validation::ValidationResult {
+    pub fn validate_current_field(&mut self) -> crate::validation::ValidationResult {
         let field_index = self.ui_state.current_field;
         let current_text = self.current_text().to_string();
         self.ui_state
@@ -47,8 +45,7 @@ impl<D: DataProvider> FormEditor<D> {
         field_index: usize,
     ) -> Option<crate::validation::ValidationResult> {
         if field_index < self.data_provider.field_count() {
-            let text =
-                self.data_provider.field_value(field_index).to_string();
+            let text = self.data_provider.field_value(field_index).to_string();
             Some(
                 self.ui_state
                     .validation
@@ -65,28 +62,24 @@ impl<D: DataProvider> FormEditor<D> {
     }
 
     #[cfg(feature = "validation")]
-    pub fn validation_summary(
-        &self,
-    ) -> crate::validation::ValidationSummary {
+    pub fn validation_summary(&self) -> crate::validation::ValidationSummary {
         self.ui_state.validation.summary()
     }
 
     #[cfg(feature = "validation")]
     pub fn can_switch_fields(&self) -> bool {
         let current_text = self.current_text();
-        self.ui_state.validation.allows_field_switch(
-            self.ui_state.current_field,
-            current_text,
-        )
+        self.ui_state
+            .validation
+            .allows_field_switch(self.ui_state.current_field, current_text)
     }
 
     #[cfg(feature = "validation")]
     pub fn field_switch_block_reason(&self) -> Option<String> {
         let current_text = self.current_text();
-        self.ui_state.validation.field_switch_block_reason(
-            self.ui_state.current_field,
-            current_text,
-        )
+        self.ui_state
+            .validation
+            .field_switch_block_reason(self.ui_state.current_field, current_text)
     }
 
     #[cfg(feature = "validation")]
@@ -109,9 +102,7 @@ impl<D: DataProvider> FormEditor<D> {
     pub fn current_formatter_warning(&self) -> Option<String> {
         let idx = self.ui_state.current_field;
         if let Some(cfg) = self.ui_state.validation.get_field_config(idx) {
-            if let Some((_fmt, _mapper, warn)) =
-                cfg.run_custom_formatter(self.current_text())
-            {
+            if let Some((_fmt, _mapper, warn)) = cfg.run_custom_formatter(self.current_text()) {
                 return warn;
             }
         }
@@ -154,10 +145,7 @@ impl<D: DataProvider> FormEditor<D> {
     #[cfg(feature = "validation")]
     pub fn set_external_validation_callback<F>(&mut self, callback: F)
     where
-        F: FnMut(usize, &str) -> crate::validation::ExternalValidationState
-            + Send
-            + Sync
-            + 'static,
+        F: FnMut(usize, &str) -> crate::validation::ExternalValidationState + Send + Sync + 'static,
     {
         self.external_validation_callback = Some(Box::new(callback));
     }
@@ -166,9 +154,7 @@ impl<D: DataProvider> FormEditor<D> {
     pub(crate) fn initialize_validation(&mut self) {
         let field_count = self.data_provider.field_count();
         for field_index in 0..field_count {
-            if let Some(config) =
-                self.data_provider.validation_config(field_index)
-            {
+            if let Some(config) = self.data_provider.validation_config(field_index) {
                 self.ui_state
                     .validation
                     .set_field_config(field_index, config);

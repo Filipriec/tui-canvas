@@ -30,11 +30,7 @@ pub(crate) fn display_cols_up_to(s: &str, char_count: usize) -> u16 {
 }
 
 #[cfg(feature = "gui")]
-pub(crate) fn slice_by_display_cols(
-    s: &str,
-    start_cols: u16,
-    max_cols: u16,
-) -> String {
+pub(crate) fn slice_by_display_cols(s: &str, start_cols: u16, max_cols: u16) -> String {
     if max_cols == 0 {
         return String::new();
     }
@@ -69,10 +65,7 @@ pub(crate) fn slice_by_display_cols(
 }
 
 #[cfg(feature = "gui")]
-pub(crate) fn compute_h_scroll_with_padding(
-    cursor_cols: u16,
-    width: u16,
-) -> (u16, u16) {
+pub(crate) fn compute_h_scroll_with_padding(cursor_cols: u16, width: u16) -> (u16, u16) {
     let mut h = 0u16;
     for _ in 0..2 {
         let left_cols = if h > 0 { 1 } else { 0 };

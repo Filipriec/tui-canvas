@@ -16,11 +16,7 @@ impl<D: DataProvider> FormEditor<D> {
     }
 
     #[cfg(feature = "suggestions")]
-    fn set_active_suggestion_query(
-        &mut self,
-        field_index: usize,
-        query: &SuggestionQuery,
-    ) {
+    fn set_active_suggestion_query(&mut self, field_index: usize, query: &SuggestionQuery) {
         self.ui_state.open_suggestions(field_index);
         self.ui_state.suggestions.active_query = Some(query.query.clone());
         self.ui_state.suggestions.replace_range = query.replace_range;
@@ -65,8 +61,7 @@ impl<D: DataProvider> FormEditor<D> {
 
     /// Update UI state's completion text from current selection
     pub fn update_inline_completion(&mut self) {
-        self.ui_state.suggestions.completion_text =
-            self.compute_current_completion();
+        self.ui_state.suggestions.completion_text = self.compute_current_completion();
     }
 
     /// Open the suggestions UI for `field_index`
@@ -223,8 +218,7 @@ impl<D: DataProvider> FormEditor<D> {
 
     pub fn apply_suggestion(&mut self) -> Option<String> {
         if let Some(selected_index) = self.ui_state.suggestions.selected_index {
-            if let Some(suggestion) = self.suggestions.get(selected_index).cloned()
-            {
+            if let Some(suggestion) = self.suggestions.get(selected_index).cloned() {
                 let field_index = self.ui_state.current_field;
                 let query = SuggestionQuery {
                     query: self
@@ -250,10 +244,10 @@ impl<D: DataProvider> FormEditor<D> {
                 #[cfg(feature = "validation")]
                 {
                     let text = self.data_provider.field_value(field_index).to_string();
-                    let _ = self.ui_state.validation.validate_field_content(
-                        field_index,
-                        &text,
-                    );
+                    let _ = self
+                        .ui_state
+                        .validation
+                        .validate_field_content(field_index, &text);
                 }
 
                 return Some(suggestion.display_text);

@@ -17,7 +17,6 @@ pub trait CanvasTheme {
     fn suggestion_gray(&self) -> Color;
 }
 
-
 #[cfg(feature = "gui")]
 #[derive(Debug, Clone, Default)]
 pub struct DefaultCanvasTheme;

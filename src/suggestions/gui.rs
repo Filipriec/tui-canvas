@@ -35,7 +35,14 @@ pub fn render_suggestions_dropdown<T: CanvasTheme, D: DataProvider>(
     if ui_state.suggestions.is_loading {
         render_loading_indicator(f, frame_area, input_rect, theme);
     } else if !editor.suggestions().is_empty() {
-        render_suggestions_dropdown_list(f, frame_area, input_rect, theme, editor.suggestions(), ui_state.suggestions.selected_index);
+        render_suggestions_dropdown_list(
+            f,
+            frame_area,
+            input_rect,
+            theme,
+            editor.suggestions(),
+            ui_state.suggestions.selected_index,
+        );
     }
 }
 
@@ -51,15 +58,10 @@ fn render_loading_indicator<T: CanvasTheme>(
     let loading_width = loading_text.width() as u16 + 4; // +4 for borders and padding
     let loading_height = 3;
 
-    let dropdown_area = calculate_dropdown_position(
-        input_rect,
-        frame_area,
-        loading_width,
-        loading_height,
-    );
+    let dropdown_area =
+        calculate_dropdown_position(input_rect, frame_area, loading_width, loading_height);
 
-    let loading_block = Block::default()
-        .style(Style::default().bg(theme.bg()));
+    let loading_block = Block::default().style(Style::default().bg(theme.bg()));
 
     let loading_paragraph = Paragraph::new(loading_text)
         .block(loading_block)
@@ -93,8 +95,7 @@ fn render_suggestions_dropdown_list<T: CanvasTheme>(
     );
 
     // Background
-    let dropdown_block = Block::default()
-        .style(Style::default().bg(theme.bg()));
+    let dropdown_block = Block::default().style(Style::default().bg(theme.bg()));
 
     // List items
     let items = create_suggestion_list_items(

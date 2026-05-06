@@ -23,9 +23,7 @@ use std::io;
 use std::sync::Arc;
 
 use crossterm::{
-    event::{
-        self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyModifiers,
-    },
+    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyModifiers},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
@@ -40,9 +38,8 @@ use ratatui::{
 
 use canvas::{
     canvas::{gui::render_canvas_default, modes::AppMode, CursorManager},
-    DataProvider, FormEditor,
-    ValidationConfig, ValidationConfigBuilder,
-    CustomFormatter, FormattingResult,
+    CustomFormatter, DataProvider, FormEditor, FormattingResult, ValidationConfig,
+    ValidationConfigBuilder,
 };
 
 /// PSC (Postal Code) Formatter: "01001" -> "010 01"
@@ -63,10 +60,9 @@ impl CustomFormatter for PSCFormatter {
         match len {
             0 => FormattingResult::success(""),
             1..=3 => FormattingResult::success(raw),
-            4 => FormattingResult::warning(
-                format!("{} ", &raw[..3]),
-                "PSC incomplete (4/5 digits)"
-            ),
+            4 => {
+                FormattingResult::warning(format!("{} ", &raw[..3]), "PSC incomplete (4/5 digits)")
+            }
             5 => {
                 let formatted = format!("{} {}", &raw[..3], &raw[3..]);
                 if raw == "00000" {
@@ -74,7 +70,7 @@ impl CustomFormatter for PSCFormatter {
                 } else {
                     FormattingResult::success(formatted)
                 }
-            },
+            }
             _ => FormattingResult::error("PSC too long (max 5 digits)"),
         }
     }
@@ -99,14 +95,16 @@ impl CustomFormatter for PhoneFormatter {
             0 => FormattingResult::success(""),
             1..=3 => FormattingResult::success(format!("({raw})")),
             4..=6 => FormattingResult::success(format!("({}) {}", &raw[..3], &raw[3..])),
-            7..=10 => FormattingResult::success(format!("({}) {}-{}", &raw[..3], &raw[3..6], &raw[6..])),
+            7..=10 => {
+                FormattingResult::success(format!("({}) {}-{}", &raw[..3], &raw[3..6], &raw[6..]))
+            }
             10 => {
                 let formatted = format!("({}) {}-{}", &raw[..3], &raw[3..6], &raw[6..]);
                 FormattingResult::success(formatted)
-            },
+            }
             _ => FormattingResult::warning(
                 format!("({}) {}-{}", &raw[..3], &raw[3..6], &raw[6..10]),
-                "Phone too long (extra digits ignored)"
+                "Phone too long (extra digits ignored)",
             ),
         }
     }
@@ -135,17 +133,14 @@ impl CustomFormatter for CreditCardFormatter {
 
         let len = raw.chars().count();
         match len {
-            0..=15 => FormattingResult::warning(formatted, format!("Card incomplete ({len}/16 digits)")),
+            0..=15 => {
+                FormattingResult::warning(formatted, format!("Card incomplete ({len}/16 digits)"))
+            }
             16 => FormattingResult::success(formatted),
             _ => FormattingResult::warning(formatted, "Card too long (extra digits shown)"),
         }
     }
 }
-
-
-
-
-
 
 /// Date Formatter: "12012024" -> "12/01/2024"
 struct DateFormatter;
@@ -165,7 +160,9 @@ impl CustomFormatter for DateFormatter {
             0 => FormattingResult::success(""),
             1..=2 => FormattingResult::success(raw.to_string()),
             3..=4 => FormattingResult::success(format!("{}/{}", &raw[..2], &raw[2..])),
-            5..=8 => FormattingResult::success(format!("{}/{}/{}", &raw[..2], &raw[2..4], &raw[4..])),
+            5..=8 => {
+                FormattingResult::success(format!("{}/{}/{}", &raw[..2], &raw[2..4], &raw[4..]))
+            }
             8 => {
                 let month = &raw[..2];
                 let day = &raw[2..4];
@@ -178,17 +175,17 @@ impl CustomFormatter for DateFormatter {
                 if m == 0 || m > 12 {
                     FormattingResult::warning(
                         format!("{month}/{day}/{year}"),
-                        "Invalid month (01-12)"
+                        "Invalid month (01-12)",
                     )
                 } else if d == 0 || d > 31 {
                     FormattingResult::warning(
                         format!("{month}/{day}/{year}"),
-                        "Invalid day (01-31)"
+                        "Invalid day (01-31)",
                     )
                 } else {
                     FormattingResult::success(format!("{month}/{day}/{year}"))
                 }
-            },
+            }
             _ => FormattingResult::error("Date too long (MMDDYYYY format)"),
         }
     }
@@ -233,26 +230,36 @@ impl DataProvider for MultiFormatterDemoData {
     #[cfg(feature = "validation")]
     fn validation_config(&self, field_index: usize) -> Option<ValidationConfig> {
         match field_index {
-            0 => Some(ValidationConfigBuilder::new()
-                .with_custom_formatter(Arc::new(PSCFormatter))
-                .with_max_length(5)
-                .build()),
-            1 => Some(ValidationConfigBuilder::new()
-                .with_custom_formatter(Arc::new(PhoneFormatter))
-                .with_max_length(12)
-                .build()),
-            2 => Some(ValidationConfigBuilder::new()
-                .with_custom_formatter(Arc::new(CreditCardFormatter))
-                .with_max_length(20)
-                .build()),
-            3 => Some(ValidationConfigBuilder::new()
-                .with_custom_formatter(Arc::new(DateFormatter))
-                .with_max_length(8)
-                .build()),
-            4 => Some(ValidationConfigBuilder::new()
-                .with_custom_formatter(Arc::new(DateFormatter))
-                .with_max_length(8)
-                .build()),
+            0 => Some(
+                ValidationConfigBuilder::new()
+                    .with_custom_formatter(Arc::new(PSCFormatter))
+                    .with_max_length(5)
+                    .build(),
+            ),
+            1 => Some(
+                ValidationConfigBuilder::new()
+                    .with_custom_formatter(Arc::new(PhoneFormatter))
+                    .with_max_length(12)
+                    .build(),
+            ),
+            2 => Some(
+                ValidationConfigBuilder::new()
+                    .with_custom_formatter(Arc::new(CreditCardFormatter))
+                    .with_max_length(20)
+                    .build(),
+            ),
+            3 => Some(
+                ValidationConfigBuilder::new()
+                    .with_custom_formatter(Arc::new(DateFormatter))
+                    .with_max_length(8)
+                    .build(),
+            ),
+            4 => Some(
+                ValidationConfigBuilder::new()
+                    .with_custom_formatter(Arc::new(DateFormatter))
+                    .with_max_length(8)
+                    .build(),
+            ),
             _ => None, // Plain text field - no formatter
         }
     }
@@ -275,7 +282,9 @@ impl<D: DataProvider> EnhancedDemoEditor<D> {
 
         Self {
             editor,
-            debug_message: "🧩 Enhanced Custom Formatter Demo - Multiple formatters with rich edge cases!".to_string(),
+            debug_message:
+                "🧩 Enhanced Custom Formatter Demo - Multiple formatters with rich edge cases!"
+                    .to_string(),
             validation_enabled: true,
             show_raw_data: false,
             show_cursor_details: false,
@@ -312,13 +321,34 @@ impl<D: DataProvider> EnhancedDemoEditor<D> {
     fn cycle_example_data(&mut self) {
         let examples = [
             // PSC examples
-            vec!["01001", "1234567890", "1234567890123456", "12345", "12012024", "Plain text here"],
+            vec![
+                "01001",
+                "1234567890",
+                "1234567890123456",
+                "12345",
+                "12012024",
+                "Plain text here",
+            ],
             // Incomplete examples
             vec!["010", "123", "1234", "123", "1201", "More text"],
             // Invalid examples (will show error handling)
-            vec!["0abc1", "12a45", "123abc", "abc", "ab01cd", "Special chars!"],
+            vec![
+                "0abc1",
+                "12a45",
+                "123abc",
+                "abc",
+                "ab01cd",
+                "Special chars!",
+            ],
             // Edge cases
-            vec!["00000", "0000000000", "0000000000000000", "99", "13012024", ""],
+            vec![
+                "00000",
+                "0000000000",
+                "0000000000000000",
+                "99",
+                "13012024",
+                "",
+            ],
         ];
 
         self.example_mode = (self.example_mode + 1) % examples.len();
@@ -326,11 +356,18 @@ impl<D: DataProvider> EnhancedDemoEditor<D> {
 
         for (i, example) in current_examples.iter().enumerate() {
             if i < self.editor.data_provider().field_count() {
-                self.editor.data_provider_mut().set_field_value(i, example.to_string());
+                self.editor
+                    .data_provider_mut()
+                    .set_field_value(i, example.to_string());
             }
         }
 
-        let mode_names = ["Valid Examples", "Incomplete Input", "Invalid Characters", "Edge Cases"];
+        let mode_names = [
+            "Valid Examples",
+            "Incomplete Input",
+            "Invalid Characters",
+            "Edge Cases",
+        ];
         self.debug_message = format!("📋 Loaded: {}", mode_names[self.example_mode]);
     }
 
@@ -407,16 +444,24 @@ impl<D: DataProvider> EnhancedDemoEditor<D> {
         self.editor.enter_edit_mode();
         let field_type = self.current_field_type();
         let rules = self.get_input_rules();
-        self.debug_message = format!("✏️ INSERT MODE - Cursor: Steady Bar | - {field_type} - {rules}");
+        self.debug_message =
+            format!("✏️ INSERT MODE - Cursor: Steady Bar | - {field_type} - {rules}");
     }
 
     fn exit_edit_mode(&mut self) {
         self.editor.exit_edit_mode();
         let (raw, display, _, warning) = self.get_current_field_analysis();
         if let Some(warn) = warning {
-            self.debug_message = format!("🔒 NORMAL - Cursor: Steady Block █ - {} | ⚠️ {}", self.current_field_type(), warn);
+            self.debug_message = format!(
+                "🔒 NORMAL - Cursor: Steady Block █ - {} | ⚠️ {}",
+                self.current_field_type(),
+                warn
+            );
         } else if raw != display {
-            self.debug_message = format!("🔒 NORMAL - Cursor: Steady Block █ - {} formatted successfully", self.current_field_type());
+            self.debug_message = format!(
+                "🔒 NORMAL - Cursor: Steady Block █ - {} formatted successfully",
+                self.current_field_type()
+            );
         } else {
             self.debug_message = "🔒 NORMAL MODE - Cursor: Steady Block █".to_string();
         }
@@ -462,21 +507,49 @@ impl<D: DataProvider> EnhancedDemoEditor<D> {
     }
 
     // Delegate remaining methods
-    fn mode(&self) -> AppMode { self.editor.mode() }
-    fn current_field(&self) -> usize { self.editor.current_field() }
-    fn cursor_position(&self) -> usize { self.editor.cursor_position() }
-    fn data_provider(&self) -> &D { self.editor.data_provider() }
-    fn data_provider_mut(&mut self) -> &mut D { self.editor.data_provider_mut() }
-    fn ui_state(&self) -> &canvas::EditorState { self.editor.ui_state() }
+    fn mode(&self) -> AppMode {
+        self.editor.mode()
+    }
+    fn current_field(&self) -> usize {
+        self.editor.current_field()
+    }
+    fn cursor_position(&self) -> usize {
+        self.editor.cursor_position()
+    }
+    fn data_provider(&self) -> &D {
+        self.editor.data_provider()
+    }
+    fn data_provider_mut(&mut self) -> &mut D {
+        self.editor.data_provider_mut()
+    }
+    fn ui_state(&self) -> &canvas::EditorState {
+        self.editor.ui_state()
+    }
 
-    fn move_up(&mut self) { let _ = self.editor.move_up(); }
-    fn move_down(&mut self) { let _ = self.editor.move_down(); }
-    fn move_left(&mut self) { let _ = self.editor.move_left(); }
-    fn move_right(&mut self) { let _ = self.editor.move_right(); }
-    fn delete_backward(&mut self) -> anyhow::Result<()> { self.editor.delete_backward() }
-    fn delete_forward(&mut self) -> anyhow::Result<()> { self.editor.delete_forward() }
-    fn next_field(&mut self) { let _ = self.editor.next_field(); }
-    fn prev_field(&mut self) { let _ = self.editor.prev_field(); }
+    fn move_up(&mut self) {
+        let _ = self.editor.move_up();
+    }
+    fn move_down(&mut self) {
+        let _ = self.editor.move_down();
+    }
+    fn move_left(&mut self) {
+        let _ = self.editor.move_left();
+    }
+    fn move_right(&mut self) {
+        let _ = self.editor.move_right();
+    }
+    fn delete_backward(&mut self) -> anyhow::Result<()> {
+        self.editor.delete_backward()
+    }
+    fn delete_forward(&mut self) -> anyhow::Result<()> {
+        self.editor.delete_forward()
+    }
+    fn next_field(&mut self) {
+        let _ = self.editor.next_field();
+    }
+    fn prev_field(&mut self) {
+        let _ = self.editor.prev_field();
+    }
 }
 
 // Key handling
@@ -488,9 +561,10 @@ fn handle_key_press(
     let mode = editor.mode();
 
     // Quit
-    if matches!(key, KeyCode::F(10)) ||
-       (key == KeyCode::Char('q') && modifiers.contains(KeyModifiers::CONTROL)) ||
-       (key == KeyCode::Char('c') && modifiers.contains(KeyModifiers::CONTROL)) {
+    if matches!(key, KeyCode::F(10))
+        || (key == KeyCode::Char('q') && modifiers.contains(KeyModifiers::CONTROL))
+        || (key == KeyCode::Char('c') && modifiers.contains(KeyModifiers::CONTROL))
+    {
         return Ok(false);
     }
 
@@ -499,8 +573,12 @@ fn handle_key_press(
         (AppMode::ReadOnly, KeyCode::Char('i'), _) => editor.enter_edit_mode(),
         (AppMode::ReadOnly, KeyCode::Char('a'), _) => {
             editor.editor.enter_append_mode();
-            editor.debug_message = format!("✏️ APPEND {} - {}", editor.current_field_type(), editor.get_input_rules());
-        },
+            editor.debug_message = format!(
+                "✏️ APPEND {} - {}",
+                editor.current_field_type(),
+                editor.get_input_rules()
+            );
+        }
         (_, KeyCode::Esc, _) => editor.exit_edit_mode(),
 
         // Demo features
@@ -521,9 +599,13 @@ fn handle_key_press(
         // Editing
         (AppMode::Edit, KeyCode::Char(c), m) if !m.contains(KeyModifiers::CONTROL) => {
             editor.insert_char(c)?;
-        },
-        (AppMode::Edit, KeyCode::Backspace, _) => { editor.delete_backward()?; },
-        (AppMode::Edit, KeyCode::Delete, _) => { editor.delete_forward()?; },
+        }
+        (AppMode::Edit, KeyCode::Backspace, _) => {
+            editor.delete_backward()?;
+        }
+        (AppMode::Edit, KeyCode::Delete, _) => {
+            editor.delete_forward()?;
+        }
 
         // Field analysis
         (AppMode::ReadOnly, KeyCode::Char('?'), _) => {
@@ -531,9 +613,13 @@ fn handle_key_press(
             let warning_text = warning.map(|w| format!(" ⚠️ {w}")).unwrap_or_default();
             editor.debug_message = format!(
                 "🔍 Field {}: {} | Raw: '{}' | Display: '{}'{}",
-                editor.current_field() + 1, status, raw, display, warning_text
+                editor.current_field() + 1,
+                status,
+                raw,
+                display,
+                warning_text
             );
-        },
+        }
 
         _ => {}
     }
@@ -582,9 +668,9 @@ fn render_enhanced_status(
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(3),  // Status bar
-            Constraint::Length(6),  // Current field analysis
-            Constraint::Length(9),  // Help
+            Constraint::Length(3), // Status bar
+            Constraint::Length(6), // Current field analysis
+            Constraint::Length(9), // Help
         ])
         .split(area);
 
@@ -605,12 +691,23 @@ fn render_enhanced_status(
         editor.debug_message,
         formatter_count,
         editor.data_provider().field_count(),
-        if editor.show_raw_data { "RAW" } else { "DISPLAY" },
-        if editor.show_cursor_details { " | CURSOR+" } else { "" }
+        if editor.show_raw_data {
+            "RAW"
+        } else {
+            "DISPLAY"
+        },
+        if editor.show_cursor_details {
+            " | CURSOR+"
+        } else {
+            ""
+        }
     );
 
-    let status = Paragraph::new(Line::from(Span::raw(status_text)))
-        .block(Block::default().borders(Borders::ALL).title("🧩 Enhanced Custom Formatter Demo"));
+    let status = Paragraph::new(Line::from(Span::raw(status_text))).block(
+        Block::default()
+            .borders(Borders::ALL)
+            .title("🧩 Enhanced Custom Formatter Demo"),
+    );
 
     f.render_widget(status, chunks[0]);
 
@@ -653,7 +750,11 @@ fn render_enhanced_status(
     };
 
     let analysis = Paragraph::new(analysis_lines.join("\n"))
-        .block(Block::default().borders(Borders::ALL).title("🔍 Field Analysis"))
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title("🔍 Field Analysis"),
+        )
         .style(Style::default().fg(analysis_color))
         .wrap(Wrap { trim: true });
 
@@ -694,7 +795,11 @@ fn render_enhanced_status(
     };
 
     let help = Paragraph::new(formatted_help)
-        .block(Block::default().borders(Borders::ALL).title("🚀 Enhanced Features & Commands"))
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title("🚀 Enhanced Features & Commands"),
+        )
         .style(Style::default().fg(Color::Gray))
         .wrap(Wrap { trim: true });
 
@@ -731,7 +836,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let res = run_app(&mut terminal, editor);
 
     disable_raw_mode()?;
-    execute!(terminal.backend_mut(), LeaveAlternateScreen, DisableMouseCapture)?;
+    execute!(
+        terminal.backend_mut(),
+        LeaveAlternateScreen,
+        DisableMouseCapture
+    )?;
     terminal.show_cursor()?;
 
     CursorManager::reset()?;

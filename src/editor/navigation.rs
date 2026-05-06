@@ -23,10 +23,8 @@ impl<D: DataProvider> FormEditor<D> {
 
         let search_forward_first = target_field >= prev_field;
 
-        let mut search_forward = || {
-            ((target_field + 1)..field_count)
-                .find(|&i| !computed_state.is_computed_field(i))
-        };
+        let mut search_forward =
+            || ((target_field + 1)..field_count).find(|&i| !computed_state.is_computed_field(i));
         let mut search_backward = || {
             (0..target_field)
                 .rev()
@@ -53,8 +51,7 @@ impl<D: DataProvider> FormEditor<D> {
         let prev_field = self.ui_state.current_field;
 
         #[cfg(feature = "computed")]
-        let target_field =
-            self.resolved_navigable_field(new_field, prev_field, field_count);
+        let target_field = self.resolved_navigable_field(new_field, prev_field, field_count);
         #[cfg(not(feature = "computed"))]
         let target_field = new_field.min(field_count - 1);
 
@@ -82,35 +79,27 @@ impl<D: DataProvider> FormEditor<D> {
                         .validation
                         .set_last_switch_block(reason.clone());
                     tracing::debug!("Field switch blocked: {}", reason);
-                    return Err(anyhow::anyhow!(
-                        "Cannot switch fields: {}",
-                        reason
-                    ));
+                    return Err(anyhow::anyhow!("Cannot switch fields: {}", reason));
                 }
             }
         }
 
         #[cfg(feature = "validation")]
         {
-            let text =
-                self.data_provider.field_value(prev_field).to_string();
+            let text = self.data_provider.field_value(prev_field).to_string();
             let _ = self
                 .ui_state
                 .validation
                 .validate_field_content(prev_field, &text);
 
-            if let Some(cfg) =
-                self.ui_state.validation.get_field_config(prev_field)
-            {
+            if let Some(cfg) = self.ui_state.validation.get_field_config(prev_field) {
                 if cfg.external_validation_enabled && !text.is_empty() {
                     self.set_external_validation(
                         prev_field,
                         crate::validation::ExternalValidationState::Validating,
                     );
 
-                    if let Some(cb) =
-                        self.external_validation_callback.as_mut()
-                    {
+                    if let Some(cb) = self.external_validation_callback.as_mut() {
                         let final_state = cb(prev_field, &text);
                         self.set_external_validation(prev_field, final_state);
                     }
@@ -139,8 +128,7 @@ impl<D: DataProvider> FormEditor<D> {
 
     /// Move to last line (vim G)
     pub fn move_last_line(&mut self) -> anyhow::Result<()> {
-        let last_field =
-            self.data_provider.field_count().saturating_sub(1);
+        let last_field = self.data_provider.field_count().saturating_sub(1);
         self.transition_to_field(last_field)
     }
 
@@ -152,8 +140,7 @@ impl<D: DataProvider> FormEditor<D> {
         }
         let before = self.ui_state.current_field;
         let new_field = self.ui_state.current_field - 1;
-        self.transition_to_field(new_field).is_ok()
-            && self.ui_state.current_field != before
+        self.transition_to_field(new_field).is_ok() && self.ui_state.current_field != before
     }
 
     /// Move to next field (vim j / down)
@@ -165,8 +152,7 @@ impl<D: DataProvider> FormEditor<D> {
         }
         let before = self.ui_state.current_field;
         let new_field = self.ui_state.current_field + 1;
-        self.transition_to_field(new_field).is_ok()
-            && self.ui_state.current_field != before
+        self.transition_to_field(new_field).is_ok() && self.ui_state.current_field != before
     }
 
     /// Move to next field cyclic
@@ -201,10 +187,7 @@ mod tests {
     impl TestProvider {
         fn new(names: &[&'static str]) -> Self {
             Self {
-                fields: names
-                    .iter()
-                    .map(|name| (*name, String::new()))
-                    .collect(),
+                fields: names.iter().map(|name| (*name, String::new())).collect(),
             }
         }
     }

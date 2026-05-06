@@ -48,7 +48,10 @@ impl TextAreaProvider {
         Self {
             rope,
             name: "Text".to_string(),
-            line_cache: vec![(); lines].into_iter().map(|_| OnceCell::new()).collect(),
+            line_cache: vec![(); lines]
+                .into_iter()
+                .map(|_| OnceCell::new())
+                .collect(),
         }
     }
 
@@ -68,7 +71,10 @@ impl TextAreaProvider {
         Ok(Self {
             rope,
             name: "Text".to_string(),
-            line_cache: vec![(); lines].into_iter().map(|_| OnceCell::new()).collect(),
+            line_cache: vec![(); lines]
+                .into_iter()
+                .map(|_| OnceCell::new())
+                .collect(),
         })
     }
 

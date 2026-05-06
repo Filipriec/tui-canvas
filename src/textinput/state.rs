@@ -6,12 +6,11 @@ use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use std::io;
 
 #[cfg(feature = "cursor-style")]
-use crate::canvas::{CursorManager, modes::AppMode};
+use crate::canvas::{modes::AppMode, CursorManager};
 use crate::editor::FormEditor;
 #[cfg(feature = "gui")]
 use crate::gui_utils::{
-    compute_h_scroll_with_padding, display_cols_up_to, display_width,
-    RIGHT_PAD,
+    compute_h_scroll_with_padding, display_cols_up_to, display_width, RIGHT_PAD,
 };
 use crate::textinput::provider::{TextInputDataProvider, TextInputProvider};
 
@@ -89,7 +88,8 @@ impl<P: TextInputDataProvider> TextInputState<P> {
     pub fn set_text<S: Into<String>>(&mut self, text: S) {
         self.editor.data_provider_mut().set_text(text.into());
         self.editor.ui_state.current_field = 0;
-        self.editor.set_cursor_raw(self.current_text().chars().count());
+        self.editor
+            .set_cursor_raw(self.current_text().chars().count());
         self.clear_suggestion_suffix();
         self.h_scroll = 0;
     }
@@ -192,9 +192,7 @@ impl<P: TextInputDataProvider> TextInputState<P> {
 
         match (key.code, key.modifiers) {
             (KeyCode::Enter, _) => TextInputEventOutcome::Submitted,
-            (KeyCode::Tab, KeyModifiers::NONE) => {
-                self.accept_suggestion_suffix()
-            }
+            (KeyCode::Tab, KeyModifiers::NONE) => self.accept_suggestion_suffix(),
             (KeyCode::Backspace, _) => {
                 self.clear_suggestion_suffix();
                 #[cfg(feature = "gui")]
@@ -221,16 +219,12 @@ impl<P: TextInputDataProvider> TextInputState<P> {
                 let _ = self.move_right();
                 TextInputEventOutcome::Handled
             }
-            (KeyCode::Up, _) | (KeyCode::Down, _) => {
-                TextInputEventOutcome::Ignored
-            }
-            (KeyCode::Home, _)
-            | (KeyCode::Char('a'), KeyModifiers::CONTROL) => {
+            (KeyCode::Up, _) | (KeyCode::Down, _) => TextInputEventOutcome::Ignored,
+            (KeyCode::Home, _) | (KeyCode::Char('a'), KeyModifiers::CONTROL) => {
                 self.move_line_start();
                 TextInputEventOutcome::Handled
             }
-            (KeyCode::End, _)
-            | (KeyCode::Char('e'), KeyModifiers::CONTROL) => {
+            (KeyCode::End, _) | (KeyCode::Char('e'), KeyModifiers::CONTROL) => {
                 self.move_line_end();
                 TextInputEventOutcome::Handled
             }
@@ -262,7 +256,11 @@ impl<P: TextInputDataProvider> TextInputState<P> {
 
     #[cfg(feature = "gui")]
     pub fn cursor(&self, area: Rect, block: Option<&Block<'_>>) -> (u16, u16) {
-        let inner = if let Some(b) = block { b.inner(area) } else { area };
+        let inner = if let Some(b) = block {
+            b.inner(area)
+        } else {
+            area
+        };
         let cursor_cols = self.current_cursor_cols();
         let left_cols = if self.h_scroll > 0 { 1 } else { 0 };
 
@@ -280,7 +278,11 @@ impl<P: TextInputDataProvider> TextInputState<P> {
 
     #[cfg(feature = "gui")]
     pub(crate) fn ensure_visible(&mut self, area: Rect, block: Option<&Block<'_>>) {
-        let inner = if let Some(b) = block { b.inner(area) } else { area };
+        let inner = if let Some(b) = block {
+            b.inner(area)
+        } else {
+            area
+        };
         if inner.width == 0 {
             return;
         }
@@ -339,8 +341,7 @@ mod tests {
 
     #[test]
     fn enter_submits_without_mutating_text() {
-        let mut input =
-            TextInputState::<TextInputProvider>::from_text("hello");
+        let mut input = TextInputState::<TextInputProvider>::from_text("hello");
         let outcome = input.input(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
 
         assert_eq!(outcome, TextInputEventOutcome::Submitted);
@@ -349,8 +350,7 @@ mod tests {
 
     #[test]
     fn vertical_arrows_are_ignored() {
-        let mut input =
-            TextInputState::<TextInputProvider>::from_text("hello");
+        let mut input = TextInputState::<TextInputProvider>::from_text("hello");
         let outcome = input.input(KeyEvent::new(KeyCode::Up, KeyModifiers::NONE));
 
         assert_eq!(outcome, TextInputEventOutcome::Ignored);
@@ -359,8 +359,7 @@ mod tests {
 
     #[test]
     fn paste_filters_line_breaks_for_single_line_input() {
-        let mut input =
-            TextInputState::<TextInputProvider>::from_text("ab");
+        let mut input = TextInputState::<TextInputProvider>::from_text("ab");
         input.enter_edit_mode();
         input.set_cursor_position(2);
 
@@ -372,8 +371,7 @@ mod tests {
 
     #[test]
     fn tab_accepts_inline_suggestion_suffix() {
-        let mut input =
-            TextInputState::<TextInputProvider>::from_text("ad");
+        let mut input = TextInputState::<TextInputProvider>::from_text("ad");
         input.enter_edit_mode();
         input.set_cursor_position(2);
         input.set_suggestion_suffix("min");
@@ -388,8 +386,7 @@ mod tests {
     #[cfg(feature = "crossterm")]
     #[test]
     fn handle_event_routes_paste_events() {
-        let mut input =
-            TextInputState::<TextInputProvider>::from_text("hi");
+        let mut input = TextInputState::<TextInputProvider>::from_text("hi");
         input.enter_edit_mode();
         input.set_cursor_position(2);
 

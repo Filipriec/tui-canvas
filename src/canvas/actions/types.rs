@@ -232,21 +232,34 @@ impl CanvasAction {
 
     /// Check if this action modifies text content.
     pub fn is_editing_action(&self) -> bool {
-        matches!(self,
-            Self::InsertChar(_) |
-            Self::DeleteBackward |
-            Self::DeleteForward
+        matches!(
+            self,
+            Self::InsertChar(_) | Self::DeleteBackward | Self::DeleteForward
         )
     }
 
     /// Check if this action moves the cursor.
     pub fn is_movement_action(&self) -> bool {
-        matches!(self,
-            Self::MoveLeft | Self::MoveRight | Self::MoveUp | Self::MoveDown |
-            Self::MoveWordNext | Self::MoveWordPrev | Self::MoveWordEnd | Self::MoveWordEndPrev |
-            Self::MoveBigWordNext | Self::MoveBigWordPrev | Self::MoveBigWordEnd | Self::MoveBigWordEndPrev |
-            Self::MoveLineStart | Self::MoveLineEnd | Self::NextField | Self::PrevField |
-            Self::MoveFirstLine | Self::MoveLastLine
+        matches!(
+            self,
+            Self::MoveLeft
+                | Self::MoveRight
+                | Self::MoveUp
+                | Self::MoveDown
+                | Self::MoveWordNext
+                | Self::MoveWordPrev
+                | Self::MoveWordEnd
+                | Self::MoveWordEndPrev
+                | Self::MoveBigWordNext
+                | Self::MoveBigWordPrev
+                | Self::MoveBigWordEnd
+                | Self::MoveBigWordEndPrev
+                | Self::MoveLineStart
+                | Self::MoveLineEnd
+                | Self::NextField
+                | Self::PrevField
+                | Self::MoveFirstLine
+                | Self::MoveLastLine
         )
     }
 }

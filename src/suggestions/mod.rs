@@ -4,9 +4,9 @@
 //! Contains the suggestion provider types used by the editor and, when the GUI
 //! feature is enabled, the rendering helpers for the suggestions dropdown.
 
-pub mod state;
 #[cfg(feature = "gui")]
 pub mod gui;
+pub mod state;
 
 pub use state::SuggestionItem;
 

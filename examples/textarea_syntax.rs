@@ -12,9 +12,10 @@ compile_error!(
      Run with: cargo run --example textarea_syntax --features \"gui,cursor-style,textarea,syntect,textmode-normal\""
 );
 
-use std::io;
 use crossterm::{
-    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEvent, KeyModifiers},
+    event::{
+        self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEvent, KeyModifiers,
+    },
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
@@ -26,6 +27,7 @@ use ratatui::{
     widgets::{Block, Borders, Paragraph},
     Frame, Terminal,
 };
+use std::io;
 
 use canvas::{
     canvas::CursorManager,
@@ -104,7 +106,7 @@ greet("World");
         let _ = self.textarea.set_syntax_by_extension("rs");
         self.current_language = "Rust".to_string();
         self.debug_message = format!("🦀 Switched to Rust syntax ({})", self.current_theme);
-        
+
         let rust_code = r#"// Rust example
 fn fibonacci(n: u32) -> u32 {
     match n {
@@ -127,7 +129,7 @@ fn main() {
         let _ = self.textarea.set_syntax_by_extension("py");
         self.current_language = "Python".to_string();
         self.debug_message = format!("🐍 Switched to Python syntax ({})", self.current_theme);
-        
+
         let python_code = r#"# Python example
 def fibonacci(n):
     if n <= 1:
@@ -148,7 +150,7 @@ if __name__ == "__main__":
         let _ = self.textarea.set_syntax_by_extension("js");
         self.current_language = "JavaScript".to_string();
         self.debug_message = format!("🟨 Switched to JavaScript syntax ({})", self.current_theme);
-        
+
         let js_code = r#"// JavaScript example
 function fibonacci(n) {
     if (n <= 1) return n;
@@ -170,7 +172,7 @@ main();"#;
         let _ = self.textarea.set_syntax_by_name("Scheme");
         self.current_language = "Scheme".to_string();
         self.debug_message = format!("🎭 Switched to Scheme syntax ({})", self.current_theme);
-        
+
         let scheme_code = r#";; Scheme example
 (define (fibonacci n)
   (cond ((= n 0) 0)
@@ -230,10 +232,7 @@ main();"#;
     }
 }
 
-fn handle_key_press(
-    key_event: KeyEvent,
-    editor: &mut SyntaxTextAreaDemo,
-) -> anyhow::Result<bool> {
+fn handle_key_press(key_event: KeyEvent, editor: &mut SyntaxTextAreaDemo) -> anyhow::Result<bool> {
     let KeyEvent {
         code: key,
         modifiers,
@@ -261,21 +260,33 @@ fn handle_key_press(
         // Overflow modes
         (KeyCode::F(1), _) => {
             editor.textarea.use_overflow_indicator('$');
-            editor.set_debug_message(format!("Overflow: indicator '$' (wrap OFF) | Theme: {}", editor.current_theme));
+            editor.set_debug_message(format!(
+                "Overflow: indicator '$' (wrap OFF) | Theme: {}",
+                editor.current_theme
+            ));
         }
         (KeyCode::F(2), _) => {
             editor.textarea.use_wrap();
-            editor.set_debug_message(format!("Overflow: wrap ON | Theme: {}", editor.current_theme));
+            editor.set_debug_message(format!(
+                "Overflow: wrap ON | Theme: {}",
+                editor.current_theme
+            ));
         }
 
         // Wrap indent
         (KeyCode::F(3), _) => {
             editor.textarea.set_wrap_indent_cols(4);
-            editor.set_debug_message(format!("Wrap indent: 4 columns | Theme: {}", editor.current_theme));
+            editor.set_debug_message(format!(
+                "Wrap indent: 4 columns | Theme: {}",
+                editor.current_theme
+            ));
         }
         (KeyCode::F(4), _) => {
             editor.textarea.set_wrap_indent_cols(0);
-            editor.set_debug_message(format!("Wrap indent: 0 columns | Theme: {}", editor.current_theme));
+            editor.set_debug_message(format!(
+                "Wrap indent: 0 columns | Theme: {}",
+                editor.current_theme
+            ));
         }
 
         // Info
@@ -293,7 +304,10 @@ fn handle_key_press(
     Ok(true)
 }
 
-fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut editor: SyntaxTextAreaDemo) -> io::Result<()> {
+fn run_app<B: Backend>(
+    terminal: &mut Terminal<B>,
+    mut editor: SyntaxTextAreaDemo,
+) -> io::Result<()> {
     loop {
         terminal.draw(|f| ui(f, &mut editor))?;
 
@@ -356,8 +370,11 @@ fn render_status_and_help(f: &mut Frame, area: ratatui::layout::Rect, editor: &S
         )
     };
 
-    let status = Paragraph::new(Line::from(Span::raw(status_text)))
-        .block(Block::default().borders(Borders::ALL).title("🎨 Syntax Status"));
+    let status = Paragraph::new(Line::from(Span::raw(status_text))).block(
+        Block::default()
+            .borders(Borders::ALL)
+            .title("🎨 Syntax Status"),
+    );
 
     f.render_widget(status, chunks[0]);
 
@@ -394,7 +411,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     CursorManager::reset()?;
 
     disable_raw_mode()?;
-    execute!(terminal.backend_mut(), LeaveAlternateScreen, DisableMouseCapture)?;
+    execute!(
+        terminal.backend_mut(),
+        LeaveAlternateScreen,
+        DisableMouseCapture
+    )?;
     terminal.show_cursor()?;
 
     if let Err(err) = res {

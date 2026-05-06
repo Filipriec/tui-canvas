@@ -21,11 +21,7 @@ fn normalize_indent(width: u16, indent: u16) -> u16 {
 }
 
 #[cfg(feature = "gui")]
-pub(crate) fn count_wrapped_rows_indented(
-    s: &str,
-    width: u16,
-    indent: u16,
-) -> u16 {
+pub(crate) fn count_wrapped_rows_indented(s: &str, width: u16, indent: u16) -> u16 {
     if width == 0 {
         return 1;
     }
@@ -192,10 +188,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         let line_idx = self.current_field();
         let col = self.cursor_position();
 
-        let new_idx = self
-            .editor
-            .data_provider_mut()
-            .split_line_at(line_idx, col);
+        let new_idx = self.editor.data_provider_mut().split_line_at(line_idx, col);
 
         let _ = self.transition_to_field(new_idx);
         self.move_line_start();
@@ -218,8 +211,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
             return;
         }
 
-        if let Some((prev_idx, new_col)) =
-            self.editor.data_provider_mut().join_with_prev(line_idx)
+        if let Some((prev_idx, new_col)) = self.editor.data_provider_mut().join_with_prev(line_idx)
         {
             #[cfg(feature = "gui")]
             {
@@ -245,9 +237,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
             return;
         }
 
-        if let Some(new_col) =
-            self.editor.data_provider_mut().join_with_next(line_idx)
-        {
+        if let Some(new_col) = self.editor.data_provider_mut().join_with_next(line_idx) {
             #[cfg(feature = "gui")]
             {
                 self.edited_this_frame = true;
@@ -310,12 +300,10 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
                 let _ = self.move_down();
             }
 
-            (KeyCode::Home, _)
-            | (KeyCode::Char('a'), KeyModifiers::CONTROL) => {
+            (KeyCode::Home, _) | (KeyCode::Char('a'), KeyModifiers::CONTROL) => {
                 self.move_line_start();
             }
-            (KeyCode::End, _)
-            | (KeyCode::Char('e'), KeyModifiers::CONTROL) => {
+            (KeyCode::End, _) | (KeyCode::Char('e'), KeyModifiers::CONTROL) => {
                 self.move_line_end();
             }
 
@@ -348,11 +336,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
     }
 
     #[cfg(feature = "gui")]
-    fn visual_rows_before_line_and_intra_indented(
-        &self,
-        width: u16,
-        line_idx: usize,
-    ) -> u16 {
+    fn visual_rows_before_line_and_intra_indented(&self, width: u16, line_idx: usize) -> u16 {
         let provider = self.editor.data_provider();
         let mut acc: u16 = 0;
         let indent = self.wrap_indent_cols;
@@ -366,7 +350,11 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
 
     #[cfg(feature = "gui")]
     pub fn cursor(&self, area: Rect, block: Option<&Block<'_>>) -> (u16, u16) {
-        let inner = if let Some(b) = block { b.inner(area) } else { area };
+        let inner = if let Some(b) = block {
+            b.inner(area)
+        } else {
+            area
+        };
         let line_idx = self.current_field();
 
         match self.overflow_mode {
@@ -381,17 +369,12 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
                     return (inner.x, y);
                 }
 
-                let prefix_rows =
-                    self.visual_rows_before_line_and_intra_indented(width, line_idx);
+                let prefix_rows = self.visual_rows_before_line_and_intra_indented(width, line_idx);
                 let current_line = self.current_text();
                 let col_chars = self.display_cursor_position();
 
-                let (subrow, x_cols) = wrapped_rows_to_cursor_indented(
-                    current_line,
-                    width,
-                    indent,
-                    col_chars,
-                );
+                let (subrow, x_cols) =
+                    wrapped_rows_to_cursor_indented(current_line, width, indent, col_chars);
 
                 let caret_vis_row = prefix_rows.saturating_add(subrow);
                 let y = y_top.saturating_add(caret_vis_row.saturating_sub(self.scroll_y));
@@ -433,7 +416,11 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
 
     #[cfg(feature = "gui")]
     pub(crate) fn ensure_visible(&mut self, area: Rect, block: Option<&Block<'_>>) {
-        let inner = if let Some(b) = block { b.inner(area) } else { area };
+        let inner = if let Some(b) = block {
+            b.inner(area)
+        } else {
+            area
+        };
         if inner.height == 0 {
             return;
         }
@@ -455,8 +442,8 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
                 let current_line = self.current_text();
                 let mut total_cols: u16 = 0;
                 for ch in current_line.chars() {
-                    total_cols = total_cols
-                        .saturating_add(UnicodeWidthChar::width(ch).unwrap_or(0) as u16);
+                    total_cols =
+                        total_cols.saturating_add(UnicodeWidthChar::width(ch).unwrap_or(0) as u16);
                 }
                 if total_cols <= width {
                     self.h_scroll = 0;
@@ -469,12 +456,11 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
                     if i >= col {
                         break;
                     }
-                    cursor_cols = cursor_cols
-                        .saturating_add(UnicodeWidthChar::width(ch).unwrap_or(0) as u16);
+                    cursor_cols =
+                        cursor_cols.saturating_add(UnicodeWidthChar::width(ch).unwrap_or(0) as u16);
                 }
 
-                let (target_h, _left_cols) =
-                    compute_h_scroll_with_padding(cursor_cols, width);
+                let (target_h, _left_cols) = compute_h_scroll_with_padding(cursor_cols, width);
 
                 if target_h > self.h_scroll {
                     self.h_scroll = target_h;
@@ -492,8 +478,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
                 let indent = self.wrap_indent_cols;
                 let line_idx = self.current_field();
 
-                let prefix_rows =
-                    self.visual_rows_before_line_and_intra_indented(width, line_idx);
+                let prefix_rows = self.visual_rows_before_line_and_intra_indented(width, line_idx);
 
                 let current_line = self.current_text();
                 let col = self.display_cursor_position();
@@ -520,7 +505,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
             }
         }
     }
-    
+
     #[cfg(feature = "gui")]
     pub(crate) fn take_edited_flag(&mut self) -> bool {
         let v = self.edited_this_frame;
@@ -536,8 +521,7 @@ mod tests {
 
     #[test]
     fn paste_splits_lines() {
-        let mut textarea =
-            TextAreaState::<TextAreaProvider>::from_text("ab");
+        let mut textarea = TextAreaState::<TextAreaProvider>::from_text("ab");
         textarea.enter_edit_mode();
         textarea.set_cursor_position(2);
 

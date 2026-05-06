@@ -9,9 +9,8 @@ use ratatui::{
 
 #[cfg(feature = "gui")]
 use crate::gui_utils::{
-    clip_inline_completion_with_indicator_padded,
-    clip_window_with_indicator_padded, compute_h_scroll_with_padding,
-    display_cols_up_to, display_width,
+    clip_inline_completion_with_indicator_padded, clip_window_with_indicator_padded,
+    compute_h_scroll_with_padding, display_cols_up_to, display_width,
 };
 #[cfg(feature = "gui")]
 use crate::textinput::provider::{TextInputDataProvider, TextInputProvider};
@@ -91,20 +90,18 @@ impl<'a, P: TextInputDataProvider> StatefulWidget for TextInput<'a, P> {
         let suggestion = state.suggestion_suffix();
 
         let line = if text.is_empty() && suggestion.is_none() {
-            Line::from(Span::raw(
-                state.placeholder.clone().unwrap_or_default(),
-            ))
+            Line::from(Span::raw(state.placeholder.clone().unwrap_or_default()))
         } else {
             let fits = display_width(&text) <= inner.width;
             let start_cols = if fits {
-                if edited_now { 0 } else { state.h_scroll }
+                if edited_now {
+                    0
+                } else {
+                    state.h_scroll
+                }
             } else {
-                let cursor_cols = display_cols_up_to(
-                    &text,
-                    state.display_cursor_position(),
-                );
-                let (target_h, _) =
-                    compute_h_scroll_with_padding(cursor_cols, inner.width);
+                let cursor_cols = display_cols_up_to(&text, state.display_cursor_position());
+                let (target_h, _) = compute_h_scroll_with_padding(cursor_cols, inner.width);
                 target_h.max(state.h_scroll)
             };
 

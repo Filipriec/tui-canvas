@@ -15,9 +15,7 @@ compile_error!(
      Run with: cargo run --example textinput_normal --features \"gui,cursor-style,textinput,textmode-normal\""
 );
 
-use crossterm::{
-    event::{Event, KeyCode, KeyEvent, KeyModifiers},
-};
+use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 use ratatui::{
     backend::{Backend, CrosstermBackend},
     layout::{Constraint, Direction, Layout},
@@ -28,9 +26,7 @@ use ratatui::{
 };
 
 use canvas::{
-    integration::crossterm_input::{
-        CrosstermInputOptions, CrosstermInputSession,
-    },
+    integration::crossterm_input::{CrosstermInputOptions, CrosstermInputSession},
     textinput::{TextInput, TextInputEventOutcome, TextInputState},
     CursorManager,
 };
@@ -71,8 +67,7 @@ impl TextInputDemo {
 }
 
 fn handle_key_press(key_event: KeyEvent, app: &mut TextInputDemo) -> bool {
-    if (key_event.code == KeyCode::Char('q')
-        && key_event.modifiers.contains(KeyModifiers::CONTROL))
+    if (key_event.code == KeyCode::Char('q') && key_event.modifiers.contains(KeyModifiers::CONTROL))
         || (key_event.code == KeyCode::Char('c')
             && key_event.modifiers.contains(KeyModifiers::CONTROL))
         || key_event.code == KeyCode::F(10)
@@ -131,9 +126,8 @@ fn run_app<B: Backend>(
 }
 
 fn main() -> anyhow::Result<()> {
-    let mut session = CrosstermInputSession::install_with_options(
-        CrosstermInputOptions::tui_defaults(),
-    )?;
+    let mut session =
+        CrosstermInputSession::install_with_options(CrosstermInputOptions::tui_defaults())?;
     let backend = CrosstermBackend::new(std::io::stdout());
     let mut terminal = Terminal::new(backend)?;
 

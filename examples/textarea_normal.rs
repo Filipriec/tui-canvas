@@ -19,9 +19,7 @@ compile_error!(
      Run with: cargo run --example canvas_textarea_cursor_auto_normal --features \"gui,cursor-style,textarea,textmode-normal\""
 );
 
-use crossterm::{
-    event::{Event, KeyCode, KeyEvent, KeyModifiers},
-};
+use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 use ratatui::{
     backend::{Backend, CrosstermBackend},
     layout::{Constraint, Direction, Layout},
@@ -33,9 +31,7 @@ use ratatui::{
 
 use canvas::{
     canvas::CursorManager,
-    integration::crossterm_input::{
-        CrosstermInputOptions, CrosstermInputSession,
-    },
+    integration::crossterm_input::{CrosstermInputOptions, CrosstermInputSession},
     textarea::{TextArea, TextAreaState},
 };
 
@@ -201,10 +197,7 @@ Press ? for help, Ctrl+Q to quit.";
 }
 
 /// Handle key press in NORMALMODE (always editing, casual editor style)
-fn handle_key_press(
-    key_event: KeyEvent,
-    editor: &mut AutoCursorTextArea,
-) -> anyhow::Result<bool> {
+fn handle_key_press(key_event: KeyEvent, editor: &mut AutoCursorTextArea) -> anyhow::Result<bool> {
     let KeyEvent {
         code: key,
         modifiers,
@@ -352,8 +345,11 @@ fn render_status_and_help(f: &mut Frame, area: ratatui::layout::Rect, editor: &A
         )
     };
 
-    let status = Paragraph::new(Line::from(Span::raw(status_text)))
-        .block(Block::default().borders(Borders::ALL).title("🎯 Cursor Status"));
+    let status = Paragraph::new(Line::from(Span::raw(status_text))).block(
+        Block::default()
+            .borders(Borders::ALL)
+            .title("🎯 Cursor Status"),
+    );
 
     f.render_widget(status, chunks[0]);
 
@@ -377,9 +373,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("🚀 Always editing, underscore cursor active");
     println!();
 
-    let mut session = CrosstermInputSession::install_with_options(
-        CrosstermInputOptions::tui_defaults(),
-    )?;
+    let mut session =
+        CrosstermInputSession::install_with_options(CrosstermInputOptions::tui_defaults())?;
     let backend = CrosstermBackend::new(std::io::stdout());
     let mut terminal = Terminal::new(backend)?;
 

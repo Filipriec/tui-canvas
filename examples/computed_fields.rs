@@ -12,27 +12,25 @@ compile_error!(
      Run with: cargo run --example computed_fields --features \"gui,computed\""
 );
 
-use std::io;
 use crossterm::{
-    event::{
-        self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyModifiers,
-    },
+    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyModifiers},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use ratatui::{
     backend::{Backend, CrosstermBackend},
     layout::{Constraint, Direction, Layout, Rect},
-    style::{Color, Style, Modifier},
+    style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Paragraph, Wrap},
     Frame, Terminal,
 };
+use std::io;
 
 use canvas::{
     canvas::{gui::render_canvas_default, modes::AppMode},
+    computed::{ComputedContext, ComputedProvider},
     DataProvider, FormEditor,
-    computed::{ComputedProvider, ComputedContext},
 };
 
 /// Invoice data with computed fields
@@ -44,7 +42,7 @@ struct InvoiceData {
 impl InvoiceData {
     fn new() -> Self {
         let mut computed_indices = std::collections::HashSet::new();
-        
+
         // Mark computed fields (read-only, calculated)
         computed_indices.insert(4); // Subtotal
         computed_indices.insert(5); // Tax Amount
@@ -56,9 +54,9 @@ impl InvoiceData {
                 ("🔢 Quantity".to_string(), "".to_string()),
                 ("💰 Unit Price ($)".to_string(), "".to_string()),
                 ("📊 Tax Rate (%)".to_string(), "".to_string()),
-                ("➕ Subtotal ($)".to_string(), "".to_string()),        // COMPUTED
-                ("🧾 Tax Amount ($)".to_string(), "".to_string()),      // COMPUTED
-                ("💳 Total ($)".to_string(), "".to_string()),           // COMPUTED
+                ("➕ Subtotal ($)".to_string(), "".to_string()), // COMPUTED
+                ("🧾 Tax Amount ($)".to_string(), "".to_string()), // COMPUTED
+                ("💳 Total ($)".to_string(), "".to_string()),    // COMPUTED
                 ("📝 Notes".to_string(), "".to_string()),
             ],
             computed_indices,
@@ -90,7 +88,7 @@ impl DataProvider for InvoiceData {
     fn display_value(&self, _index: usize) -> Option<&str> {
         None
     }
-    
+
     /// Mark computed fields
     fn is_computed_field(&self, field_index: usize) -> bool {
         self.computed_indices.contains(&field_index)
@@ -127,9 +125,9 @@ impl ComputedProvider for InvoiceCalculator {
                 let qty = parse_field(1);
                 let price = parse_field(2);
                 let subtotal = qty * price;
-                
+
                 if qty == 0.0 || price == 0.0 {
-                    "".to_string()  // Show empty if no meaningful calculation
+                    "".to_string() // Show empty if no meaningful calculation
                 } else {
                     format!("{subtotal:.2}")
                 }
@@ -141,7 +139,7 @@ impl ComputedProvider for InvoiceCalculator {
                 let tax_rate = parse_field(3);
                 let subtotal = qty * price;
                 let tax_amount = subtotal * (tax_rate / 100.0);
-                
+
                 if subtotal == 0.0 || tax_rate == 0.0 {
                     "".to_string()
                 } else {
@@ -154,7 +152,7 @@ impl ComputedProvider for InvoiceCalculator {
                 let price = parse_field(2);
                 let tax_rate = parse_field(3);
                 let subtotal = qty * price;
-                
+
                 if subtotal == 0.0 {
                     "".to_string()
                 } else {
@@ -166,16 +164,16 @@ impl ComputedProvider for InvoiceCalculator {
             _ => "".to_string(),
         }
     }
-    
+
     fn handles_field(&self, field_index: usize) -> bool {
         matches!(field_index, 4..=6) // Subtotal, Tax Amount, Total
     }
-    
+
     fn field_dependencies(&self, field_index: usize) -> Vec<usize> {
         match field_index {
-            4 => vec![1, 2],       // Subtotal depends on Quantity, Unit Price
-            5 => vec![1, 2, 3],    // Tax Amount depends on Quantity, Unit Price, Tax Rate
-            6 => vec![1, 2, 3],    // Total depends on Quantity, Unit Price, Tax Rate
+            4 => vec![1, 2],    // Subtotal depends on Quantity, Unit Price
+            5 => vec![1, 2, 3], // Tax Amount depends on Quantity, Unit Price, Tax Rate
+            6 => vec![1, 2, 3], // Total depends on Quantity, Unit Price, Tax Rate
             _ => vec![],
         }
     }
@@ -200,7 +198,8 @@ impl<D: DataProvider> ComputedFieldsEditor<D> {
         Self {
             editor,
             calculator,
-            debug_message: "💰 Invoice Calculator - Start typing in fields to see calculations!".to_string(),
+            debug_message: "💰 Invoice Calculator - Start typing in fields to see calculations!"
+                .to_string(),
             last_computed_values,
         }
     }
@@ -212,14 +211,17 @@ impl<D: DataProvider> ComputedFieldsEditor<D> {
     fn update_computed_fields(&mut self) {
         self.editor.recompute_all_fields(&mut self.calculator);
 
-        for i in [4, 5, 6] { // Computed field indices  
+        for i in [4, 5, 6] {
+            // Computed field indices
             let computed_value = self.editor.effective_field_value(i);
-            self.editor.data_provider_mut().set_field_value(i, computed_value.clone());
+            self.editor
+                .data_provider_mut()
+                .set_field_value(i, computed_value.clone());
         }
 
         let mut changed = false;
         let mut has_calculations = false;
-        
+
         for i in [4, 5, 6] {
             let new_value = self.editor.effective_field_value(i);
             if new_value != self.last_computed_values[i] {
@@ -236,7 +238,7 @@ impl<D: DataProvider> ComputedFieldsEditor<D> {
                 let subtotal = &self.last_computed_values[4];
                 let tax = &self.last_computed_values[5];
                 let total = &self.last_computed_values[6];
-                
+
                 let mut parts = Vec::new();
                 if !subtotal.is_empty() {
                     parts.push(format!("Subtotal=${subtotal}"));
@@ -247,14 +249,16 @@ impl<D: DataProvider> ComputedFieldsEditor<D> {
                 if !total.is_empty() {
                     parts.push(format!("Total=${total}"));
                 }
-                
+
                 if !parts.is_empty() {
                     self.debug_message = format!("🧮 Calculated: {}", parts.join(", "));
                 } else {
-                    self.debug_message = "💰 Enter Quantity and Unit Price to see calculations".to_string();
+                    self.debug_message =
+                        "💰 Enter Quantity and Unit Price to see calculations".to_string();
                 }
             } else {
-                self.debug_message = "💰 Enter Quantity and Unit Price to see calculations".to_string();
+                self.debug_message =
+                    "💰 Enter Quantity and Unit Price to see calculations".to_string();
             }
         }
     }
@@ -264,7 +268,8 @@ impl<D: DataProvider> ComputedFieldsEditor<D> {
         let result = self.editor.insert_char(ch);
 
         if result.is_ok() && matches!(current_field, 1..=3) {
-            self.editor.on_field_changed(&mut self.calculator, current_field);
+            self.editor
+                .on_field_changed(&mut self.calculator, current_field);
             self.update_computed_fields();
         }
 
@@ -276,7 +281,8 @@ impl<D: DataProvider> ComputedFieldsEditor<D> {
         let result = self.editor.delete_backward();
 
         if result.is_ok() && matches!(current_field, 1..=3) {
-            self.editor.on_field_changed(&mut self.calculator, current_field);
+            self.editor
+                .on_field_changed(&mut self.calculator, current_field);
             self.update_computed_fields();
         }
 
@@ -288,7 +294,8 @@ impl<D: DataProvider> ComputedFieldsEditor<D> {
         let result = self.editor.delete_forward();
 
         if result.is_ok() && matches!(current_field, 1..=3) {
-            self.editor.on_field_changed(&mut self.calculator, current_field);
+            self.editor
+                .on_field_changed(&mut self.calculator, current_field);
             self.update_computed_fields();
         }
 
@@ -329,16 +336,17 @@ impl<D: DataProvider> ComputedFieldsEditor<D> {
 
     fn enter_edit_mode(&mut self) {
         let current = self.editor.current_field();
-        
+
         // Double protection: check both ways
-        if self.editor.data_provider().is_computed_field(current) || self.is_computed_field(current) {
+        if self.editor.data_provider().is_computed_field(current) || self.is_computed_field(current)
+        {
             let field_name = self.editor.data_provider().field_name(current);
             self.debug_message = format!(
                 "🚫 {field_name} is computed (read-only) - Press Tab to move to editable fields"
             );
             return;
         }
-        
+
         self.editor.enter_edit_mode();
         let field_name = self.editor.data_provider().field_name(current);
         self.debug_message = format!("✏️ Editing {field_name} - Type to see calculations update");
@@ -346,15 +354,16 @@ impl<D: DataProvider> ComputedFieldsEditor<D> {
 
     fn enter_append_mode(&mut self) {
         let current = self.editor.current_field();
-        
-        if self.editor.data_provider().is_computed_field(current) || self.is_computed_field(current) {
+
+        if self.editor.data_provider().is_computed_field(current) || self.is_computed_field(current)
+        {
             let field_name = self.editor.data_provider().field_name(current);
             self.debug_message = format!(
                 "🚫 {field_name} is computed (read-only) - Press Tab to move to editable fields"
             );
             return;
         }
-        
+
         self.editor.enter_append_mode();
         let field_name = self.editor.data_provider().field_name(current);
         self.debug_message = format!("✏️ Appending to {field_name} - Type to see calculations");
@@ -365,7 +374,8 @@ impl<D: DataProvider> ComputedFieldsEditor<D> {
         self.editor.exit_edit_mode();
 
         if matches!(current_field, 1..=3) {
-            self.editor.on_field_changed(&mut self.calculator, current_field);
+            self.editor
+                .on_field_changed(&mut self.calculator, current_field);
             self.update_computed_fields();
         }
 
@@ -373,19 +383,37 @@ impl<D: DataProvider> ComputedFieldsEditor<D> {
     }
 
     // Delegate methods
-    fn current_field(&self) -> usize { self.editor.current_field() }
-    fn cursor_position(&self) -> usize { self.editor.cursor_position() }
-    fn mode(&self) -> AppMode { self.editor.mode() }
+    fn current_field(&self) -> usize {
+        self.editor.current_field()
+    }
+    fn cursor_position(&self) -> usize {
+        self.editor.cursor_position()
+    }
+    fn mode(&self) -> AppMode {
+        self.editor.mode()
+    }
     fn current_text(&self) -> &str {
         let field_index = self.editor.current_field();
         self.editor.data_provider().field_value(field_index)
     }
-    fn data_provider(&self) -> &D { self.editor.data_provider() }
-    fn ui_state(&self) -> &canvas::EditorState { self.editor.ui_state() }
-    fn move_left(&mut self) { self.editor.move_left(); }
-    fn move_right(&mut self) { self.editor.move_right(); }
-    fn move_up(&mut self) { let _ = self.editor.move_up(); }
-    fn move_down(&mut self) { let _ = self.editor.move_down(); }
+    fn data_provider(&self) -> &D {
+        self.editor.data_provider()
+    }
+    fn ui_state(&self) -> &canvas::EditorState {
+        self.editor.ui_state()
+    }
+    fn move_left(&mut self) {
+        self.editor.move_left();
+    }
+    fn move_right(&mut self) {
+        self.editor.move_right();
+    }
+    fn move_up(&mut self) {
+        let _ = self.editor.move_up();
+    }
+    fn move_down(&mut self) {
+        let _ = self.editor.move_down();
+    }
 }
 
 fn handle_key_press(
@@ -434,10 +462,18 @@ fn handle_key_press(
         }
 
         // Edit mode movement
-        (AppMode::Edit, KeyCode::Left, _) => { editor.move_left(); }
-        (AppMode::Edit, KeyCode::Right, _) => { editor.move_right(); }
-        (AppMode::Edit, KeyCode::Up, _) => { editor.move_up(); }
-        (AppMode::Edit, KeyCode::Down, _) => { editor.move_down(); }
+        (AppMode::Edit, KeyCode::Left, _) => {
+            editor.move_left();
+        }
+        (AppMode::Edit, KeyCode::Right, _) => {
+            editor.move_right();
+        }
+        (AppMode::Edit, KeyCode::Up, _) => {
+            editor.move_up();
+        }
+        (AppMode::Edit, KeyCode::Down, _) => {
+            editor.move_down();
+        }
 
         // Navigation
         (_, KeyCode::Tab, _) => {
@@ -469,7 +505,10 @@ fn handle_key_press(
             };
             editor.debug_message = format!(
                 "{} - {} - Position {} - Mode: {:?}",
-                field_name, field_type, editor.cursor_position(), mode
+                field_name,
+                field_type,
+                editor.cursor_position(),
+                mode
             );
         }
 
@@ -538,10 +577,16 @@ fn render_computed_status(f: &mut Frame, area: Rect, editor: &ComputedFieldsEdit
         "✏️ EDITABLE FIELD"
     };
 
-    let status_text = format!("-- {} -- {} | {}", mode_text, field_status, editor.debug_message);
+    let status_text = format!(
+        "-- {} -- {} | {}",
+        mode_text, field_status, editor.debug_message
+    );
 
-    let status = Paragraph::new(Line::from(Span::raw(status_text)))
-        .block(Block::default().borders(Borders::ALL).title("💰 Invoice Calculator"));
+    let status = Paragraph::new(Line::from(Span::raw(status_text))).block(
+        Block::default()
+            .borders(Borders::ALL)
+            .title("💰 Invoice Calculator"),
+    );
 
     f.render_widget(status, chunks[0]);
 
@@ -565,17 +610,23 @@ fn render_computed_status(f: &mut Frame, area: Rect, editor: &ComputedFieldsEdit
              \n\
              Esc=normal, Tab=next field (auto-skips computed fields)"
         }
-        _ => "💰 Invoice Calculator with Computed Fields"
+        _ => "💰 Invoice Calculator with Computed Fields",
     };
 
     let help_style = if editor.is_computed_field(editor.current_field()) {
-        Style::default().fg(Color::Yellow).add_modifier(Modifier::ITALIC)
+        Style::default()
+            .fg(Color::Yellow)
+            .add_modifier(Modifier::ITALIC)
     } else {
         Style::default().fg(Color::Gray)
     };
 
     let help = Paragraph::new(help_text)
-        .block(Block::default().borders(Borders::ALL).title("🚀 Try It Now!"))
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title("🚀 Try It Now!"),
+        )
         .style(help_style)
         .wrap(Wrap { trim: true });
 
@@ -604,7 +655,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let res = run_app(&mut terminal, editor);
 
     disable_raw_mode()?;
-    execute!(terminal.backend_mut(), LeaveAlternateScreen, DisableMouseCapture)?;
+    execute!(
+        terminal.backend_mut(),
+        LeaveAlternateScreen,
+        DisableMouseCapture
+    )?;
     terminal.show_cursor()?;
 
     if let Err(err) = res {

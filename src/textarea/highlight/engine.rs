@@ -12,8 +12,8 @@ use syntect::{
     parsing::{ParseState, ScopeStack, SyntaxReference, SyntaxSet},
 };
 
-use crate::data_provider::DataProvider;
 use super::chunks::StyledChunk;
+use crate::data_provider::DataProvider;
 
 #[derive(Debug)]
 pub struct SyntectEngine {
@@ -106,10 +106,7 @@ impl SyntectEngine {
     }
 
     fn theme(&self) -> &Theme {
-        self.ts
-            .themes
-            .get(&self.theme_name)
-            .expect("theme exists")
+        self.ts.themes.get(&self.theme_name).expect("theme exists")
     }
 
     fn syntax_ref(&self) -> &SyntaxReference {
@@ -122,8 +119,7 @@ impl SyntectEngine {
     }
 
     fn map_syntect_style(s: SynStyle) -> Style {
-        let fg =
-            ratatui::style::Color::Rgb(s.foreground.r, s.foreground.g, s.foreground.b);
+        let fg = ratatui::style::Color::Rgb(s.foreground.r, s.foreground.g, s.foreground.b);
         let mut st = Style::default().fg(fg);
         use syntect::highlighting::FontStyle;
         if s.font_style.contains(FontStyle::BOLD) {
@@ -262,7 +258,7 @@ impl SyntectEngine {
         } else {
             self.parse_after[line_idx] = ps;
         }
-        
+
         // Update stack from highlight state
         let final_stack = highlight_state.path.clone();
         if line_idx >= self.stack_after.len() {
@@ -270,7 +266,7 @@ impl SyntectEngine {
         } else {
             self.stack_after[line_idx] = final_stack;
         }
-        
+
         if line_idx >= self.line_hashes.len() {
             self.line_hashes.push(h);
         } else {

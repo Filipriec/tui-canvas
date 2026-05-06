@@ -1,7 +1,7 @@
 // src/lib.rs
 pub mod canvas;
-pub mod editor;
 pub mod data_provider;
+pub mod editor;
 pub mod integration;
 
 #[cfg(feature = "gui")]
@@ -28,32 +28,28 @@ pub mod keymap;
 #[cfg(feature = "cursor-style")]
 pub use canvas::CursorManager;
 
-pub use editor::FormEditor;
-#[cfg(feature = "crossterm")]
-pub use editor::event_input::FormInputEventOutcome;
 pub use data_provider::DataProvider;
 #[cfg(feature = "suggestions")]
-pub use data_provider::{
-    SuggestionItem, SuggestionQuery, SuggestionTrigger,
-};
+pub use data_provider::{SuggestionItem, SuggestionQuery, SuggestionTrigger};
+#[cfg(feature = "crossterm")]
+pub use editor::event_input::FormInputEventOutcome;
+pub use editor::FormEditor;
 
-pub use canvas::state::EditorState;
 pub use canvas::modes::AppMode;
+pub use canvas::state::EditorState;
 
-pub use canvas::actions::{CanvasAction, ActionResult};
+pub use canvas::actions::{ActionResult, CanvasAction};
 
 #[cfg(feature = "validation")]
 pub use validation::{
-    ValidationConfig, ValidationResult, ValidationError,
-    CharacterLimits, ValidationConfigBuilder, ValidationState,
-    ValidationSummary, PatternFilters, PositionFilter, PositionRange, CharacterFilter, 
-    DisplayMask,
-    AppliedValidation, ValidationRule, ValidationSet, ValidationSettings,
-    CustomFormatter, FormattingResult, PositionMapper, DefaultPositionMapper,
+    AppliedValidation, CharacterFilter, CharacterLimits, CustomFormatter, DefaultPositionMapper,
+    DisplayMask, FormattingResult, PatternFilters, PositionFilter, PositionMapper, PositionRange,
+    ValidationConfig, ValidationConfigBuilder, ValidationError, ValidationResult, ValidationRule,
+    ValidationSet, ValidationSettings, ValidationState, ValidationSummary,
 };
 
 #[cfg(feature = "computed")]
-pub use computed::{ComputedProvider, ComputedContext, ComputedState};
+pub use computed::{ComputedContext, ComputedProvider, ComputedState};
 
 #[cfg(feature = "gui")]
 pub use canvas::theme::{CanvasTheme, DefaultCanvasTheme};
@@ -75,12 +71,11 @@ pub use keymap::{CanvasKeyMap, KeyEventOutcome};
 
 #[cfg(feature = "textarea")]
 pub use textarea::{
-    TextArea, TextAreaDataProvider, TextAreaEditor, TextAreaProvider,
-    TextAreaState,
+    TextArea, TextAreaDataProvider, TextAreaEditor, TextAreaProvider, TextAreaState,
 };
 
 #[cfg(feature = "textinput")]
 pub use textinput::{
-    TextInput, TextInputDataProvider, TextInputEditor, TextInputEventOutcome,
-    TextInputProvider, TextInputState,
+    TextInput, TextInputDataProvider, TextInputEditor, TextInputEventOutcome, TextInputProvider,
+    TextInputState,
 };

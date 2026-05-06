@@ -2,7 +2,7 @@
 //! Demonstrates automatic cursor management with the canvas library
 //!
 //! This example REQUIRES the `cursor-style` feature to compile.
-//! 
+//!
 //! Run with:
 //! cargo run --example canvas_cursor_auto --features "gui,cursor-style"
 //!
@@ -16,15 +16,10 @@ compile_error!(
      Run with: cargo run --example canvas-cursor-auto --features \"gui,cursor-style\""
 );
 
-use std::io;
 use crossterm::{
-    event::{
-        self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyModifiers,
-    },
+    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyModifiers},
     execute,
-    terminal::{
-        disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
-    },
+    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use ratatui::{
     backend::{Backend, CrosstermBackend},
@@ -34,6 +29,7 @@ use ratatui::{
     widgets::{Block, Borders, Paragraph},
     Frame, Terminal,
 };
+use std::io;
 
 use canvas::{
     canvas::{
@@ -82,7 +78,6 @@ impl<D: DataProvider> AutoCursorFormEditor<D> {
 
     // Visual highlight mode support
 
-
     fn enter_visual_mode(&mut self) {
         // Use the library method instead of manual state setting
         self.editor.enter_highlight_mode();
@@ -90,7 +85,7 @@ impl<D: DataProvider> AutoCursorFormEditor<D> {
     }
 
     fn enter_visual_line_mode(&mut self) {
-        // Use the library method instead of manual state setting  
+        // Use the library method instead of manual state setting
         self.editor.enter_highlight_line_mode();
         self.debug_message = "🔥 VISUAL LINE MODE - Cursor: Blinking Block █".to_string();
     }
@@ -244,7 +239,7 @@ impl<D: DataProvider> AutoCursorFormEditor<D> {
     }
 
     // Manual cursor override demonstration
-    
+
     /// Demonstrate manual cursor control.
     fn demo_manual_cursor_control(&mut self) -> std::io::Result<()> {
         // Users can still manually control cursor if needed
@@ -355,12 +350,24 @@ impl CursorDemoData {
         Self {
             fields: vec![
                 ("👤 Name".to_string(), "John-Paul McDonald".to_string()),
-                ("📧 Email".to_string(), "user@example-domain.com".to_string()),
+                (
+                    "📧 Email".to_string(),
+                    "user@example-domain.com".to_string(),
+                ),
                 ("📱 Phone".to_string(), "+1 (555) 123-4567".to_string()),
                 ("🏠 Address".to_string(), "123 Main St, Apt 4B".to_string()),
-                ("🏷️  Tags".to_string(), "urgent,important,follow-up".to_string()),
-                ("📝 Notes".to_string(), "Watch the cursor change! Normal=█ Insert=| Visual=blinking█".to_string()),
-                ("🎯 Cursor Demo".to_string(), "Press 'i' for insert, 'v' for visual, 'Esc' for normal".to_string()),
+                (
+                    "🏷️  Tags".to_string(),
+                    "urgent,important,follow-up".to_string(),
+                ),
+                (
+                    "📝 Notes".to_string(),
+                    "Watch the cursor change! Normal=█ Insert=| Visual=blinking█".to_string(),
+                ),
+                (
+                    "🎯 Cursor Demo".to_string(),
+                    "Press 'i' for insert, 'v' for visual, 'Esc' for normal".to_string(),
+                ),
             ],
         }
     }
@@ -449,7 +456,7 @@ fn handle_key_press(
             editor.enter_visual_line_mode();
             editor.clear_command_buffer();
         }
-        
+
         // From Visual Mode: Switch between visual modes or exit
         (AppMode::Highlight, KeyCode::Char('v'), _) => {
             use canvas::canvas::state::SelectionState;
@@ -468,7 +475,7 @@ fn handle_key_press(
             }
             editor.clear_command_buffer();
         }
-        
+
         (AppMode::Highlight, KeyCode::Char('V'), _) => {
             use canvas::canvas::state::SelectionState;
             match editor.editor.selection_state() {
@@ -486,7 +493,7 @@ fn handle_key_press(
             }
             editor.clear_command_buffer();
         }
-        
+
         // Escape: Exit any mode back to normal
         (_, KeyCode::Esc, _) => {
             match mode {
@@ -766,20 +773,28 @@ fn render_status_and_help(
                 SelectionState::Linewise { .. } => "VISUAL LINE █ (blinking block)",
                 _ => "VISUAL █ (blinking block)",
             }
-        },
+        }
         _ => "NORMAL █ (block cursor)",
     };
 
     let status_text = if editor.has_pending_command() {
-        format!("-- {} -- {} [{}]", mode_text, editor.debug_message(), editor.get_command_buffer())
+        format!(
+            "-- {} -- {} [{}]",
+            mode_text,
+            editor.debug_message(),
+            editor.get_command_buffer()
+        )
     } else if editor.has_unsaved_changes() {
         format!("-- {} -- [Modified] {}", mode_text, editor.debug_message())
     } else {
         format!("-- {} -- {}", mode_text, editor.debug_message())
     };
 
-    let status = Paragraph::new(Line::from(Span::raw(status_text)))
-        .block(Block::default().borders(Borders::ALL).title("🎯 Automatic Cursor Status"));
+    let status = Paragraph::new(Line::from(Span::raw(status_text))).block(
+        Block::default()
+            .borders(Borders::ALL)
+            .title("🎯 Automatic Cursor Status"),
+    );
 
     f.render_widget(status, chunks[0]);
 
@@ -788,7 +803,7 @@ fn render_status_and_help(
             if editor.has_pending_command() {
                 match editor.get_command_buffer() {
                     "g" => "Press 'g' again for first field, or any other key to cancel",
-                    _ => "Pending command... (Esc to cancel)"
+                    _ => "Pending command... (Esc to cancel)",
                 }
             } else {
                 "🎯 CURSOR-STYLE DEMO: Normal █ | Insert | | Visual blinking█\n\
@@ -807,11 +822,15 @@ fn render_status_and_help(
              hjkl/arrows=extend selection, w/b/e=word selection\n\
              Esc=normal"
         }
-        _ => "🎯 Watch the cursor change automatically!"
+        _ => "🎯 Watch the cursor change automatically!",
     };
 
     let help = Paragraph::new(help_text)
-        .block(Block::default().borders(Borders::ALL).title("🚀 Automatic Cursor Management"))
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title("🚀 Automatic Cursor Management"),
+        )
         .style(Style::default().fg(Color::Gray));
 
     f.render_widget(help, chunks[1]);
@@ -833,7 +852,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let data = CursorDemoData::new();
     let mut editor = AutoCursorFormEditor::new(data);
-    
+
     // Initialize with normal mode - library automatically sets block cursor
     editor.set_mode(AppMode::ReadOnly);
 

@@ -1,18 +1,16 @@
 // src/editor/key_input.rs
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
-use crate::canvas::modes::AppMode;
 #[cfg(feature = "keymap")]
 use crate::canvas::actions::{ActionResult, CanvasAction};
+use crate::canvas::modes::AppMode;
 use crate::editor::FormEditor;
 use crate::DataProvider;
 
 #[cfg(feature = "keymap")]
-use crate::keymap::{CanvasKeyAction, KeyEventOutcome, KeyStroke};
+use crate::integration::focus_handoff::{key_outcome_for_vertical_navigation, BoundaryExit};
 #[cfg(feature = "keymap")]
-use crate::integration::focus_handoff::{
-    BoundaryExit, key_outcome_for_vertical_navigation,
-};
+use crate::keymap::{CanvasKeyAction, KeyEventOutcome, KeyStroke};
 
 impl<D: DataProvider> FormEditor<D> {
     #[cfg(feature = "keymap")]
@@ -33,8 +31,7 @@ impl<D: DataProvider> FormEditor<D> {
         let Some(km) = self.keymap.as_ref() else {
             return KeyEventOutcome::NotMatched;
         };
-        let (matched, is_prefix) =
-            km.lookup_action(mode, self.seq_tracker.sequence());
+        let (matched, is_prefix) = km.lookup_action(mode, self.seq_tracker.sequence());
 
         if let Some(action) = matched.cloned() {
             let outcome = self.dispatch_canvas_action(&action);
@@ -54,8 +51,7 @@ impl<D: DataProvider> FormEditor<D> {
             if let KeyCode::Char(c) = evt.code {
                 // Skip control/alt combos
                 let m = evt.modifiers;
-                let is_plain =
-                    m.is_empty() || m == KeyModifiers::SHIFT;
+                let is_plain = m.is_empty() || m == KeyModifiers::SHIFT;
                 if is_plain {
                     if self.insert_char(c).is_ok() {
                         return KeyEventOutcome::Consumed(None);
@@ -68,12 +64,8 @@ impl<D: DataProvider> FormEditor<D> {
     }
 
     #[cfg(feature = "keymap")]
-    fn dispatch_canvas_action(
-        &mut self,
-        action: &CanvasKeyAction,
-    ) -> KeyEventOutcome {
-        let Some(canvas_action) = Self::canvas_action_for_key_action(action)
-        else {
+    fn dispatch_canvas_action(&mut self, action: &CanvasKeyAction) -> KeyEventOutcome {
+        let Some(canvas_action) = Self::canvas_action_for_key_action(action) else {
             return KeyEventOutcome::NotMatched;
         };
 
@@ -90,9 +82,7 @@ impl<D: DataProvider> FormEditor<D> {
     }
 
     #[cfg(feature = "keymap")]
-    fn canvas_action_for_key_action(
-        action: &CanvasKeyAction,
-    ) -> Option<CanvasAction> {
+    fn canvas_action_for_key_action(action: &CanvasKeyAction) -> Option<CanvasAction> {
         match action {
             CanvasKeyAction::MoveLeft => Some(CanvasAction::MoveLeft),
             CanvasKeyAction::MoveRight => Some(CanvasAction::MoveRight),
@@ -107,57 +97,33 @@ impl<D: DataProvider> FormEditor<D> {
             CanvasKeyAction::MoveWordNext => Some(CanvasAction::MoveWordNext),
             CanvasKeyAction::MoveWordPrev => Some(CanvasAction::MoveWordPrev),
             CanvasKeyAction::MoveWordEnd => Some(CanvasAction::MoveWordEnd),
-            CanvasKeyAction::MoveWordEndPrev => {
-                Some(CanvasAction::MoveWordEndPrev)
-            }
-            CanvasKeyAction::MoveBigWordNext => {
-                Some(CanvasAction::MoveBigWordNext)
-            }
-            CanvasKeyAction::MoveBigWordPrev => {
-                Some(CanvasAction::MoveBigWordPrev)
-            }
+            CanvasKeyAction::MoveWordEndPrev => Some(CanvasAction::MoveWordEndPrev),
+            CanvasKeyAction::MoveBigWordNext => Some(CanvasAction::MoveBigWordNext),
+            CanvasKeyAction::MoveBigWordPrev => Some(CanvasAction::MoveBigWordPrev),
             CanvasKeyAction::MoveBigWordEnd => Some(CanvasAction::MoveBigWordEnd),
-            CanvasKeyAction::MoveBigWordEndPrev => {
-                Some(CanvasAction::MoveBigWordEndPrev)
-            }
-            CanvasKeyAction::DeleteCharBackward => {
-                Some(CanvasAction::DeleteBackward)
-            }
-            CanvasKeyAction::DeleteCharForward => {
-                Some(CanvasAction::DeleteForward)
-            }
+            CanvasKeyAction::MoveBigWordEndPrev => Some(CanvasAction::MoveBigWordEndPrev),
+            CanvasKeyAction::DeleteCharBackward => Some(CanvasAction::DeleteBackward),
+            CanvasKeyAction::DeleteCharForward => Some(CanvasAction::DeleteForward),
             CanvasKeyAction::OpenLineBelow => Some(CanvasAction::OpenLineBelow),
             CanvasKeyAction::OpenLineAbove => Some(CanvasAction::OpenLineAbove),
-            CanvasKeyAction::EnterEditModeBefore => {
-                Some(CanvasAction::EnterEditMode)
-            }
-            CanvasKeyAction::EnterEditModeAfter => {
-                Some(CanvasAction::EnterEditModeAfter)
-            }
+            CanvasKeyAction::EnterEditModeBefore => Some(CanvasAction::EnterEditMode),
+            CanvasKeyAction::EnterEditModeAfter => Some(CanvasAction::EnterEditModeAfter),
             CanvasKeyAction::Exit | CanvasKeyAction::ExitEditMode => {
                 Some(CanvasAction::ExitEditMode)
             }
-            CanvasKeyAction::EnterHighlightMode => {
-                Some(CanvasAction::EnterHighlightMode)
-            }
+            CanvasKeyAction::EnterHighlightMode => Some(CanvasAction::EnterHighlightMode),
             CanvasKeyAction::EnterHighlightModeLinewise => {
                 Some(CanvasAction::EnterHighlightModeLinewise)
             }
-            CanvasKeyAction::ExitHighlightMode => {
-                Some(CanvasAction::ExitHighlightMode)
-            }
+            CanvasKeyAction::ExitHighlightMode => Some(CanvasAction::ExitHighlightMode),
             #[cfg(feature = "suggestions")]
-            CanvasKeyAction::OpenSuggestions => {
-                Some(CanvasAction::TriggerSuggestions)
-            }
+            CanvasKeyAction::OpenSuggestions => Some(CanvasAction::TriggerSuggestions),
             #[cfg(feature = "suggestions")]
             CanvasKeyAction::ApplySuggestion | CanvasKeyAction::EnterDecider => {
                 Some(CanvasAction::SelectSuggestion)
             }
             #[cfg(feature = "suggestions")]
-            CanvasKeyAction::SuggestionDown => {
-                Some(CanvasAction::SuggestionDown)
-            }
+            CanvasKeyAction::SuggestionDown => Some(CanvasAction::SuggestionDown),
             #[cfg(feature = "suggestions")]
             CanvasKeyAction::SuggestionUp => Some(CanvasAction::SuggestionUp),
             CanvasKeyAction::Unknown(_) => None,
@@ -171,16 +137,10 @@ impl<D: DataProvider> FormEditor<D> {
     }
 
     #[cfg(feature = "keymap")]
-    fn vertical_boundary_for_key_action(
-        action: &CanvasKeyAction,
-    ) -> Option<BoundaryExit> {
+    fn vertical_boundary_for_key_action(action: &CanvasKeyAction) -> Option<BoundaryExit> {
         match action {
-            CanvasKeyAction::MoveUp | CanvasKeyAction::PrevField => {
-                Some(BoundaryExit::Top)
-            }
-            CanvasKeyAction::MoveDown | CanvasKeyAction::NextField => {
-                Some(BoundaryExit::Bottom)
-            }
+            CanvasKeyAction::MoveUp | CanvasKeyAction::PrevField => Some(BoundaryExit::Top),
+            CanvasKeyAction::MoveDown | CanvasKeyAction::NextField => Some(BoundaryExit::Bottom),
             _ => None,
         }
     }

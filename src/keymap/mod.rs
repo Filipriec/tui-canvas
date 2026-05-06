@@ -194,8 +194,7 @@ impl KeySequenceTracker {
 
 fn normalize_stroke(mut s: KeyStroke) -> KeyStroke {
     // Normalize Shift+Tab to BackTab
-    let is_shift_tab =
-        s.code == KeyCode::Tab && s.modifiers.contains(KeyModifiers::SHIFT);
+    let is_shift_tab = s.code == KeyCode::Tab && s.modifiers.contains(KeyModifiers::SHIFT);
     if is_shift_tab {
         s.code = KeyCode::BackTab;
         s.modifiers.remove(KeyModifiers::SHIFT);
@@ -264,11 +263,7 @@ impl CanvasKeyMap {
         (None, false)
     }
 
-    pub fn lookup(
-        &self,
-        mode: AppMode,
-        seq: &[KeyStroke],
-    ) -> (Option<&str>, bool) {
+    pub fn lookup(&self, mode: AppMode, seq: &[KeyStroke]) -> (Option<&str>, bool) {
         let (action, is_prefix) = self.lookup_action(mode, seq);
         (action.map(|a| a.as_str()), is_prefix)
     }
@@ -296,9 +291,7 @@ fn is_prefix(binding: &[KeyStroke], seq: &[KeyStroke]) -> bool {
         .all(|(b, s)| strokes_equal(b, s))
 }
 
-fn collect_bindings(
-    mode_map: &HashMap<String, Vec<String>>,
-) -> Vec<Binding> {
+fn collect_bindings(mode_map: &HashMap<String, Vec<String>>) -> Vec<Binding> {
     let mut out = Vec::new();
     for (action, list) in mode_map {
         for binding_str in list {
@@ -413,8 +406,12 @@ fn parse_part_to_sequence(part: &str) -> Option<Vec<KeyStroke>> {
 
 fn contains_modifier_token(s: &str) -> bool {
     let low = s.to_lowercase();
-    low.contains("ctrl") || low.contains("shift") || low.contains("alt") || 
-    low.contains("super") || low.contains("cmd") || low.contains("meta")
+    low.contains("ctrl")
+        || low.contains("shift")
+        || low.contains("alt")
+        || low.contains("super")
+        || low.contains("cmd")
+        || low.contains("meta")
 }
 
 fn parse_chord_with_modifiers(s: &str) -> Option<KeyStroke> {
@@ -434,24 +431,47 @@ fn parse_chord_with_modifiers(s: &str) -> Option<KeyStroke> {
         }
     }
 
-    key.map(|k| normalize_stroke(KeyStroke { code: k, modifiers: mods }))
+    key.map(|k| {
+        normalize_stroke(KeyStroke {
+            code: k,
+            modifiers: mods,
+        })
+    })
 }
 
 fn is_compound_key(s: &str) -> bool {
-    matches!(s.to_lowercase().as_str(),
-        "left" | "right" | "up" | "down" | "esc" | "enter" | "backspace" | 
-        "delete" | "tab" | "home" | "end" | "$" | "0"
+    matches!(
+        s.to_lowercase().as_str(),
+        "left"
+            | "right"
+            | "up"
+            | "down"
+            | "esc"
+            | "enter"
+            | "backspace"
+            | "delete"
+            | "tab"
+            | "home"
+            | "end"
+            | "$"
+            | "0"
     )
 }
 
 fn parse_simple_key(s: &str) -> Option<KeyStroke> {
     if let Some(kc) = string_to_keycode(&s.to_lowercase()) {
-        return Some(KeyStroke { code: kc, modifiers: KeyModifiers::empty() });
+        return Some(KeyStroke {
+            code: kc,
+            modifiers: KeyModifiers::empty(),
+        });
     }
 
     if s.chars().count() == 1 {
         let ch = s.chars().next().unwrap();
-        return Some(KeyStroke { code: KeyCode::Char(ch), modifiers: KeyModifiers::empty() });
+        return Some(KeyStroke {
+            code: KeyCode::Char(ch),
+            modifiers: KeyModifiers::empty(),
+        });
     }
 
     None
@@ -460,7 +480,7 @@ fn parse_simple_key(s: &str) -> Option<KeyStroke> {
 fn string_to_keycode(s: &str) -> Option<KeyCode> {
     Some(match s {
         "left" => KeyCode::Left,
-        "right" => KeyCode::Right, 
+        "right" => KeyCode::Right,
         "up" => KeyCode::Up,
         "down" => KeyCode::Down,
         "esc" => KeyCode::Esc,

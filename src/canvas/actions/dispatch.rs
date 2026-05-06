@@ -1,9 +1,9 @@
 // src/canvas/actions/dispatch.rs
 //! Provides the typed dispatcher that maps CanvasAction → FormEditor method calls.
 
-use crate::DataProvider;
+use super::types::{ActionResult, CanvasAction};
 use crate::editor::FormEditor;
-use super::types::{CanvasAction, ActionResult};
+use crate::DataProvider;
 use std::fmt::Display;
 
 impl<D: DataProvider> FormEditor<D> {
@@ -19,32 +19,89 @@ impl<D: DataProvider> FormEditor<D> {
         use CanvasAction::*;
         match action {
             // Mode switching
-            EnterEditMode => { self.enter_edit_mode(); ActionResult::Success }
-            EnterEditModeAfter => { self.enter_append_mode(); ActionResult::Success }
+            EnterEditMode => {
+                self.enter_edit_mode();
+                ActionResult::Success
+            }
+            EnterEditModeAfter => {
+                self.enter_append_mode();
+                ActionResult::Success
+            }
             ExitEditMode => Self::into_action_result(self.exit_edit_mode()),
-            EnterHighlightMode => { self.enter_highlight_mode(); ActionResult::Success }
-            EnterHighlightModeLinewise => { self.enter_highlight_line_mode(); ActionResult::Success }
-            ExitHighlightMode => { self.exit_highlight_mode(); ActionResult::Success }
+            EnterHighlightMode => {
+                self.enter_highlight_mode();
+                ActionResult::Success
+            }
+            EnterHighlightModeLinewise => {
+                self.enter_highlight_line_mode();
+                ActionResult::Success
+            }
+            ExitHighlightMode => {
+                self.exit_highlight_mode();
+                ActionResult::Success
+            }
 
             // Movement
             MoveLeft => Self::into_action_result(self.move_left()),
             MoveRight => Self::into_action_result(self.move_right()),
-            MoveUp => { self.move_up(); ActionResult::Success }
-            MoveDown => { self.move_down(); ActionResult::Success }
-            MoveWordNext => { self.move_word_next(); ActionResult::Success }
-            MoveWordPrev => { self.move_word_prev(); ActionResult::Success }
-            MoveWordEnd => { self.move_word_end(); ActionResult::Success }
-            MoveWordEndPrev => { self.move_word_end_prev(); ActionResult::Success }
-            MoveBigWordNext => { self.move_big_word_next(); ActionResult::Success }
-            MoveBigWordPrev => { self.move_big_word_prev(); ActionResult::Success }
-            MoveBigWordEnd => { self.move_big_word_end(); ActionResult::Success }
-            MoveBigWordEndPrev => { self.move_big_word_end_prev(); ActionResult::Success }
+            MoveUp => {
+                self.move_up();
+                ActionResult::Success
+            }
+            MoveDown => {
+                self.move_down();
+                ActionResult::Success
+            }
+            MoveWordNext => {
+                self.move_word_next();
+                ActionResult::Success
+            }
+            MoveWordPrev => {
+                self.move_word_prev();
+                ActionResult::Success
+            }
+            MoveWordEnd => {
+                self.move_word_end();
+                ActionResult::Success
+            }
+            MoveWordEndPrev => {
+                self.move_word_end_prev();
+                ActionResult::Success
+            }
+            MoveBigWordNext => {
+                self.move_big_word_next();
+                ActionResult::Success
+            }
+            MoveBigWordPrev => {
+                self.move_big_word_prev();
+                ActionResult::Success
+            }
+            MoveBigWordEnd => {
+                self.move_big_word_end();
+                ActionResult::Success
+            }
+            MoveBigWordEndPrev => {
+                self.move_big_word_end_prev();
+                ActionResult::Success
+            }
             MoveFirstLine => Self::into_action_result(self.move_first_line()),
             MoveLastLine => Self::into_action_result(self.move_last_line()),
-            MoveLineStart => { self.move_line_start(); ActionResult::Success }
-            MoveLineEnd => { self.move_line_end(); ActionResult::Success }
-            NextField => { self.next_field(); ActionResult::Success }
-            PrevField => { self.prev_field(); ActionResult::Success }
+            MoveLineStart => {
+                self.move_line_start();
+                ActionResult::Success
+            }
+            MoveLineEnd => {
+                self.move_line_end();
+                ActionResult::Success
+            }
+            NextField => {
+                self.next_field();
+                ActionResult::Success
+            }
+            PrevField => {
+                self.prev_field();
+                ActionResult::Success
+            }
 
             // Editing
             DeleteBackward => Self::into_action_result(self.delete_backward()),
@@ -87,17 +144,13 @@ impl<D: DataProvider> FormEditor<D> {
             }
             #[cfg(not(feature = "suggestions"))]
             TriggerSuggestions | SuggestionUp | SuggestionDown | SelectSuggestion
-            | ExitSuggestions => ActionResult::Message(
-                "suggestions feature is disabled".into(),
-            ),
+            | ExitSuggestions => ActionResult::Message("suggestions feature is disabled".into()),
 
             // Any actions that require arguments / not handled directly
             InsertChar(c) => Self::into_action_result(self.insert_char(c)),
 
             // Fallback: custom or unhandled
-            Custom(name) => {
-                ActionResult::Message(format!("Unhandled custom action: {name}"))
-            }
+            Custom(name) => ActionResult::Message(format!("Unhandled custom action: {name}")),
         }
     }
 }

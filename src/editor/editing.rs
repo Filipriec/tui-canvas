@@ -9,8 +9,7 @@ impl<D: DataProvider> FormEditor<D> {
         if field_count == 0 {
             return Ok(());
         }
-        let next_field = (self.ui_state.current_field + 1)
-            .min(field_count.saturating_sub(1));
+        let next_field = (self.ui_state.current_field + 1).min(field_count.saturating_sub(1));
         self.transition_to_field(next_field)?;
         self.set_cursor_raw(0);
         self.enter_edit_mode();
@@ -28,8 +27,7 @@ impl<D: DataProvider> FormEditor<D> {
 
     /// Handle character insertion (mask/limit-aware)
     pub fn insert_char(&mut self, ch: char) -> anyhow::Result<()> {
-        if self.ui_state.current_mode != crate::canvas::modes::AppMode::Edit
-        {
+        if self.ui_state.current_mode != crate::canvas::modes::AppMode::Edit {
             return Ok(());
         }
 
@@ -49,12 +47,9 @@ impl<D: DataProvider> FormEditor<D> {
 
         #[cfg(feature = "validation")]
         {
-            if let Some(cfg) = self.ui_state.validation.get_field_config(
-                field_index,
-            ) {
+            if let Some(cfg) = self.ui_state.validation.get_field_config(field_index) {
                 if let Some(mask) = &cfg.display_mask {
-                    let display_cursor_pos =
-                        mask.raw_pos_to_display_pos(raw_cursor_pos);
+                    let display_cursor_pos = mask.raw_pos_to_display_pos(raw_cursor_pos);
 
                     let pattern_char_len = mask.pattern().chars().count();
                     if display_cursor_pos >= pattern_char_len {
@@ -90,22 +85,16 @@ impl<D: DataProvider> FormEditor<D> {
 
         let new_raw_text = {
             let mut temp = current_raw_text.to_string();
-            let byte_pos = Self::char_to_byte_index(
-                current_raw_text,
-                raw_cursor_pos,
-            );
+            let byte_pos = Self::char_to_byte_index(current_raw_text, raw_cursor_pos);
             temp.insert(byte_pos, ch);
             temp
         };
 
         #[cfg(feature = "validation")]
         {
-            if let Some(cfg) = self.ui_state.validation.get_field_config(
-                field_index,
-            ) {
+            if let Some(cfg) = self.ui_state.validation.get_field_config(field_index) {
                 if let Some(limits) = &cfg.character_limits {
-                    if let Some(result) = limits.validate_content(&new_raw_text)
-                    {
+                    if let Some(result) = limits.validate_content(&new_raw_text) {
                         if !result.is_acceptable() {
                             return Ok(());
                         }
@@ -128,16 +117,12 @@ impl<D: DataProvider> FormEditor<D> {
 
         #[cfg(feature = "validation")]
         {
-            if let Some(cfg) = self.ui_state.validation.get_field_config(
-                field_index,
-            ) {
+            if let Some(cfg) = self.ui_state.validation.get_field_config(field_index) {
                 if let Some(mask) = &cfg.display_mask {
                     let new_raw_pos = raw_cursor_pos + 1;
                     let display_pos = mask.raw_pos_to_display_pos(new_raw_pos);
-                    let next_input_display =
-                        mask.next_input_position(display_pos);
-                    let next_raw_pos =
-                        mask.display_pos_to_raw_pos(next_input_display);
+                    let next_input_display = mask.next_input_position(display_pos);
+                    let next_raw_pos = mask.display_pos_to_raw_pos(next_input_display);
                     let max_raw = new_raw_text.chars().count();
 
                     self.set_cursor_raw(next_raw_pos.min(max_raw));
@@ -168,8 +153,7 @@ impl<D: DataProvider> FormEditor<D> {
 
     /// Delete backward (backspace)
     pub fn delete_backward(&mut self) -> anyhow::Result<()> {
-        if self.ui_state.current_mode != crate::canvas::modes::AppMode::Edit
-        {
+        if self.ui_state.current_mode != crate::canvas::modes::AppMode::Edit {
             return Ok(());
         }
         if self.ui_state.cursor_pos == 0 {
@@ -177,17 +161,12 @@ impl<D: DataProvider> FormEditor<D> {
         }
 
         let field_index = self.ui_state.current_field;
-        let mut current_text =
-            self.data_provider.field_value(field_index).to_string();
+        let mut current_text = self.data_provider.field_value(field_index).to_string();
 
         let new_cursor = self.ui_state.cursor_pos.saturating_sub(1);
 
-        let start = Self::char_to_byte_index(
-            &current_text,
-            self.ui_state.cursor_pos - 1,
-        );
-        let end =
-            Self::char_to_byte_index(&current_text, self.ui_state.cursor_pos);
+        let start = Self::char_to_byte_index(&current_text, self.ui_state.cursor_pos - 1);
+        let end = Self::char_to_byte_index(&current_text, self.ui_state.cursor_pos);
         current_text.replace_range(start..end, "");
         self.data_provider
             .set_field_value(field_index, current_text.clone());
@@ -199,17 +178,11 @@ impl<D: DataProvider> FormEditor<D> {
 
         #[cfg(feature = "validation")]
         {
-            if let Some(cfg) = self.ui_state.validation.get_field_config(
-                field_index,
-            ) {
+            if let Some(cfg) = self.ui_state.validation.get_field_config(field_index) {
                 if let Some(mask) = &cfg.display_mask {
-                    let display_pos =
-                        mask.raw_pos_to_display_pos(new_cursor);
-                    if let Some(prev_input) =
-                        mask.prev_input_position(display_pos)
-                    {
-                        target_cursor =
-                            mask.display_pos_to_raw_pos(prev_input);
+                    let display_pos = mask.raw_pos_to_display_pos(new_cursor);
+                    if let Some(prev_input) = mask.prev_input_position(display_pos) {
+                        target_cursor = mask.display_pos_to_raw_pos(prev_input);
                     }
                 }
             }
@@ -219,10 +192,10 @@ impl<D: DataProvider> FormEditor<D> {
 
         #[cfg(feature = "validation")]
         {
-            let _ = self.ui_state.validation.validate_field_content(
-                field_index,
-                &current_text,
-            );
+            let _ = self
+                .ui_state
+                .validation
+                .validate_field_content(field_index, &current_text);
         }
 
         #[cfg(feature = "suggestions")]
@@ -233,24 +206,16 @@ impl<D: DataProvider> FormEditor<D> {
 
     /// Delete forward (Delete key)
     pub fn delete_forward(&mut self) -> anyhow::Result<()> {
-        if self.ui_state.current_mode != crate::canvas::modes::AppMode::Edit
-        {
+        if self.ui_state.current_mode != crate::canvas::modes::AppMode::Edit {
             return Ok(());
         }
 
         let field_index = self.ui_state.current_field;
-        let mut current_text =
-            self.data_provider.field_value(field_index).to_string();
+        let mut current_text = self.data_provider.field_value(field_index).to_string();
 
         if self.ui_state.cursor_pos < current_text.chars().count() {
-            let start = Self::char_to_byte_index(
-                &current_text,
-                self.ui_state.cursor_pos,
-            );
-            let end = Self::char_to_byte_index(
-                &current_text,
-                self.ui_state.cursor_pos + 1,
-            );
+            let start = Self::char_to_byte_index(&current_text, self.ui_state.cursor_pos);
+            let end = Self::char_to_byte_index(&current_text, self.ui_state.cursor_pos + 1);
             current_text.replace_range(start..end, "");
             self.data_provider
                 .set_field_value(field_index, current_text.clone());
@@ -262,16 +227,10 @@ impl<D: DataProvider> FormEditor<D> {
 
             #[cfg(feature = "validation")]
             {
-                if let Some(cfg) = self.ui_state.validation.get_field_config(
-                    field_index,
-                ) {
+                if let Some(cfg) = self.ui_state.validation.get_field_config(field_index) {
                     if let Some(mask) = &cfg.display_mask {
-                        let display_pos =
-                            mask.raw_pos_to_display_pos(
-                                self.ui_state.cursor_pos,
-                            );
-                        let next_input =
-                            mask.next_input_position(display_pos);
+                        let display_pos = mask.raw_pos_to_display_pos(self.ui_state.cursor_pos);
+                        let next_input = mask.next_input_position(display_pos);
                         target_cursor = mask
                             .display_pos_to_raw_pos(next_input)
                             .min(current_text.chars().count());
@@ -283,10 +242,10 @@ impl<D: DataProvider> FormEditor<D> {
 
             #[cfg(feature = "validation")]
             {
-                let _ = self.ui_state.validation.validate_field_content(
-                    field_index,
-                    &current_text,
-                );
+                let _ = self
+                    .ui_state
+                    .validation
+                    .validate_field_content(field_index, &current_text);
             }
 
             #[cfg(feature = "suggestions")]
@@ -315,7 +274,8 @@ impl<D: DataProvider> FormEditor<D> {
     /// Set current field value (validates under feature flag)
     pub fn set_current_field_value(&mut self, value: String) {
         let field_index = self.ui_state.current_field;
-        self.data_provider.set_field_value(field_index, value.clone());
+        self.data_provider
+            .set_field_value(field_index, value.clone());
         self.set_cursor_raw(0);
 
         #[cfg(feature = "validation")]

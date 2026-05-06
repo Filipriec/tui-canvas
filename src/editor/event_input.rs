@@ -46,8 +46,7 @@ impl<D: DataProvider> FormEditor<D> {
 
         match (key.code, key.modifiers) {
             (KeyCode::Enter, _) => {
-                let last =
-                    self.data_provider().field_count().saturating_sub(1);
+                let last = self.data_provider().field_count().saturating_sub(1);
                 if self.current_field() >= last {
                     FormInputEventOutcome::Submitted
                 } else {
@@ -95,13 +94,11 @@ impl<D: DataProvider> FormEditor<D> {
                 let _ = self.move_down();
                 FormInputEventOutcome::Handled
             }
-            (KeyCode::Home, _)
-            | (KeyCode::Char('a'), KeyModifiers::CONTROL) => {
+            (KeyCode::Home, _) | (KeyCode::Char('a'), KeyModifiers::CONTROL) => {
                 self.move_line_start();
                 FormInputEventOutcome::Handled
             }
-            (KeyCode::End, _)
-            | (KeyCode::Char('e'), KeyModifiers::CONTROL) => {
+            (KeyCode::End, _) | (KeyCode::Char('e'), KeyModifiers::CONTROL) => {
                 self.move_line_end();
                 FormInputEventOutcome::Handled
             }
@@ -126,8 +123,7 @@ impl<D: DataProvider> FormEditor<D> {
                 }
             }
             (KeyCode::Char(c), m)
-                if !m.contains(KeyModifiers::CONTROL)
-                    && !m.contains(KeyModifiers::ALT) =>
+                if !m.contains(KeyModifiers::CONTROL) && !m.contains(KeyModifiers::ALT) =>
             {
                 self.enter_edit_mode();
                 let _ = self.insert_char(c);
@@ -190,8 +186,7 @@ mod tests {
         let mut editor = FormEditor::new(TestProvider::default());
         let _ = editor.next_field();
 
-        let outcome = editor
-            .input(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
+        let outcome = editor.input(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
 
         assert_eq!(outcome, FormInputEventOutcome::Submitted);
         assert_eq!(editor.current_field(), 1);

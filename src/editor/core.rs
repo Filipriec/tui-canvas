@@ -24,11 +24,7 @@ pub struct FormEditor<D: DataProvider> {
     #[derivative(Debug = "ignore")]
     #[derivative(Default(value = "None"))]
     pub(crate) external_validation_callback: Option<
-        Box<
-            dyn FnMut(usize, &str) -> crate::validation::ExternalValidationState
-                + Send
-                + Sync,
-        >,
+        Box<dyn FnMut(usize, &str) -> crate::validation::ExternalValidationState + Send + Sync>,
     >,
     #[cfg(feature = "keymap")]
     #[derivative(Default(value = "None"))]
@@ -119,11 +115,8 @@ impl<D: DataProvider> FormEditor<D> {
     }
 
     pub(crate) fn set_cursor_for_mode(&mut self, pos: usize, max_len: usize) {
-        self.ui_state.set_cursor(
-            pos,
-            max_len,
-            self.ui_state.current_mode == AppMode::Edit,
-        );
+        self.ui_state
+            .set_cursor(pos, max_len, self.ui_state.current_mode == AppMode::Edit);
     }
 
     pub fn current_field(&self) -> usize {

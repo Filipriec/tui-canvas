@@ -10,9 +10,9 @@ pub mod display;
 pub mod editing;
 #[cfg(feature = "crossterm")]
 pub mod event_input;
+pub mod mode;
 pub mod movement;
 pub mod navigation;
-pub mod mode;
 
 #[cfg(feature = "suggestions")]
 pub mod suggestions;
@@ -23,7 +23,7 @@ pub mod validation_helpers;
 #[cfg(feature = "computed")]
 pub mod computed_helpers;
 
-#[cfg(feature = "keymap")] 
+#[cfg(feature = "keymap")]
 pub mod key_input;
 
 // Re-export the main type

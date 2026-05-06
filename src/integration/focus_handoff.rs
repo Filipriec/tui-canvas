@@ -87,19 +87,13 @@ pub enum HostKeyEventOutcome {
 
 /// Convert a canvas `KeyEventOutcome` into host-friendly focus handoff output.
 #[cfg(feature = "keymap")]
-pub fn map_key_event_outcome_for_host(
-    outcome: KeyEventOutcome,
-) -> HostKeyEventOutcome {
+pub fn map_key_event_outcome_for_host(outcome: KeyEventOutcome) -> HostKeyEventOutcome {
     match outcome {
         KeyEventOutcome::Consumed(msg) => HostKeyEventOutcome::Consumed(msg),
         KeyEventOutcome::Pending => HostKeyEventOutcome::PendingSequence,
         KeyEventOutcome::NotMatched => HostKeyEventOutcome::NotHandled,
-        KeyEventOutcome::ExitTop => {
-            HostKeyEventOutcome::ExitCanvas(BoundaryExit::Top)
-        }
-        KeyEventOutcome::ExitBottom => {
-            HostKeyEventOutcome::ExitCanvas(BoundaryExit::Bottom)
-        }
+        KeyEventOutcome::ExitTop => HostKeyEventOutcome::ExitCanvas(BoundaryExit::Top),
+        KeyEventOutcome::ExitBottom => HostKeyEventOutcome::ExitCanvas(BoundaryExit::Bottom),
     }
 }
 
@@ -113,9 +107,7 @@ pub fn handle_key_event_for_host<D: DataProvider>(
 
     // Preserve common host expectation: boundary exits are only meaningful for
     // outer focus handoff when the editor is in read-only navigation mode.
-    if editor.mode() != AppMode::ReadOnly
-        && matches!(outcome, HostKeyEventOutcome::ExitCanvas(_))
-    {
+    if editor.mode() != AppMode::ReadOnly && matches!(outcome, HostKeyEventOutcome::ExitCanvas(_)) {
         HostKeyEventOutcome::NotHandled
     } else {
         outcome
@@ -124,9 +116,7 @@ pub fn handle_key_event_for_host<D: DataProvider>(
 
 /// Extract only boundary exit information from a key outcome.
 #[cfg(feature = "keymap")]
-pub fn boundary_from_key_outcome(
-    outcome: &KeyEventOutcome,
-) -> Option<BoundaryExit> {
+pub fn boundary_from_key_outcome(outcome: &KeyEventOutcome) -> Option<BoundaryExit> {
     match outcome {
         KeyEventOutcome::ExitTop => Some(BoundaryExit::Top),
         KeyEventOutcome::ExitBottom => Some(BoundaryExit::Bottom),
@@ -139,10 +129,7 @@ pub fn boundary_from_key_outcome(
 /// This is the single place in the crate that decides when a failed vertical
 /// movement should become `ExitTop` / `ExitBottom`.
 #[cfg(feature = "keymap")]
-pub fn key_outcome_for_vertical_navigation(
-    moved: bool,
-    boundary: BoundaryExit,
-) -> KeyEventOutcome {
+pub fn key_outcome_for_vertical_navigation(moved: bool, boundary: BoundaryExit) -> KeyEventOutcome {
     if moved {
         KeyEventOutcome::Consumed(None)
     } else {

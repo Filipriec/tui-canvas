@@ -19,16 +19,12 @@ compile_error!(
      Run with: cargo run --example canvas_textarea_cursor_auto --features \"gui,cursor-style,textarea\""
 );
 
-use std::io;
-use std::time::Duration;
 use crossterm::{
     event::{
         self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEvent, KeyModifiers,
     },
     execute,
-    terminal::{
-        disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
-    },
+    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use ratatui::{
     backend::{Backend, CrosstermBackend},
@@ -38,6 +34,8 @@ use ratatui::{
     widgets::{Block, Borders, Paragraph},
     Frame, Terminal,
 };
+use std::io;
+use std::time::Duration;
 
 use canvas::{
     canvas::{
@@ -81,7 +79,7 @@ Terminal cursor changes automatically!
         let mut textarea = TextAreaState::from_text(initial_text);
         textarea.set_placeholder("Start typing...");
         textarea.use_wrap();
-        
+
         Self {
             textarea,
             has_unsaved_changes: false,
@@ -308,11 +306,12 @@ Terminal cursor changes automatically!
 }
 
 /// Handle key press with automatic cursor management
-fn handle_key_press(
-    key_event: KeyEvent,
-    editor: &mut AutoCursorTextArea,
-) -> anyhow::Result<bool> {
-    let KeyEvent { code: key, modifiers, .. } = key_event;
+fn handle_key_press(key_event: KeyEvent, editor: &mut AutoCursorTextArea) -> anyhow::Result<bool> {
+    let KeyEvent {
+        code: key,
+        modifiers,
+        ..
+    } = key_event;
     let mode = editor.mode();
 
     // Quit handling
@@ -372,23 +371,19 @@ fn handle_key_press(
         }
 
         // Movement vim style navigation normal mode
-        (AppMode::ReadOnly, KeyCode::Char('h'), _)
-        | (AppMode::ReadOnly, KeyCode::Left, _) => {
+        (AppMode::ReadOnly, KeyCode::Char('h'), _) | (AppMode::ReadOnly, KeyCode::Left, _) => {
             editor.move_left();
             editor.clear_command_buffer();
         }
-        (AppMode::ReadOnly, KeyCode::Char('l'), _)
-        | (AppMode::ReadOnly, KeyCode::Right, _) => {
+        (AppMode::ReadOnly, KeyCode::Char('l'), _) | (AppMode::ReadOnly, KeyCode::Right, _) => {
             editor.move_right();
             editor.clear_command_buffer();
         }
-        (AppMode::ReadOnly, KeyCode::Char('j'), _)
-        | (AppMode::ReadOnly, KeyCode::Down, _) => {
+        (AppMode::ReadOnly, KeyCode::Char('j'), _) | (AppMode::ReadOnly, KeyCode::Down, _) => {
             editor.move_down();
             editor.clear_command_buffer();
         }
-        (AppMode::ReadOnly, KeyCode::Char('k'), _)
-        | (AppMode::ReadOnly, KeyCode::Up, _) => {
+        (AppMode::ReadOnly, KeyCode::Char('k'), _) | (AppMode::ReadOnly, KeyCode::Up, _) => {
             editor.move_up();
             editor.clear_command_buffer();
         }
@@ -432,13 +427,11 @@ fn handle_key_press(
         }
 
         // Line movement
-        (AppMode::ReadOnly, KeyCode::Char('0'), _)
-        | (AppMode::ReadOnly, KeyCode::Home, _) => {
+        (AppMode::ReadOnly, KeyCode::Char('0'), _) | (AppMode::ReadOnly, KeyCode::Home, _) => {
             editor.move_line_start();
             editor.clear_command_buffer();
         }
-        (AppMode::ReadOnly, KeyCode::Char('$'), _)
-        | (AppMode::ReadOnly, KeyCode::End, _) => {
+        (AppMode::ReadOnly, KeyCode::Char('$'), _) | (AppMode::ReadOnly, KeyCode::End, _) => {
             editor.move_line_end();
             editor.clear_command_buffer();
         }
@@ -530,11 +523,7 @@ fn ui(f: &mut Frame, editor: &mut AutoCursorTextArea) {
     render_status_and_help(f, chunks[1], editor);
 }
 
-fn render_textarea(
-    f: &mut Frame,
-    area: ratatui::layout::Rect,
-    editor: &mut AutoCursorTextArea,
-) {
+fn render_textarea(f: &mut Frame, area: ratatui::layout::Rect, editor: &mut AutoCursorTextArea) {
     let block = Block::default()
         .borders(Borders::ALL)
         .title("Automatic Cursor");
@@ -549,11 +538,7 @@ fn render_textarea(
     f.set_cursor_position((cx, cy));
 }
 
-fn render_status_and_help(
-    f: &mut Frame,
-    area: ratatui::layout::Rect,
-    editor: &AutoCursorTextArea,
-) {
+fn render_status_and_help(f: &mut Frame, area: ratatui::layout::Rect, editor: &AutoCursorTextArea) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([Constraint::Length(3), Constraint::Length(5)])
@@ -568,15 +553,33 @@ fn render_status_and_help(
     };
 
     let status_text = if editor.has_pending_command() {
-        format!("-- {} -- {} [{}]", mode_text, editor.debug_message(), editor.get_command_buffer())
+        format!(
+            "-- {} -- {} [{}]",
+            mode_text,
+            editor.debug_message(),
+            editor.get_command_buffer()
+        )
     } else if editor.has_unsaved_changes() {
-        format!("-- {} -- [Modified] {} | {}", mode_text, editor.debug_message(), editor.get_cursor_info())
+        format!(
+            "-- {} -- [Modified] {} | {}",
+            mode_text,
+            editor.debug_message(),
+            editor.get_cursor_info()
+        )
     } else {
-        format!("-- {} -- {} | {}", mode_text, editor.debug_message(), editor.get_cursor_info())
+        format!(
+            "-- {} -- {} | {}",
+            mode_text,
+            editor.debug_message(),
+            editor.get_cursor_info()
+        )
     };
 
-    let status = Paragraph::new(Line::from(Span::raw(status_text)))
-        .block(Block::default().borders(Borders::ALL).title("Automatic Cursor Status"));
+    let status = Paragraph::new(Line::from(Span::raw(status_text))).block(
+        Block::default()
+            .borders(Borders::ALL)
+            .title("Automatic Cursor Status"),
+    );
 
     f.render_widget(status, chunks[0]);
 
@@ -585,7 +588,7 @@ fn render_status_and_help(
             if editor.has_pending_command() {
                 match editor.get_command_buffer() {
                     "g" => "Press 'g' again for first line, or any other key to cancel",
-                    _ => "Pending command... (Esc to cancel)"
+                    _ => "Pending command... (Esc to cancel)",
                 }
             } else {
                 "CURSOR-STYLE DEMO: Normal █ | Insert | \n\
@@ -604,11 +607,15 @@ fn render_status_and_help(
             hjkl/arrows=extend selection\n\
             Esc=normal mode"
         }
-        _ => "Watch the cursor change automatically!"
+        _ => "Watch the cursor change automatically!",
     };
 
     let help = Paragraph::new(help_text)
-        .block(Block::default().borders(Borders::ALL).title("Automatic Cursor"))
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title("Automatic Cursor"),
+        )
         .style(Style::default().fg(Color::Gray));
 
     f.render_widget(help, chunks[1]);

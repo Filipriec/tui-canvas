@@ -16,15 +16,15 @@ compile_error!(
      Run with: cargo run --example validation_1 --features \"gui,validation,cursor-style\""
 );
 
-use std::io;
+use canvas::{
+    canvas::{gui::render_canvas_default, modes::AppMode, CursorManager},
+    CharacterLimits, DataProvider, FormEditor, ValidationConfig, ValidationConfigBuilder,
+    ValidationResult,
+};
 use crossterm::{
-    event::{
-        self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyModifiers,
-    },
+    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyModifiers},
     execute,
-    terminal::{
-        disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
-    },
+    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use ratatui::{
     backend::{Backend, CrosstermBackend},
@@ -34,15 +34,7 @@ use ratatui::{
     widgets::{Block, Borders, Paragraph, Wrap},
     Frame, Terminal,
 };
-use canvas::{
-    canvas::{
-        gui::render_canvas_default,
-        modes::AppMode,
-        CursorManager,
-    },
-    DataProvider, FormEditor,
-    ValidationConfig, ValidationConfigBuilder, CharacterLimits, ValidationResult,
-};
+use std::io;
 
 // Import CountMode from the validation module directly
 use canvas::validation::limits::CountMode;
@@ -247,10 +239,12 @@ impl<D: DataProvider> ValidationFormEditor<D> {
                 self.debug_message = format!("Field {}: ✅ Valid", self.editor.current_field() + 1);
             }
             ValidationResult::Warning { message } => {
-                self.debug_message = format!("Field {}: ⚠️  {}", self.editor.current_field() + 1, message);
+                self.debug_message =
+                    format!("Field {}: ⚠️  {}", self.editor.current_field() + 1, message);
             }
             ValidationResult::Error { message } => {
-                self.debug_message = format!("Field {}: ❌ {}", self.editor.current_field() + 1, message);
+                self.debug_message =
+                    format!("Field {}: ❌ {}", self.editor.current_field() + 1, message);
             }
         }
     }
@@ -258,17 +252,21 @@ impl<D: DataProvider> ValidationFormEditor<D> {
     // Mode transitions
     fn enter_edit_mode(&mut self) {
         self.editor.enter_edit_mode();
-        self.debug_message = "✏️  INSERT MODE - Cursor: Steady Bar | - Type to test validation".to_string();
+        self.debug_message =
+            "✏️  INSERT MODE - Cursor: Steady Bar | - Type to test validation".to_string();
     }
 
     fn enter_append_mode(&mut self) {
         self.editor.enter_append_mode();
-        self.debug_message = "✏️  INSERT (append) - Cursor: Steady Bar | - Validation active".to_string();
+        self.debug_message =
+            "✏️  INSERT (append) - Cursor: Steady Bar | - Validation active".to_string();
     }
 
     fn exit_edit_mode(&mut self) {
         self.editor.exit_edit_mode();
-        self.debug_message = "🔒 NORMAL MODE - Cursor: Steady Block █ - Press 'v' to validate current field".to_string();
+        self.debug_message =
+            "🔒 NORMAL MODE - Cursor: Steady Block █ - Press 'v' to validate current field"
+                .to_string();
         self.update_field_validation_status();
     }
 
@@ -283,9 +281,9 @@ impl<D: DataProvider> ValidationFormEditor<D> {
                     // Don't spam with valid messages, just show character count if applicable
                     if let Some(limits) = self.get_current_field_limits() {
                         let field_index = self.editor.current_field();
-                        if let Some(status) = limits.status_text(
-                            self.editor.data_provider().field_value(field_index)
-                        ) {
+                        if let Some(status) =
+                            limits.status_text(self.editor.data_provider().field_value(field_index))
+                        {
                             self.debug_message = format!("✏️  {status}");
                         }
                     }
@@ -453,39 +451,37 @@ impl DataProvider for ValidationDemoData {
             0 => Some(ValidationConfig::with_max_length(20)), // Name: simple 20 char limit
             1 => Some(
                 ValidationConfigBuilder::new()
-                    .with_character_limits(
-                        CharacterLimits::new(50).with_warning_threshold(40)
-                    )
-                    .build()
+                    .with_character_limits(CharacterLimits::new(50).with_warning_threshold(40))
+                    .build(),
             ), // Email: 50 chars with warning at 40
             2 => Some(
                 ValidationConfigBuilder::new()
                     .with_character_limits(CharacterLimits::new_range(5, 20))
-                    .build()
+                    .build(),
             ), // Password: must be 5-20 characters (blocks field switching if 1-4 chars)
             3 => Some(
                 ValidationConfigBuilder::new()
                     .with_character_limits(CharacterLimits::new_range(3, 10))
-                    .build()
+                    .build(),
             ), // ID: must be 3-10 characters (blocks field switching if 1-2 chars)
             4 => Some(
                 ValidationConfigBuilder::new()
                     .with_character_limits(CharacterLimits::new_range(10, 100))
-                    .build()
+                    .build(),
             ), // Comment: must be 10-100 characters (blocks field switching if 1-9 chars)
             5 => Some(
                 ValidationConfigBuilder::new()
                     .with_character_limits(
-                        CharacterLimits::new(30).with_count_mode(CountMode::Bytes)
+                        CharacterLimits::new(30).with_count_mode(CountMode::Bytes),
                     )
-                    .build()
+                    .build(),
             ), // Tag: 30 bytes (useful for UTF-8)
             6 => Some(
                 ValidationConfigBuilder::new()
                     .with_character_limits(
-                        CharacterLimits::new_range(2, 20).with_count_mode(CountMode::DisplayWidth)
+                        CharacterLimits::new_range(2, 20).with_count_mode(CountMode::DisplayWidth),
                     )
-                    .build()
+                    .build(),
             ), // Unicode: 2-20 display width (useful for CJK characters, blocks if 1 char)
             _ => None,
         }
@@ -691,36 +687,56 @@ fn render_validation_status(
     let validation_status = editor.get_validation_status();
 
     let status_text = if editor.has_pending_command() {
-        format!("-- {} -- {} [{}] | Validation: {}",
-                mode_text, editor.debug_message(), editor.get_command_buffer(), validation_status)
+        format!(
+            "-- {} -- {} [{}] | Validation: {}",
+            mode_text,
+            editor.debug_message(),
+            editor.get_command_buffer(),
+            validation_status
+        )
     } else if editor.has_unsaved_changes() {
-        format!("-- {} -- [Modified] {} | Validation: {}",
-                mode_text, editor.debug_message(), validation_status)
+        format!(
+            "-- {} -- [Modified] {} | Validation: {}",
+            mode_text,
+            editor.debug_message(),
+            validation_status
+        )
     } else {
-        format!("-- {} -- {} | Validation: {}",
-                mode_text, editor.debug_message(), validation_status)
+        format!(
+            "-- {} -- {} | Validation: {}",
+            mode_text,
+            editor.debug_message(),
+            validation_status
+        )
     };
 
-    let status = Paragraph::new(Line::from(Span::raw(status_text)))
-        .block(Block::default().borders(Borders::ALL).title("🔍 Validation Status"));
+    let status = Paragraph::new(Line::from(Span::raw(status_text))).block(
+        Block::default()
+            .borders(Borders::ALL)
+            .title("🔍 Validation Status"),
+    );
     f.render_widget(status, chunks[0]);
 
     // Validation summary with field switching info
     let summary = editor.editor.validation_summary();
     let summary_text = if editor.validation_enabled {
         let switch_info = if editor.field_switch_blocked {
-            format!("\n🚫 Field switching blocked: {}",
-                   editor.block_reason.as_deref().unwrap_or("Unknown reason"))
+            format!(
+                "\n🚫 Field switching blocked: {}",
+                editor.block_reason.as_deref().unwrap_or("Unknown reason")
+            )
         } else {
             let (can_switch, reason) = editor.check_field_switch_allowed();
             if !can_switch {
-                format!("\n⚠️  Field switching will be blocked: {}",
-                       reason.as_deref().unwrap_or("Unknown reason"))
+                format!(
+                    "\n⚠️  Field switching will be blocked: {}",
+                    reason.as_deref().unwrap_or("Unknown reason")
+                )
             } else {
                 "\n✅ Field switching allowed".to_string()
             }
         };
-        
+
         format!(
             "📊 Validation Summary: {} fields configured, {} validated{}\n\
              ✅ Valid: {}  ⚠️  Warnings: {}  ❌ Errors: {}  📈 Progress: {:.0}%",
@@ -745,7 +761,11 @@ fn render_validation_status(
     };
 
     let validation_summary = Paragraph::new(summary_text)
-        .block(Block::default().borders(Borders::ALL).title("📈 Validation Overview"))
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title("📈 Validation Overview"),
+        )
         .style(summary_style)
         .wrap(Wrap { trim: true });
     f.render_widget(validation_summary, chunks[1]);
@@ -767,11 +787,15 @@ fn render_validation_status(
              arrows=move, Backspace/Del=delete, Esc=normal, Tab=next field\n\
              Field switching may be BLOCKED if minimum requirements not met!"
         }
-        _ => "🎯 Watch the cursor change automatically while validating!"
+        _ => "🎯 Watch the cursor change automatically while validating!",
     };
 
     let help = Paragraph::new(help_text)
-        .block(Block::default().borders(Borders::ALL).title("🚀 Validation Commands"))
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title("🚀 Validation Commands"),
+        )
         .style(Style::default().fg(Color::Gray))
         .wrap(Wrap { trim: true });
     f.render_widget(help, chunks[2]);
@@ -798,10 +822,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let data = ValidationDemoData::new();
     let mut editor = ValidationFormEditor::new(data);
-    
+
     // Initialize with normal mode - library automatically sets block cursor
     editor.set_mode(AppMode::ReadOnly);
-    
+
     CursorManager::update_for_mode(AppMode::ReadOnly)?;
 
     let res = run_app(&mut terminal, editor);

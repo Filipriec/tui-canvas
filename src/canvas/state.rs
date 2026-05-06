@@ -169,12 +169,7 @@ impl EditorState {
     /// If `for_edit_mode` is true the cursor may be positioned at the end of
     /// the text (allowing insertion); otherwise it will be kept within the
     /// bounds of the existing text for read-only/highlight modes.
-    pub(crate) fn set_cursor(
-        &mut self,
-        position: usize,
-        max_position: usize,
-        for_edit_mode: bool,
-    ) {
+    pub(crate) fn set_cursor(&mut self, position: usize, max_position: usize, for_edit_mode: bool) {
         if for_edit_mode {
             // Edit mode: can go past end for insertion
             self.cursor_pos = position.min(max_position);

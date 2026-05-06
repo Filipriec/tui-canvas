@@ -26,9 +26,7 @@ impl<D: DataProvider> FormEditor<D> {
                 if matches!(self.ui_state.current_mode, AppMode::Edit) {
                     return raw.to_string();
                 }
-                if let Some((formatted, _mapper, _warning)) =
-                    cfg.run_custom_formatter(raw)
-                {
+                if let Some((formatted, _mapper, _warning)) = cfg.run_custom_formatter(raw) {
                     return formatted;
                 }
             }
@@ -63,9 +61,7 @@ impl<D: DataProvider> FormEditor<D> {
                 {
                     return raw.to_string();
                 }
-                if let Some((formatted, _mapper, _warning)) =
-                    cfg.run_custom_formatter(raw)
-                {
+                if let Some((formatted, _mapper, _warning)) = cfg.run_custom_formatter(raw) {
                     return formatted;
                 }
             }
@@ -89,9 +85,7 @@ impl<D: DataProvider> FormEditor<D> {
                 if char_count == 0 {
                     0
                 } else {
-                    self.ui_state
-                        .cursor_pos
-                        .min(char_count.saturating_sub(1))
+                    self.ui_state.cursor_pos.min(char_count.saturating_sub(1))
                 }
             }
         };
@@ -101,14 +95,8 @@ impl<D: DataProvider> FormEditor<D> {
             let field_index = self.ui_state.current_field;
             if let Some(cfg) = self.ui_state.validation.get_field_config(field_index) {
                 if !matches!(self.ui_state.current_mode, AppMode::Edit) {
-                    if let Some((formatted, mapper, _)) =
-                        cfg.run_custom_formatter(current_text)
-                    {
-                        return mapper.raw_to_formatted(
-                            current_text,
-                            &formatted,
-                            raw_pos,
-                        );
+                    if let Some((formatted, mapper, _)) = cfg.run_custom_formatter(current_text) {
+                        return mapper.raw_to_formatted(current_text, &formatted, raw_pos);
                     }
                 }
                 if let Some(mask) = &cfg.display_mask {

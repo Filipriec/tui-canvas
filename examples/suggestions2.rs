@@ -17,15 +17,10 @@ compile_error!(
      Run with: cargo run --example suggestions2 --features \"gui,cursor-style,suggestions\""
 );
 
-use std::io;
 use crossterm::{
-    event::{
-        self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyModifiers,
-    },
+    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyModifiers},
     execute,
-    terminal::{
-        disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
-    },
+    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use ratatui::{
     backend::{Backend, CrosstermBackend},
@@ -35,6 +30,7 @@ use ratatui::{
     widgets::{Block, Borders, Paragraph},
     Frame, Terminal,
 };
+use std::io;
 
 use canvas::{
     canvas::{
@@ -237,12 +233,14 @@ impl<D: DataProvider> AutoCursorFormEditor<D> {
 
     fn enter_edit_mode(&mut self) {
         self.editor.enter_edit_mode(); // 🎯 Library automatically sets cursor to bar |
-        self.debug_message = "✏️  INSERT MODE - Cursor: Steady Bar | - Press Tab for suggestions".to_string();
+        self.debug_message =
+            "✏️  INSERT MODE - Cursor: Steady Bar | - Press Tab for suggestions".to_string();
     }
 
     fn enter_append_mode(&mut self) {
         self.editor.enter_append_mode(); // 🎯 Library automatically positions cursor and sets mode
-        self.debug_message = "✏️  INSERT (append) - Cursor: Steady Bar | - Press Tab for suggestions".to_string();
+        self.debug_message =
+            "✏️  INSERT (append) - Cursor: Steady Bar | - Press Tab for suggestions".to_string();
     }
 
     fn exit_edit_mode(&mut self) {
@@ -262,10 +260,7 @@ impl<D: DataProvider> AutoCursorFormEditor<D> {
     // Suggestions
 
     /// Trigger suggestions and fetch results synchronously.
-    fn trigger_and_fetch_suggestions(
-        &mut self,
-        provider: &mut ProductionSuggestionsProvider,
-    ) {
+    fn trigger_and_fetch_suggestions(&mut self, provider: &mut ProductionSuggestionsProvider) {
         if let Some((field_index, query)) = self.editor.trigger_suggestions() {
             let results = provider.fetch_suggestions(field_index, &query);
             self.editor.apply_suggestions(results);
@@ -273,7 +268,11 @@ impl<D: DataProvider> AutoCursorFormEditor<D> {
             if self.editor.suggestions().is_empty() {
                 self.set_debug_message(format!("🔍 No matches for '{query}'"));
             } else {
-                self.set_debug_message(format!("✨ {} matches for '{}'", self.editor.suggestions().len(), query));
+                self.set_debug_message(format!(
+                    "✨ {} matches for '{}'",
+                    self.editor.suggestions().len(),
+                    query
+                ));
             }
         }
     }
@@ -527,10 +526,10 @@ impl ProductionSuggestionsProvider {
 
         items
             .iter()
-            .filter(|(item, _)| {
-                query.is_empty() || item.to_lowercase().starts_with(&query_lower)
+            .filter(|(item, _)| query.is_empty() || item.to_lowercase().starts_with(&query_lower))
+            .map(|(item, description)| {
+                SuggestionItem::new(format!("{item} - {description}"), *item)
             })
-            .map(|(item, description)| SuggestionItem::new(format!("{item} - {description}"), *item))
             .collect()
     }
 }
@@ -559,7 +558,10 @@ fn handle_key_press(
                 // Cycle through suggestions
                 editor.suggestions_next();
                 editor.set_debug_message("📍 Next suggestion".to_string());
-            } else if editor.data_provider().supports_suggestions(editor.current_field()) {
+            } else if editor
+                .data_provider()
+                .supports_suggestions(editor.current_field())
+            {
                 // Trigger suggestions
                 editor.trigger_and_fetch_suggestions(suggestions_provider);
             } else {
@@ -612,13 +614,19 @@ fn handle_key_press(
         }
         (AppMode::ReadOnly, KeyCode::Char('a'), _) => {
             editor.enter_append_mode();
-            editor.set_debug_message("✏️  INSERT (append) - Cursor: Steady Bar | - Press Tab for suggestions".to_string());
+            editor.set_debug_message(
+                "✏️  INSERT (append) - Cursor: Steady Bar | - Press Tab for suggestions"
+                    .to_string(),
+            );
             editor.clear_command_buffer();
         }
         (AppMode::ReadOnly, KeyCode::Char('A'), _) => {
             editor.move_line_end();
             editor.enter_edit_mode();
-            editor.set_debug_message("✏️  INSERT (end of line) - Cursor: Steady Bar | - Press Tab for suggestions".to_string());
+            editor.set_debug_message(
+                "✏️  INSERT (end of line) - Cursor: Steady Bar | - Press Tab for suggestions"
+                    .to_string(),
+            );
             editor.clear_command_buffer();
         }
 
@@ -782,7 +790,9 @@ fn handle_key_press(
         // Debug info commands
         (AppMode::ReadOnly, KeyCode::Char('?'), _) => {
             let field_names = ["Fruit🍎", "Job💼", "Language💻", "Country🌍", "Color🎨"];
-            let current_field_name = field_names.get(editor.current_field()).unwrap_or(&"Unknown");
+            let current_field_name = field_names
+                .get(editor.current_field())
+                .unwrap_or(&"Unknown");
             editor.set_debug_message(format!(
                 "Field: {} ({}/{}), Pos: {}, Mode: {:?}",
                 current_field_name,
@@ -820,7 +830,12 @@ fn run_app<B: Backend>(
         terminal.draw(|f| ui(f, &editor))?;
 
         if let Event::Key(key) = event::read()? {
-            match handle_key_press(key.code, key.modifiers, &mut editor, &mut suggestions_provider) {
+            match handle_key_press(
+                key.code,
+                key.modifiers,
+                &mut editor,
+                &mut suggestions_provider,
+            ) {
                 Ok(should_continue) => {
                     if !should_continue {
                         break;
@@ -878,7 +893,9 @@ fn render_status_and_help(
 
     // Status bar with current field and cursor information
     let field_names = ["Fruit🍎", "Job💼", "Language💻", "Country🌍", "Color🎨"];
-    let current_field_name = field_names.get(editor.current_field()).unwrap_or(&"Unknown");
+    let current_field_name = field_names
+        .get(editor.current_field())
+        .unwrap_or(&"Unknown");
 
     let mode_text = match editor.mode() {
         AppMode::Edit => "INSERT | (bar cursor)",
@@ -907,8 +924,11 @@ fn render_status_and_help(
         suggestions_info
     );
 
-    let status = Paragraph::new(Line::from(Span::raw(status_text)))
-        .block(Block::default().borders(Borders::ALL).title("🚀 Production-Ready Smart Suggestions (Tab to activate → type to filter)"));
+    let status = Paragraph::new(Line::from(Span::raw(status_text))).block(
+        Block::default()
+            .borders(Borders::ALL)
+            .title("🚀 Production-Ready Smart Suggestions (Tab to activate → type to filter)"),
+    );
 
     f.render_widget(status, chunks[0]);
 
@@ -938,7 +958,11 @@ fn render_status_and_help(
     };
 
     let help = Paragraph::new(help_text)
-        .block(Block::default().borders(Borders::ALL).title("📋 Production Integration Guide"))
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title("📋 Production Integration Guide"),
+        )
         .style(Style::default().fg(Color::Gray));
 
     f.render_widget(help, chunks[1]);

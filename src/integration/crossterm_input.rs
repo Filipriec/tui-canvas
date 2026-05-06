@@ -7,14 +7,11 @@
 #[cfg(feature = "crossterm")]
 use crossterm::{
     event::{
-        self, DisableBracketedPaste, DisableMouseCapture,
-        EnableBracketedPaste, EnableMouseCapture, Event,
+        self, DisableBracketedPaste, DisableMouseCapture, EnableBracketedPaste, EnableMouseCapture,
+        Event,
     },
     execute,
-    terminal::{
-        disable_raw_mode, enable_raw_mode, EnterAlternateScreen,
-        LeaveAlternateScreen,
-    },
+    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 #[cfg(feature = "crossterm")]
 use std::{io, time::Duration};
@@ -100,9 +97,7 @@ impl CrosstermInputSession {
         Self::install_with_options(CrosstermInputOptions::default())
     }
 
-    pub fn install_with_options(
-        options: CrosstermInputOptions,
-    ) -> io::Result<Self> {
+    pub fn install_with_options(options: CrosstermInputOptions) -> io::Result<Self> {
         let mut session = Self {
             raw_mode_enabled: false,
             alternate_screen_enabled: false,

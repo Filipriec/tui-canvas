@@ -6,20 +6,20 @@ use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, BorderType, Paragraph, Wrap},
+    widgets::{Block, BorderType, Borders, Paragraph, Wrap},
     Frame,
 };
 
+use crate::canvas::modes::HighlightState;
 #[cfg(feature = "gui")]
 use crate::canvas::theme::{CanvasTheme, DefaultCanvasTheme};
-#[cfg(feature = "gui")]
-use crate::gui_utils::{
-    clip_inline_completion_with_indicator_padded,
-    compute_h_scroll_with_padding, display_width, RIGHT_PAD,
-};
-use crate::canvas::modes::HighlightState;
 use crate::data_provider::DataProvider;
 use crate::editor::FormEditor;
+#[cfg(feature = "gui")]
+use crate::gui_utils::{
+    clip_inline_completion_with_indicator_padded, compute_h_scroll_with_padding, display_width,
+    RIGHT_PAD,
+};
 #[cfg(feature = "gui")]
 use unicode_width::UnicodeWidthChar;
 
@@ -96,8 +96,7 @@ fn render_active_line_with_indicator<T: CanvasTheme>(
         if i >= cursor_chars {
             break;
         }
-        cursor_cols = cursor_cols
-            .saturating_add(UnicodeWidthChar::width(ch).unwrap_or(0) as u16);
+        cursor_cols = cursor_cols.saturating_add(UnicodeWidthChar::width(ch).unwrap_or(0) as u16);
     }
 
     let (h_scroll, left_cols) = compute_h_scroll_with_padding(cursor_cols, width);
@@ -143,13 +142,11 @@ pub fn render_canvas_with_options<T: CanvasTheme, D: DataProvider>(
     theme: &T,
     opts: CanvasDisplayOptions,
 ) -> Option<Rect> {
-    let highlight_state =
-        convert_selection_to_highlight(editor.ui_state().selection_state());
+    let highlight_state = convert_selection_to_highlight(editor.ui_state().selection_state());
 
     #[cfg(feature = "suggestions")]
     let active_completion = if editor.ui_state().is_suggestions_active()
-        && editor.ui_state().suggestions.active_field
-            == Some(editor.ui_state().current_field())
+        && editor.ui_state().suggestions.active_field == Some(editor.ui_state().current_field())
     {
         editor.ui_state().suggestions.completion_text.clone()
     } else {
@@ -243,11 +240,9 @@ fn convert_selection_to_highlight(
         SelectionState::Characterwise { anchor } => {
             HighlightState::Characterwise { anchor: *anchor }
         }
-        SelectionState::Linewise { anchor_field } => {
-            HighlightState::Linewise {
-                anchor_line: *anchor_field,
-            }
-        }
+        SelectionState::Linewise { anchor_field } => HighlightState::Linewise {
+            anchor_line: *anchor_field,
+        },
     }
 }
 
@@ -358,14 +353,14 @@ where
                     if is_active {
                         let mut spans: Vec<Span> = Vec::new();
                         spans.push(Span::styled(
-                                typed_text.clone(),
-                                Style::default().fg(theme.fg()),
+                            typed_text.clone(),
+                            Style::default().fg(theme.fg()),
                         ));
                         if let Some(completion) = &active_completion {
                             if !completion.is_empty() {
                                 spans.push(Span::styled(
-                                        completion.clone(),
-                                        Style::default().fg(theme.suggestion_gray()),
+                                    completion.clone(),
+                                    Style::default().fg(theme.suggestion_gray()),
                                 ));
                             }
                         }
@@ -442,31 +437,25 @@ fn apply_highlighting<'a, T: CanvasTheme>(
     let text_len = text.chars().count();
 
     match highlight_state {
-        HighlightState::Off => {
-            Line::from(Span::styled(text, Style::default().fg(theme.fg())))
-        }
-        HighlightState::Characterwise { anchor } => {
-            apply_characterwise_highlighting(
-                text,
-                text_len,
-                field_index,
-                current_field_idx,
-                current_cursor_pos,
-                anchor,
-                theme,
-                is_active,
-            )
-        }
-        HighlightState::Linewise { anchor_line } => {
-            apply_linewise_highlighting(
-                text,
-                field_index,
-                current_field_idx,
-                anchor_line,
-                theme,
-                is_active,
-            )
-        }
+        HighlightState::Off => Line::from(Span::styled(text, Style::default().fg(theme.fg()))),
+        HighlightState::Characterwise { anchor } => apply_characterwise_highlighting(
+            text,
+            text_len,
+            field_index,
+            current_field_idx,
+            current_cursor_pos,
+            anchor,
+            theme,
+            is_active,
+        ),
+        HighlightState::Linewise { anchor_line } => apply_linewise_highlighting(
+            text,
+            field_index,
+            current_field_idx,
+            anchor_line,
+            theme,
+            is_active,
+        ),
     }
 }
 

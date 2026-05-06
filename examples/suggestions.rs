@@ -17,15 +17,10 @@ compile_error!(
      Run with: cargo run --example suggestions2 --features \"gui,cursor-style,suggestions\""
 );
 
-use std::io;
 use crossterm::{
-    event::{
-        self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyModifiers,
-    },
+    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyModifiers},
     execute,
-    terminal::{
-        disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
-    },
+    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use ratatui::{
     backend::{Backend, CrosstermBackend},
@@ -35,6 +30,7 @@ use ratatui::{
     widgets::{Block, Borders, Paragraph},
     Frame, Terminal,
 };
+use std::io;
 
 use canvas::{
     canvas::{
@@ -61,7 +57,9 @@ impl<D: DataProvider> AutoCursorFormEditor<D> {
         Self {
             editor: FormEditor::new(data_provider),
             has_unsaved_changes: false,
-            debug_message: "🚀 Production-Ready Suggestions Demo - Copy this architecture for your app!".to_string(),
+            debug_message:
+                "🚀 Production-Ready Suggestions Demo - Copy this architecture for your app!"
+                    .to_string(),
             command_buffer: String::new(),
         }
     }
@@ -555,10 +553,10 @@ impl ProductionSuggestionsProvider {
 
         items
             .iter()
-            .filter(|(item, _)| {
-                query.is_empty() || item.to_lowercase().starts_with(&query_lower)
+            .filter(|(item, _)| query.is_empty() || item.to_lowercase().starts_with(&query_lower))
+            .map(|(item, description)| {
+                SuggestionItem::new(format!("{item} - {description}"), *item)
             })
-            .map(|(item, description)| SuggestionItem::new(format!("{item} - {description}"), *item))
             .collect()
     }
 }
@@ -592,7 +590,10 @@ fn handle_key_press(
                 // Cycle through suggestions
                 editor.suggestions_next();
                 editor.set_debug_message("📍 Next suggestion".to_string());
-            } else if editor.data_provider().supports_suggestions(editor.current_field()) {
+            } else if editor
+                .data_provider()
+                .supports_suggestions(editor.current_field())
+            {
                 // Open suggestions and fetch synchronously
                 if let Some((field_index, query)) = editor.trigger_suggestions() {
                     let results = suggestions_provider.fetch_suggestions(field_index, &query);
@@ -836,7 +837,9 @@ fn handle_key_press(
         // Debug info commands
         (AppMode::ReadOnly, KeyCode::Char('?'), _) => {
             let field_names = ["Fruit🍎", "Job💼", "Language💻", "Country🌍", "Color🎨"];
-            let current_field_name = field_names.get(editor.current_field()).unwrap_or(&"Unknown");
+            let current_field_name = field_names
+                .get(editor.current_field())
+                .unwrap_or(&"Unknown");
             editor.set_debug_message(format!(
                 "Field: {} ({}/{}), Pos: {}, Mode: {:?}",
                 current_field_name,
@@ -874,7 +877,12 @@ fn run_app<B: Backend>(
         terminal.draw(|f| ui(f, &editor))?;
 
         if let Event::Key(key) = event::read()? {
-            match handle_key_press(key.code, key.modifiers, &mut editor, &mut suggestions_provider) {
+            match handle_key_press(
+                key.code,
+                key.modifiers,
+                &mut editor,
+                &mut suggestions_provider,
+            ) {
                 Ok(should_continue) => {
                     if !should_continue {
                         break;
@@ -932,7 +940,9 @@ fn render_status_and_help(
 
     // Status bar with current field and cursor information
     let field_names = ["Fruit🍎", "Job💼", "Language💻", "Country🌍", "Color🎨"];
-    let current_field_name = field_names.get(editor.current_field()).unwrap_or(&"Unknown");
+    let current_field_name = field_names
+        .get(editor.current_field())
+        .unwrap_or(&"Unknown");
 
     let mode_text = match editor.mode() {
         AppMode::Edit => "INSERT | (bar cursor)",
@@ -961,8 +971,11 @@ fn render_status_and_help(
         suggestions_info
     );
 
-    let status = Paragraph::new(Line::from(Span::raw(status_text)))
-        .block(Block::default().borders(Borders::ALL).title("🚀 Production-Ready Non-Blocking Suggestions"));
+    let status = Paragraph::new(Line::from(Span::raw(status_text))).block(
+        Block::default()
+            .borders(Borders::ALL)
+            .title("🚀 Production-Ready Non-Blocking Suggestions"),
+    );
 
     f.render_widget(status, chunks[0]);
 
@@ -988,11 +1001,15 @@ fn render_status_and_help(
              Selection: hjkl/arrows=extend, w/b/e=word selection, Esc=normal\n\
              Professional editor experience with modern autocomplete!"
         }
-        _ => "🚀 Copy this suggestions architecture for your production app!"
+        _ => "🚀 Copy this suggestions architecture for your production app!",
     };
 
     let help = Paragraph::new(help_text)
-        .block(Block::default().borders(Borders::ALL).title("📋 Production Integration Guide"))
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title("📋 Production Integration Guide"),
+        )
         .style(Style::default().fg(Color::Gray));
 
     f.render_widget(help, chunks[1]);

@@ -5,8 +5,8 @@
 //! consumers can import them from `crate::canvas`.
 
 pub mod actions;
-pub mod state;
 pub mod modes;
+pub mod state;
 
 #[cfg(feature = "gui")]
 pub mod gui;

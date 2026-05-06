@@ -1,7 +1,7 @@
 // src/validation/config.rs
 //! Validation configuration types and builders
 
-use crate::validation::{CharacterLimits, PatternFilters, DisplayMask};
+use crate::validation::{CharacterLimits, DisplayMask, PatternFilters};
 #[cfg(feature = "validation")]
 use crate::validation::{CustomFormatter, FormattingResult, PositionMapper};
 use std::sync::Arc;
@@ -41,9 +41,7 @@ impl AllowedValues {
 
     fn matches(&self, text: &str) -> bool {
         if self.case_insensitive {
-            self.allowed
-                .iter()
-                .any(|s| s.eq_ignore_ascii_case(text))
+            self.allowed.iter().any(|s| s.eq_ignore_ascii_case(text))
         } else {
             self.allowed.iter().any(|s| s == text)
         }
@@ -80,26 +78,30 @@ impl std::fmt::Debug for ValidationConfig {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut ds = f.debug_struct("ValidationConfig");
         ds.field("character_limits", &self.character_limits)
-          .field("pattern_filters", &self.pattern_filters)
-          .field("display_mask", &self.display_mask)
-          // Do not print the formatter itself to avoid requiring Debug
-          .field(
-              "custom_formatter",
-              &{
-                  #[cfg(feature = "validation")]
-                  {
-                      if self.custom_formatter.is_some() { &"Some(<CustomFormatter>)" } else { &"None" }
-                  }
-                  #[cfg(not(feature = "validation"))]
-                  {
-                      &"N/A"
-                  }
-              },
-          )
-          .field("allowed_values", &self.allowed_values)
-          .field("external_validation_enabled", &self.external_validation_enabled)
-          .field("external_validation", &self.external_validation)
-          .finish()
+            .field("pattern_filters", &self.pattern_filters)
+            .field("display_mask", &self.display_mask)
+            // Do not print the formatter itself to avoid requiring Debug
+            .field("custom_formatter", &{
+                #[cfg(feature = "validation")]
+                {
+                    if self.custom_formatter.is_some() {
+                        &"Some(<CustomFormatter>)"
+                    } else {
+                        &"None"
+                    }
+                }
+                #[cfg(not(feature = "validation"))]
+                {
+                    &"N/A"
+                }
+            })
+            .field("allowed_values", &self.allowed_values)
+            .field(
+                "external_validation_enabled",
+                &self.external_validation_enabled,
+            )
+            .field("external_validation", &self.external_validation)
+            .finish()
     }
 }
 
@@ -115,12 +117,12 @@ impl ValidationConfig {
     ) -> Option<(String, Arc<dyn PositionMapper>, Option<String>)> {
         let formatter = self.custom_formatter.as_ref()?;
         match formatter.format(raw) {
-            FormattingResult::Success { formatted, mapper } => {
-                Some((formatted, mapper, None))
-            }
-            FormattingResult::Warning { formatted, message, mapper } => {
-                Some((formatted, mapper, Some(message)))
-            }
+            FormattingResult::Success { formatted, mapper } => Some((formatted, mapper, None)),
+            FormattingResult::Warning {
+                formatted,
+                message,
+                mapper,
+            } => Some((formatted, mapper, Some(message))),
             FormattingResult::Error { .. } => None, // Fall back to raw display
         }
     }
@@ -229,9 +231,13 @@ impl ValidationConfig {
             || self.display_mask.is_some()
             || {
                 #[cfg(feature = "validation")]
-                { self.custom_formatter.is_some() }
+                {
+                    self.custom_formatter.is_some()
+                }
                 #[cfg(not(feature = "validation"))]
-                { false }
+                {
+                    false
+                }
             }
             || self.allowed_values.is_some()
     }
@@ -364,10 +370,7 @@ impl ValidationConfigBuilder {
     /// Configure whether empty value should be allowed when using AllowedValues.
     pub fn with_allowed_values_allow_empty(mut self, allow_empty: bool) -> Self {
         if let Some(av) = self.config.allowed_values.take() {
-            self.config.allowed_values = Some(AllowedValues {
-                allow_empty,
-                ..av
-            });
+            self.config.allowed_values = Some(AllowedValues { allow_empty, ..av });
         } else {
             self.config.allowed_values = Some(AllowedValues::new(vec![]).allow_empty(allow_empty));
         }
@@ -410,9 +413,7 @@ mod tests {
 
     #[test]
     fn test_validation_config_builder() {
-        let config = ValidationConfigBuilder::new()
-            .with_max_length(10)
-            .build();
+        let config = ValidationConfigBuilder::new().with_max_length(10).build();
 
         assert!(config.character_limits.is_some());
         assert_eq!(config.character_limits.unwrap().max_length(), Some(10));
@@ -507,13 +508,12 @@ mod tests {
 
     #[test]
     fn test_config_with_patterns() {
-        use crate::validation::{PatternFilters, PositionFilter, PositionRange, CharacterFilter};
+        use crate::validation::{CharacterFilter, PatternFilters, PositionFilter, PositionRange};
 
-        let patterns = PatternFilters::new()
-            .add_filter(PositionFilter::new(
-                PositionRange::Range(0, 1),
-                CharacterFilter::Alphabetic,
-            ));
+        let patterns = PatternFilters::new().add_filter(PositionFilter::new(
+            PositionRange::Range(0, 1),
+            CharacterFilter::Alphabetic,
+        ));
 
         let config = ValidationConfig::with_patterns(patterns);
         assert!(config.has_validation());

@@ -5,25 +5,19 @@ use ratatui::{
     layout::{Alignment, Rect},
     style::Style,
     text::{Line, Span},
-    widgets::{
-        Block, BorderType, Borders, Paragraph, StatefulWidget, Widget,
-    },
+    widgets::{Block, BorderType, Borders, Paragraph, StatefulWidget, Widget},
 };
 
 #[cfg(feature = "gui")]
 use crate::gui_utils::{
-    clip_window_with_indicator_padded, compute_h_scroll_with_padding,
-    display_cols_up_to, display_width,
+    clip_window_with_indicator_padded, compute_h_scroll_with_padding, display_cols_up_to,
+    display_width,
 };
 #[cfg(feature = "gui")]
 use crate::textarea::provider::{TextAreaDataProvider, TextAreaProvider};
 
 #[cfg(feature = "gui")]
-use crate::textarea::state::{
-    count_wrapped_rows_indented,
-    TextAreaState,
-    TextOverflowMode,
-};
+use crate::textarea::state::{count_wrapped_rows_indented, TextAreaState, TextOverflowMode};
 
 #[cfg(feature = "gui")]
 use unicode_width::UnicodeWidthChar;
@@ -75,11 +69,7 @@ impl<'a, P: TextAreaDataProvider> TextArea<'a, P> {
 }
 
 #[cfg(feature = "gui")]
-fn wrap_segments_with_indent(
-    s: &str,
-    width: u16,
-    indent: u16,
-) -> Vec<String> {
+fn wrap_segments_with_indent(s: &str, width: u16, indent: u16) -> Vec<String> {
     let mut segments: Vec<String> = Vec::new();
     if width == 0 {
         segments.push(String::new());
@@ -219,7 +209,11 @@ impl<'a, P: TextAreaDataProvider> StatefulWidget for TextArea<'a, P> {
                                 compute_h_scroll_with_padding(cursor_cols, inner.width);
 
                             if fits {
-                                if edited_now { target_h } else { 0 }
+                                if edited_now {
+                                    target_h
+                                } else {
+                                    0
+                                }
                             } else {
                                 target_h.max(state.h_scroll)
                             }

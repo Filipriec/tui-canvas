@@ -9,19 +9,12 @@ use ratatui::{
 
 use unicode_width::UnicodeWidthChar;
 
-use super::chunks::{
-    clip_chunks_window_with_indicator_padded,
-    wrap_chunks_indented,
-};
+use super::chunks::{clip_chunks_window_with_indicator_padded, wrap_chunks_indented};
 use super::state::TextAreaSyntaxState;
 
 use crate::data_provider::DataProvider;
-use crate::gui_utils::{
-    compute_h_scroll_with_padding, display_cols_up_to, display_width,
-};
-use crate::textarea::state::{
-    count_wrapped_rows_indented, TextOverflowMode,
-};
+use crate::gui_utils::{compute_h_scroll_with_padding, display_cols_up_to, display_width};
+use crate::textarea::state::{count_wrapped_rows_indented, TextOverflowMode};
 
 #[derive(Debug, Clone)]
 pub struct TextAreaSyntax<'a> {
@@ -62,10 +55,7 @@ impl<'a> TextAreaSyntax<'a> {
     }
 }
 
-fn resolve_start_line_and_intra_indented(
-    state: &TextAreaSyntaxState,
-    inner: Rect,
-) -> (usize, u16) {
+fn resolve_start_line_and_intra_indented(state: &TextAreaSyntaxState, inner: Rect) -> (usize, u16) {
     let provider = state.textarea.editor.data_provider();
     let total = provider.line_count();
 
@@ -134,9 +124,7 @@ impl<'a> StatefulWidget for TextAreaSyntax<'a> {
             while i < total && rows_left > 0 {
                 let s = provider.field_value(i);
 
-                let chunks = state
-                    .engine
-                    .highlight_line_cached(i, s, provider);
+                let chunks = state.engine.highlight_line_cached(i, s, provider);
 
                 let lines = wrap_chunks_indented(&chunks, inner.width, indent);
                 let skip = if i == start { intra as usize } else { 0 };

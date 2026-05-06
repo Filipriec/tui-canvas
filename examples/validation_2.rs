@@ -13,17 +13,11 @@ compile_error!(
      Run with: cargo run --example validation_advanced_patterns --features \"validation,gui,cursor-style\""
 );
 
-use std::io;
-use std::sync::Arc;
 use canvas::ValidationResult;
 use crossterm::{
-    event::{
-        self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyModifiers,
-    },
+    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyModifiers},
     execute,
-    terminal::{
-        disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
-    },
+    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use ratatui::{
     backend::{Backend, CrosstermBackend},
@@ -33,15 +27,13 @@ use ratatui::{
     widgets::{Block, Borders, Paragraph, Wrap},
     Frame, Terminal,
 };
+use std::io;
+use std::sync::Arc;
 
 use canvas::{
-    canvas::{
-        gui::render_canvas_default,
-        modes::AppMode,
-        CursorManager,
-    },
-    DataProvider, FormEditor,
-    ValidationConfig, ValidationConfigBuilder, PatternFilters, PositionFilter, PositionRange, CharacterFilter,
+    canvas::{gui::render_canvas_default, modes::AppMode, CursorManager},
+    CharacterFilter, DataProvider, FormEditor, PatternFilters, PositionFilter, PositionRange,
+    ValidationConfig, ValidationConfigBuilder,
 };
 
 struct AdvancedPatternFormEditor<D: DataProvider> {
@@ -60,7 +52,9 @@ impl<D: DataProvider> AdvancedPatternFormEditor<D> {
 
         Self {
             editor,
-            debug_message: "🚀 Advanced Pattern Validation - Showcasing edge cases and complex patterns!".to_string(),
+            debug_message:
+                "🚀 Advanced Pattern Validation - Showcasing edge cases and complex patterns!"
+                    .to_string(),
             command_buffer: String::new(),
             validation_enabled: true,
             field_switch_blocked: false,
@@ -68,10 +62,18 @@ impl<D: DataProvider> AdvancedPatternFormEditor<D> {
         }
     }
 
-    fn clear_command_buffer(&mut self) { self.command_buffer.clear(); }
-    fn add_to_command_buffer(&mut self, ch: char) { self.command_buffer.push(ch); }
-    fn get_command_buffer(&self) -> &str { &self.command_buffer }
-    fn has_pending_command(&self) -> bool { !self.command_buffer.is_empty() }
+    fn clear_command_buffer(&mut self) {
+        self.command_buffer.clear();
+    }
+    fn add_to_command_buffer(&mut self, ch: char) {
+        self.command_buffer.push(ch);
+    }
+    fn get_command_buffer(&self) -> &str {
+        &self.command_buffer
+    }
+    fn has_pending_command(&self) -> bool {
+        !self.command_buffer.is_empty()
+    }
 
     fn toggle_validation(&mut self) {
         self.validation_enabled = !self.validation_enabled;
@@ -83,34 +85,65 @@ impl<D: DataProvider> AdvancedPatternFormEditor<D> {
         }
     }
 
-    fn move_left(&mut self) { self.editor.move_left(); self.field_switch_blocked = false; self.block_reason = None; }
-    fn move_right(&mut self) { self.editor.move_right(); self.field_switch_blocked = false; self.block_reason = None; }
+    fn move_left(&mut self) {
+        self.editor.move_left();
+        self.field_switch_blocked = false;
+        self.block_reason = None;
+    }
+    fn move_right(&mut self) {
+        self.editor.move_right();
+        self.field_switch_blocked = false;
+        self.block_reason = None;
+    }
 
     fn move_up(&mut self) {
         match self.editor.move_up() {
-            Ok(()) => { self.update_field_validation_status(); self.field_switch_blocked = false; self.block_reason = None; }
-            Err(e) => { self.field_switch_blocked = true; self.block_reason = Some(e.to_string()); self.debug_message = format!("🚫 Field switch blocked: {e}"); }
+            Ok(()) => {
+                self.update_field_validation_status();
+                self.field_switch_blocked = false;
+                self.block_reason = None;
+            }
+            Err(e) => {
+                self.field_switch_blocked = true;
+                self.block_reason = Some(e.to_string());
+                self.debug_message = format!("🚫 Field switch blocked: {e}");
+            }
         }
     }
 
     fn move_down(&mut self) {
         match self.editor.move_down() {
-            Ok(()) => { self.update_field_validation_status(); self.field_switch_blocked = false; self.block_reason = None; }
-            Err(e) => { self.field_switch_blocked = true; self.block_reason = Some(e.to_string()); self.debug_message = format!("🚫 Field switch blocked: {e}"); }
+            Ok(()) => {
+                self.update_field_validation_status();
+                self.field_switch_blocked = false;
+                self.block_reason = None;
+            }
+            Err(e) => {
+                self.field_switch_blocked = true;
+                self.block_reason = Some(e.to_string());
+                self.debug_message = format!("🚫 Field switch blocked: {e}");
+            }
         }
     }
 
-    fn move_line_start(&mut self) { self.editor.move_line_start(); }
-    fn move_line_end(&mut self) { self.editor.move_line_end(); }
+    fn move_line_start(&mut self) {
+        self.editor.move_line_start();
+    }
+    fn move_line_end(&mut self) {
+        self.editor.move_line_end();
+    }
 
     fn enter_edit_mode(&mut self) {
         self.editor.enter_edit_mode();
-        self.debug_message = "✏️  INSERT MODE - Cursor: Steady Bar | - Testing advanced pattern validation".to_string();
+        self.debug_message =
+            "✏️  INSERT MODE - Cursor: Steady Bar | - Testing advanced pattern validation"
+                .to_string();
     }
 
     fn enter_append_mode(&mut self) {
         self.editor.enter_append_mode();
-        self.debug_message = "✏️  INSERT (append) - Cursor: Steady Bar | - Advanced patterns active".to_string();
+        self.debug_message =
+            "✏️  INSERT (append) - Cursor: Steady Bar | - Advanced patterns active".to_string();
     }
 
     fn exit_edit_mode(&mut self) {
@@ -124,9 +157,15 @@ impl<D: DataProvider> AdvancedPatternFormEditor<D> {
         if result.is_ok() {
             let validation_result = self.editor.validate_current_field();
             match validation_result {
-                ValidationResult::Valid => { self.debug_message = "✅ Character accepted".to_string(); }
-                ValidationResult::Warning { message } => { self.debug_message = format!("⚠️  Warning: {message}"); }
-                ValidationResult::Error { message } => { self.debug_message = format!("❌ Pattern violation: {message}"); }
+                ValidationResult::Valid => {
+                    self.debug_message = "✅ Character accepted".to_string();
+                }
+                ValidationResult::Warning { message } => {
+                    self.debug_message = format!("⚠️  Warning: {message}");
+                }
+                ValidationResult::Error { message } => {
+                    self.debug_message = format!("❌ Pattern violation: {message}");
+                }
             }
         }
         result
@@ -134,63 +173,121 @@ impl<D: DataProvider> AdvancedPatternFormEditor<D> {
 
     fn delete_backward(&mut self) -> anyhow::Result<()> {
         let result = self.editor.delete_backward();
-        if result.is_ok() { self.debug_message = "⌫ Character deleted".to_string(); }
+        if result.is_ok() {
+            self.debug_message = "⌫ Character deleted".to_string();
+        }
         result
     }
 
     fn delete_forward(&mut self) -> anyhow::Result<()> {
         let result = self.editor.delete_forward();
-        if result.is_ok() { self.debug_message = "⌦ Character deleted".to_string(); }
+        if result.is_ok() {
+            self.debug_message = "⌦ Character deleted".to_string();
+        }
         result
     }
 
     // Delegate methods
-    fn current_field(&self) -> usize { self.editor.current_field() }
-    fn cursor_position(&self) -> usize { self.editor.cursor_position() }
-    fn mode(&self) -> AppMode { self.editor.mode() }
+    fn current_field(&self) -> usize {
+        self.editor.current_field()
+    }
+    fn cursor_position(&self) -> usize {
+        self.editor.cursor_position()
+    }
+    fn mode(&self) -> AppMode {
+        self.editor.mode()
+    }
     fn current_text(&self) -> &str {
         let field_index = self.editor.current_field();
         self.editor.data_provider().field_value(field_index)
     }
-    fn data_provider(&self) -> &D { self.editor.data_provider() }
-    fn ui_state(&self) -> &canvas::EditorState { self.editor.ui_state() }
-    fn set_mode(&mut self, mode: AppMode) { self.editor.set_mode(mode); }
+    fn data_provider(&self) -> &D {
+        self.editor.data_provider()
+    }
+    fn ui_state(&self) -> &canvas::EditorState {
+        self.editor.ui_state()
+    }
+    fn set_mode(&mut self, mode: AppMode) {
+        self.editor.set_mode(mode);
+    }
 
     fn next_field(&mut self) {
         match self.editor.next_field() {
-            Ok(()) => { self.update_field_validation_status(); self.field_switch_blocked = false; self.block_reason = None; }
-            Err(e) => { self.field_switch_blocked = true; self.block_reason = Some(e.to_string()); self.debug_message = format!("🚫 Cannot move to next field: {e}"); }
+            Ok(()) => {
+                self.update_field_validation_status();
+                self.field_switch_blocked = false;
+                self.block_reason = None;
+            }
+            Err(e) => {
+                self.field_switch_blocked = true;
+                self.block_reason = Some(e.to_string());
+                self.debug_message = format!("🚫 Cannot move to next field: {e}");
+            }
         }
     }
 
     fn prev_field(&mut self) {
         match self.editor.prev_field() {
-            Ok(()) => { self.update_field_validation_status(); self.field_switch_blocked = false; self.block_reason = None; }
-            Err(e) => { self.field_switch_blocked = true; self.block_reason = Some(e.to_string()); self.debug_message = format!("🚫 Cannot move to previous field: {e}"); }
+            Ok(()) => {
+                self.update_field_validation_status();
+                self.field_switch_blocked = false;
+                self.block_reason = None;
+            }
+            Err(e) => {
+                self.field_switch_blocked = true;
+                self.block_reason = Some(e.to_string());
+                self.debug_message = format!("🚫 Cannot move to previous field: {e}");
+            }
         }
     }
 
-    fn set_debug_message(&mut self, msg: String) { self.debug_message = msg; }
-    fn debug_message(&self) -> &str { &self.debug_message }
+    fn set_debug_message(&mut self, msg: String) {
+        self.debug_message = msg;
+    }
+    fn debug_message(&self) -> &str {
+        &self.debug_message
+    }
 
     fn update_field_validation_status(&mut self) {
-        if !self.validation_enabled { return; }
+        if !self.validation_enabled {
+            return;
+        }
         let result = self.editor.validate_current_field();
         match result {
-            ValidationResult::Valid => { self.debug_message = format!("Field {}: ✅ Pattern valid", self.editor.current_field() + 1); }
-            ValidationResult::Warning { message } => { self.debug_message = format!("Field {}: ⚠️  {}", self.editor.current_field() + 1, message); }
-            ValidationResult::Error { message } => { self.debug_message = format!("Field {}: ❌ {}", self.editor.current_field() + 1, message); }
+            ValidationResult::Valid => {
+                self.debug_message = format!(
+                    "Field {}: ✅ Pattern valid",
+                    self.editor.current_field() + 1
+                );
+            }
+            ValidationResult::Warning { message } => {
+                self.debug_message =
+                    format!("Field {}: ⚠️  {}", self.editor.current_field() + 1, message);
+            }
+            ValidationResult::Error { message } => {
+                self.debug_message =
+                    format!("Field {}: ❌ {}", self.editor.current_field() + 1, message);
+            }
         }
     }
 
     fn get_validation_status(&self) -> String {
-        if !self.validation_enabled { return "❌ DISABLED".to_string(); }
-        if self.field_switch_blocked { return "🚫 SWITCH BLOCKED".to_string(); }
+        if !self.validation_enabled {
+            return "❌ DISABLED".to_string();
+        }
+        if self.field_switch_blocked {
+            return "🚫 SWITCH BLOCKED".to_string();
+        }
         let summary = self.editor.validation_summary();
-        if summary.has_errors() { format!("❌ {} ERRORS", summary.error_fields) }
-        else if summary.has_warnings() { format!("⚠️  {} WARNINGS", summary.warning_fields) }
-        else if summary.validated_fields > 0 { format!("✅ {} VALID", summary.valid_fields) }
-        else { "🔍 READY".to_string() }
+        if summary.has_errors() {
+            format!("❌ {} ERRORS", summary.error_fields)
+        } else if summary.has_warnings() {
+            format!("⚠️  {} WARNINGS", summary.warning_fields)
+        } else if summary.validated_fields > 0 {
+            format!("✅ {} VALID", summary.valid_fields)
+        } else {
+            "🔍 READY".to_string()
+        }
     }
 }
 
@@ -204,23 +301,52 @@ impl AdvancedPatternData {
         Self {
             fields: vec![
                 ("🕐 Time (HH:MM) - 24hr format".to_string(), "".to_string()),
-                ("🎨 Hex Color (#RRGGBB) - Web colors".to_string(), "".to_string()),
-                ("🌐 IPv4 (XXX.XXX.XXX.XXX) - Network address".to_string(), "".to_string()),
-                ("🏷️  Product Code (ABC-123-XYZ) - Mixed format".to_string(), "".to_string()),
-                ("📅 Date Code (2024W15) - Year + Week".to_string(), "".to_string()),
-                ("🔢 Binary (101010) - Only 0s and 1s".to_string(), "".to_string()),
-                ("🎯 Complex ID (A1-B2C-3D4E) - Multi-rule".to_string(), "".to_string()),
-                ("🚀 Custom Pattern - Advanced logic".to_string(), "".to_string()),
+                (
+                    "🎨 Hex Color (#RRGGBB) - Web colors".to_string(),
+                    "".to_string(),
+                ),
+                (
+                    "🌐 IPv4 (XXX.XXX.XXX.XXX) - Network address".to_string(),
+                    "".to_string(),
+                ),
+                (
+                    "🏷️  Product Code (ABC-123-XYZ) - Mixed format".to_string(),
+                    "".to_string(),
+                ),
+                (
+                    "📅 Date Code (2024W15) - Year + Week".to_string(),
+                    "".to_string(),
+                ),
+                (
+                    "🔢 Binary (101010) - Only 0s and 1s".to_string(),
+                    "".to_string(),
+                ),
+                (
+                    "🎯 Complex ID (A1-B2C-3D4E) - Multi-rule".to_string(),
+                    "".to_string(),
+                ),
+                (
+                    "🚀 Custom Pattern - Advanced logic".to_string(),
+                    "".to_string(),
+                ),
             ],
         }
     }
 }
 
 impl DataProvider for AdvancedPatternData {
-    fn field_count(&self) -> usize { self.fields.len() }
-    fn field_name(&self, index: usize) -> &str { &self.fields[index].0 }
-    fn field_value(&self, index: usize) -> &str { &self.fields[index].1 }
-    fn set_field_value(&mut self, index: usize, value: String) { self.fields[index].1 = value; }
+    fn field_count(&self) -> usize {
+        self.fields.len()
+    }
+    fn field_name(&self, index: usize) -> &str {
+        &self.fields[index].0
+    }
+    fn field_value(&self, index: usize) -> &str {
+        &self.fields[index].1
+    }
+    fn set_field_value(&mut self, index: usize, value: String) {
+        self.fields[index].1 = value;
+    }
 
     fn validation_config(&self, field_index: usize) -> Option<ValidationConfig> {
         match field_index {
@@ -237,15 +363,20 @@ impl DataProvider for AdvancedPatternData {
                         CharacterFilter::Exact(':'),
                     ));
 
-                Some(ValidationConfigBuilder::new()
-                    .with_pattern_filters(time_pattern)
-                    .with_max_length(5) // HH:MM = 5 characters
-                    .build())
+                Some(
+                    ValidationConfigBuilder::new()
+                        .with_pattern_filters(time_pattern)
+                        .with_max_length(5) // HH:MM = 5 characters
+                        .build(),
+                )
             }
             1 => {
                 // 🎨 Hex Color (#RRGGBB) - Web color format
                 // This showcases: OneOf filter with hex digits, exact character at start
-                let hex_digits = vec!['0','1','2','3','4','5','6','7','8','9','A','B','C','D','E','F','a','b','c','d','e','f'];
+                let hex_digits = vec![
+                    '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F',
+                    'a', 'b', 'c', 'd', 'e', 'f',
+                ];
                 let hex_color_pattern = PatternFilters::new()
                     .add_filter(PositionFilter::new(
                         PositionRange::Single(0), // Hash symbol
@@ -256,10 +387,12 @@ impl DataProvider for AdvancedPatternData {
                         CharacterFilter::OneOf(hex_digits),
                     ));
 
-                Some(ValidationConfigBuilder::new()
-                    .with_pattern_filters(hex_color_pattern)
-                    .with_max_length(7) // #RRGGBB = 7 characters
-                    .build())
+                Some(
+                    ValidationConfigBuilder::new()
+                        .with_pattern_filters(hex_color_pattern)
+                        .with_max_length(7) // #RRGGBB = 7 characters
+                        .build(),
+                )
             }
             2 => {
                 // 🌐 IPv4 Address (XXX.XXX.XXX.XXX) - Network address
@@ -270,14 +403,16 @@ impl DataProvider for AdvancedPatternData {
                         CharacterFilter::Exact('.'),
                     ))
                     .add_filter(PositionFilter::new(
-                        PositionRange::Multiple(vec![0,1,2,4,5,6,8,9,10,12,13,14]), // Number positions
+                        PositionRange::Multiple(vec![0, 1, 2, 4, 5, 6, 8, 9, 10, 12, 13, 14]), // Number positions
                         CharacterFilter::Numeric,
                     ));
 
-                Some(ValidationConfigBuilder::new()
-                    .with_pattern_filters(ipv4_pattern)
-                    .with_max_length(15) // XXX.XXX.XXX.XXX = up to 15 chars
-                    .build())
+                Some(
+                    ValidationConfigBuilder::new()
+                        .with_pattern_filters(ipv4_pattern)
+                        .with_max_length(15) // XXX.XXX.XXX.XXX = up to 15 chars
+                        .build(),
+                )
             }
             3 => {
                 // 🏷️ Product Code (ABC-123-XYZ) - Mixed format sections
@@ -300,10 +435,12 @@ impl DataProvider for AdvancedPatternData {
                         CharacterFilter::Alphabetic,
                     ));
 
-                Some(ValidationConfigBuilder::new()
-                    .with_pattern_filters(product_code_pattern)
-                    .with_max_length(11) // ABC-123-XYZ = 11 characters
-                    .build())
+                Some(
+                    ValidationConfigBuilder::new()
+                        .with_pattern_filters(product_code_pattern)
+                        .with_max_length(11) // ABC-123-XYZ = 11 characters
+                        .build(),
+                )
             }
             4 => {
                 // 📅 Date Code (2024W15) - Year + Week format
@@ -322,24 +459,27 @@ impl DataProvider for AdvancedPatternData {
                         CharacterFilter::Numeric,
                     ));
 
-                Some(ValidationConfigBuilder::new()
-                    .with_pattern_filters(date_code_pattern)
-                    .with_max_length(7) // 2024W15 = 7 characters
-                    .build())
+                Some(
+                    ValidationConfigBuilder::new()
+                        .with_pattern_filters(date_code_pattern)
+                        .with_max_length(7) // 2024W15 = 7 characters
+                        .build(),
+                )
             }
             5 => {
                 // 🔢 Binary (101010) - Only 0s and 1s
                 // This showcases: OneOf filter with limited character set
-                let binary_pattern = PatternFilters::new()
-                    .add_filter(PositionFilter::new(
-                        PositionRange::From(0), // All positions
-                        CharacterFilter::OneOf(vec!['0', '1']),
-                    ));
+                let binary_pattern = PatternFilters::new().add_filter(PositionFilter::new(
+                    PositionRange::From(0), // All positions
+                    CharacterFilter::OneOf(vec!['0', '1']),
+                ));
 
-                Some(ValidationConfigBuilder::new()
-                    .with_pattern_filters(binary_pattern)
-                    .with_max_length(16) // Allow up to 16 binary digits
-                    .build())
+                Some(
+                    ValidationConfigBuilder::new()
+                        .with_pattern_filters(binary_pattern)
+                        .with_max_length(16) // Allow up to 16 binary digits
+                        .build(),
+                )
             }
             6 => {
                 // 🎯 Complex ID (A1-B2C-3D4E) - Multiple overlapping rules
@@ -358,37 +498,40 @@ impl DataProvider for AdvancedPatternData {
                         CharacterFilter::Exact('-'),
                     ))
                     .add_filter(PositionFilter::new(
-                        PositionRange::Single(5), // Special case: override dash with letter C
+                        PositionRange::Single(5),    // Special case: override dash with letter C
                         CharacterFilter::Alphabetic, // This creates an interesting edge case
                     ));
 
-                Some(ValidationConfigBuilder::new()
-                    .with_pattern_filters(complex_id_pattern)
-                    .with_max_length(10) // A1-B2C-3D4E = 10 characters
-                    .build())
+                Some(
+                    ValidationConfigBuilder::new()
+                        .with_pattern_filters(complex_id_pattern)
+                        .with_max_length(10) // A1-B2C-3D4E = 10 characters
+                        .build(),
+                )
             }
             7 => {
                 // 🚀 Custom Pattern - Advanced logic with custom function
                 // This showcases: Custom validation function for complex rules
-                let custom_pattern = PatternFilters::new()
-                    .add_filter(PositionFilter::new(
-                        PositionRange::From(0),
-                        CharacterFilter::Custom(Arc::new(|c| {
-                            // Advanced rule: Alternating vowels and consonants!
-                            // Even positions (0,2,4...): vowels (a,e,i,o,u)
-                            // Odd positions (1,3,5...): consonants
-                            let vowels = ['a', 'e', 'i', 'o', 'u', 'A', 'E', 'I', 'O', 'U'];
+                let custom_pattern = PatternFilters::new().add_filter(PositionFilter::new(
+                    PositionRange::From(0),
+                    CharacterFilter::Custom(Arc::new(|c| {
+                        // Advanced rule: Alternating vowels and consonants!
+                        // Even positions (0,2,4...): vowels (a,e,i,o,u)
+                        // Odd positions (1,3,5...): consonants
+                        let vowels = ['a', 'e', 'i', 'o', 'u', 'A', 'E', 'I', 'O', 'U'];
 
-                            // For demo purposes, we'll just accept alphabetic characters
-                            // In real usage, you'd implement the alternating logic based on position
-                            c.is_alphabetic()
-                        })),
-                    ));
+                        // For demo purposes, we'll just accept alphabetic characters
+                        // In real usage, you'd implement the alternating logic based on position
+                        c.is_alphabetic()
+                    })),
+                ));
 
-                Some(ValidationConfigBuilder::new()
-                    .with_pattern_filters(custom_pattern)
-                    .with_max_length(12) // Allow up to 12 characters
-                    .build())
+                Some(
+                    ValidationConfigBuilder::new()
+                        .with_pattern_filters(custom_pattern)
+                        .with_max_length(12) // Allow up to 12 characters
+                        .build(),
+                )
             }
             _ => None,
         }
@@ -413,33 +556,79 @@ fn handle_key_press(
 
     match (mode, key, modifiers) {
         // Mode transitions
-        (AppMode::ReadOnly, KeyCode::Char('i'), _) => { editor.enter_edit_mode(); editor.clear_command_buffer(); }
-        (AppMode::ReadOnly, KeyCode::Char('a'), _) => { editor.enter_append_mode(); editor.clear_command_buffer(); }
-        (AppMode::ReadOnly, KeyCode::Char('A'), _) => { editor.move_line_end(); editor.enter_edit_mode(); editor.clear_command_buffer(); }
-        (_, KeyCode::Esc, _) => { if mode == AppMode::Edit { editor.exit_edit_mode(); } else { editor.clear_command_buffer(); } }
+        (AppMode::ReadOnly, KeyCode::Char('i'), _) => {
+            editor.enter_edit_mode();
+            editor.clear_command_buffer();
+        }
+        (AppMode::ReadOnly, KeyCode::Char('a'), _) => {
+            editor.enter_append_mode();
+            editor.clear_command_buffer();
+        }
+        (AppMode::ReadOnly, KeyCode::Char('A'), _) => {
+            editor.move_line_end();
+            editor.enter_edit_mode();
+            editor.clear_command_buffer();
+        }
+        (_, KeyCode::Esc, _) => {
+            if mode == AppMode::Edit {
+                editor.exit_edit_mode();
+            } else {
+                editor.clear_command_buffer();
+            }
+        }
 
         // Validation commands
-        (AppMode::ReadOnly, KeyCode::F(1), _) => { editor.toggle_validation(); }
+        (AppMode::ReadOnly, KeyCode::F(1), _) => {
+            editor.toggle_validation();
+        }
 
         // Movement in ReadOnly mode
-        (AppMode::ReadOnly, KeyCode::Char('h'), _) | (AppMode::ReadOnly, KeyCode::Left, _) => { editor.move_left(); editor.clear_command_buffer(); }
-        (AppMode::ReadOnly, KeyCode::Char('l'), _) | (AppMode::ReadOnly, KeyCode::Right, _) => { editor.move_right(); editor.clear_command_buffer(); }
-        (AppMode::ReadOnly, KeyCode::Char('j'), _) | (AppMode::ReadOnly, KeyCode::Down, _) => { editor.move_down(); editor.clear_command_buffer(); }
-        (AppMode::ReadOnly, KeyCode::Char('k'), _) | (AppMode::ReadOnly, KeyCode::Up, _) => { editor.move_up(); editor.clear_command_buffer(); }
+        (AppMode::ReadOnly, KeyCode::Char('h'), _) | (AppMode::ReadOnly, KeyCode::Left, _) => {
+            editor.move_left();
+            editor.clear_command_buffer();
+        }
+        (AppMode::ReadOnly, KeyCode::Char('l'), _) | (AppMode::ReadOnly, KeyCode::Right, _) => {
+            editor.move_right();
+            editor.clear_command_buffer();
+        }
+        (AppMode::ReadOnly, KeyCode::Char('j'), _) | (AppMode::ReadOnly, KeyCode::Down, _) => {
+            editor.move_down();
+            editor.clear_command_buffer();
+        }
+        (AppMode::ReadOnly, KeyCode::Char('k'), _) | (AppMode::ReadOnly, KeyCode::Up, _) => {
+            editor.move_up();
+            editor.clear_command_buffer();
+        }
 
         // Movement in Edit mode
-        (AppMode::Edit, KeyCode::Left, _) => { editor.move_left(); }
-        (AppMode::Edit, KeyCode::Right, _) => { editor.move_right(); }
-        (AppMode::Edit, KeyCode::Up, _) => { editor.move_up(); }
-        (AppMode::Edit, KeyCode::Down, _) => { editor.move_down(); }
+        (AppMode::Edit, KeyCode::Left, _) => {
+            editor.move_left();
+        }
+        (AppMode::Edit, KeyCode::Right, _) => {
+            editor.move_right();
+        }
+        (AppMode::Edit, KeyCode::Up, _) => {
+            editor.move_up();
+        }
+        (AppMode::Edit, KeyCode::Down, _) => {
+            editor.move_down();
+        }
 
         // Delete operations
-        (AppMode::Edit, KeyCode::Backspace, _) => { editor.delete_backward()?; }
-        (AppMode::Edit, KeyCode::Delete, _) => { editor.delete_forward()?; }
+        (AppMode::Edit, KeyCode::Backspace, _) => {
+            editor.delete_backward()?;
+        }
+        (AppMode::Edit, KeyCode::Delete, _) => {
+            editor.delete_forward()?;
+        }
 
         // Tab navigation
-        (_, KeyCode::Tab, _) => { editor.next_field(); }
-        (_, KeyCode::BackTab, _) => { editor.prev_field(); }
+        (_, KeyCode::Tab, _) => {
+            editor.next_field();
+        }
+        (_, KeyCode::BackTab, _) => {
+            editor.prev_field();
+        }
 
         // Character input
         (AppMode::Edit, KeyCode::Char(c), m) if !m.contains(KeyModifiers::CONTROL) => {
@@ -526,10 +715,18 @@ fn render_advanced_validation_status(
     };
 
     let validation_status = editor.get_validation_status();
-    let status_text = format!("-- {} -- {} | Advanced Patterns: {}", mode_text, editor.debug_message(), validation_status);
+    let status_text = format!(
+        "-- {} -- {} | Advanced Patterns: {}",
+        mode_text,
+        editor.debug_message(),
+        validation_status
+    );
 
-    let status = Paragraph::new(Line::from(Span::raw(status_text)))
-        .block(Block::default().borders(Borders::ALL).title("🚀 Advanced Pattern Validation"));
+    let status = Paragraph::new(Line::from(Span::raw(status_text))).block(
+        Block::default()
+            .borders(Borders::ALL)
+            .title("🚀 Advanced Pattern Validation"),
+    );
 
     f.render_widget(status, chunks[0]);
 
@@ -562,7 +759,8 @@ fn render_advanced_validation_status(
             field_info
         )
     } else {
-        "❌ Advanced pattern validation is DISABLED\nPress F1 to enable and see the magic!".to_string()
+        "❌ Advanced pattern validation is DISABLED\nPress F1 to enable and see the magic!"
+            .to_string()
     };
 
     let summary_style = if summary.has_errors() {
@@ -574,7 +772,11 @@ fn render_advanced_validation_status(
     };
 
     let validation_summary = Paragraph::new(summary_text)
-        .block(Block::default().borders(Borders::ALL).title("🎯 Advanced Pattern Analysis"))
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title("🎯 Advanced Pattern Analysis"),
+        )
         .style(summary_style)
         .wrap(Wrap { trim: true });
 
@@ -600,7 +802,11 @@ fn render_advanced_validation_status(
     };
 
     let help = Paragraph::new(help_text)
-        .block(Block::default().borders(Borders::ALL).title("🎯 Advanced Pattern Commands & Info"))
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title("🎯 Advanced Pattern Commands & Info"),
+        )
         .style(Style::default().fg(Color::Gray))
         .wrap(Wrap { trim: true });
 

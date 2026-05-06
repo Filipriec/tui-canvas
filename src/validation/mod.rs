@@ -18,21 +18,19 @@
 //! - Raw stored values should remain unmasked even when a display mask is used.
 
 pub mod config;
-pub mod limits;
-pub mod state;
-pub mod patterns;
-pub mod mask;
 pub mod formatting;
+pub mod limits;
+pub mod mask;
+pub mod patterns;
+pub mod state;
 
-pub use config::{ValidationConfig, ValidationResult, ValidationConfigBuilder};
+pub use config::{ValidationConfig, ValidationConfigBuilder, ValidationResult};
+pub use formatting::{CustomFormatter, DefaultPositionMapper, FormattingResult, PositionMapper};
 pub use limits::{CharacterLimits, LimitCheckResult};
-pub use state::{ValidationState, ValidationSummary};
-pub use patterns::{PatternFilters, PositionFilter, PositionRange, CharacterFilter};
 pub use mask::DisplayMask;
-pub use formatting::{CustomFormatter, FormattingResult, PositionMapper, DefaultPositionMapper};
-pub use validation_core::{
-    AppliedValidation, ValidationRule, ValidationSet, ValidationSettings,
-};
+pub use patterns::{CharacterFilter, PatternFilters, PositionFilter, PositionRange};
+pub use state::{ValidationState, ValidationSummary};
+pub use validation_core::{AppliedValidation, ValidationRule, ValidationSet, ValidationSettings};
 
 /// External validation UI state.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -40,8 +38,13 @@ pub enum ExternalValidationState {
     NotValidated,
     Validating,
     Valid(Option<String>),
-    Invalid { message: String, suggestion: Option<String> },
-    Warning { message: String },
+    Invalid {
+        message: String,
+        suggestion: Option<String>,
+    },
+    Warning {
+        message: String,
+    },
 }
 
 /// Validation error types.
@@ -49,10 +52,10 @@ pub enum ExternalValidationState {
 pub enum ValidationError {
     #[error("Character limit exceeded: {message}")]
     LimitExceeded { message: String },
-    
+
     #[error("Pattern validation failed: {message}")]
     PatternFailed { message: String },
-    
+
     #[error("Custom validation failed: {message}")]
     CustomFailed { message: String },
 }
