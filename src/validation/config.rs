@@ -5,6 +5,7 @@ use crate::validation::{CharacterLimits, PatternFilters, DisplayMask};
 #[cfg(feature = "validation")]
 use crate::validation::{CustomFormatter, FormattingResult, PositionMapper};
 use std::sync::Arc;
+pub use validation_core::ValidationResult;
 
 /// Whitelist of allowed exact values for a field.
 /// If configured, the field is valid when it is empty (by default) or when the
@@ -382,50 +383,6 @@ impl ValidationConfigBuilder {
     /// Build the final validation configuration
     pub fn build(self) -> ValidationConfig {
         self.config
-    }
-}
-
-/// Result of a validation operation
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ValidationResult {
-    /// Validation passed
-    Valid,
-
-    /// Validation failed with warning (input still accepted)
-    Warning { message: String },
-
-    /// Validation failed with error (input rejected)
-    Error { message: String },
-}
-
-impl ValidationResult {
-    /// Check if the validation result allows the input
-    pub fn is_acceptable(&self) -> bool {
-        matches!(self, ValidationResult::Valid | ValidationResult::Warning { .. })
-    }
-
-    /// Check if the validation result is an error
-    pub fn is_error(&self) -> bool {
-        matches!(self, ValidationResult::Error { .. })
-    }
-
-    /// Get the message if there is one
-    pub fn message(&self) -> Option<&str> {
-        match self {
-            ValidationResult::Valid => None,
-            ValidationResult::Warning { message } => Some(message),
-            ValidationResult::Error { message } => Some(message),
-        }
-    }
-
-    /// Create a warning result
-    pub fn warning(message: impl Into<String>) -> Self {
-        ValidationResult::Warning { message: message.into() }
-    }
-
-    /// Create an error result
-    pub fn error(message: impl Into<String>) -> Self {
-        ValidationResult::Error { message: message.into() }
     }
 }
 

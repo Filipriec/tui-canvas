@@ -27,6 +27,7 @@ ropey = { version = "1.6.1", optional = true }
 once_cell = "1.21.3"
 syntect = { version = "5.2.0", optional = true, default-features = false, features = ["default-fancy"] }
 derivative = "2.2.0"
+validation-core = { path = "../validation-core", optional = true }
 
 [dev-dependencies]
 tokio-test = "0.4.4"
@@ -36,7 +37,7 @@ default = ["textmode-vim"]
 gui = ["ratatui", "crossterm"]
 suggestions = ["tokio"]
 cursor-style = ["crossterm"]
-validation = ["regex"]
+validation = ["regex", "validation-core"]
 computed = []
 textarea = ["dep:ropey","gui"]
 textinput = ["gui"]

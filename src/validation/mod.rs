@@ -30,6 +30,10 @@ pub use state::{ValidationState, ValidationSummary};
 pub use patterns::{PatternFilters, PositionFilter, PositionRange, CharacterFilter};
 pub use mask::DisplayMask;
 pub use formatting::{CustomFormatter, FormattingResult, PositionMapper, DefaultPositionMapper};
+pub use validation_core::{
+    AppliedValidation, PackageId, PackageRequirement, RecipeId, RecipeReference,
+    ValidationPackage, ValidationRecipe, ValidationSettings,
+};
 
 /// External validation UI state.
 #[derive(Debug, Clone, PartialEq, Eq)]
