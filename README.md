@@ -19,6 +19,7 @@ It provides:
 - Validation (regex, masks, limits, formatting)
 - Suggestions (asynchronous dropdowns)
 - Computed fields (derived values)
+- Undo/redo history (built in; enabled by default)
 - Single-line text input widget
 - Textarea widget with cursor management
 - Syntax highlighting (via syntect)

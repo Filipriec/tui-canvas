@@ -112,6 +112,8 @@ impl<D: DataProvider> FormEditor<D> {
             }
         }
 
+        self.record_checkpoint(crate::editor::history::EditKind::Insert);
+
         self.data_provider
             .set_field_value(field_index, new_raw_text.clone());
 
@@ -168,6 +170,9 @@ impl<D: DataProvider> FormEditor<D> {
         let start = Self::char_to_byte_index(&current_text, self.ui_state.cursor_pos - 1);
         let end = Self::char_to_byte_index(&current_text, self.ui_state.cursor_pos);
         current_text.replace_range(start..end, "");
+
+        self.record_checkpoint(crate::editor::history::EditKind::Delete);
+
         self.data_provider
             .set_field_value(field_index, current_text.clone());
 
@@ -217,6 +222,9 @@ impl<D: DataProvider> FormEditor<D> {
             let start = Self::char_to_byte_index(&current_text, self.ui_state.cursor_pos);
             let end = Self::char_to_byte_index(&current_text, self.ui_state.cursor_pos + 1);
             current_text.replace_range(start..end, "");
+
+            self.record_checkpoint(crate::editor::history::EditKind::Delete);
+
             self.data_provider
                 .set_field_value(field_index, current_text.clone());
 
@@ -274,6 +282,9 @@ impl<D: DataProvider> FormEditor<D> {
     /// Set current field value (validates under feature flag)
     pub fn set_current_field_value(&mut self, value: String) {
         let field_index = self.ui_state.current_field;
+
+        self.record_checkpoint(crate::editor::history::EditKind::Other);
+
         self.data_provider
             .set_field_value(field_index, value.clone());
         self.set_cursor_raw(0);
@@ -290,6 +301,8 @@ impl<D: DataProvider> FormEditor<D> {
     /// Set specific field value by index (validates under feature flag)
     pub fn set_field_value(&mut self, field_index: usize, value: String) {
         if field_index < self.data_provider.field_count() {
+            self.record_checkpoint(crate::editor::history::EditKind::Other);
+
             self.data_provider
                 .set_field_value(field_index, value.clone());
             if field_index == self.ui_state.current_field {

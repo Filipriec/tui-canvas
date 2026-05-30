@@ -291,7 +291,9 @@ fn run_app<B: Backend>(
                     editor.set_debug_message(format!("Error: {e}"));
                 }
             },
-            other => editor.textarea.handle_event(other),
+            other => {
+                editor.textarea.handle_event(other);
+            }
         }
     }
     Ok(())

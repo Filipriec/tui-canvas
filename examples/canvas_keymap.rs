@@ -205,6 +205,10 @@ impl KeymapDemoApp {
             KeyEventOutcome::NotMatched => {
                 // Fall through to client actions
             }
+            KeyEventOutcome::ExitTop | KeyEventOutcome::ExitBottom => {
+                // Canvas reached a navigation boundary; a host with its own
+                // focus manager would move focus here. Fall through.
+            }
         }
 
         // Handle client-specific actions (non-canvas)

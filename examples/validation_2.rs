@@ -97,32 +97,26 @@ impl<D: DataProvider> AdvancedPatternFormEditor<D> {
     }
 
     fn move_up(&mut self) {
-        match self.editor.move_up() {
-            Ok(()) => {
-                self.update_field_validation_status();
-                self.field_switch_blocked = false;
-                self.block_reason = None;
-            }
-            Err(e) => {
-                self.field_switch_blocked = true;
-                self.block_reason = Some(e.to_string());
-                self.debug_message = format!("🚫 Field switch blocked: {e}");
-            }
+        if self.editor.move_up() {
+            self.update_field_validation_status();
+            self.field_switch_blocked = false;
+            self.block_reason = None;
+        } else if let Some(reason) = self.editor.field_switch_block_reason() {
+            self.field_switch_blocked = true;
+            self.block_reason = Some(reason.clone());
+            self.debug_message = format!("🚫 Field switch blocked: {reason}");
         }
     }
 
     fn move_down(&mut self) {
-        match self.editor.move_down() {
-            Ok(()) => {
-                self.update_field_validation_status();
-                self.field_switch_blocked = false;
-                self.block_reason = None;
-            }
-            Err(e) => {
-                self.field_switch_blocked = true;
-                self.block_reason = Some(e.to_string());
-                self.debug_message = format!("🚫 Field switch blocked: {e}");
-            }
+        if self.editor.move_down() {
+            self.update_field_validation_status();
+            self.field_switch_blocked = false;
+            self.block_reason = None;
+        } else if let Some(reason) = self.editor.field_switch_block_reason() {
+            self.field_switch_blocked = true;
+            self.block_reason = Some(reason.clone());
+            self.debug_message = format!("🚫 Field switch blocked: {reason}");
         }
     }
 
@@ -212,32 +206,26 @@ impl<D: DataProvider> AdvancedPatternFormEditor<D> {
     }
 
     fn next_field(&mut self) {
-        match self.editor.next_field() {
-            Ok(()) => {
-                self.update_field_validation_status();
-                self.field_switch_blocked = false;
-                self.block_reason = None;
-            }
-            Err(e) => {
-                self.field_switch_blocked = true;
-                self.block_reason = Some(e.to_string());
-                self.debug_message = format!("🚫 Cannot move to next field: {e}");
-            }
+        if self.editor.next_field() {
+            self.update_field_validation_status();
+            self.field_switch_blocked = false;
+            self.block_reason = None;
+        } else if let Some(reason) = self.editor.field_switch_block_reason() {
+            self.field_switch_blocked = true;
+            self.block_reason = Some(reason.clone());
+            self.debug_message = format!("🚫 Cannot move to next field: {reason}");
         }
     }
 
     fn prev_field(&mut self) {
-        match self.editor.prev_field() {
-            Ok(()) => {
-                self.update_field_validation_status();
-                self.field_switch_blocked = false;
-                self.block_reason = None;
-            }
-            Err(e) => {
-                self.field_switch_blocked = true;
-                self.block_reason = Some(e.to_string());
-                self.debug_message = format!("🚫 Cannot move to previous field: {e}");
-            }
+        if self.editor.prev_field() {
+            self.update_field_validation_status();
+            self.field_switch_blocked = false;
+            self.block_reason = None;
+        } else if let Some(reason) = self.editor.field_switch_block_reason() {
+            self.field_switch_blocked = true;
+            self.block_reason = Some(reason.clone());
+            self.debug_message = format!("🚫 Cannot move to previous field: {reason}");
         }
     }
 

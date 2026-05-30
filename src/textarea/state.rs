@@ -212,6 +212,9 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         let line_idx = self.current_field();
         let col = self.cursor_position();
 
+        self.editor
+            .record_checkpoint(crate::editor::history::EditKind::Other);
+
         let new_idx = self.editor.data_provider_mut().split_line_at(line_idx, col);
 
         let _ = self.transition_to_field(new_idx);
@@ -234,6 +237,9 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         if line_idx == 0 {
             return;
         }
+
+        self.editor
+            .record_checkpoint(crate::editor::history::EditKind::Other);
 
         if let Some((prev_idx, new_col)) = self.editor.data_provider_mut().join_with_prev(line_idx)
         {
@@ -259,6 +265,12 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
             }
             let _ = self.delete_forward();
             return;
+        }
+
+        // Checkpoint only when a next line actually exists to join.
+        if line_idx + 1 < self.editor.data_provider().field_count() {
+            self.editor
+                .record_checkpoint(crate::editor::history::EditKind::Other);
         }
 
         if let Some(new_col) = self.editor.data_provider_mut().join_with_next(line_idx) {
@@ -775,6 +787,88 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
     }
 }
 
+/// Undo/redo, re-exposed from the underlying [`FormEditor`].
+impl<P: TextAreaDataProvider> TextAreaState<P> {
+    pub fn undo(&mut self) -> bool {
+        self.editor.undo()
+    }
+
+    pub fn redo(&mut self) -> bool {
+        self.editor.redo()
+    }
+
+    pub fn can_undo(&self) -> bool {
+        self.editor.can_undo()
+    }
+
+    pub fn can_redo(&self) -> bool {
+        self.editor.can_redo()
+    }
+
+    pub fn clear_history(&mut self) {
+        self.editor.clear_history();
+    }
+
+    pub fn set_history_limit(&mut self, limit: usize) {
+        self.editor.set_history_limit(limit);
+    }
+}
+
+/// Dropdown suggestions, re-exposed from the underlying [`FormEditor`] so that
+/// `TextInput`, `TextArea`, and `FormEditor` all share one suggestions
+/// mechanism. Render the dropdown with
+/// `canvas::suggestions::gui::render_suggestions_dropdown(.., self.editor())`.
+#[cfg(feature = "suggestions")]
+impl<P: TextAreaDataProvider> TextAreaState<P> {
+    pub fn open_suggestions(&mut self, field_index: usize) {
+        self.editor.open_suggestions(field_index);
+    }
+
+    pub fn trigger_suggestions(&mut self) -> Option<(usize, String)> {
+        self.editor.trigger_suggestions()
+    }
+
+    pub fn apply_suggestions(&mut self, items: Vec<crate::SuggestionItem>) {
+        self.editor.apply_suggestions(items);
+    }
+
+    pub fn update_suggestions(&mut self, items: Vec<crate::SuggestionItem>) {
+        self.editor.update_suggestions(items);
+    }
+
+    pub fn dismiss_suggestions(&mut self) {
+        self.editor.dismiss_suggestions();
+    }
+
+    pub fn cancel_suggestions(&mut self) {
+        self.editor.cancel_suggestions();
+    }
+
+    pub fn suggestions_next(&mut self) {
+        self.editor.suggestions_next();
+    }
+
+    pub fn suggestions_prev(&mut self) {
+        self.editor.suggestions_prev();
+    }
+
+    pub fn apply_suggestion(&mut self) -> Option<String> {
+        self.editor.apply_suggestion()
+    }
+
+    pub fn is_suggestions_active(&self) -> bool {
+        self.editor.is_suggestions_active()
+    }
+
+    pub fn is_suggestions_loading(&self) -> bool {
+        self.editor.ui_state().is_suggestions_loading()
+    }
+
+    pub fn dropdown_suggestions(&self) -> &[crate::SuggestionItem] {
+        self.editor.suggestions()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     #[cfg(feature = "crossterm")]
@@ -813,5 +907,26 @@ mod tests {
         // An unrecognized key is ignored so a host can react to it.
         let out = textarea.input(KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE));
         assert_eq!(out, TextAreaEventOutcome::Ignored);
+    }
+
+    #[test]
+    fn undo_textarea_newline_and_typing() {
+        let mut textarea = TextAreaState::<TextAreaProvider>::from_text("");
+        textarea.enter_edit_mode();
+        let _ = textarea.insert_text("ab"); // Insert run
+        textarea.insert_newline(); // structural -> its own step
+        let _ = textarea.insert_text("cd"); // new Insert run
+        assert_eq!(textarea.text(), "ab\ncd");
+
+        assert!(textarea.undo()); // undo "cd"
+        assert_eq!(textarea.text(), "ab\n");
+        assert!(textarea.undo()); // undo the newline
+        assert_eq!(textarea.text(), "ab");
+        assert!(textarea.undo()); // undo "ab"
+        assert_eq!(textarea.text(), "");
+        assert!(!textarea.undo());
+
+        assert!(textarea.redo()); // redo "ab"
+        assert_eq!(textarea.text(), "ab");
     }
 }

@@ -11,6 +11,8 @@ use crate::DataProvider;
 impl<D: DataProvider> FormEditor<D> {
     /// Move cursor left within current field (mask-aware)
     pub fn move_left(&mut self) -> anyhow::Result<()> {
+        self.break_undo_coalescing();
+
         #[cfg(feature = "validation")]
         let mut moved = false;
         #[cfg(not(feature = "validation"))]
@@ -43,6 +45,8 @@ impl<D: DataProvider> FormEditor<D> {
 
     /// Move cursor right within current field (mask-aware)
     pub fn move_right(&mut self) -> anyhow::Result<()> {
+        self.break_undo_coalescing();
+
         #[cfg(feature = "validation")]
         let mut moved = false;
         #[cfg(not(feature = "validation"))]

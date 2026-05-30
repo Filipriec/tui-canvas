@@ -33,6 +33,14 @@ pub struct FormEditor<D: DataProvider> {
     #[cfg(feature = "keymap")]
     #[derivative(Default(value = "KeySequenceTracker::new(400)"))]
     pub(crate) seq_tracker: KeySequenceTracker,
+
+    pub(crate) undo_stack: Vec<crate::editor::history::EditSnapshot>,
+    pub(crate) redo_stack: Vec<crate::editor::history::EditSnapshot>,
+    #[derivative(Default(value = "crate::editor::history::DEFAULT_HISTORY_LIMIT"))]
+    pub(crate) history_limit: usize,
+    pub(crate) history_last_kind: Option<crate::editor::history::EditKind>,
+    #[derivative(Default(value = "true"))]
+    pub(crate) history_enabled: bool,
 }
 
 impl<D: DataProvider> FormEditor<D> {
@@ -60,6 +68,11 @@ impl<D: DataProvider> FormEditor<D> {
             keymap: None,
             #[cfg(feature = "keymap")]
             seq_tracker: KeySequenceTracker::new(400),
+            undo_stack: Vec::new(),
+            redo_stack: Vec::new(),
+            history_limit: crate::editor::history::DEFAULT_HISTORY_LIMIT,
+            history_last_kind: None,
+            history_enabled: true,
         };
 
         #[cfg(feature = "validation")]

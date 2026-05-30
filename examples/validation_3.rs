@@ -135,24 +135,18 @@ impl<D: DataProvider> MaskDemoFormEditor<D> {
     }
 
     fn move_up(&mut self) {
-        match self.editor.move_up() {
-            Ok(()) => {
-                self.update_field_info();
-            }
-            Err(e) => {
-                self.debug_message = format!("🚫 Field switch blocked: {e}");
-            }
+        if self.editor.move_up() {
+            self.update_field_info();
+        } else if let Some(reason) = self.editor.field_switch_block_reason() {
+            self.debug_message = format!("🚫 Field switch blocked: {reason}");
         }
     }
 
     fn move_down(&mut self) {
-        match self.editor.move_down() {
-            Ok(()) => {
-                self.update_field_info();
-            }
-            Err(e) => {
-                self.debug_message = format!("🚫 Field switch blocked: {e}");
-            }
+        if self.editor.move_down() {
+            self.update_field_info();
+        } else if let Some(reason) = self.editor.field_switch_block_reason() {
+            self.debug_message = format!("🚫 Field switch blocked: {reason}");
         }
     }
 
@@ -265,24 +259,18 @@ impl<D: DataProvider> MaskDemoFormEditor<D> {
     }
 
     fn next_field(&mut self) {
-        match self.editor.next_field() {
-            Ok(()) => {
-                self.update_field_info();
-            }
-            Err(e) => {
-                self.debug_message = format!("🚫 Cannot move to next field: {e}");
-            }
+        if self.editor.next_field() {
+            self.update_field_info();
+        } else if let Some(reason) = self.editor.field_switch_block_reason() {
+            self.debug_message = format!("🚫 Cannot move to next field: {reason}");
         }
     }
 
     fn prev_field(&mut self) {
-        match self.editor.prev_field() {
-            Ok(()) => {
-                self.update_field_info();
-            }
-            Err(e) => {
-                self.debug_message = format!("🚫 Cannot move to previous field: {e}");
-            }
+        if self.editor.prev_field() {
+            self.update_field_info();
+        } else if let Some(reason) = self.editor.field_switch_block_reason() {
+            self.debug_message = format!("🚫 Cannot move to previous field: {reason}");
         }
     }
 

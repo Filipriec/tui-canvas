@@ -26,5 +26,7 @@ pub mod computed_helpers;
 #[cfg(feature = "keymap")]
 pub mod key_input;
 
+pub mod history;
+
 // Re-export the main type
 pub use core::FormEditor;

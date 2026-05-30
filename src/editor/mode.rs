@@ -11,6 +11,15 @@ use crate::DataProvider;
 impl<D: DataProvider> FormEditor<D> {
     /// Change mode
     pub fn set_mode(&mut self, mode: AppMode) {
+        // A genuine mode change ends any in-progress undo-coalescing run. In
+        // normal mode the mode never actually changes (always Edit), and the
+        // wrappers call `enter_edit_mode` on every keystroke, so we must only
+        // break on a real transition to keep typing coalesced.
+        #[cfg(not(feature = "textmode-normal"))]
+        if self.ui_state.current_mode != mode {
+            self.break_undo_coalescing();
+        }
+
         // Avoid unused param warning in normalmode
         #[cfg(feature = "textmode-normal")]
         let _ = mode;

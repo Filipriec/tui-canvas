@@ -553,6 +553,91 @@ impl<P: TextInputDataProvider> TextInputState<P> {
     }
 }
 
+/// Undo/redo, re-exposed from the underlying [`FormEditor`].
+impl<P: TextInputDataProvider> TextInputState<P> {
+    pub fn undo(&mut self) -> bool {
+        self.editor.undo()
+    }
+
+    pub fn redo(&mut self) -> bool {
+        self.editor.redo()
+    }
+
+    pub fn can_undo(&self) -> bool {
+        self.editor.can_undo()
+    }
+
+    pub fn can_redo(&self) -> bool {
+        self.editor.can_redo()
+    }
+
+    pub fn clear_history(&mut self) {
+        self.editor.clear_history();
+    }
+
+    pub fn set_history_limit(&mut self, limit: usize) {
+        self.editor.set_history_limit(limit);
+    }
+}
+
+/// Dropdown suggestions, re-exposed from the underlying [`FormEditor`] so that
+/// `TextInput`, `TextArea`, and `FormEditor` all share one suggestions
+/// mechanism. Render the dropdown with
+/// `canvas::suggestions::gui::render_suggestions_dropdown(.., self.editor())`.
+///
+/// This is distinct from the lightweight inline-suffix completion
+/// ([`TextInputState::set_suggestion_suffix`]), which `TextInput` also offers.
+#[cfg(feature = "suggestions")]
+impl<P: TextInputDataProvider> TextInputState<P> {
+    pub fn open_suggestions(&mut self, field_index: usize) {
+        self.editor.open_suggestions(field_index);
+    }
+
+    pub fn trigger_suggestions(&mut self) -> Option<(usize, String)> {
+        self.editor.trigger_suggestions()
+    }
+
+    pub fn apply_suggestions(&mut self, items: Vec<crate::SuggestionItem>) {
+        self.editor.apply_suggestions(items);
+    }
+
+    pub fn update_suggestions(&mut self, items: Vec<crate::SuggestionItem>) {
+        self.editor.update_suggestions(items);
+    }
+
+    pub fn dismiss_suggestions(&mut self) {
+        self.editor.dismiss_suggestions();
+    }
+
+    pub fn cancel_suggestions(&mut self) {
+        self.editor.cancel_suggestions();
+    }
+
+    pub fn suggestions_next(&mut self) {
+        self.editor.suggestions_next();
+    }
+
+    pub fn suggestions_prev(&mut self) {
+        self.editor.suggestions_prev();
+    }
+
+    pub fn apply_suggestion(&mut self) -> Option<String> {
+        self.editor.apply_suggestion()
+    }
+
+    pub fn is_suggestions_active(&self) -> bool {
+        self.editor.is_suggestions_active()
+    }
+
+    pub fn is_suggestions_loading(&self) -> bool {
+        self.editor.ui_state().is_suggestions_loading()
+    }
+
+    pub fn dropdown_suggestions(&self) -> &[crate::SuggestionItem] {
+        self.editor.suggestions()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     #[cfg(feature = "crossterm")]
@@ -617,5 +702,69 @@ mod tests {
 
         assert_eq!(outcome, TextInputEventOutcome::Handled);
         assert_eq!(input.text(), "hi there");
+    }
+
+    #[test]
+    fn undo_redo_round_trip() {
+        let mut input = TextInputState::<TextInputProvider>::from_text("");
+        input.enter_edit_mode();
+        let _ = input.insert_text("abc"); // one coalesced Insert run
+
+        assert_eq!(input.text(), "abc");
+        assert!(input.can_undo());
+        assert!(input.undo());
+        assert_eq!(input.text(), "");
+        assert!(input.can_redo());
+        assert!(input.redo());
+        assert_eq!(input.text(), "abc");
+        assert!(!input.redo());
+    }
+
+    #[test]
+    fn undo_separates_insert_and_delete_runs() {
+        let mut input = TextInputState::<TextInputProvider>::from_text("");
+        input.enter_edit_mode();
+        let _ = input.insert_text("ab"); // Insert run
+        let _ = input.delete_backward(); // Delete run -> separate step
+        assert_eq!(input.text(), "a");
+
+        assert!(input.undo()); // undo the delete
+        assert_eq!(input.text(), "ab");
+        assert!(input.undo()); // undo the insert run
+        assert_eq!(input.text(), "");
+        assert!(!input.undo());
+    }
+
+    #[test]
+    fn history_limit_drops_oldest() {
+        let mut input = TextInputState::<TextInputProvider>::from_text("");
+        input.set_history_limit(2);
+
+        // Three non-coalescing edits; only the last two checkpoints are kept.
+        input.set_current_field_value("one".to_string());
+        input.set_current_field_value("two".to_string());
+        input.set_current_field_value("three".to_string());
+
+        assert!(input.undo());
+        assert_eq!(input.text(), "two");
+        assert!(input.undo());
+        assert_eq!(input.text(), "one");
+        // The checkpoint for the empty initial state was dropped by the limit.
+        assert!(!input.undo());
+    }
+
+    #[test]
+    fn cursor_move_breaks_coalescing() {
+        let mut input = TextInputState::<TextInputProvider>::from_text("");
+        input.enter_edit_mode();
+        let _ = input.insert_text("ab");
+        let _ = input.move_left(); // ends the typing run
+        let _ = input.insert_text("X"); // new run, inserted before 'b'
+        assert_eq!(input.text(), "aXb");
+
+        assert!(input.undo()); // undo "X"
+        assert_eq!(input.text(), "ab");
+        assert!(input.undo()); // undo "ab"
+        assert_eq!(input.text(), "");
     }
 }

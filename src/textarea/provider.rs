@@ -261,6 +261,12 @@ impl DataProvider for TextAreaProvider {
             let _ = self.line_cache[index].set(clean);
         }
     }
+
+    /// Rebuild the whole rope from captured lines. Overrides the default because
+    /// the line count can change between capture and restore (undo/redo).
+    fn restore_content(&mut self, fields: &[String]) {
+        self.set_text(fields.join("\n"));
+    }
 }
 
 impl TextAreaDataProvider for TextAreaProvider {
@@ -301,5 +307,42 @@ impl TextAreaDataProvider for TextAreaProvider {
 
     fn insert_blank_line_before(&mut self, line_idx: usize) -> usize {
         TextAreaProvider::insert_blank_line_before(self, line_idx)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::TextAreaProvider;
+    use crate::DataProvider;
+
+    #[test]
+    fn capture_restore_round_trip_multiline() {
+        let mut provider = TextAreaProvider::from_text("one\ntwo\nthree");
+        let snapshot = provider.capture_content();
+        assert_eq!(snapshot, vec!["one", "two", "three"]);
+        assert_eq!(provider.field_count(), 3);
+
+        // Mutate the structure (fewer lines) ...
+        provider.set_text("only");
+        assert_eq!(provider.field_count(), 1);
+
+        // ... then restore must rebuild the original line count.
+        provider.restore_content(&snapshot);
+        assert_eq!(provider.field_count(), 3);
+        assert_eq!(provider.to_text(), "one\ntwo\nthree");
+    }
+
+    #[test]
+    fn capture_restore_round_trip_grows_lines() {
+        let mut provider = TextAreaProvider::from_text("solo");
+        let snapshot = provider.capture_content();
+        assert_eq!(provider.field_count(), 1);
+
+        provider.set_text("a\nb\nc\nd");
+        assert_eq!(provider.field_count(), 4);
+
+        provider.restore_content(&snapshot);
+        assert_eq!(provider.field_count(), 1);
+        assert_eq!(provider.to_text(), "solo");
     }
 }

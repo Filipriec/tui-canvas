@@ -102,4 +102,17 @@ mod tests {
         provider.set_field_value(0, "abc\r\ndef".to_string());
         assert_eq!(provider.field_value(0), "abc");
     }
+
+    #[test]
+    fn capture_restore_round_trip() {
+        let mut provider = TextInputProvider::from_text("hello");
+        let snapshot = provider.capture_content();
+        assert_eq!(snapshot, vec!["hello".to_string()]);
+
+        provider.set_field_value(0, "changed".to_string());
+        assert_eq!(provider.field_value(0), "changed");
+
+        provider.restore_content(&snapshot);
+        assert_eq!(provider.field_value(0), "hello");
+    }
 }

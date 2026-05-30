@@ -43,6 +43,9 @@ impl<D: DataProvider> FormEditor<D> {
     }
 
     pub fn transition_to_field(&mut self, new_field: usize) -> anyhow::Result<()> {
+        // Switching fields ends any in-progress undo-coalescing run.
+        self.break_undo_coalescing();
+
         let field_count = self.data_provider.field_count();
         if field_count == 0 {
             return Ok(());

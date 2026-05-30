@@ -906,14 +906,14 @@ impl<D: DataProvider> ValidationDemoEditor<D> {
     }
 
     fn next_field(&mut self) {
-        if let Ok(()) = self.editor.next_field() {
+        if self.editor.next_field() {
             // Library triggers external validation automatically via transition_to_field()
             self.debug_message = "➡ Next field (auto-validation triggered by library)".to_string();
         }
     }
 
     fn prev_field(&mut self) {
-        if let Ok(()) = self.editor.prev_field() {
+        if self.editor.prev_field() {
             // Library triggers external validation automatically via transition_to_field()
             self.debug_message =
                 "⬅ Previous field (auto-validation triggered by library)".to_string();
@@ -921,14 +921,14 @@ impl<D: DataProvider> ValidationDemoEditor<D> {
     }
 
     fn move_up(&mut self) {
-        if let Ok(()) = self.editor.move_up() {
+        if self.editor.move_up() {
             // Library triggers external validation automatically via transition_to_field()
             self.debug_message = "⬆ Move up (auto-validation triggered by library)".to_string();
         }
     }
 
     fn move_down(&mut self) {
-        if let Ok(()) = self.editor.move_down() {
+        if self.editor.move_down() {
             // Library triggers external validation automatically via transition_to_field()
             self.debug_message = "⬇ Move down (auto-validation triggered by library)".to_string();
         }
