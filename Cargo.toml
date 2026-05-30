@@ -122,3 +122,8 @@ path = "examples/textinput_normal.rs"
 name = "canvas_keymap"
 required-features = ["gui", "keymap", "cursor-style"]
 path = "examples/canvas_keymap.rs"
+
+[[example]]
+name = "undo_redo"
+required-features = ["gui", "cursor-style", "textinput"]
+path = "examples/default/undo_redo.rs"
