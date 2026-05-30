@@ -350,6 +350,69 @@ impl<P: TextInputDataProvider> TextInputState<P> {
     pub fn editor_mut(&mut self) -> &mut TextInputEditor<P> {
         &mut self.editor
     }
+
+    /// Move to the start of the next word.
+    pub fn move_word_next(&mut self) {
+        self.editor.move_word_next();
+    }
+
+    /// Move to the start of the previous word.
+    pub fn move_word_prev(&mut self) {
+        self.editor.move_word_prev();
+    }
+
+    /// Move to the end of the current/next word.
+    pub fn move_word_end(&mut self) {
+        self.editor.move_word_end();
+    }
+
+    /// Move to the end of the previous word.
+    pub fn move_word_end_prev(&mut self) {
+        self.editor.move_word_end_prev();
+    }
+
+    /// Move to the start of the next WORD (whitespace-delimited, vim `W`).
+    pub fn move_big_word_next(&mut self) {
+        self.editor.move_big_word_next();
+    }
+
+    /// Move to the start of the previous WORD (vim `B`).
+    pub fn move_big_word_prev(&mut self) {
+        self.editor.move_big_word_prev();
+    }
+
+    /// Move to the end of the current/next WORD (vim `E`).
+    pub fn move_big_word_end(&mut self) {
+        self.editor.move_big_word_end();
+    }
+
+    /// Move to the end of the previous WORD (vim `gE`).
+    pub fn move_big_word_end_prev(&mut self) {
+        self.editor.move_big_word_end_prev();
+    }
+
+    /// Enter edit mode with the cursor positioned for append (vim `a`).
+    pub fn enter_append_mode(&mut self) {
+        self.editor.enter_append_mode();
+    }
+
+    /// The current field's display text (mask/formatter-aware when the
+    /// `validation` feature is enabled; otherwise the raw text).
+    #[cfg(feature = "validation")]
+    pub fn current_display_text(&self) -> String {
+        self.editor.current_display_text()
+    }
+
+    /// The current field's text (raw; no validation feature for masking).
+    #[cfg(not(feature = "validation"))]
+    pub fn current_display_text(&self) -> String {
+        self.editor.current_text().to_string()
+    }
+
+    /// Cursor position in display coordinates (accounts for a display mask).
+    pub fn display_cursor_position(&self) -> usize {
+        self.editor.display_cursor_position()
+    }
 }
 
 /// Validation helpers, re-exposed from the underlying [`FormEditor`] so they are

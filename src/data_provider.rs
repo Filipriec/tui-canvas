@@ -51,6 +51,32 @@ pub trait DataProvider {
     /// Set field value (library calls this when text changes)
     fn set_field_value(&mut self, index: usize, value: String);
 
+    /// Capture the full editable content as a flat list of field values, for
+    /// undo/redo history. The default collects every field value in order.
+    ///
+    /// Providers whose field/line count varies (e.g. a rope-backed textarea)
+    /// can rely on this default for capture but must override
+    /// [`DataProvider::restore_content`] so the structure can be rebuilt.
+    fn capture_content(&self) -> Vec<String> {
+        (0..self.field_count())
+            .map(|i| self.field_value(i).to_string())
+            .collect()
+    }
+
+    /// Restore content previously produced by [`DataProvider::capture_content`].
+    ///
+    /// The default writes each value back by index and assumes a stable
+    /// `field_count`. Providers whose field/line count can change must override
+    /// this to rebuild their structure (add/remove fields or lines as needed).
+    fn restore_content(&mut self, fields: &[String]) {
+        let count = self.field_count();
+        for (i, value) in fields.iter().enumerate() {
+            if i < count {
+                self.set_field_value(i, value.clone());
+            }
+        }
+    }
+
     /// Check if field supports suggestions (optional)
     fn supports_suggestions(&self, _field_index: usize) -> bool {
         false
