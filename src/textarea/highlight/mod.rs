@@ -1,18 +1,18 @@
 // src/textarea/highlight/mod.rs
-#[cfg(all(feature = "syntect", feature = "gui"))]
+#[cfg(feature = "syntect")]
 pub mod chunks;
-#[cfg(all(feature = "syntect", feature = "gui"))]
+#[cfg(feature = "syntect")]
 pub mod engine;
-#[cfg(all(feature = "syntect", feature = "gui"))]
+#[cfg(feature = "syntect")]
 pub mod state;
-#[cfg(all(feature = "syntect", feature = "gui"))]
+#[cfg(feature = "syntect")]
 pub mod widget;
 
-#[cfg(all(feature = "syntect", feature = "gui"))]
+#[cfg(feature = "syntect")]
 pub use chunks::StyledChunk;
-#[cfg(all(feature = "syntect", feature = "gui"))]
+#[cfg(feature = "syntect")]
 pub use engine::SyntectEngine;
-#[cfg(all(feature = "syntect", feature = "gui"))]
+#[cfg(feature = "syntect")]
 pub use state::TextAreaSyntaxState;
-#[cfg(all(feature = "syntect", feature = "gui"))]
+#[cfg(feature = "syntect")]
 pub use widget::TextAreaSyntax;

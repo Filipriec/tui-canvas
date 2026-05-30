@@ -7,7 +7,7 @@ pub mod state;
 #[cfg(feature = "gui")]
 pub mod widget;
 
-#[cfg(all(feature = "syntect", feature = "gui"))]
+#[cfg(feature = "syntect")]
 pub mod highlight;
 
 pub use provider::{TextAreaDataProvider, TextAreaProvider};

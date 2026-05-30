@@ -1,4 +1,21 @@
 // src/lib.rs
+
+// Text modes are mutually exclusive: enable exactly one of `textmode-vim`
+// (the default) or `textmode-normal`. The editing logic branches on
+// `textmode-normal`, so enabling both would silently behave as normal mode and
+// enabling neither would silently behave as vim mode — both contradict the
+// documented contract, so reject them at compile time.
+#[cfg(all(feature = "textmode-vim", feature = "textmode-normal"))]
+compile_error!(
+    "features `textmode-vim` and `textmode-normal` are mutually exclusive; \
+     enable exactly one"
+);
+#[cfg(not(any(feature = "textmode-vim", feature = "textmode-normal")))]
+compile_error!(
+    "exactly one text mode must be enabled: `textmode-vim` (default) or \
+     `textmode-normal`"
+);
+
 pub mod canvas;
 pub mod data_provider;
 pub mod editor;

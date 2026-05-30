@@ -42,7 +42,13 @@ Typical mapping:
 - server `pattern` -> `canvas::validation::PatternFilters`
 - server `allowed_values` -> canvas allowed-values config
 - server `mask` -> `canvas::validation::DisplayMask`
-- server formatter metadata -> client formatter registry
+- server formatter metadata -> a host-provided `canvas::validation::CustomFormatter`
+
+Canvas does not ship a built-in formatter registry: it exposes the
+`CustomFormatter` trait (display formatting) and the `PositionMapper` trait
+(cursor mapping between raw and formatted text). The host application is
+responsible for mapping server formatter metadata to the appropriate
+`CustomFormatter` implementation for each field.
 
 This keeps validation definition centralized on the server while still letting
 Canvas handle local editing, masking, and feedback.
@@ -111,6 +117,34 @@ match handle_key_event_for_host(&mut editor, key_event) {
 
 For typed action pipelines, use:
 - `execute_action_for_host`
+
+### Integration API reference
+
+`canvas::integration::focus_handoff` (always available):
+
+- `handle_key_event_for_host(&mut editor, key_event) -> HostKeyEventOutcome`
+  — drive canvas from a raw key event and learn when focus should leave canvas.
+- `execute_action_for_host(&mut editor, action) -> HostActionOutcome` and
+  `execute_action_for_host_with_options(..)` — run a typed action and get a
+  host-oriented outcome.
+- `map_key_event_outcome_for_host(KeyEventOutcome) -> HostKeyEventOutcome` —
+  translate a raw canvas outcome if you call the editor directly.
+- `BoundaryExit`, `HostKeyEventOutcome`, `HostActionOutcome` — outcome enums.
+- `boundary_from_key_outcome(..)`, `key_outcome_for_vertical_navigation(..)` —
+  lower-level helpers for custom vertical-navigation wiring.
+
+`canvas::integration::crossterm_input` (requires the `crossterm` feature, pulled
+in by `gui` / `cursor-style`):
+
+- `CrosstermInputSession` — installs raw mode + bracketed paste; `install()`,
+  `install_with_options(CrosstermInputOptions)`, `read_event()`, `poll_event()`,
+  `uninstall()`; restores terminal state on `Drop`.
+- `CrosstermInputOptions` — builder: `tui_defaults()`, `with_raw_mode(..)`,
+  `with_alternate_screen(..)`, `with_mouse_capture(..)`, `with_bracketed_paste(..)`.
+- `CrosstermInputGuard` — minimal RAII guard (`install()` / `uninstall()`) that
+  just toggles terminal state without owning event reads.
+
+See `cargo doc --open` for full signatures.
 
 ---
 

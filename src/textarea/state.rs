@@ -90,6 +90,13 @@ pub enum TextOverflowMode {
     Wrap,
 }
 
+/// Multi-line textarea widget state.
+///
+/// Wraps a [`FormEditor`]. Editing, cursor, and movement methods from the engine
+/// are available directly, and the engine can be reached explicitly via
+/// [`TextAreaState::editor`] / [`TextAreaState::editor_mut`]. With the
+/// `validation` and `computed` features enabled, the corresponding helper
+/// methods are re-exposed as inherent methods on this type.
 pub struct TextAreaState<P: TextAreaDataProvider = TextAreaProvider> {
     pub(crate) editor: TextAreaEditor<P>,
     pub(crate) scroll_y: u16,
@@ -511,6 +518,159 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         let v = self.edited_this_frame;
         self.edited_this_frame = false;
         v
+    }
+}
+
+impl<P: TextAreaDataProvider> TextAreaState<P> {
+    /// Borrow the underlying [`FormEditor`] engine.
+    ///
+    /// `TextAreaState` is a thin wrapper around a `FormEditor`. Use this for
+    /// engine functionality not re-exposed directly on the wrapper.
+    pub fn editor(&self) -> &TextAreaEditor<P> {
+        &self.editor
+    }
+
+    /// Mutably borrow the underlying [`FormEditor`] engine.
+    pub fn editor_mut(&mut self) -> &mut TextAreaEditor<P> {
+        &mut self.editor
+    }
+}
+
+/// Validation helpers, re-exposed from the underlying [`FormEditor`] so they are
+/// part of `TextAreaState`'s own public API rather than only reachable through
+/// `Deref`.
+#[cfg(feature = "validation")]
+impl<P: TextAreaDataProvider> TextAreaState<P> {
+    pub fn set_validation_enabled(&mut self, enabled: bool) {
+        self.editor.set_validation_enabled(enabled);
+    }
+
+    pub fn is_validation_enabled(&self) -> bool {
+        self.editor.is_validation_enabled()
+    }
+
+    pub fn set_field_validation(
+        &mut self,
+        field_index: usize,
+        config: crate::validation::ValidationConfig,
+    ) {
+        self.editor.set_field_validation(field_index, config);
+    }
+
+    pub fn remove_field_validation(&mut self, field_index: usize) {
+        self.editor.remove_field_validation(field_index);
+    }
+
+    pub fn validate_current_field(&mut self) -> crate::validation::ValidationResult {
+        self.editor.validate_current_field()
+    }
+
+    pub fn validate_field(
+        &mut self,
+        field_index: usize,
+    ) -> Option<crate::validation::ValidationResult> {
+        self.editor.validate_field(field_index)
+    }
+
+    pub fn clear_validation_results(&mut self) {
+        self.editor.clear_validation_results();
+    }
+
+    pub fn validation_summary(&self) -> crate::validation::ValidationSummary {
+        self.editor.validation_summary()
+    }
+
+    pub fn can_switch_fields(&self) -> bool {
+        self.editor.can_switch_fields()
+    }
+
+    pub fn field_switch_block_reason(&self) -> Option<String> {
+        self.editor.field_switch_block_reason()
+    }
+
+    pub fn last_switch_block(&self) -> Option<&str> {
+        self.editor.last_switch_block()
+    }
+
+    pub fn current_limits_status_text(&self) -> Option<String> {
+        self.editor.current_limits_status_text()
+    }
+
+    pub fn current_formatter_warning(&self) -> Option<String> {
+        self.editor.current_formatter_warning()
+    }
+
+    pub fn external_validation_of(
+        &self,
+        field_index: usize,
+    ) -> crate::validation::ExternalValidationState {
+        self.editor.external_validation_of(field_index)
+    }
+
+    pub fn clear_all_external_validation(&mut self) {
+        self.editor.clear_all_external_validation();
+    }
+
+    pub fn clear_external_validation(&mut self, field_index: usize) {
+        self.editor.clear_external_validation(field_index);
+    }
+
+    pub fn set_external_validation(
+        &mut self,
+        field_index: usize,
+        state: crate::validation::ExternalValidationState,
+    ) {
+        self.editor.set_external_validation(field_index, state);
+    }
+
+    pub fn set_external_validation_callback<F>(&mut self, callback: F)
+    where
+        F: FnMut(usize, &str) -> crate::validation::ExternalValidationState + Send + Sync + 'static,
+    {
+        self.editor.set_external_validation_callback(callback);
+    }
+}
+
+/// Computed-field helpers, re-exposed from the underlying [`FormEditor`].
+#[cfg(feature = "computed")]
+impl<P: TextAreaDataProvider> TextAreaState<P> {
+    pub fn register_computed_provider<C>(&mut self, provider: &C)
+    where
+        C: crate::computed::ComputedProvider,
+    {
+        self.editor.register_computed_provider(provider);
+    }
+
+    pub fn set_computed_provider<C>(&mut self, provider: C)
+    where
+        C: crate::computed::ComputedProvider,
+    {
+        self.editor.set_computed_provider(provider);
+    }
+
+    pub fn recompute_fields<C>(&mut self, provider: &mut C, field_indices: &[usize])
+    where
+        C: crate::computed::ComputedProvider,
+    {
+        self.editor.recompute_fields(provider, field_indices);
+    }
+
+    pub fn recompute_all_fields<C>(&mut self, provider: &mut C)
+    where
+        C: crate::computed::ComputedProvider,
+    {
+        self.editor.recompute_all_fields(provider);
+    }
+
+    pub fn on_field_changed<C>(&mut self, provider: &mut C, changed_field: usize)
+    where
+        C: crate::computed::ComputedProvider,
+    {
+        self.editor.on_field_changed(provider, changed_field);
+    }
+
+    pub fn effective_field_value(&self, field_index: usize) -> String {
+        self.editor.effective_field_value(field_index)
     }
 }
 
