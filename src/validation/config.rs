@@ -193,12 +193,19 @@ impl ValidationConfig {
 
     /// Validate the current text content (raw text space)
     pub fn validate_content(&self, text: &str) -> ValidationResult {
+        // A soft warning (e.g. "minimum length not met") should still be
+        // surfaced, but it must not short-circuit the harder error checks below.
+        // Track it and only emit it if nothing more severe fails.
+        let mut pending_warning: Option<ValidationResult> = None;
+
         // Character limits validation
         if let Some(ref limits) = self.character_limits {
             if let Some(result) = limits.validate_content(text) {
-                if !result.is_acceptable() {
+                if result.is_error() {
                     return result;
                 }
+                // Acceptable (warning): remember it and keep checking.
+                pending_warning = Some(result);
             }
         }
 
@@ -221,7 +228,7 @@ impl ValidationConfig {
             }
         }
 
-        ValidationResult::Valid
+        pending_warning.unwrap_or(ValidationResult::Valid)
     }
 
     /// Check if any validation rules are configured

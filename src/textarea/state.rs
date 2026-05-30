@@ -4,10 +4,14 @@ use std::ops::{Deref, DerefMut};
 #[cfg(feature = "crossterm")]
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 
+#[cfg(feature = "cursor-style")]
+use crate::canvas::CursorManager;
 use crate::editor::FormEditor;
 #[cfg(feature = "gui")]
 use crate::gui_utils::{compute_h_scroll_with_padding, RIGHT_PAD};
 use crate::textarea::provider::{TextAreaDataProvider, TextAreaProvider};
+#[cfg(feature = "cursor-style")]
+use std::io;
 
 #[cfg(feature = "gui")]
 use ratatui::{layout::Rect, widgets::Block};
@@ -83,6 +87,19 @@ fn wrapped_rows_to_cursor_indented(
 }
 
 pub type TextAreaEditor<P = TextAreaProvider> = FormEditor<P>;
+
+/// Outcome of feeding a single input event to a [`TextAreaState`].
+///
+/// Unlike the single-line input there is no `Submitted` variant: in a textarea
+/// `Enter` inserts a newline rather than submitting. Hosts can use `Ignored` to
+/// detect keys the textarea did not consume (e.g. to drive focus handoff).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TextAreaEventOutcome {
+    /// The event was not recognized/consumed by the textarea.
+    Ignored,
+    /// The event was handled (text edited or cursor moved).
+    Handled,
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TextOverflowMode {
@@ -254,7 +271,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         }
     }
 
-    pub fn paste(&mut self, text: &str) {
+    pub fn paste(&mut self, text: &str) -> TextAreaEventOutcome {
         self.enter_edit_mode();
         #[cfg(feature = "gui")]
         {
@@ -270,23 +287,25 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
                 }
             }
         }
+
+        TextAreaEventOutcome::Handled
     }
 
     // TODO: Replace direct crossterm event coupling with a backend-agnostic
     // input abstraction so terminal input backends can be swapped cleanly.
     #[cfg(feature = "crossterm")]
-    pub fn handle_event(&mut self, event: Event) {
+    pub fn handle_event(&mut self, event: Event) -> TextAreaEventOutcome {
         match event {
             Event::Key(key) => self.input(key),
             Event::Paste(text) => self.paste(&text),
-            _ => {}
+            _ => TextAreaEventOutcome::Ignored,
         }
     }
 
     #[cfg(feature = "crossterm")]
-    pub fn input(&mut self, key: KeyEvent) {
+    pub fn input(&mut self, key: KeyEvent) -> TextAreaEventOutcome {
         if key.kind != KeyEventKind::Press {
-            return;
+            return TextAreaEventOutcome::Ignored;
         }
 
         match (key.code, key.modifiers) {
@@ -338,8 +357,10 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
                 }
             }
 
-            _ => {}
+            _ => return TextAreaEventOutcome::Ignored,
         }
+
+        TextAreaEventOutcome::Handled
     }
 
     #[cfg(feature = "gui")]
@@ -534,6 +555,23 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
     pub fn editor_mut(&mut self) -> &mut TextAreaEditor<P> {
         &mut self.editor
     }
+
+    /// Update the terminal cursor style to match the textarea's current mode.
+    ///
+    /// Unlike the single-line input (which is always insert-style), the textarea
+    /// honours the editor's mode: in vim mode this yields a steady block cursor
+    /// in normal/read-only mode and a bar cursor in edit mode. With the
+    /// `cursor-style` feature disabled this is a no-op.
+    #[cfg(feature = "cursor-style")]
+    pub fn update_cursor_style(&self) -> io::Result<()> {
+        CursorManager::update_for_mode(self.editor.mode())
+    }
+
+    /// No-op when the `cursor-style` feature is disabled.
+    #[cfg(not(feature = "cursor-style"))]
+    pub fn update_cursor_style(&self) -> std::io::Result<()> {
+        Ok(())
+    }
 }
 
 /// Validation helpers, re-exposed from the underlying [`FormEditor`] so they are
@@ -676,6 +714,8 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(feature = "crossterm")]
+    use super::TextAreaEventOutcome;
     use super::TextAreaState;
     use crate::textarea::provider::TextAreaProvider;
 
@@ -688,5 +728,27 @@ mod tests {
         textarea.paste("c\r\nd\nef");
 
         assert_eq!(textarea.text(), "abc\nd\nef");
+    }
+
+    #[cfg(feature = "crossterm")]
+    #[test]
+    fn input_reports_handled_and_ignored() {
+        use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+
+        let mut textarea = TextAreaState::<TextAreaProvider>::from_text("");
+
+        // A printable character is consumed.
+        let out = textarea.input(KeyEvent::new(KeyCode::Char('x'), KeyModifiers::NONE));
+        assert_eq!(out, TextAreaEventOutcome::Handled);
+        assert_eq!(textarea.text(), "x");
+
+        // Enter inserts a newline and is handled (never "submitted").
+        let out = textarea.input(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
+        assert_eq!(out, TextAreaEventOutcome::Handled);
+        assert_eq!(textarea.text(), "x\n");
+
+        // An unrecognized key is ignored so a host can react to it.
+        let out = textarea.input(KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE));
+        assert_eq!(out, TextAreaEventOutcome::Ignored);
     }
 }
