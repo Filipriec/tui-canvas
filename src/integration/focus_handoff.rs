@@ -70,13 +70,13 @@ pub fn execute_action_for_host_with_options<D: DataProvider>(
     }
 }
 
-#[cfg(feature = "keymap")]
-use crate::keymap::KeyEventOutcome;
-#[cfg(feature = "keymap")]
+#[cfg(feature = "keybindings")]
+use crate::keybindings::KeyEventOutcome;
+#[cfg(feature = "keybindings")]
 use crossterm::event::KeyEvent;
 
 /// Host-friendly key processing outcome.
-#[cfg(feature = "keymap")]
+#[cfg(feature = "keybindings")]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum HostKeyEventOutcome {
     Consumed(Option<String>),
@@ -86,7 +86,7 @@ pub enum HostKeyEventOutcome {
 }
 
 /// Convert a canvas `KeyEventOutcome` into host-friendly focus handoff output.
-#[cfg(feature = "keymap")]
+#[cfg(feature = "keybindings")]
 pub fn map_key_event_outcome_for_host(outcome: KeyEventOutcome) -> HostKeyEventOutcome {
     match outcome {
         KeyEventOutcome::Consumed(msg) => HostKeyEventOutcome::Consumed(msg),
@@ -98,7 +98,7 @@ pub fn map_key_event_outcome_for_host(outcome: KeyEventOutcome) -> HostKeyEventO
 }
 
 /// Handle a key event and directly emit host-friendly handoff outcomes.
-#[cfg(feature = "keymap")]
+#[cfg(feature = "keybindings")]
 pub fn handle_key_event_for_host<D: DataProvider>(
     editor: &mut FormEditor<D>,
     evt: KeyEvent,
@@ -115,7 +115,7 @@ pub fn handle_key_event_for_host<D: DataProvider>(
 }
 
 /// Extract only boundary exit information from a key outcome.
-#[cfg(feature = "keymap")]
+#[cfg(feature = "keybindings")]
 pub fn boundary_from_key_outcome(outcome: &KeyEventOutcome) -> Option<BoundaryExit> {
     match outcome {
         KeyEventOutcome::ExitTop => Some(BoundaryExit::Top),
@@ -128,7 +128,7 @@ pub fn boundary_from_key_outcome(outcome: &KeyEventOutcome) -> Option<BoundaryEx
 ///
 /// This is the single place in the crate that decides when a failed vertical
 /// movement should become `ExitTop` / `ExitBottom`.
-#[cfg(feature = "keymap")]
+#[cfg(feature = "keybindings")]
 pub fn key_outcome_for_vertical_navigation(moved: bool, boundary: BoundaryExit) -> KeyEventOutcome {
     if moved {
         KeyEventOutcome::Consumed(None)

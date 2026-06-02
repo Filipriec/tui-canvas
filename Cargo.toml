@@ -42,7 +42,7 @@ computed = []
 textarea = ["dep:ropey","gui"]
 textinput = ["gui"]
 syntect = ["dep:syntect", "gui", "textarea"]
-keymap = ["gui"]
+keybindings = ["gui"]
 
 # text modes (mutually exclusive; default to vim)
 textmode-vim = []
@@ -56,7 +56,7 @@ all-nontextmodes = [
     "computed",
     "textarea",
     "textinput",
-    "keymap"
+    "keybindings"
 ]
 
 [[example]]
@@ -119,9 +119,9 @@ required-features = ["gui", "cursor-style", "textinput", "textmode-normal"]
 path = "examples/textinput_normal.rs"
 
 [[example]]
-name = "canvas_keymap"
-required-features = ["gui", "keymap", "cursor-style"]
-path = "examples/canvas_keymap.rs"
+name = "canvas_keybindings"
+required-features = ["gui", "keybindings", "cursor-style"]
+path = "examples/canvas_keybindings.rs"
 
 [[example]]
 name = "undo_redo"

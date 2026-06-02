@@ -23,7 +23,7 @@ pub mod validation_helpers;
 #[cfg(feature = "computed")]
 pub mod computed_helpers;
 
-#[cfg(feature = "keymap")]
+#[cfg(feature = "keybindings")]
 pub mod key_input;
 
 pub mod history;

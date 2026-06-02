@@ -9,8 +9,8 @@ use crate::DataProvider;
 use crate::SuggestionItem;
 use derivative::Derivative;
 
-#[cfg(feature = "keymap")]
-use crate::keymap::{CanvasKeyMap, KeySequenceTracker};
+#[cfg(feature = "keybindings")]
+use crate::keybindings::{CanvasKeyBindings, KeySequenceTracker};
 
 #[derive(Derivative)]
 #[derivative(Debug, Default)]
@@ -26,11 +26,11 @@ pub struct FormEditor<D: DataProvider> {
     pub(crate) external_validation_callback: Option<
         Box<dyn FnMut(usize, &str) -> crate::validation::ExternalValidationState + Send + Sync>,
     >,
-    #[cfg(feature = "keymap")]
+    #[cfg(feature = "keybindings")]
     #[derivative(Default(value = "None"))]
-    pub(crate) keymap: Option<CanvasKeyMap>,
+    pub(crate) keybindings: Option<CanvasKeyBindings>,
 
-    #[cfg(feature = "keymap")]
+    #[cfg(feature = "keybindings")]
     #[derivative(Default(value = "KeySequenceTracker::new(400)"))]
     pub(crate) seq_tracker: KeySequenceTracker,
 
@@ -64,9 +64,9 @@ impl<D: DataProvider> FormEditor<D> {
             suggestions: Vec::new(),
             #[cfg(feature = "validation")]
             external_validation_callback: None,
-            #[cfg(feature = "keymap")]
-            keymap: None,
-            #[cfg(feature = "keymap")]
+            #[cfg(feature = "keybindings")]
+            keybindings: None,
+            #[cfg(feature = "keybindings")]
             seq_tracker: KeySequenceTracker::new(400),
             undo_stack: Vec::new(),
             redo_stack: Vec::new(),
@@ -96,20 +96,20 @@ impl<D: DataProvider> FormEditor<D> {
         }
     }
 
-    /// Set the keymap for this editor instance
-    #[cfg(feature = "keymap")]
-    pub fn set_keymap(&mut self, keymap: CanvasKeyMap) {
-        self.keymap = Some(keymap);
+    /// Set the keybindings for this editor instance.
+    #[cfg(feature = "keybindings")]
+    pub fn set_keybindings(&mut self, keybindings: CanvasKeyBindings) {
+        self.keybindings = Some(keybindings);
     }
 
-    /// Check if this editor has a keymap configured
-    #[cfg(feature = "keymap")]
-    pub fn has_keymap(&self) -> bool {
-        self.keymap.is_some()
+    /// Check if this editor has keybindings configured.
+    #[cfg(feature = "keybindings")]
+    pub fn has_keybindings(&self) -> bool {
+        self.keybindings.is_some()
     }
 
     /// Set the timeout for multi-key sequences (in milliseconds)
-    #[cfg(feature = "keymap")]
+    #[cfg(feature = "keybindings")]
     pub fn set_key_sequence_timeout_ms(&mut self, timeout_ms: u64) {
         self.seq_tracker = KeySequenceTracker::new(timeout_ms);
     }

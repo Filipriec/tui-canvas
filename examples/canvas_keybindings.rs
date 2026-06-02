@@ -1,17 +1,17 @@
-// examples/canvas_keymap.rs
-//! Demonstrates the centralized keymap system for canvas interactions
+// examples/canvas_keybindings.rs
+//! Demonstrates the centralized keybinding system for canvas interactions
 //!
-//! This example shows how to use the canvas-keymap feature to delegate
+//! This example shows how to use the canvas-keybindings feature to delegate
 //! all canvas key handling to the library, supporting complex sequences
 //! like "gg", "ge", etc.
 //!
 //! Run with:
-//! cargo run --example canvas_keymap --features "gui,keymap,cursor-style"
+//! cargo run --example canvas_keybindings --features "gui,keybindings,cursor-style"
 
-#[cfg(not(feature = "keymap"))]
+#[cfg(not(feature = "keybindings"))]
 compile_error!(
-    "This example requires the 'keymap' feature. \
-     Run with: cargo run --example canvas_keymap --features \"gui,keymap,cursor-style\""
+    "This example requires the 'keybindings' feature. \
+     Run with: cargo run --example canvas_keybindings --features \"gui,keybindings,cursor-style\""
 );
 
 use crossterm::{
@@ -31,33 +31,33 @@ use std::io;
 
 use canvas::{
     canvas::{gui::render_canvas_default, modes::AppMode},
-    keymap::{CanvasKeyMap, KeyEventOutcome},
+    keybindings::{CanvasKeyBindings, KeyEventOutcome},
     DataProvider, FormEditor,
 };
 
-/// Demo application using centralized keymap system
-struct KeymapDemoApp {
+/// Demo application using centralized keybinding system
+struct KeybindingDemoApp {
     editor: FormEditor<DemoData>,
     message: String,
     quit: bool,
 }
 
-impl KeymapDemoApp {
+impl KeybindingDemoApp {
     fn new() -> Self {
         let data = DemoData::new();
         let mut editor = FormEditor::new(data);
 
-        editor.set_keymap(CanvasKeyMap::vim_defaults());
+        editor.set_keybindings(CanvasKeyBindings::vim_defaults());
 
         Self {
             editor,
-            message: "🎯 Keymap system loaded! Try: gg, ge, hjkl, w/b/e, v, i, etc.".to_string(),
+            message: "🎯 Keybinding system loaded! Try: gg, ge, hjkl, w/b/e, v, i, etc.".to_string(),
             quit: false,
         }
     }
 
     fn handle_key_event(&mut self, key_event: KeyEvent) -> io::Result<()> {
-        // First, try canvas keymap
+        // First, try canvas keybindings
         match self.editor.handle_key_event(key_event) {
             KeyEventOutcome::Consumed(Some(msg)) => {
                 self.message = format!("🎯 Canvas: {}", msg);
@@ -90,7 +90,7 @@ impl KeymapDemoApp {
             }
             (KeyCode::F(1), _) => {
                 self.message =
-                    "ℹ️  F1: This is a client action (not handled by canvas keymap)".to_string();
+                    "ℹ️  F1: This is a client action (not handled by canvas keybindings)".to_string();
             }
             (KeyCode::F(2), _) => {
                 // Demonstrate saving
@@ -131,7 +131,7 @@ impl KeymapDemoApp {
     }
 }
 
-/// Demo form data with interesting examples for keymap testing
+/// Demo form data with interesting examples for keybinding testing
 struct DemoData {
     fields: Vec<(String, String)>,
 }
@@ -197,7 +197,7 @@ impl DataProvider for DemoData {
     }
 }
 
-fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: KeymapDemoApp) -> io::Result<()> {
+fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: KeybindingDemoApp) -> io::Result<()> {
     loop {
         terminal.draw(|f| ui(f, &app))?;
 
@@ -211,7 +211,7 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: KeymapDemoApp) -> io
     Ok(())
 }
 
-fn ui(f: &mut Frame, app: &KeymapDemoApp) {
+fn ui(f: &mut Frame, app: &KeybindingDemoApp) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([Constraint::Min(8), Constraint::Length(12)])
@@ -224,7 +224,7 @@ fn ui(f: &mut Frame, app: &KeymapDemoApp) {
     render_status_and_help(f, chunks[1], app);
 }
 
-fn render_status_and_help(f: &mut Frame, area: ratatui::layout::Rect, app: &KeymapDemoApp) {
+fn render_status_and_help(f: &mut Frame, area: ratatui::layout::Rect, app: &KeybindingDemoApp) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([Constraint::Length(3), Constraint::Min(9)])
@@ -243,7 +243,7 @@ fn render_status_and_help(f: &mut Frame, area: ratatui::layout::Rect, app: &Keym
     let status = Paragraph::new(Line::from(Span::raw(status_text))).block(
         Block::default()
             .borders(Borders::ALL)
-            .title("🎯 Keymap Demo Status"),
+            .title("🎯 Keybinding Demo Status"),
     );
 
     f.render_widget(status, chunks[0]);
@@ -251,7 +251,7 @@ fn render_status_and_help(f: &mut Frame, area: ratatui::layout::Rect, app: &Keym
     // Help text based on current mode
     let help_text = match app.editor().mode() {
         AppMode::ReadOnly => {
-            "🎯 KEYMAP DEMO - All keys handled by centralized keymap system!\n\
+            "🎯 KEYBINDING DEMO - All keys handled by centralized keybinding system!\n\
              \n\
              📍 MOVEMENT: hjkl(basic) | w/b/e(words) | W/B/E(WORDS) | 0/$(line) | gg/G(fields)\n\
              🔥 MULTI-KEY: gg=first-field, ge=prev-word-end, gE=prev-WORD-end\n\
@@ -263,16 +263,16 @@ fn render_status_and_help(f: &mut Frame, area: ratatui::layout::Rect, app: &Keym
              🚪 Ctrl+C=quit | ?=help | F1/F2=client actions (not canvas)"
         }
         AppMode::Edit => {
-            "✏️  INSERT MODE - Keys handled by keymap system\n\
+            "✏️  INSERT MODE - Keys handled by keybinding system\n\
              \n\
              🔄 NAVIGATION: arrows | Ctrl+arrows(words) | Home/End(line) | Tab/Shift+Tab(fields)\n\
              🗑️  DELETE: Backspace/Delete\n\
              🚪 EXIT: Esc=normal\n\
              \n\
-             💡 Type text normally - the keymap handles navigation!"
+             💡 Type text normally - the keybindings handle navigation!"
         }
         AppMode::Highlight => {
-            "🎯 VISUAL MODE - Selection extended by keymap movements\n\
+            "🎯 VISUAL MODE - Selection extended by keybinding movements\n\
              \n\
              📍 EXTEND: hjkl(basic) | w/b/e(words) | 0/$(line) | gg/G(fields)\n\
              🔄 SWITCH: V=toggle-line-mode\n\
@@ -280,14 +280,14 @@ fn render_status_and_help(f: &mut Frame, area: ratatui::layout::Rect, app: &Keym
              \n\
              💡 All movements extend the selection automatically!"
         }
-        _ => "🎯 Keymap system active!",
+        _ => "🎯 Keybinding system active!",
     };
 
     let help = Paragraph::new(help_text)
         .block(
             Block::default()
                 .borders(Borders::ALL)
-                .title("🚀 Centralized Keymap System"),
+                .title("🚀 Centralized Keybinding System"),
         )
         .style(Style::default().fg(Color::Gray));
 
@@ -295,8 +295,8 @@ fn render_status_and_help(f: &mut Frame, area: ratatui::layout::Rect, app: &Keym
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    println!("🎯 Canvas Keymap Demo");
-    println!("✅ canvas-keymap feature: ENABLED");
+    println!("🎯 Canvas Keybinding Demo");
+    println!("✅ canvas-keybindings feature: ENABLED");
     println!("🚀 Centralized key handling: ACTIVE");
     println!("📖 Multi-key sequences: SUPPORTED (gg, ge, gE, etc.)");
     println!();
@@ -307,7 +307,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
-    let app = KeymapDemoApp::new();
+    let app = KeybindingDemoApp::new();
     let res = run_app(&mut terminal, app);
 
     disable_raw_mode()?;
@@ -322,6 +322,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("{err:?}");
     }
 
-    println!("🎯 Keymap demo completed!");
+    println!("🎯 Keybinding demo completed!");
     Ok(())
 }

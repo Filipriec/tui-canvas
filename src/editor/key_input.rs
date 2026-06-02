@@ -1,19 +1,19 @@
 // src/editor/key_input.rs
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
-#[cfg(feature = "keymap")]
+#[cfg(feature = "keybindings")]
 use crate::canvas::actions::{ActionResult, CanvasAction};
 use crate::canvas::modes::AppMode;
 use crate::editor::FormEditor;
 use crate::DataProvider;
 
-#[cfg(feature = "keymap")]
+#[cfg(feature = "keybindings")]
 use crate::integration::focus_handoff::{key_outcome_for_vertical_navigation, BoundaryExit};
-#[cfg(feature = "keymap")]
-use crate::keymap::{CanvasKeyAction, KeyEventOutcome, KeyStroke};
+#[cfg(feature = "keybindings")]
+use crate::keybindings::{CanvasKeyAction, KeyEventOutcome, KeyStroke};
 
 impl<D: DataProvider> FormEditor<D> {
-    #[cfg(feature = "keymap")]
+    #[cfg(feature = "keybindings")]
     pub fn handle_key_event(&mut self, evt: KeyEvent) -> KeyEventOutcome {
         let mode = self.ui_state.current_mode;
 
@@ -26,12 +26,12 @@ impl<D: DataProvider> FormEditor<D> {
         // Add key to sequence tracker
         self.seq_tracker.add_key(stroke);
 
-        // Look up the action in keymap
-        // Check if keymap exists first
-        let Some(km) = self.keymap.as_ref() else {
+        // Look up the action in configured keybindings.
+        let Some(keybindings) = self.keybindings.as_ref() else {
             return KeyEventOutcome::NotMatched;
         };
-        let (matched, is_prefix) = km.lookup_action(mode, self.seq_tracker.sequence());
+        let (matched, is_prefix) =
+            keybindings.lookup_action(mode, self.seq_tracker.sequence());
 
         if let Some(action) = matched.cloned() {
             let outcome = self.dispatch_canvas_action(&action);
@@ -63,7 +63,7 @@ impl<D: DataProvider> FormEditor<D> {
         KeyEventOutcome::NotMatched
     }
 
-    #[cfg(feature = "keymap")]
+    #[cfg(feature = "keybindings")]
     fn dispatch_canvas_action(&mut self, action: &CanvasKeyAction) -> KeyEventOutcome {
         let Some(canvas_action) = Self::canvas_action_for_key_action(action) else {
             return KeyEventOutcome::NotMatched;
@@ -81,7 +81,7 @@ impl<D: DataProvider> FormEditor<D> {
         Self::key_outcome_for_action_result(result)
     }
 
-    #[cfg(feature = "keymap")]
+    #[cfg(feature = "keybindings")]
     fn canvas_action_for_key_action(action: &CanvasKeyAction) -> Option<CanvasAction> {
         match action {
             CanvasKeyAction::MoveLeft => Some(CanvasAction::MoveLeft),
@@ -138,7 +138,7 @@ impl<D: DataProvider> FormEditor<D> {
         }
     }
 
-    #[cfg(feature = "keymap")]
+    #[cfg(feature = "keybindings")]
     fn vertical_boundary_for_key_action(action: &CanvasKeyAction) -> Option<BoundaryExit> {
         match action {
             CanvasKeyAction::MoveUp | CanvasKeyAction::PrevField => Some(BoundaryExit::Top),
@@ -147,7 +147,7 @@ impl<D: DataProvider> FormEditor<D> {
         }
     }
 
-    #[cfg(feature = "keymap")]
+    #[cfg(feature = "keybindings")]
     fn key_outcome_for_action_result(result: ActionResult) -> KeyEventOutcome {
         match result {
             ActionResult::Success => KeyEventOutcome::Consumed(None),

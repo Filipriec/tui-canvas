@@ -12,6 +12,6 @@ src/canvas/gui.rs
 src/canvas/cursor.rs
 src/canvas/theme.rs
 src/canvas/actions/types.rs
-src/keymap/mod.rs
+src/keybindings/mod.rs
 examples/canvas_cursor_auto.rs
-examples/canvas_keymap.rs
+examples/canvas_keybindings.rs

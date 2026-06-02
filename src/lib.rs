@@ -39,8 +39,8 @@ pub mod textinput;
 #[cfg(feature = "computed")]
 pub mod computed;
 
-#[cfg(feature = "keymap")]
-pub mod keymap;
+#[cfg(feature = "keybindings")]
+pub mod keybindings;
 
 #[cfg(feature = "cursor-style")]
 pub use canvas::CursorManager;
@@ -83,9 +83,10 @@ pub use canvas::gui::{CanvasDisplayOptions, OverflowMode};
 #[cfg(all(feature = "gui", feature = "suggestions"))]
 pub use suggestions::gui::render_suggestions_dropdown;
 
-#[cfg(feature = "keymap")]
-pub use keymap::{
-    default_vim_action_bindings, preset, CanvasActionBinding, CanvasKeyMap, KeyEventOutcome,
+#[cfg(feature = "keybindings")]
+pub use keybindings::{
+    default_vim_action_bindings, preset, BuiltinCanvasKeybindingPreset, CanvasActionBinding,
+    CanvasActionKeyBinding, CanvasKeyBindings, KeyEventOutcome,
 };
 
 #[cfg(feature = "textarea")]
