@@ -1,9 +1,12 @@
 // src/keymap/mod.rs
+pub mod preset;
+
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
 
 use crossterm::event::{KeyCode, KeyModifiers};
 
+use crate::canvas::actions::CanvasAction;
 use crate::canvas::modes::AppMode;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -23,6 +26,13 @@ pub struct CanvasKeyMap {
     ro: Vec<Binding>,
     edit: Vec<Binding>,
     hl: Vec<Binding>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CanvasActionBinding {
+    pub mode: AppMode,
+    pub action: CanvasAction,
+    pub sequence: Vec<KeyStroke>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -58,6 +68,8 @@ pub enum CanvasKeyAction {
     MoveBigWordEndPrev,
     DeleteCharBackward,
     DeleteCharForward,
+    Undo,
+    Redo,
     OpenLineBelow,
     OpenLineAbove,
     OpenSuggestions,
@@ -98,6 +110,8 @@ impl CanvasKeyAction {
             "move_big_word_end_prev" => Self::MoveBigWordEndPrev,
             "delete_char_backward" => Self::DeleteCharBackward,
             "delete_char_forward" => Self::DeleteCharForward,
+            "undo" => Self::Undo,
+            "redo" => Self::Redo,
             "open_line_below" => Self::OpenLineBelow,
             "open_line_above" => Self::OpenLineAbove,
             "open_suggestions" => Self::OpenSuggestions,
@@ -138,6 +152,8 @@ impl CanvasKeyAction {
             Self::MoveBigWordEndPrev => "move_big_word_end_prev",
             Self::DeleteCharBackward => "delete_char_backward",
             Self::DeleteCharForward => "delete_char_forward",
+            Self::Undo => "undo",
+            Self::Redo => "redo",
             Self::OpenLineBelow => "open_line_below",
             Self::OpenLineAbove => "open_line_above",
             Self::OpenSuggestions => "open_suggestions",
@@ -218,6 +234,36 @@ fn normalize_stroke(mut s: KeyStroke) -> KeyStroke {
 }
 
 impl CanvasKeyMap {
+    pub fn vim_defaults() -> Self {
+        Self::from_preset(&preset::builtin_vim_preset())
+    }
+
+    pub fn from_preset(preset: &preset::CanvasKeymapPreset) -> Self {
+        let mut km = Self::default();
+        for section in preset.sections() {
+            let bindings = section
+                .bindings
+                .iter()
+                .flat_map(|binding| {
+                    binding.keys.iter().filter_map(|key| {
+                        parse_binding_to_sequence(key).map(|sequence| Binding {
+                            action: binding.action.clone(),
+                            sequence,
+                        })
+                    })
+                })
+                .collect::<Vec<_>>();
+
+            match section.mode {
+                AppMode::ReadOnly => km.ro.extend(bindings),
+                AppMode::Edit => km.edit.extend(bindings),
+                AppMode::Highlight => km.hl.extend(bindings),
+                _ => {}
+            }
+        }
+        km
+    }
+
     pub fn from_mode_maps(
         read_only: &HashMap<String, Vec<String>>,
         edit: &HashMap<String, Vec<String>>,
@@ -267,6 +313,70 @@ impl CanvasKeyMap {
         let (action, is_prefix) = self.lookup_action(mode, seq);
         (action.map(|a| a.as_str()), is_prefix)
     }
+}
+
+impl CanvasKeyAction {
+    pub fn to_canvas_action(&self) -> Option<CanvasAction> {
+        Some(match self {
+            Self::MoveLeft => CanvasAction::MoveLeft,
+            Self::MoveRight => CanvasAction::MoveRight,
+            Self::MoveUp => CanvasAction::MoveUp,
+            Self::MoveDown => CanvasAction::MoveDown,
+            Self::MoveWordNext => CanvasAction::MoveWordNext,
+            Self::MoveWordPrev => CanvasAction::MoveWordPrev,
+            Self::MoveWordEnd => CanvasAction::MoveWordEnd,
+            Self::MoveWordEndPrev => CanvasAction::MoveWordEndPrev,
+            Self::MoveBigWordNext => CanvasAction::MoveBigWordNext,
+            Self::MoveBigWordPrev => CanvasAction::MoveBigWordPrev,
+            Self::MoveBigWordEnd => CanvasAction::MoveBigWordEnd,
+            Self::MoveBigWordEndPrev => CanvasAction::MoveBigWordEndPrev,
+            Self::MoveLineStart => CanvasAction::MoveLineStart,
+            Self::MoveLineEnd => CanvasAction::MoveLineEnd,
+            Self::NextField => CanvasAction::NextField,
+            Self::PrevField => CanvasAction::PrevField,
+            Self::MoveFirstLine => CanvasAction::MoveFirstLine,
+            Self::MoveLastLine => CanvasAction::MoveLastLine,
+            Self::DeleteCharBackward => CanvasAction::DeleteBackward,
+            Self::DeleteCharForward => CanvasAction::DeleteForward,
+            Self::Undo => CanvasAction::Undo,
+            Self::Redo => CanvasAction::Redo,
+            Self::OpenSuggestions => CanvasAction::TriggerSuggestions,
+            Self::SuggestionUp => CanvasAction::SuggestionUp,
+            Self::SuggestionDown => CanvasAction::SuggestionDown,
+            Self::ApplySuggestion => CanvasAction::SelectSuggestion,
+            Self::EnterEditModeBefore => CanvasAction::EnterEditMode,
+            Self::EnterEditModeAfter => CanvasAction::EnterEditModeAfter,
+            Self::ExitEditMode => CanvasAction::ExitEditMode,
+            Self::EnterHighlightMode => CanvasAction::EnterHighlightMode,
+            Self::EnterHighlightModeLinewise => CanvasAction::EnterHighlightModeLinewise,
+            Self::ExitHighlightMode => CanvasAction::ExitHighlightMode,
+            Self::OpenLineBelow => CanvasAction::OpenLineBelow,
+            Self::OpenLineAbove => CanvasAction::OpenLineAbove,
+            Self::EnterDecider | Self::Exit | Self::Unknown(_) => return None,
+        })
+    }
+}
+
+pub fn default_vim_action_bindings() -> Vec<CanvasActionBinding> {
+    let mut bindings = Vec::new();
+    for section in preset::builtin_vim_preset().sections() {
+        for binding in &section.bindings {
+            let Some(action) = binding.action.to_canvas_action() else {
+                continue;
+            };
+            for key in &binding.keys {
+                let Some(sequence) = parse_binding_to_sequence(key) else {
+                    continue;
+                };
+                bindings.push(CanvasActionBinding {
+                    mode: section.mode,
+                    action: action.clone(),
+                    sequence,
+                });
+            }
+        }
+    }
+    bindings
 }
 
 fn sequences_equal(a: &[KeyStroke], b: &[KeyStroke]) -> bool {
@@ -426,7 +536,15 @@ fn parse_chord_with_modifiers(s: &str) -> Option<KeyStroke> {
             "super" | "cmd" => mods |= KeyModifiers::SUPER,
             "meta" => mods |= KeyModifiers::META,
             other => {
-                key = string_to_keycode(other);
+                key = string_to_keycode(other).or_else(|| {
+                    let mut chars = other.chars();
+                    let ch = chars.next()?;
+                    if chars.next().is_none() {
+                        Some(KeyCode::Char(ch))
+                    } else {
+                        None
+                    }
+                });
             }
         }
     }

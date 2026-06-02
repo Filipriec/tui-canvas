@@ -104,6 +104,8 @@ impl<D: DataProvider> FormEditor<D> {
             CanvasKeyAction::MoveBigWordEndPrev => Some(CanvasAction::MoveBigWordEndPrev),
             CanvasKeyAction::DeleteCharBackward => Some(CanvasAction::DeleteBackward),
             CanvasKeyAction::DeleteCharForward => Some(CanvasAction::DeleteForward),
+            CanvasKeyAction::Undo => Some(CanvasAction::Undo),
+            CanvasKeyAction::Redo => Some(CanvasAction::Redo),
             CanvasKeyAction::OpenLineBelow => Some(CanvasAction::OpenLineBelow),
             CanvasKeyAction::OpenLineAbove => Some(CanvasAction::OpenLineAbove),
             CanvasKeyAction::EnterEditModeBefore => Some(CanvasAction::EnterEditMode),

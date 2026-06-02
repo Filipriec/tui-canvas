@@ -60,6 +60,10 @@ pub enum CanvasAction {
     DeleteBackward,
     /// Delete character under/after the cursor.
     DeleteForward,
+    /// Undo the most recent edit.
+    Undo,
+    /// Redo the most recently undone edit.
+    Redo,
 
     // Suggestions actions
     /// Trigger suggestions dropdown (e.g. Tab).
@@ -165,6 +169,8 @@ impl CanvasAction {
             Self::InsertChar(_c) => "insert character",
             Self::DeleteBackward => "delete backward",
             Self::DeleteForward => "delete forward",
+            Self::Undo => "undo",
+            Self::Redo => "redo",
             Self::TriggerSuggestions => "trigger suggestions",
             Self::SuggestionUp => "suggestion up",
             Self::SuggestionDown => "suggestion down",

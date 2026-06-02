@@ -27,7 +27,6 @@ use ratatui::{
     widgets::{Block, Borders, Paragraph},
     Frame, Terminal,
 };
-use std::collections::HashMap;
 use std::io;
 
 use canvas::{
@@ -48,143 +47,13 @@ impl KeymapDemoApp {
         let data = DemoData::new();
         let mut editor = FormEditor::new(data);
 
-        // Build and inject the keymap from our config
-        let keymap = Self::build_demo_keymap();
-        editor.set_keymap(keymap);
+        editor.set_keymap(CanvasKeyMap::vim_defaults());
 
         Self {
             editor,
             message: "🎯 Keymap system loaded! Try: gg, ge, hjkl, w/b/e, v, i, etc.".to_string(),
             quit: false,
         }
-    }
-
-    /// Build a keymap configuration
-    fn build_demo_keymap() -> CanvasKeyMap {
-        let mut read_only = HashMap::new();
-        let mut edit = HashMap::new();
-        let mut highlight = HashMap::new();
-
-        // Read only mode keybindings
-
-        // Basic movement
-        read_only.insert(
-            "move_left".to_string(),
-            vec!["h".to_string(), "Left".to_string()],
-        );
-        read_only.insert(
-            "move_right".to_string(),
-            vec!["l".to_string(), "Right".to_string()],
-        );
-        read_only.insert(
-            "move_up".to_string(),
-            vec!["k".to_string(), "Up".to_string()],
-        );
-        read_only.insert(
-            "move_down".to_string(),
-            vec!["j".to_string(), "Down".to_string()],
-        );
-
-        // Word movement
-        read_only.insert("move_word_next".to_string(), vec!["w".to_string()]);
-        read_only.insert("move_word_prev".to_string(), vec!["b".to_string()]);
-        read_only.insert("move_word_end".to_string(), vec!["e".to_string()]);
-        read_only.insert("move_word_end_prev".to_string(), vec!["ge".to_string()]); // Multi-key!
-
-        // Big word movement
-        read_only.insert("move_big_word_next".to_string(), vec!["W".to_string()]);
-        read_only.insert("move_big_word_prev".to_string(), vec!["B".to_string()]);
-        read_only.insert("move_big_word_end".to_string(), vec!["E".to_string()]);
-        read_only.insert("move_big_word_end_prev".to_string(), vec!["gE".to_string()]); // Multi-key!
-
-        // Line movement
-        read_only.insert(
-            "move_line_start".to_string(),
-            vec!["0".to_string(), "Home".to_string()],
-        );
-        read_only.insert(
-            "move_line_end".to_string(),
-            vec!["$".to_string(), "End".to_string()],
-        );
-
-        // Field movement
-        read_only.insert("move_first_line".to_string(), vec!["gg".to_string()]); // Multi-key!
-        read_only.insert("move_last_line".to_string(), vec!["G".to_string()]);
-        read_only.insert("next_field".to_string(), vec!["Tab".to_string()]);
-        read_only.insert("prev_field".to_string(), vec!["Shift+Tab".to_string()]);
-
-        // Mode transitions
-        read_only.insert("enter_edit_mode_before".to_string(), vec!["i".to_string()]);
-        read_only.insert("enter_edit_mode_after".to_string(), vec!["a".to_string()]);
-        read_only.insert("enter_highlight_mode".to_string(), vec!["v".to_string()]);
-        read_only.insert(
-            "enter_highlight_mode_linewise".to_string(),
-            vec!["V".to_string()],
-        );
-
-        // Editing actions in normal mode
-        read_only.insert("delete_char_forward".to_string(), vec!["x".to_string()]);
-        read_only.insert("delete_char_backward".to_string(), vec!["X".to_string()]);
-        read_only.insert("open_line_below".to_string(), vec!["o".to_string()]);
-        read_only.insert("open_line_above".to_string(), vec!["O".to_string()]);
-
-        // Edit mode keybindings
-
-        edit.insert("exit_edit_mode".to_string(), vec!["esc".to_string()]);
-        edit.insert("move_left".to_string(), vec!["Left".to_string()]);
-        edit.insert("move_right".to_string(), vec!["Right".to_string()]);
-        edit.insert("move_up".to_string(), vec!["Up".to_string()]);
-        edit.insert("move_down".to_string(), vec!["Down".to_string()]);
-        edit.insert("move_line_start".to_string(), vec!["Home".to_string()]);
-        edit.insert("move_line_end".to_string(), vec!["End".to_string()]);
-        edit.insert("move_word_next".to_string(), vec!["Ctrl+Right".to_string()]);
-        edit.insert("move_word_prev".to_string(), vec!["Ctrl+Left".to_string()]);
-        edit.insert("next_field".to_string(), vec!["Tab".to_string()]);
-        edit.insert("prev_field".to_string(), vec!["Shift+Tab".to_string()]);
-        edit.insert(
-            "delete_char_backward".to_string(),
-            vec!["Backspace".to_string()],
-        );
-        edit.insert(
-            "delete_char_forward".to_string(),
-            vec!["Delete".to_string()],
-        );
-
-        // Highlight mode keybindings
-
-        highlight.insert("exit_highlight_mode".to_string(), vec!["esc".to_string()]);
-        highlight.insert(
-            "enter_highlight_mode_linewise".to_string(),
-            vec!["V".to_string()],
-        );
-
-        // Movement (extends selection)
-        highlight.insert(
-            "move_left".to_string(),
-            vec!["h".to_string(), "Left".to_string()],
-        );
-        highlight.insert(
-            "move_right".to_string(),
-            vec!["l".to_string(), "Right".to_string()],
-        );
-        highlight.insert(
-            "move_up".to_string(),
-            vec!["k".to_string(), "Up".to_string()],
-        );
-        highlight.insert(
-            "move_down".to_string(),
-            vec!["j".to_string(), "Down".to_string()],
-        );
-        highlight.insert("move_word_next".to_string(), vec!["w".to_string()]);
-        highlight.insert("move_word_prev".to_string(), vec!["b".to_string()]);
-        highlight.insert("move_word_end".to_string(), vec!["e".to_string()]);
-        highlight.insert("move_word_end_prev".to_string(), vec!["ge".to_string()]);
-        highlight.insert("move_line_start".to_string(), vec!["0".to_string()]);
-        highlight.insert("move_line_end".to_string(), vec!["$".to_string()]);
-        highlight.insert("move_first_line".to_string(), vec!["gg".to_string()]);
-        highlight.insert("move_last_line".to_string(), vec!["G".to_string()]);
-
-        CanvasKeyMap::from_mode_maps(&read_only, &edit, &highlight)
     }
 
     fn handle_key_event(&mut self, key_event: KeyEvent) -> io::Result<()> {

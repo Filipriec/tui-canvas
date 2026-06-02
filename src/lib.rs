@@ -84,7 +84,9 @@ pub use canvas::gui::{CanvasDisplayOptions, OverflowMode};
 pub use suggestions::gui::render_suggestions_dropdown;
 
 #[cfg(feature = "keymap")]
-pub use keymap::{CanvasKeyMap, KeyEventOutcome};
+pub use keymap::{
+    default_vim_action_bindings, preset, CanvasActionBinding, CanvasKeyMap, KeyEventOutcome,
+};
 
 #[cfg(feature = "textarea")]
 pub use textarea::{

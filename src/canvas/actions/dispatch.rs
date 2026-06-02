@@ -106,6 +106,14 @@ impl<D: DataProvider> FormEditor<D> {
             // Editing
             DeleteBackward => Self::into_action_result(self.delete_backward()),
             DeleteForward => Self::into_action_result(self.delete_forward()),
+            Undo => {
+                self.undo();
+                ActionResult::Success
+            }
+            Redo => {
+                self.redo();
+                ActionResult::Success
+            }
             OpenLineBelow => Self::into_action_result(self.open_line_below()),
             OpenLineAbove => Self::into_action_result(self.open_line_above()),
 
