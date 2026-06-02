@@ -11,8 +11,10 @@ use crate::canvas::modes::AppMode;
 
 pub use action::CanvasKeyAction;
 pub use builtin::{
-    builtin_vim_preset, default_vim_action_bindings, vim_preset_toml,
-    BuiltinCanvasKeybindingPreset,
+    builtin_emacs_preset, builtin_helix_preset, builtin_vim_preset,
+    default_builtin_action_bindings, default_emacs_action_bindings,
+    default_helix_action_bindings, default_vim_action_bindings, emacs_preset_toml,
+    helix_preset_toml, vim_preset_toml, BuiltinCanvasKeybindingPreset,
 };
 pub use key_sequence::{
     parse_binding, try_parse_binding, try_parse_key, KeyStroke, ParseKeyError,
@@ -94,6 +96,14 @@ impl KeySequenceTracker {
 impl CanvasKeyBindings {
     pub fn vim_defaults() -> Self {
         Self::from_preset(&builtin_vim_preset())
+    }
+
+    pub fn helix_defaults() -> Self {
+        Self::from_preset(&builtin_helix_preset())
+    }
+
+    pub fn emacs_defaults() -> Self {
+        Self::from_preset(&builtin_emacs_preset())
     }
 
     pub fn from_preset(preset: &CanvasKeybindingPreset) -> Self {

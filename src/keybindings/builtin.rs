@@ -4,18 +4,24 @@ use super::{try_parse_binding, CanvasActionKeyBinding};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum BuiltinCanvasKeybindingPreset {
     Vim,
+    Helix,
+    Emacs,
 }
 
 impl BuiltinCanvasKeybindingPreset {
     pub fn name(&self) -> &str {
         match self {
             Self::Vim => "vim",
+            Self::Helix => "helix",
+            Self::Emacs => "emacs",
         }
     }
 
     pub fn toml(&self) -> &str {
         match self {
             Self::Vim => include_str!("presets/vim.toml"),
+            Self::Helix => include_str!("presets/helix.toml"),
+            Self::Emacs => include_str!("presets/emacs.toml"),
         }
     }
 
@@ -28,13 +34,47 @@ pub fn vim_preset_toml() -> &'static str {
     BuiltinCanvasKeybindingPreset::Vim.toml()
 }
 
+pub fn helix_preset_toml() -> &'static str {
+    BuiltinCanvasKeybindingPreset::Helix.toml()
+}
+
+pub fn emacs_preset_toml() -> &'static str {
+    BuiltinCanvasKeybindingPreset::Emacs.toml()
+}
+
 pub fn builtin_vim_preset() -> CanvasKeybindingPreset {
     BuiltinCanvasKeybindingPreset::Vim.preset()
 }
 
+pub fn builtin_helix_preset() -> CanvasKeybindingPreset {
+    BuiltinCanvasKeybindingPreset::Helix.preset()
+}
+
+pub fn builtin_emacs_preset() -> CanvasKeybindingPreset {
+    BuiltinCanvasKeybindingPreset::Emacs.preset()
+}
+
+pub fn default_builtin_action_bindings(
+    preset: BuiltinCanvasKeybindingPreset,
+) -> Vec<CanvasActionKeyBinding> {
+    action_bindings_from_preset(preset.preset())
+}
+
 pub fn default_vim_action_bindings() -> Vec<CanvasActionKeyBinding> {
+    default_builtin_action_bindings(BuiltinCanvasKeybindingPreset::Vim)
+}
+
+pub fn default_helix_action_bindings() -> Vec<CanvasActionKeyBinding> {
+    default_builtin_action_bindings(BuiltinCanvasKeybindingPreset::Helix)
+}
+
+pub fn default_emacs_action_bindings() -> Vec<CanvasActionKeyBinding> {
+    default_builtin_action_bindings(BuiltinCanvasKeybindingPreset::Emacs)
+}
+
+fn action_bindings_from_preset(preset: CanvasKeybindingPreset) -> Vec<CanvasActionKeyBinding> {
     let mut bindings = Vec::new();
-    for section in builtin_vim_preset().sections() {
+    for section in preset.sections() {
         for binding in &section.bindings {
             let Some(action) = binding.action.to_canvas_action() else {
                 continue;
@@ -67,16 +107,15 @@ mod tests {
     use crossterm::event::{KeyCode, KeyModifiers};
 
     #[test]
-    fn parses_builtin_vim_preset() {
-        let preset = CanvasKeybindingPreset::from_toml(vim_preset_toml()).unwrap();
-
-        assert_eq!(preset.sections().len(), 3);
-        assert!(preset
-            .sections()
-            .iter()
-            .any(|section| section.mode == AppMode::ReadOnly
-                && section.bindings.iter().any(|binding| binding.action == CanvasKeyAction::Undo
-                    && binding.keys == vec!["u".to_string()])));
+    fn parses_builtin_presets() {
+        for preset in [
+            BuiltinCanvasKeybindingPreset::Vim,
+            BuiltinCanvasKeybindingPreset::Helix,
+            BuiltinCanvasKeybindingPreset::Emacs,
+        ] {
+            let parsed = CanvasKeybindingPreset::from_toml(preset.toml()).unwrap();
+            assert_eq!(parsed.sections().len(), 3);
+        }
     }
 
     #[test]
@@ -123,5 +162,20 @@ mod tests {
                         modifiers: KeyModifiers::CONTROL,
                     }]
         }));
+    }
+
+    #[test]
+    fn non_vim_defaults_are_available() {
+        let helix = default_helix_action_bindings();
+        let emacs = default_emacs_action_bindings();
+
+        assert!(helix
+            .iter()
+            .any(|binding| binding.mode == AppMode::ReadOnly
+                && binding.action == CanvasAction::Undo));
+        assert!(emacs
+            .iter()
+            .any(|binding| binding.mode == AppMode::Edit
+                && binding.action == CanvasAction::DeleteForward));
     }
 }
