@@ -81,6 +81,7 @@ pub(crate) fn compute_h_scroll_with_padding(cursor_cols: u16, width: u16) -> (u1
 }
 
 #[cfg(feature = "gui")]
+#[allow(dead_code)]
 pub(crate) fn clip_window_with_indicator_padded(
     text: &str,
     view_width: u16,

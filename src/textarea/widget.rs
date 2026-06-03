@@ -3,16 +3,17 @@
 use ratatui::{
     buffer::Buffer,
     layout::{Alignment, Rect},
-    style::Style,
+    style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, BorderType, Borders, Paragraph, StatefulWidget, Widget},
 };
 
 #[cfg(feature = "gui")]
 use crate::gui_utils::{
-    clip_window_with_indicator_padded, compute_h_scroll_with_padding, display_cols_up_to,
-    display_width,
+    compute_h_scroll_with_padding, display_cols_up_to, display_width,
 };
+#[cfg(feature = "gui")]
+use crate::canvas::state::SelectionState;
 #[cfg(feature = "gui")]
 use crate::textarea::provider::{TextAreaDataProvider, TextAreaProvider};
 
@@ -69,10 +70,136 @@ impl<'a, P: TextAreaDataProvider> TextArea<'a, P> {
 }
 
 #[cfg(feature = "gui")]
-fn wrap_segments_with_indent(s: &str, width: u16, indent: u16) -> Vec<String> {
-    let mut segments: Vec<String> = Vec::new();
+fn selection_style() -> Style {
+    Style::default()
+        .fg(Color::Yellow)
+        .bg(Color::Blue)
+        .add_modifier(Modifier::BOLD)
+}
+
+#[cfg(feature = "gui")]
+fn char_selection_range<P: TextAreaDataProvider>(
+    state: &TextAreaState<P>,
+    line_idx: usize,
+    text_len: usize,
+) -> Option<(usize, usize)> {
+    let SelectionState::Characterwise { anchor } = *state.selection_state() else {
+        return None;
+    };
+
+    let cursor = (state.current_field(), state.cursor_position());
+    let start = anchor.min(cursor);
+    let end = anchor.max(cursor);
+
+    if line_idx < start.0 || line_idx > end.0 {
+        return None;
+    }
+
+    if start.0 == end.0 {
+        return Some((start.1.min(text_len), end.1.min(text_len)));
+    }
+
+    if line_idx == start.0 {
+        Some((start.1.min(text_len), text_len.saturating_sub(1)))
+    } else if line_idx == end.0 {
+        Some((0, end.1.min(text_len)))
+    } else {
+        Some((0, text_len.saturating_sub(1)))
+    }
+}
+
+#[cfg(feature = "gui")]
+fn line_is_linewise_selected<P: TextAreaDataProvider>(
+    state: &TextAreaState<P>,
+    line_idx: usize,
+) -> bool {
+    let SelectionState::Linewise { anchor_field } = *state.selection_state() else {
+        return false;
+    };
+
+    let start = anchor_field.min(state.current_field());
+    let end = anchor_field.max(state.current_field());
+    line_idx >= start && line_idx <= end
+}
+
+#[cfg(feature = "gui")]
+fn styled_segment_line<'a, P: TextAreaDataProvider>(
+    visible: String,
+    line_idx: usize,
+    original_char_offset: usize,
+    state: &TextAreaState<P>,
+    prefix: Option<String>,
+    suffix: Option<String>,
+) -> Line<'a> {
+    let normal = Style::default();
+    let selected = selection_style();
+    let mut spans = Vec::new();
+
+    if let Some(prefix) = prefix {
+        spans.push(Span::styled(prefix, normal));
+    }
+
+    if line_is_linewise_selected(state, line_idx) {
+        let selected_text = if visible.is_empty() {
+            " ".to_string()
+        } else {
+            visible
+        };
+        spans.push(Span::styled(selected_text, selected));
+    } else if let Some((start, end)) =
+        char_selection_range(
+            state,
+            line_idx,
+            state
+                .editor
+                .data_provider()
+                .field_value(line_idx)
+                .chars()
+                .count(),
+        )
+    {
+        let mut before = String::new();
+        let mut highlighted = String::new();
+        let mut after = String::new();
+
+        for (i, ch) in visible.chars().enumerate() {
+            let original_idx = original_char_offset + i;
+            if original_idx >= start && original_idx <= end {
+                highlighted.push(ch);
+            } else if original_idx < start {
+                before.push(ch);
+            } else {
+                after.push(ch);
+            }
+        }
+
+        if !before.is_empty() {
+            spans.push(Span::styled(before, normal));
+        }
+        if highlighted.is_empty() && visible.is_empty() {
+            spans.push(Span::styled(" ", selected));
+        } else if !highlighted.is_empty() {
+            spans.push(Span::styled(highlighted, selected));
+        }
+        if !after.is_empty() {
+            spans.push(Span::styled(after, normal));
+        }
+    } else {
+        spans.push(Span::styled(visible, normal));
+    }
+
+    if let Some(suffix) = suffix {
+        spans.push(Span::styled(suffix, normal));
+    }
+
+    Line::from(spans)
+}
+
+#[cfg(feature = "gui")]
+fn wrap_segments_with_offsets(s: &str, width: u16, indent: u16) -> Vec<(String, usize)> {
+    let mut segments: Vec<(String, usize)> = Vec::new();
     if width == 0 {
-        segments.push(String::new());
+        segments.push((String::new(), 0));
         return segments;
     }
 
@@ -83,17 +210,18 @@ fn wrap_segments_with_indent(s: &str, width: u16, indent: u16) -> Vec<String> {
     let mut buf = String::new();
     let mut used: u16 = 0;
     let mut first = true;
+    let mut segment_start = 0;
 
-    for ch in s.chars() {
+    for (char_idx, ch) in s.chars().enumerate() {
         let w = UnicodeWidthChar::width(ch).unwrap_or(0) as u16;
         let cap = if first { width } else { cont_cap };
 
-        // Early-wrap: wrap before filling the last cell (and avoid empty segment)
         if used > 0 && used.saturating_add(w) >= cap {
-            segments.push(buf);
+            segments.push((buf, segment_start));
             buf = String::new();
             used = 0;
             first = false;
+            segment_start = char_idx;
             if indent > 0 {
                 buf.push_str(&indent_str);
                 used = indent;
@@ -104,8 +232,96 @@ fn wrap_segments_with_indent(s: &str, width: u16, indent: u16) -> Vec<String> {
         used = used.saturating_add(w);
     }
 
-    segments.push(buf);
+    segments.push((buf, segment_start));
     segments
+}
+
+#[cfg(feature = "gui")]
+fn slice_by_display_cols_with_offset(s: &str, start_cols: u16, max_cols: u16) -> (String, usize) {
+    if max_cols == 0 {
+        return (String::new(), 0);
+    }
+
+    let mut cols: u16 = 0;
+    let mut out = String::new();
+    let mut taken: u16 = 0;
+    let mut started = false;
+    let mut start_char = 0;
+
+    for (char_idx, ch) in s.chars().enumerate() {
+        let w = UnicodeWidthChar::width(ch).unwrap_or(0) as u16;
+        let next = cols.saturating_add(w);
+
+        if !started {
+            if next <= start_cols {
+                cols = next;
+                continue;
+            }
+            started = true;
+            start_char = char_idx;
+        }
+
+        if taken.saturating_add(w) > max_cols {
+            break;
+        }
+
+        out.push(ch);
+        taken = taken.saturating_add(w);
+        cols = next;
+    }
+
+    (out, start_char)
+}
+
+#[cfg(feature = "gui")]
+fn clipped_line_with_selection<'a, P: TextAreaDataProvider>(
+    text: &str,
+    line_idx: usize,
+    state: &TextAreaState<P>,
+    view_width: u16,
+    indicator: char,
+    start_cols: u16,
+) -> Line<'a> {
+    if view_width == 0 {
+        return Line::from("");
+    }
+
+    let total = display_width(text);
+    let show_left = start_cols > 0;
+    let left_cols: u16 = if show_left { 1 } else { 0 };
+    let cap_with_right = view_width.saturating_sub(left_cols + 1);
+    let remaining = total.saturating_sub(start_cols);
+    let show_right = remaining > cap_with_right;
+    let max_visible = if show_right {
+        cap_with_right
+    } else {
+        view_width.saturating_sub(left_cols)
+    };
+
+    let (visible, char_offset) = slice_by_display_cols_with_offset(text, start_cols, max_visible);
+
+    let suffix = if show_right {
+        let used_cols = left_cols + display_width(&visible);
+        let right_pos = view_width.saturating_sub(1);
+        let filler = right_pos.saturating_sub(used_cols);
+        let mut suffix = String::new();
+        if filler > 0 {
+            suffix.push_str(&" ".repeat(filler as usize));
+        }
+        suffix.push(indicator);
+        Some(suffix)
+    } else {
+        None
+    };
+
+    styled_segment_line(
+        visible,
+        line_idx,
+        char_offset,
+        state,
+        show_left.then(|| indicator.to_string()),
+        suffix,
+    )
 }
 
 // Map visual row offset to (logical line, intra segment)
@@ -180,10 +396,10 @@ impl<'a, P: TextAreaDataProvider> StatefulWidget for TextArea<'a, P> {
             let mut i = start;
             while i < total && rows_left > 0 {
                 let s = provider.field_value(i);
-                let segments = wrap_segments_with_indent(s, inner.width, indent);
+                let segments = wrap_segments_with_offsets(s, inner.width, indent);
                 let skip = if i == start { intra as usize } else { 0 };
-                for seg in segments.into_iter().skip(skip) {
-                    display_lines.push(Line::from(Span::raw(seg)));
+                for (seg, offset) in segments.into_iter().skip(skip) {
+                    display_lines.push(styled_segment_line(seg, i, offset, state, None, None));
                     rows_left = rows_left.saturating_sub(1);
                     if rows_left == 0 {
                         break;
@@ -221,8 +437,10 @@ impl<'a, P: TextAreaDataProvider> StatefulWidget for TextArea<'a, P> {
                             0
                         };
 
-                        display_lines.push(clip_window_with_indicator_padded(
+                        display_lines.push(clipped_line_with_selection(
                             s,
+                            i,
+                            state,
                             inner.width,
                             ch,
                             start_cols,

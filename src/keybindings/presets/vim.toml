@@ -52,6 +52,7 @@ apply_suggestion = ["Ctrl+y"]
 [highlight]
 mode = "highlight"
 exit_highlight_mode = ["esc"]
+enter_highlight_mode = ["v"]
 enter_highlight_mode_linewise = ["V"]
 move_left = ["h", "Left"]
 move_right = ["l", "Right"]

@@ -10,6 +10,8 @@ use crate::editor::FormEditor;
 #[cfg(feature = "gui")]
 use crate::gui_utils::{compute_h_scroll_with_padding, RIGHT_PAD};
 use crate::textarea::provider::{TextAreaDataProvider, TextAreaProvider};
+#[cfg(feature = "keybindings")]
+use crate::{canvas::modes::AppMode, keybindings::KeyEventOutcome};
 #[cfg(feature = "cursor-style")]
 use std::io;
 
@@ -283,6 +285,46 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         }
     }
 
+    pub fn open_line_below(&mut self) {
+        #[cfg(feature = "gui")]
+        {
+            self.edited_this_frame = true;
+        }
+
+        self.editor
+            .record_checkpoint(crate::editor::history::EditKind::Other);
+
+        let line_idx = self.current_field();
+        let new_idx = self
+            .editor
+            .data_provider_mut()
+            .insert_blank_line_after(line_idx);
+
+        let _ = self.transition_to_field(new_idx);
+        self.move_line_start();
+        self.enter_edit_mode();
+    }
+
+    pub fn open_line_above(&mut self) {
+        #[cfg(feature = "gui")]
+        {
+            self.edited_this_frame = true;
+        }
+
+        self.editor
+            .record_checkpoint(crate::editor::history::EditKind::Other);
+
+        let line_idx = self.current_field();
+        let new_idx = self
+            .editor
+            .data_provider_mut()
+            .insert_blank_line_before(line_idx);
+
+        let _ = self.transition_to_field(new_idx);
+        self.move_line_start();
+        self.enter_edit_mode();
+    }
+
     pub fn paste(&mut self, text: &str) -> TextAreaEventOutcome {
         self.enter_edit_mode();
         #[cfg(feature = "gui")]
@@ -373,6 +415,87 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         }
 
         TextAreaEventOutcome::Handled
+    }
+
+    #[cfg(feature = "keybindings")]
+    pub fn handle_key_event(&mut self, evt: KeyEvent) -> KeyEventOutcome {
+        let mode = self.editor.ui_state.mode();
+
+        let stroke = crate::keybindings::KeyStroke {
+            code: evt.code,
+            modifiers: evt.modifiers,
+        };
+
+        self.editor.seq_tracker.add_key(stroke);
+
+        let Some(keybindings) = self.editor.keybindings.as_ref() else {
+            return KeyEventOutcome::NotMatched;
+        };
+        let (matched, is_prefix) = keybindings.lookup_action(mode, self.editor.seq_tracker.sequence());
+
+        if let Some(action) = matched.cloned() {
+            self.editor.seq_tracker.reset();
+            return self.dispatch_textarea_key_action(&action);
+        }
+
+        if is_prefix {
+            return KeyEventOutcome::Pending;
+        }
+
+        self.editor.seq_tracker.reset();
+
+        if mode == AppMode::Edit {
+            if let KeyCode::Char(c) = evt.code {
+                let m = evt.modifiers;
+                let is_plain = m.is_empty() || m == KeyModifiers::SHIFT;
+                if is_plain {
+                    self.enter_edit_mode();
+                    #[cfg(feature = "gui")]
+                    {
+                        self.edited_this_frame = true;
+                    }
+                    if self.insert_char(c).is_ok() {
+                        return KeyEventOutcome::Consumed(None);
+                    }
+                }
+            }
+        }
+
+        KeyEventOutcome::NotMatched
+    }
+
+    #[cfg(feature = "keybindings")]
+    fn dispatch_textarea_key_action(
+        &mut self,
+        action: &crate::keybindings::CanvasKeyAction,
+    ) -> KeyEventOutcome {
+        use crate::keybindings::CanvasKeyAction;
+
+        match action {
+            CanvasKeyAction::OpenLineBelow => {
+                self.open_line_below();
+                KeyEventOutcome::Consumed(None)
+            }
+            CanvasKeyAction::OpenLineAbove => {
+                self.open_line_above();
+                KeyEventOutcome::Consumed(None)
+            }
+            _ => {
+                let Some(canvas_action) = action.to_canvas_action() else {
+                    return KeyEventOutcome::NotMatched;
+                };
+                let result = self.editor.execute(canvas_action);
+                match result {
+                    crate::canvas::actions::ActionResult::Success => {
+                        KeyEventOutcome::Consumed(None)
+                    }
+                    crate::canvas::actions::ActionResult::Message(msg)
+                    | crate::canvas::actions::ActionResult::Error(msg) => {
+                        KeyEventOutcome::Consumed(Some(msg))
+                    }
+                }
+            }
+        }
     }
 
     #[cfg(feature = "gui")]
@@ -928,5 +1051,42 @@ mod tests {
 
         assert!(textarea.redo()); // redo "ab"
         assert_eq!(textarea.text(), "ab");
+    }
+
+    #[cfg(all(feature = "keybindings", feature = "crossterm"))]
+    #[test]
+    fn vim_open_line_below_inserts_textarea_line() {
+        use crate::keybindings::{CanvasKeyBindings, KeyEventOutcome};
+        use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+
+        let mut textarea = TextAreaState::<TextAreaProvider>::from_text("one\ntwo");
+        textarea.set_keybindings(CanvasKeyBindings::vim_defaults());
+
+        let out = textarea.handle_key_event(KeyEvent::new(KeyCode::Char('o'), KeyModifiers::NONE));
+
+        assert!(matches!(out, KeyEventOutcome::Consumed(None)));
+        assert_eq!(textarea.text(), "one\n\ntwo");
+        assert_eq!(textarea.current_field(), 1);
+        assert_eq!(textarea.cursor_position(), 0);
+        assert_eq!(textarea.mode(), crate::canvas::modes::AppMode::Edit);
+    }
+
+    #[cfg(all(feature = "keybindings", feature = "crossterm"))]
+    #[test]
+    fn vim_open_line_above_inserts_textarea_line() {
+        use crate::keybindings::{CanvasKeyBindings, KeyEventOutcome};
+        use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+
+        let mut textarea = TextAreaState::<TextAreaProvider>::from_text("one\ntwo");
+        textarea.set_keybindings(CanvasKeyBindings::vim_defaults());
+        let _ = textarea.move_down();
+
+        let out = textarea.handle_key_event(KeyEvent::new(KeyCode::Char('O'), KeyModifiers::SHIFT));
+
+        assert!(matches!(out, KeyEventOutcome::Consumed(None)));
+        assert_eq!(textarea.text(), "one\n\ntwo");
+        assert_eq!(textarea.current_field(), 1);
+        assert_eq!(textarea.cursor_position(), 0);
+        assert_eq!(textarea.mode(), crate::canvas::modes::AppMode::Edit);
     }
 }
