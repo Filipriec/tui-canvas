@@ -11,7 +11,7 @@ use crate::editor::FormEditor;
 use crate::gui_utils::{compute_h_scroll_with_padding, RIGHT_PAD};
 use crate::textarea::provider::{TextAreaDataProvider, TextAreaProvider};
 #[cfg(feature = "keybindings")]
-use crate::{canvas::modes::AppMode, keybindings::KeyEventOutcome};
+use crate::{canvas::modes::AppMode, canvas::state::SelectionState, keybindings::KeyEventOutcome};
 #[cfg(feature = "cursor-style")]
 use std::io;
 
@@ -452,6 +452,12 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
 
     #[cfg(feature = "keybindings")]
     pub fn yank_current_lines(&mut self, count: usize) {
+        if self.mode() == AppMode::Highlight {
+            self.yank_selection();
+            self.exit_highlight_mode();
+            return;
+        }
+
         let current = self.current_field();
         let lines = self.editor.data_provider().capture_content();
         if lines.is_empty() {
@@ -461,6 +467,52 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
 
         let end = current.saturating_add(count.max(1)).min(lines.len());
         self.yank_buffer = Some(YankBuffer::Lines(lines[current..end].to_vec()));
+    }
+
+    #[cfg(feature = "keybindings")]
+    fn yank_selection(&mut self) {
+        match self.selection_state().clone() {
+            SelectionState::Linewise { anchor_field } => {
+                let current = self.current_field();
+                let start = anchor_field.min(current);
+                let end = anchor_field.max(current);
+                let lines = self.editor.data_provider().capture_content();
+                if start < lines.len() {
+                    self.yank_buffer = Some(YankBuffer::Lines(
+                        lines[start..=end.min(lines.len() - 1)].to_vec(),
+                    ));
+                }
+            }
+            SelectionState::Characterwise { anchor } => {
+                let cursor = (self.current_field(), self.cursor_position());
+                let start = anchor.min(cursor);
+                let end = anchor.max(cursor);
+                let lines = self.editor.data_provider().capture_content();
+                if start.0 >= lines.len() || end.0 >= lines.len() {
+                    return;
+                }
+
+                let mut yanked = Vec::new();
+                if start.0 == end.0 {
+                    let text: String = lines[start.0]
+                        .chars()
+                        .skip(start.1)
+                        .take(end.1.saturating_sub(start.1) + 1)
+                        .collect();
+                    yanked.push(text);
+                } else {
+                    let first: String = lines[start.0].chars().skip(start.1).collect();
+                    yanked.push(first);
+                    for line in &lines[start.0 + 1..end.0] {
+                        yanked.push(line.clone());
+                    }
+                    let last: String = lines[end.0].chars().take(end.1 + 1).collect();
+                    yanked.push(last);
+                }
+                self.yank_buffer = Some(YankBuffer::Lines(yanked));
+            }
+            SelectionState::None => {}
+        }
     }
 
     #[cfg(feature = "keybindings")]
@@ -1716,6 +1768,33 @@ mod tests {
         assert!(matches!(out, KeyEventOutcome::Consumed(None)));
         assert_eq!(textarea.text(), "one\ntwo\ntwo\ntwo\nthree");
         assert_eq!(textarea.current_field(), 2);
+    }
+
+    #[cfg(all(feature = "keybindings", feature = "crossterm"))]
+    #[test]
+    fn vim_visual_y_yanks_selection_and_exits_highlight_mode() {
+        use crate::keybindings::{CanvasKeyBindings, KeyEventOutcome};
+        use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+
+        let mut textarea = TextAreaState::<TextAreaProvider>::from_text("one\ntwo\nthree");
+        textarea.set_keybindings(CanvasKeyBindings::vim_defaults());
+
+        let out = textarea.handle_key_event(KeyEvent::new(KeyCode::Char('V'), KeyModifiers::NONE));
+        assert!(matches!(out, KeyEventOutcome::Consumed(None)));
+        assert_eq!(textarea.mode(), crate::canvas::modes::AppMode::Highlight);
+
+        let out = textarea.handle_key_event(KeyEvent::new(KeyCode::Char('j'), KeyModifiers::NONE));
+        assert!(matches!(out, KeyEventOutcome::Consumed(None)));
+
+        let out = textarea.handle_key_event(KeyEvent::new(KeyCode::Char('y'), KeyModifiers::NONE));
+        assert!(matches!(out, KeyEventOutcome::Consumed(None)));
+        assert_eq!(textarea.mode(), crate::canvas::modes::AppMode::ReadOnly);
+        assert_eq!(textarea.text(), "one\ntwo\nthree");
+
+        let out = textarea.handle_key_event(KeyEvent::new(KeyCode::Char('p'), KeyModifiers::NONE));
+        assert!(matches!(out, KeyEventOutcome::Consumed(None)));
+        assert_eq!(textarea.text(), "one\ntwo\none\ntwo\nthree");
+        assert_eq!(textarea.mode(), crate::canvas::modes::AppMode::ReadOnly);
     }
 
     #[cfg(all(feature = "keybindings", feature = "crossterm"))]
