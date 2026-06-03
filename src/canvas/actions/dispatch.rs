@@ -42,56 +42,118 @@ impl<D: DataProvider> FormEditor<D> {
             }
 
             // Movement
-            MoveLeft => Self::into_action_result(self.move_left()),
-            MoveRight => Self::into_action_result(self.move_right()),
+            MoveLeft => {
+                if self.is_highlight_mode() {
+                    self.move_left_with_selection();
+                    ActionResult::Success
+                } else {
+                    Self::into_action_result(self.move_left())
+                }
+            }
+            MoveRight => {
+                if self.is_highlight_mode() {
+                    self.move_right_with_selection();
+                    ActionResult::Success
+                } else {
+                    Self::into_action_result(self.move_right())
+                }
+            }
             MoveUp => {
-                self.move_up();
+                if self.is_highlight_mode() {
+                    self.move_up_with_selection();
+                } else {
+                    self.move_up();
+                }
                 ActionResult::Success
             }
             MoveDown => {
-                self.move_down();
+                if self.is_highlight_mode() {
+                    self.move_down_with_selection();
+                } else {
+                    self.move_down();
+                }
                 ActionResult::Success
             }
             MoveWordNext => {
-                self.move_word_next();
+                if self.is_highlight_mode() {
+                    self.move_word_next_with_selection();
+                } else {
+                    self.move_word_next();
+                }
                 ActionResult::Success
             }
             MoveWordPrev => {
-                self.move_word_prev();
+                if self.is_highlight_mode() {
+                    self.move_word_prev_with_selection();
+                } else {
+                    self.move_word_prev();
+                }
                 ActionResult::Success
             }
             MoveWordEnd => {
-                self.move_word_end();
+                if self.is_highlight_mode() {
+                    self.move_word_end_with_selection();
+                } else {
+                    self.move_word_end();
+                }
                 ActionResult::Success
             }
             MoveWordEndPrev => {
-                self.move_word_end_prev();
+                if self.is_highlight_mode() {
+                    self.move_word_end_prev_with_selection();
+                } else {
+                    self.move_word_end_prev();
+                }
                 ActionResult::Success
             }
             MoveBigWordNext => {
-                self.move_big_word_next();
+                if self.is_highlight_mode() {
+                    self.move_big_word_next_with_selection();
+                } else {
+                    self.move_big_word_next();
+                }
                 ActionResult::Success
             }
             MoveBigWordPrev => {
-                self.move_big_word_prev();
+                if self.is_highlight_mode() {
+                    self.move_big_word_prev_with_selection();
+                } else {
+                    self.move_big_word_prev();
+                }
                 ActionResult::Success
             }
             MoveBigWordEnd => {
-                self.move_big_word_end();
+                if self.is_highlight_mode() {
+                    self.move_big_word_end_with_selection();
+                } else {
+                    self.move_big_word_end();
+                }
                 ActionResult::Success
             }
             MoveBigWordEndPrev => {
-                self.move_big_word_end_prev();
+                if self.is_highlight_mode() {
+                    self.move_big_word_end_prev_with_selection();
+                } else {
+                    self.move_big_word_end_prev();
+                }
                 ActionResult::Success
             }
             MoveFirstLine => Self::into_action_result(self.move_first_line()),
             MoveLastLine => Self::into_action_result(self.move_last_line()),
             MoveLineStart => {
-                self.move_line_start();
+                if self.is_highlight_mode() {
+                    self.move_line_start_with_selection();
+                } else {
+                    self.move_line_start();
+                }
                 ActionResult::Success
             }
             MoveLineEnd => {
-                self.move_line_end();
+                if self.is_highlight_mode() {
+                    self.move_line_end_with_selection();
+                } else {
+                    self.move_line_end();
+                }
                 ActionResult::Success
             }
             NextField => {
@@ -160,5 +222,74 @@ impl<D: DataProvider> FormEditor<D> {
             // Fallback: custom or unhandled
             Custom(name) => ActionResult::Message(format!("Unhandled custom action: {name}")),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::canvas::state::SelectionState;
+
+    #[derive(Clone)]
+    struct TestProvider {
+        fields: Vec<(&'static str, String)>,
+    }
+
+    impl TestProvider {
+        fn new(values: &[&'static str]) -> Self {
+            Self {
+                fields: values
+                    .iter()
+                    .enumerate()
+                    .map(|(i, value)| {
+                        let name = match i {
+                            0 => "a",
+                            1 => "b",
+                            _ => "c",
+                        };
+                        (name, (*value).to_string())
+                    })
+                    .collect(),
+            }
+        }
+    }
+
+    impl DataProvider for TestProvider {
+        fn field_count(&self) -> usize {
+            self.fields.len()
+        }
+
+        fn field_name(&self, index: usize) -> &str {
+            self.fields[index].0
+        }
+
+        fn field_value(&self, index: usize) -> &str {
+            &self.fields[index].1
+        }
+
+        fn set_field_value(&mut self, index: usize, value: String) {
+            self.fields[index].1 = value;
+        }
+    }
+
+    #[test]
+    fn dispatch_extends_visual_selection_without_reanchoring() {
+        let mut editor = FormEditor::new(TestProvider::new(&["alpha", "beta"]));
+
+        assert!(editor.execute(CanvasAction::EnterHighlightMode).is_success());
+        assert!(editor.execute(CanvasAction::MoveRight).is_success());
+        assert_eq!(editor.current_field(), 0);
+        assert_eq!(editor.cursor_position(), 1);
+        assert!(matches!(
+            editor.selection_state(),
+            SelectionState::Characterwise { anchor: (0, 0) }
+        ));
+
+        assert!(editor.execute(CanvasAction::MoveDown).is_success());
+        assert_eq!(editor.current_field(), 1);
+        assert!(matches!(
+            editor.selection_state(),
+            SelectionState::Characterwise { anchor: (0, 0) }
+        ));
     }
 }

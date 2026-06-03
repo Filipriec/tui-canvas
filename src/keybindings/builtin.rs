@@ -202,4 +202,33 @@ mod tests {
             }
         }
     }
+
+    #[test]
+    fn builtin_presets_include_undo_redo_in_command_modes() {
+        for bindings in [default_vim_action_bindings()] {
+            for mode in [AppMode::ReadOnly] {
+                for action in [CanvasAction::Undo, CanvasAction::Redo] {
+                    assert!(
+                        bindings
+                            .iter()
+                            .any(|binding| binding.mode == mode && binding.action == action),
+                        "missing {mode:?} binding for {action:?}"
+                    );
+                }
+            }
+        }
+
+        for bindings in [default_helix_action_bindings(), default_emacs_action_bindings()] {
+            for mode in [AppMode::ReadOnly, AppMode::Highlight] {
+                for action in [CanvasAction::Undo, CanvasAction::Redo] {
+                    assert!(
+                        bindings
+                            .iter()
+                            .any(|binding| binding.mode == mode && binding.action == action),
+                        "missing {mode:?} binding for {action:?}"
+                    );
+                }
+            }
+        }
+    }
 }
