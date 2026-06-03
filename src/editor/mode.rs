@@ -218,6 +218,11 @@ impl<D: DataProvider> FormEditor<D> {
                 (AppMode::Highlight, SelectionState::Linewise { .. }) => {
                     self.exit_highlight_mode();
                 }
+                (AppMode::Highlight, SelectionState::Characterwise { anchor }) => {
+                    self.set_highlight_mode_selection(SelectionState::Linewise {
+                        anchor_field: anchor.0,
+                    });
+                }
                 (AppMode::Highlight, _) => {
                     self.set_highlight_mode_selection(SelectionState::Linewise {
                         anchor_field: self.ui_state.current_field,
@@ -419,7 +424,22 @@ mod tests {
         editor.enter_highlight_line_mode();
         assert!(matches!(
             editor.selection_state(),
-            SelectionState::Linewise { anchor_field: 1 }
+            SelectionState::Linewise { anchor_field: 0 }
+        ));
+    }
+
+    #[test]
+    fn visual_linewise_switch_preserves_selected_line_range() {
+        let mut editor = FormEditor::new(TestProvider::new(&["alpha", "beta", "gamma"]));
+
+        editor.enter_highlight_mode();
+        editor.move_down();
+        editor.enter_highlight_line_mode();
+
+        assert_eq!(editor.current_field(), 1);
+        assert!(matches!(
+            editor.selection_state(),
+            SelectionState::Linewise { anchor_field: 0 }
         ));
     }
 }

@@ -118,6 +118,7 @@ impl<D: DataProvider> FormEditor<D> {
                 Some(CanvasAction::EnterHighlightModeLinewise)
             }
             CanvasKeyAction::ExitHighlightMode => Some(CanvasAction::ExitHighlightMode),
+            CanvasKeyAction::MoveHalfPageUp | CanvasKeyAction::MoveHalfPageDown => None,
             CanvasKeyAction::EnterEditModeLineStart
             | CanvasKeyAction::EnterEditModeLineEnd
             | CanvasKeyAction::DeleteLine

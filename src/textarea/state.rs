@@ -129,6 +129,8 @@ pub struct TextAreaState<P: TextAreaDataProvider = TextAreaProvider> {
     #[cfg(feature = "gui")]
     pub(crate) wrap_indent_cols: u16,
     #[cfg(feature = "gui")]
+    pub(crate) viewport_height: u16,
+    #[cfg(feature = "gui")]
     pub(crate) edited_this_frame: bool,
 }
 
@@ -152,6 +154,8 @@ impl<P: TextAreaDataProvider + Default> Default for TextAreaState<P> {
             yank_buffer: None,
             #[cfg(feature = "gui")]
             wrap_indent_cols: 0,
+            #[cfg(feature = "gui")]
+            viewport_height: 10,
             #[cfg(feature = "gui")]
             edited_this_frame: false,
         }
@@ -186,6 +190,8 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
             yank_buffer: None,
             #[cfg(feature = "gui")]
             wrap_indent_cols: 0,
+            #[cfg(feature = "gui")]
+            viewport_height: 10,
             #[cfg(feature = "gui")]
             edited_this_frame: false,
         }
@@ -447,6 +453,35 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         #[cfg(feature = "gui")]
         {
             self.edited_this_frame = true;
+        }
+    }
+
+    fn half_page_lines(&self) -> usize {
+        #[cfg(feature = "gui")]
+        {
+            return (self.viewport_height / 2).max(1) as usize;
+        }
+        #[cfg(not(feature = "gui"))]
+        {
+            5
+        }
+    }
+
+    pub fn move_half_page_up(&mut self, count: usize) {
+        let steps = self.half_page_lines().saturating_mul(count.max(1));
+        for _ in 0..steps {
+            if !self.move_up() {
+                break;
+            }
+        }
+    }
+
+    pub fn move_half_page_down(&mut self, count: usize) {
+        let steps = self.half_page_lines().saturating_mul(count.max(1));
+        for _ in 0..steps {
+            if !self.move_down() {
+                break;
+            }
         }
     }
 
@@ -821,6 +856,14 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
                 }
                 KeyEventOutcome::Consumed(None)
             }
+            CanvasKeyAction::MoveHalfPageUp => {
+                self.move_half_page_up(count);
+                KeyEventOutcome::Consumed(None)
+            }
+            CanvasKeyAction::MoveHalfPageDown => {
+                self.move_half_page_down(count);
+                KeyEventOutcome::Consumed(None)
+            }
             CanvasKeyAction::EnterEditModeLineStart => {
                 self.enter_line_start_insert_mode();
                 KeyEventOutcome::Consumed(None)
@@ -971,6 +1014,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         if inner.height == 0 {
             return;
         }
+        self.viewport_height = inner.height;
 
         match self.overflow_mode {
             TextOverflowMode::Indicator { .. } => {
@@ -1740,6 +1784,43 @@ mod tests {
         assert!(matches!(out, KeyEventOutcome::Consumed(None)));
         assert_eq!(textarea.text(), "two\nthree");
         assert_eq!(textarea.current_field(), 0);
+    }
+
+    #[cfg(all(feature = "keybindings", feature = "crossterm"))]
+    #[test]
+    fn vim_ctrl_u_and_ctrl_d_move_half_page() {
+        use crate::keybindings::{CanvasKeyBindings, KeyEventOutcome};
+        use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+
+        let mut textarea =
+            TextAreaState::<TextAreaProvider>::from_text("0\n1\n2\n3\n4\n5\n6\n7\n8\n9\n10");
+        textarea.set_keybindings(CanvasKeyBindings::vim_defaults());
+        textarea.viewport_height = 6;
+
+        let out = textarea.handle_key_event(KeyEvent::new(
+            KeyCode::Char('d'),
+            KeyModifiers::CONTROL,
+        ));
+        assert!(matches!(out, KeyEventOutcome::Consumed(None)));
+        assert_eq!(textarea.current_field(), 3);
+
+        let out = textarea.handle_key_event(KeyEvent::new(
+            KeyCode::Char('u'),
+            KeyModifiers::CONTROL,
+        ));
+        assert!(matches!(out, KeyEventOutcome::Consumed(None)));
+        assert_eq!(textarea.current_field(), 0);
+
+        assert!(matches!(
+            textarea.handle_key_event(KeyEvent::new(KeyCode::Char('2'), KeyModifiers::NONE)),
+            KeyEventOutcome::Pending
+        ));
+        let out = textarea.handle_key_event(KeyEvent::new(
+            KeyCode::Char('d'),
+            KeyModifiers::CONTROL,
+        ));
+        assert!(matches!(out, KeyEventOutcome::Consumed(None)));
+        assert_eq!(textarea.current_field(), 6);
     }
 
     #[cfg(all(feature = "keybindings", feature = "crossterm"))]
