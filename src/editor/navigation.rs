@@ -110,11 +110,13 @@ impl<D: DataProvider> FormEditor<D> {
             }
         }
 
+        let ideal_cursor_column = self.ui_state.ideal_cursor_column;
         self.ui_state.move_to_field(target_field, field_count);
 
         let current_text = self.current_text();
         let max_pos = current_text.chars().count();
-        self.set_cursor_for_mode(self.ui_state.ideal_cursor_column, max_pos);
+        self.set_cursor_for_mode(ideal_cursor_column, max_pos);
+        self.ui_state.ideal_cursor_column = ideal_cursor_column;
 
         #[cfg(feature = "suggestions")]
         {

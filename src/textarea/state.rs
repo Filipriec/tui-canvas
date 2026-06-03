@@ -1256,4 +1256,29 @@ mod tests {
         assert!(matches!(out, KeyEventOutcome::NotMatched));
         assert_eq!(textarea.text(), "");
     }
+
+    #[cfg(all(feature = "keybindings", feature = "crossterm"))]
+    #[test]
+    fn vim_line_end_preserves_preferred_column_across_vertical_moves() {
+        use crate::keybindings::{CanvasKeyBindings, KeyEventOutcome};
+        use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+
+        let mut textarea = TextAreaState::<TextAreaProvider>::from_text("abcde\nxy\nabcdef");
+        textarea.set_keybindings(CanvasKeyBindings::vim_defaults());
+
+        let out = textarea.handle_key_event(KeyEvent::new(KeyCode::Char('$'), KeyModifiers::NONE));
+        assert!(matches!(out, KeyEventOutcome::Consumed(None)));
+        assert_eq!(textarea.current_field(), 0);
+        assert_eq!(textarea.cursor_position(), 4);
+
+        let out = textarea.handle_key_event(KeyEvent::new(KeyCode::Char('j'), KeyModifiers::NONE));
+        assert!(matches!(out, KeyEventOutcome::Consumed(None)));
+        assert_eq!(textarea.current_field(), 1);
+        assert_eq!(textarea.cursor_position(), 1);
+
+        let out = textarea.handle_key_event(KeyEvent::new(KeyCode::Char('j'), KeyModifiers::NONE));
+        assert!(matches!(out, KeyEventOutcome::Consumed(None)));
+        assert_eq!(textarea.current_field(), 2);
+        assert_eq!(textarea.cursor_position(), 4);
+    }
 }
