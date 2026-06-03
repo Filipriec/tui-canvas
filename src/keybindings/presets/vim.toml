@@ -44,6 +44,10 @@ next_field = ["Tab"]
 prev_field = ["Shift+Tab"]
 delete_char_backward = ["Backspace"]
 delete_char_forward = ["Delete"]
+open_suggestions = ["Ctrl+space"]
+suggestion_down = ["Ctrl+n"]
+suggestion_up = ["Ctrl+p"]
+apply_suggestion = ["Ctrl+y"]
 
 [highlight]
 mode = "highlight"

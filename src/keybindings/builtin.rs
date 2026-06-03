@@ -178,4 +178,28 @@ mod tests {
             .any(|binding| binding.mode == AppMode::Edit
                 && binding.action == CanvasAction::DeleteForward));
     }
+
+    #[test]
+    fn builtin_presets_include_edit_mode_suggestion_bindings() {
+        for bindings in [
+            default_vim_action_bindings(),
+            default_helix_action_bindings(),
+            default_emacs_action_bindings(),
+        ] {
+            for action in [
+                CanvasAction::TriggerSuggestions,
+                CanvasAction::SuggestionDown,
+                CanvasAction::SuggestionUp,
+                CanvasAction::SelectSuggestion,
+            ] {
+                assert!(
+                    bindings
+                        .iter()
+                        .any(|binding| binding.mode == AppMode::Edit
+                            && binding.action == action),
+                    "missing edit mode binding for {action:?}"
+                );
+            }
+        }
+    }
 }
