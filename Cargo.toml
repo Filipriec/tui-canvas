@@ -132,3 +132,13 @@ path = "examples/textarea/textinput_normal.rs"
 name = "undo_redo"
 required-features = ["gui", "cursor-style", "textinput"]
 path = "examples/default/undo_redo.rs"
+
+[[example]]
+name = "form_vim"
+required-features = ["gui", "keybindings", "cursor-style"]
+path = "examples/minimal/form_vim.rs"
+
+[[example]]
+name = "textarea_vim_minimal"
+required-features = ["textarea", "keybindings", "cursor-style"]
+path = "examples/minimal/textarea_vim_minimal.rs"
