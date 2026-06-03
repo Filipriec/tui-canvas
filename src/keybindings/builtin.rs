@@ -141,6 +141,26 @@ mod tests {
     }
 
     #[test]
+    fn vim_defaults_include_visual_big_word_motions() {
+        let keybindings = CanvasKeyBindings::vim_defaults();
+
+        for (key, action) in [
+            ('W', CanvasKeyAction::MoveBigWordNext),
+            ('B', CanvasKeyAction::MoveBigWordPrev),
+            ('E', CanvasKeyAction::MoveBigWordEnd),
+        ] {
+            let stroke = [KeyStroke {
+                code: KeyCode::Char(key),
+                modifiers: KeyModifiers::empty(),
+            }];
+            assert_eq!(
+                keybindings.lookup_action(AppMode::Highlight, &stroke).0,
+                Some(&action)
+            );
+        }
+    }
+
+    #[test]
     fn action_bindings_are_derived_from_builtin_preset() {
         let bindings = default_vim_action_bindings();
 

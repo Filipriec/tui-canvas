@@ -285,6 +285,31 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         }
     }
 
+    fn delete_backward_preserving_mode(&mut self) {
+        let previous_mode = self.mode();
+        self.enter_edit_mode();
+        self.backspace();
+        self.set_mode(previous_mode);
+    }
+
+    fn delete_forward_preserving_mode(&mut self) {
+        let previous_mode = self.mode();
+        self.enter_edit_mode();
+        self.delete_forward_or_join();
+        self.set_mode(previous_mode);
+    }
+
+    fn insert_tab_spaces(&mut self) {
+        self.enter_edit_mode();
+        #[cfg(feature = "gui")]
+        {
+            self.edited_this_frame = true;
+        }
+        for _ in 0..4 {
+            let _ = self.insert_char(' ');
+        }
+    }
+
     pub fn open_line_below(&mut self) {
         #[cfg(feature = "gui")]
         {
@@ -419,6 +444,10 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
 
     #[cfg(feature = "keybindings")]
     pub fn handle_key_event(&mut self, evt: KeyEvent) -> KeyEventOutcome {
+        if evt.kind != KeyEventKind::Press {
+            return KeyEventOutcome::NotMatched;
+        }
+
         let mode = self.editor.ui_state.mode();
 
         let stroke = crate::keybindings::KeyStroke {
@@ -445,19 +474,30 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         self.editor.seq_tracker.reset();
 
         if mode == AppMode::Edit {
-            if let KeyCode::Char(c) = evt.code {
-                let m = evt.modifiers;
-                let is_plain = m.is_empty() || m == KeyModifiers::SHIFT;
-                if is_plain {
-                    self.enter_edit_mode();
-                    #[cfg(feature = "gui")]
-                    {
-                        self.edited_this_frame = true;
-                    }
-                    if self.insert_char(c).is_ok() {
-                        return KeyEventOutcome::Consumed(None);
+            match evt.code {
+                KeyCode::Enter => {
+                    self.insert_newline();
+                    return KeyEventOutcome::Consumed(None);
+                }
+                KeyCode::Tab => {
+                    self.insert_tab_spaces();
+                    return KeyEventOutcome::Consumed(None);
+                }
+                KeyCode::Char(c) => {
+                    let m = evt.modifiers;
+                    let is_plain = m.is_empty() || m == KeyModifiers::SHIFT;
+                    if is_plain {
+                        self.enter_edit_mode();
+                        #[cfg(feature = "gui")]
+                        {
+                            self.edited_this_frame = true;
+                        }
+                        if self.insert_char(c).is_ok() {
+                            return KeyEventOutcome::Consumed(None);
+                        }
                     }
                 }
+                _ => {}
             }
         }
 
@@ -472,6 +512,18 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         use crate::keybindings::CanvasKeyAction;
 
         match action {
+            CanvasKeyAction::NextField if self.mode() == AppMode::Edit => {
+                self.insert_tab_spaces();
+                KeyEventOutcome::Consumed(None)
+            }
+            CanvasKeyAction::DeleteCharBackward => {
+                self.delete_backward_preserving_mode();
+                KeyEventOutcome::Consumed(None)
+            }
+            CanvasKeyAction::DeleteCharForward => {
+                self.delete_forward_preserving_mode();
+                KeyEventOutcome::Consumed(None)
+            }
             CanvasKeyAction::OpenLineBelow => {
                 self.open_line_below();
                 KeyEventOutcome::Consumed(None)
@@ -1088,5 +1140,120 @@ mod tests {
         assert_eq!(textarea.current_field(), 1);
         assert_eq!(textarea.cursor_position(), 0);
         assert_eq!(textarea.mode(), crate::canvas::modes::AppMode::Edit);
+    }
+
+    #[cfg(all(feature = "keybindings", feature = "crossterm"))]
+    #[test]
+    fn vim_edit_enter_inserts_newline() {
+        use crate::keybindings::{CanvasKeyBindings, KeyEventOutcome};
+        use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+
+        let mut textarea = TextAreaState::<TextAreaProvider>::from_text("one");
+        textarea.set_keybindings(CanvasKeyBindings::vim_defaults());
+        textarea.enter_edit_mode();
+        textarea.set_cursor_position(3);
+
+        let out = textarea.handle_key_event(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
+
+        assert!(matches!(out, KeyEventOutcome::Consumed(None)));
+        assert_eq!(textarea.text(), "one\n");
+        assert_eq!(textarea.current_field(), 1);
+        assert_eq!(textarea.cursor_position(), 0);
+        assert_eq!(textarea.mode(), crate::canvas::modes::AppMode::Edit);
+    }
+
+    #[cfg(all(feature = "keybindings", feature = "crossterm"))]
+    #[test]
+    fn vim_edit_backspace_and_delete_join_textarea_lines() {
+        use crate::keybindings::{CanvasKeyBindings, KeyEventOutcome};
+        use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+
+        let mut textarea = TextAreaState::<TextAreaProvider>::from_text("one\ntwo");
+        textarea.set_keybindings(CanvasKeyBindings::vim_defaults());
+        textarea.enter_edit_mode();
+        let _ = textarea.move_down();
+
+        let out = textarea.handle_key_event(KeyEvent::new(KeyCode::Backspace, KeyModifiers::NONE));
+
+        assert!(matches!(out, KeyEventOutcome::Consumed(None)));
+        assert_eq!(textarea.text(), "onetwo");
+        assert_eq!(textarea.current_field(), 0);
+        assert_eq!(textarea.cursor_position(), 3);
+
+        textarea.set_text("one\ntwo");
+        textarea.enter_edit_mode();
+        textarea.set_cursor_position(3);
+
+        let out = textarea.handle_key_event(KeyEvent::new(KeyCode::Delete, KeyModifiers::NONE));
+
+        assert!(matches!(out, KeyEventOutcome::Consumed(None)));
+        assert_eq!(textarea.text(), "onetwo");
+        assert_eq!(textarea.current_field(), 0);
+        assert_eq!(textarea.cursor_position(), 3);
+    }
+
+    #[cfg(all(feature = "keybindings", feature = "crossterm"))]
+    #[test]
+    fn vim_normal_x_and_x_delete_without_entering_edit_mode() {
+        use crate::keybindings::{CanvasKeyBindings, KeyEventOutcome};
+        use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+
+        let mut textarea = TextAreaState::<TextAreaProvider>::from_text("abc");
+        textarea.set_keybindings(CanvasKeyBindings::vim_defaults());
+        let _ = textarea.move_right();
+
+        let out = textarea.handle_key_event(KeyEvent::new(KeyCode::Char('x'), KeyModifiers::NONE));
+
+        assert!(matches!(out, KeyEventOutcome::Consumed(None)));
+        assert_eq!(textarea.text(), "ac");
+        assert_eq!(textarea.cursor_position(), 1);
+        assert_eq!(textarea.mode(), crate::canvas::modes::AppMode::ReadOnly);
+
+        let out = textarea.handle_key_event(KeyEvent::new(KeyCode::Char('X'), KeyModifiers::SHIFT));
+
+        assert!(matches!(out, KeyEventOutcome::Consumed(None)));
+        assert_eq!(textarea.text(), "c");
+        assert_eq!(textarea.cursor_position(), 0);
+        assert_eq!(textarea.mode(), crate::canvas::modes::AppMode::ReadOnly);
+    }
+
+    #[cfg(all(feature = "keybindings", feature = "crossterm"))]
+    #[test]
+    fn vim_edit_tab_inserts_spaces_in_textarea() {
+        use crate::keybindings::{CanvasKeyBindings, KeyEventOutcome};
+        use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+
+        let mut textarea = TextAreaState::<TextAreaProvider>::from_text("ab");
+        textarea.set_keybindings(CanvasKeyBindings::vim_defaults());
+        textarea.enter_edit_mode();
+        textarea.set_cursor_position(1);
+
+        let out = textarea.handle_key_event(KeyEvent::new(KeyCode::Tab, KeyModifiers::NONE));
+
+        assert!(matches!(out, KeyEventOutcome::Consumed(None)));
+        assert_eq!(textarea.text(), "a    b");
+        assert_eq!(textarea.cursor_position(), 5);
+        assert_eq!(textarea.mode(), crate::canvas::modes::AppMode::Edit);
+    }
+
+    #[cfg(all(feature = "keybindings", feature = "crossterm"))]
+    #[test]
+    fn vim_keybinding_path_ignores_key_releases() {
+        use crate::keybindings::{CanvasKeyBindings, KeyEventOutcome};
+        use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
+
+        let mut textarea = TextAreaState::<TextAreaProvider>::from_text("");
+        textarea.set_keybindings(CanvasKeyBindings::vim_defaults());
+        textarea.enter_edit_mode();
+
+        let out = textarea.handle_key_event(KeyEvent {
+            code: KeyCode::Char('x'),
+            modifiers: KeyModifiers::NONE,
+            kind: KeyEventKind::Release,
+            state: crossterm::event::KeyEventState::NONE,
+        });
+
+        assert!(matches!(out, KeyEventOutcome::NotMatched));
+        assert_eq!(textarea.text(), "");
     }
 }
