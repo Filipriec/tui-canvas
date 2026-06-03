@@ -1,0 +1,1038 @@
+# Validation 1:
+
+
+// Demo form data with different validation rules
+struct ValidationDemoData {
+    fields: Vec<(String, String)>,
+}
+
+impl ValidationDemoData {
+    fn new() -> Self {
+        Self {
+            fields: vec![
+                ("👤 Name (max 20)".to_string(), "".to_string()),
+                ("📧 Email (max 50, warn@40)".to_string(), "".to_string()),
+                ("🔑 Password (5-20 chars)".to_string(), "".to_string()),
+                ("🔢 ID (min 3, max 10)".to_string(), "".to_string()),
+                ("📝 Comment (min 10, max 100)".to_string(), "".to_string()),
+                ("🏷️  Tag (max 30, bytes)".to_string(), "".to_string()),
+                ("🌍 Unicode (width, min 2)".to_string(), "".to_string()),
+            ],
+        }
+    }
+}
+
+impl DataProvider for ValidationDemoData {
+    fn field_count(&self) -> usize {
+        self.fields.len()
+    }
+
+    fn field_name(&self, index: usize) -> &str {
+        &self.fields[index].0
+    }
+
+    fn field_value(&self, index: usize) -> &str {
+        &self.fields[index].1
+    }
+
+    fn set_field_value(&mut self, index: usize, value: String) {
+        self.fields[index].1 = value;
+    }
+
+    fn supports_suggestions(&self, _field_index: usize) -> bool {
+        false
+    }
+
+    fn display_value(&self, _index: usize) -> Option<&str> {
+        None
+    }
+
+    // 🎯 NEW: Validation configuration per field
+    fn validation_config(&self, field_index: usize) -> Option<ValidationConfig> {
+        match field_index {
+            0 => Some(ValidationConfig::with_max_length(20)), // Name: simple 20 char limit
+            1 => Some(
+                ValidationConfigBuilder::new()
+                    .with_character_limits(
+                        CharacterLimits::new(50).with_warning_threshold(40)
+                    )
+                    .build()
+            ), // Email: 50 chars with warning at 40
+            2 => Some(
+                ValidationConfigBuilder::new()
+                    .with_character_limits(CharacterLimits::new_range(5, 20))
+                    .build()
+            ), // Password: must be 5-20 characters (blocks field switching if 1-4 chars)
+            3 => Some(
+                ValidationConfigBuilder::new()
+                    .with_character_limits(CharacterLimits::new_range(3, 10))
+                    .build()
+            ), // ID: must be 3-10 characters (blocks field switching if 1-2 chars)
+            4 => Some(
+                ValidationConfigBuilder::new()
+                    .with_character_limits(CharacterLimits::new_range(10, 100))
+                    .build()
+            ), // Comment: must be 10-100 characters (blocks field switching if 1-9 chars)
+            5 => Some(
+                ValidationConfigBuilder::new()
+                    .with_character_limits(
+                        CharacterLimits::new(30).with_count_mode(CountMode::Bytes)
+                    )
+                    .build()
+            ), // Tag: 30 bytes (useful for UTF-8)
+            6 => Some(
+                ValidationConfigBuilder::new()
+                    .with_character_limits(
+                        CharacterLimits::new_range(2, 20).with_count_mode(CountMode::DisplayWidth)
+                    )
+                    .build()
+            ), // Unicode: 2-20 display width (useful for CJK characters, blocks if 1 char)
+            _ => None,
+        }
+    }
+}
+
+# Validation2:
+
+// Advanced demo form with creative and edge-case-heavy validation patterns
+struct AdvancedPatternData {
+    fields: Vec<(String, String)>,
+}
+
+impl AdvancedPatternData {
+    fn new() -> Self {
+        Self {
+            fields: vec![
+                ("🕐 Time (HH:MM) - 24hr format".to_string(), "".to_string()),
+                ("🎨 Hex Color (#RRGGBB) - Web colors".to_string(), "".to_string()),
+                ("🌐 IPv4 (XXX.XXX.XXX.XXX) - Network address".to_string(), "".to_string()),
+                ("🏷️  Product Code (ABC-123-XYZ) - Mixed format".to_string(), "".to_string()),
+                ("📅 Date Code (2024W15) - Year + Week".to_string(), "".to_string()),
+                ("🔢 Binary (101010) - Only 0s and 1s".to_string(), "".to_string()),
+                ("🎯 Complex ID (A1-B2C-3D4E) - Multi-rule".to_string(), "".to_string()),
+                ("🚀 Custom Pattern - Advanced logic".to_string(), "".to_string()),
+            ],
+        }
+    }
+}
+
+impl DataProvider for AdvancedPatternData {
+    fn field_count(&self) -> usize { self.fields.len() }
+    fn field_name(&self, index: usize) -> &str { &self.fields[index].0 }
+    fn field_value(&self, index: usize) -> &str { &self.fields[index].1 }
+    fn set_field_value(&mut self, index: usize, value: String) { self.fields[index].1 = value; }
+
+    fn validation_config(&self, field_index: usize) -> Option<ValidationConfig> {
+        match field_index {
+            0 => {
+                // 🕐 Time (HH:MM) - Hours 00-23, Minutes 00-59
+                // This showcases: Multiple position ranges, exact character matching, custom validation
+                let time_pattern = PatternFilters::new()
+                    .add_filter(PositionFilter::new(
+                        PositionRange::Multiple(vec![0, 1, 3, 4]), // Hours and minutes positions
+                        CharacterFilter::Numeric,
+                    ))
+                    .add_filter(PositionFilter::new(
+                        PositionRange::Single(2), // Colon separator
+                        CharacterFilter::Exact(':'),
+                    ));
+
+                Some(ValidationConfigBuilder::new()
+                    .with_pattern_filters(time_pattern)
+                    .with_max_length(5) // HH:MM = 5 characters
+                    .build())
+            }
+            1 => {
+                // 🎨 Hex Color (#RRGGBB) - Web color format
+                // This showcases: OneOf filter with hex digits, exact character at start
+                let hex_digits = vec!['0','1','2','3','4','5','6','7','8','9','A','B','C','D','E','F','a','b','c','d','e','f'];
+                let hex_color_pattern = PatternFilters::new()
+                    .add_filter(PositionFilter::new(
+                        PositionRange::Single(0), // Hash symbol
+                        CharacterFilter::Exact('#'),
+                    ))
+                    .add_filter(PositionFilter::new(
+                        PositionRange::Range(1, 6), // 6 hex digits for RGB
+                        CharacterFilter::OneOf(hex_digits),
+                    ));
+
+                Some(ValidationConfigBuilder::new()
+                    .with_pattern_filters(hex_color_pattern)
+                    .with_max_length(7) // #RRGGBB = 7 characters
+                    .build())
+            }
+            2 => {
+                // 🌐 IPv4 Address (XXX.XXX.XXX.XXX) - Network address
+                // This showcases: Complex pattern with dots at specific positions
+                let ipv4_pattern = PatternFilters::new()
+                    .add_filter(PositionFilter::new(
+                        PositionRange::Multiple(vec![3, 7, 11]), // Dots at specific positions
+                        CharacterFilter::Exact('.'),
+                    ))
+                    .add_filter(PositionFilter::new(
+                        PositionRange::Multiple(vec![0,1,2,4,5,6,8,9,10,12,13,14]), // Number positions
+                        CharacterFilter::Numeric,
+                    ));
+
+                Some(ValidationConfigBuilder::new()
+                    .with_pattern_filters(ipv4_pattern)
+                    .with_max_length(15) // XXX.XXX.XXX.XXX = up to 15 chars
+                    .build())
+            }
+            3 => {
+                // 🏷️ Product Code (ABC-123-XYZ) - Mixed format sections
+                // This showcases: Different rules for different sections
+                let product_code_pattern = PatternFilters::new()
+                    .add_filter(PositionFilter::new(
+                        PositionRange::Range(0, 2), // First 3 positions: letters
+                        CharacterFilter::Alphabetic,
+                    ))
+                    .add_filter(PositionFilter::new(
+                        PositionRange::Multiple(vec![3, 7]), // Dashes
+                        CharacterFilter::Exact('-'),
+                    ))
+                    .add_filter(PositionFilter::new(
+                        PositionRange::Range(4, 6), // Middle 3 positions: numbers
+                        CharacterFilter::Numeric,
+                    ))
+                    .add_filter(PositionFilter::new(
+                        PositionRange::Range(8, 10), // Last 3 positions: letters
+                        CharacterFilter::Alphabetic,
+                    ));
+
+                Some(ValidationConfigBuilder::new()
+                    .with_pattern_filters(product_code_pattern)
+                    .with_max_length(11) // ABC-123-XYZ = 11 characters
+                    .build())
+            }
+            4 => {
+                // 📅 Date Code (2024W15) - Year + Week format
+                // This showcases: From position filtering and mixed patterns
+                let date_code_pattern = PatternFilters::new()
+                    .add_filter(PositionFilter::new(
+                        PositionRange::Range(0, 3), // Year: 4 digits
+                        CharacterFilter::Numeric,
+                    ))
+                    .add_filter(PositionFilter::new(
+                        PositionRange::Single(4), // Week indicator
+                        CharacterFilter::Exact('W'),
+                    ))
+                    .add_filter(PositionFilter::new(
+                        PositionRange::From(5), // Week number: rest are digits
+                        CharacterFilter::Numeric,
+                    ));
+
+                Some(ValidationConfigBuilder::new()
+                    .with_pattern_filters(date_code_pattern)
+                    .with_max_length(7) // 2024W15 = 7 characters
+                    .build())
+            }
+            5 => {
+                // 🔢 Binary (101010) - Only 0s and 1s
+                // This showcases: OneOf filter with limited character set
+                let binary_pattern = PatternFilters::new()
+                    .add_filter(PositionFilter::new(
+                        PositionRange::From(0), // All positions
+                        CharacterFilter::OneOf(vec!['0', '1']),
+                    ));
+
+                Some(ValidationConfigBuilder::new()
+                    .with_pattern_filters(binary_pattern)
+                    .with_max_length(16) // Allow up to 16 binary digits
+                    .build())
+            }
+            6 => {
+                // 🎯 Complex ID (A1-B2C-3D4E) - Multiple overlapping rules
+                // This showcases: Complex overlapping patterns and edge cases
+                let complex_id_pattern = PatternFilters::new()
+                    .add_filter(PositionFilter::new(
+                        PositionRange::Multiple(vec![0, 3, 6, 8]), // Letter positions
+                        CharacterFilter::Alphabetic,
+                    ))
+                    .add_filter(PositionFilter::new(
+                        PositionRange::Multiple(vec![1, 4, 7, 9]), // Number positions
+                        CharacterFilter::Numeric,
+                    ))
+                    .add_filter(PositionFilter::new(
+                        PositionRange::Multiple(vec![2, 5]), // Dashes
+                        CharacterFilter::Exact('-'),
+                    ))
+                    .add_filter(PositionFilter::new(
+                        PositionRange::Single(5), // Special case: override dash with letter C
+                        CharacterFilter::Alphabetic, // This creates an interesting edge case
+                    ));
+
+                Some(ValidationConfigBuilder::new()
+                    .with_pattern_filters(complex_id_pattern)
+                    .with_max_length(10) // A1-B2C-3D4E = 10 characters
+                    .build())
+            }
+            7 => {
+                // 🚀 Custom Pattern - Advanced logic with custom function
+                // This showcases: Custom validation function for complex rules
+                let custom_pattern = PatternFilters::new()
+                    .add_filter(PositionFilter::new(
+                        PositionRange::From(0),
+                        CharacterFilter::Custom(Arc::new(|c| {
+                            // Advanced rule: Alternating vowels and consonants!
+                            // Even positions (0,2,4...): vowels (a,e,i,o,u)
+                            // Odd positions (1,3,5...): consonants
+                            let vowels = ['a', 'e', 'i', 'o', 'u', 'A', 'E', 'I', 'O', 'U'];
+
+                            // For demo purposes, we'll just accept alphabetic characters
+                            // In real usage, you'd implement the alternating logic based on position
+                            c.is_alphabetic()
+                        })),
+                    ));
+
+                Some(ValidationConfigBuilder::new()
+                    .with_pattern_filters(custom_pattern)
+                    .with_max_length(12) // Allow up to 12 characters
+                    .build())
+            }
+            _ => None,
+        }
+    }
+}
+
+Validation3:
+
+// Demo data with comprehensive mask examples
+struct MaskDemoData {
+    fields: Vec<(String, String)>,
+}
+
+impl MaskDemoData {
+    fn new() -> Self {
+        Self {
+            fields: vec![
+                ("📞 Phone (Dynamic)".to_string(), "".to_string()),
+                ("📞 Phone (Template)".to_string(), "".to_string()),
+                ("📅 Date US (MM/DD/YYYY)".to_string(), "".to_string()),
+                ("📅 Date EU (DD.MM.YYYY)".to_string(), "".to_string()),
+                ("📅 Date ISO (YYYY-MM-DD)".to_string(), "".to_string()),
+                ("🏛️ SSN (XXX-XX-XXXX)".to_string(), "".to_string()),
+                ("💳 Credit Card".to_string(), "".to_string()),
+                ("🏢 Employee ID (EMP-####)".to_string(), "".to_string()),
+                ("📦 Product Code (ABC###XYZ)".to_string(), "".to_string()),
+                ("🌈 Custom Separators".to_string(), "".to_string()),
+                ("⭐ Custom Placeholders".to_string(), "".to_string()),
+                ("🎯 Mixed Input Chars".to_string(), "".to_string()),
+            ],
+        }
+    }
+}
+
+impl DataProvider for MaskDemoData {
+    fn field_count(&self) -> usize { self.fields.len() }
+    fn field_name(&self, index: usize) -> &str { &self.fields[index].0 }
+    fn field_value(&self, index: usize) -> &str { &self.fields[index].1 }
+    fn set_field_value(&mut self, index: usize, value: String) { self.fields[index].1 = value; }
+
+    fn validation_config(&self, field_index: usize) -> Option<ValidationConfig> {
+        match field_index {
+            0 => {
+                // 📞 Phone (Dynamic) - FIXED: Perfect mask/limit coordination
+                let phone_mask = DisplayMask::new("(###) ###-####", '#');
+                Some(ValidationConfigBuilder::new()
+                    .with_display_mask(phone_mask)
+                    .with_max_length(10)  // ✅ CRITICAL: Exactly matches 10 input positions
+                    .build())
+            }
+            1 => {
+                // 📞 Phone (Template) - FIXED: Perfect mask/limit coordination
+                let phone_template = DisplayMask::new("(###) ###-####", '#')
+                    .with_template('_');
+                Some(ValidationConfigBuilder::new()
+                    .with_display_mask(phone_template)
+                    .with_max_length(10)  // ✅ CRITICAL: Exactly matches 10 input positions
+                    .build())
+            }
+            2 => {
+                // 📅 Date US (MM/DD/YYYY) - American date format
+                let us_date = DisplayMask::new("##/##/####", '#');
+                Some(ValidationConfig::with_mask(us_date))
+            }
+            3 => {
+                // 📅 Date EU (DD.MM.YYYY) - European date format with dots
+                let eu_date = DisplayMask::new("##.##.####", '#')
+                    .with_template('•');
+                Some(ValidationConfig::with_mask(eu_date))
+            }
+            4 => {
+                // 📅 Date ISO (YYYY-MM-DD) - ISO date format
+                let iso_date = DisplayMask::new("####-##-##", '#')
+                    .with_template('-');
+                Some(ValidationConfig::with_mask(iso_date))
+            }
+            5 => {
+                // 🏛️ SSN using custom input character 'X' - FIXED: Perfect coordination
+                let ssn_mask = DisplayMask::new("XXX-XX-XXXX", 'X');
+                Some(ValidationConfigBuilder::new()
+                    .with_display_mask(ssn_mask)
+                    .with_max_length(9)  // ✅ CRITICAL: Exactly matches 9 input positions
+                    .build())
+            }
+            6 => {
+                // 💳 Credit Card (16 digits with spaces) - FIXED: Perfect coordination
+                let cc_mask = DisplayMask::new("#### #### #### ####", '#')
+                    .with_template('•');
+                Some(ValidationConfigBuilder::new()
+                    .with_display_mask(cc_mask)
+                    .with_max_length(16)  // ✅ CRITICAL: Exactly matches 16 input positions
+                    .build())
+            }
+            7 => {
+                // 🏢 Employee ID with business prefix
+                let emp_id = DisplayMask::new("EMP-####", '#');
+                Some(ValidationConfig::with_mask(emp_id))
+            }
+            8 => {
+                // 📦 Product Code with mixed letters and numbers
+                let product_code = DisplayMask::new("ABC###XYZ", '#');
+                Some(ValidationConfig::with_mask(product_code))
+            }
+            9 => {
+                // 🌈 Custom Separators - Using | and ~ as separators
+                let custom_sep = DisplayMask::new("##|##~####", '#')
+                    .with_template('?');
+                Some(ValidationConfig::with_mask(custom_sep))
+            }
+            10 => {
+                // ⭐ Custom Placeholders - Using different placeholder characters
+                let custom_placeholder = DisplayMask::new("##-##-##", '#')
+                    .with_template('★');
+                Some(ValidationConfig::with_mask(custom_placeholder))
+            }
+            11 => {
+                // 🎯 Mixed Input Characters - Using 'N' for numbers
+                let mixed_input = DisplayMask::new("ID:NNN-NNN", 'N');
+                Some(ValidationConfig::with_mask(mixed_input))
+            }
+            _ => None,
+        }
+    }
+}
+
+Validation4:
+
+/// PSC (Postal Code) Formatter: "01001" -> "010 01"
+struct PSCFormatter;
+
+impl CustomFormatter for PSCFormatter {
+    fn format(&self, raw: &str) -> FormattingResult {
+        if raw.is_empty() {
+            return FormattingResult::success("");
+        }
+
+        // Validate: only digits allowed
+        if !raw.chars().all(|c| c.is_ascii_digit()) {
+            return FormattingResult::error("PSC must contain only digits");
+        }
+
+        let len = raw.chars().count();
+        match len {
+            0 => FormattingResult::success(""),
+            1..=3 => FormattingResult::success(raw),
+            4 => FormattingResult::warning(
+                format!("{} ", &raw[..3]),
+                "PSC incomplete (4/5 digits)"
+            ),
+            5 => {
+                let formatted = format!("{} {}", &raw[..3], &raw[3..]);
+                if raw == "00000" {
+                    FormattingResult::warning(formatted, "Invalid PSC: 00000")
+                } else {
+                    FormattingResult::success(formatted)
+                }
+            },
+            _ => FormattingResult::error("PSC too long (max 5 digits)"),
+        }
+    }
+}
+
+/// Phone Number Formatter: "1234567890" -> "(123) 456-7890"
+struct PhoneFormatter;
+
+impl CustomFormatter for PhoneFormatter {
+    fn format(&self, raw: &str) -> FormattingResult {
+        if raw.is_empty() {
+            return FormattingResult::success("");
+        }
+
+        // Only digits allowed
+        if !raw.chars().all(|c| c.is_ascii_digit()) {
+            return FormattingResult::error("Phone must contain only digits");
+        }
+
+        let len = raw.chars().count();
+        match len {
+            0 => FormattingResult::success(""),
+            1..=3 => FormattingResult::success(format!("({raw})")),
+            4..=6 => FormattingResult::success(format!("({}) {}", &raw[..3], &raw[3..])),
+            7..=10 => FormattingResult::success(format!("({}) {}-{}", &raw[..3], &raw[3..6], &raw[6..])),
+            10 => {
+                let formatted = format!("({}) {}-{}", &raw[..3], &raw[3..6], &raw[6..]);
+                FormattingResult::success(formatted)
+            },
+            _ => FormattingResult::warning(
+                format!("({}) {}-{}", &raw[..3], &raw[3..6], &raw[6..10]),
+                "Phone too long (extra digits ignored)"
+            ),
+        }
+    }
+}
+
+/// Credit Card Formatter: "1234567890123456" -> "1234 5678 9012 3456"
+struct CreditCardFormatter;
+
+impl CustomFormatter for CreditCardFormatter {
+    fn format(&self, raw: &str) -> FormattingResult {
+        if raw.is_empty() {
+            return FormattingResult::success("");
+        }
+
+        if !raw.chars().all(|c| c.is_ascii_digit()) {
+            return FormattingResult::error("Card number must contain only digits");
+        }
+
+        let mut formatted = String::new();
+        for (i, ch) in raw.chars().enumerate() {
+            if i > 0 && i % 4 == 0 {
+                formatted.push(' ');
+            }
+            formatted.push(ch);
+        }
+
+        let len = raw.chars().count();
+        match len {
+            0..=15 => FormattingResult::warning(formatted, format!("Card incomplete ({len}/16 digits)")),
+            16 => FormattingResult::success(formatted),
+            _ => FormattingResult::warning(formatted, "Card too long (extra digits shown)"),
+        }
+    }
+}
+
+
+
+
+
+
+/// Date Formatter: "12012024" -> "12/01/2024"
+struct DateFormatter;
+
+impl CustomFormatter for DateFormatter {
+    fn format(&self, raw: &str) -> FormattingResult {
+        if raw.is_empty() {
+            return FormattingResult::success("");
+        }
+
+        if !raw.chars().all(|c| c.is_ascii_digit()) {
+            return FormattingResult::error("Date must contain only digits");
+        }
+
+        let len = raw.len();
+        match len {
+            0 => FormattingResult::success(""),
+            1..=2 => FormattingResult::success(raw.to_string()),
+            3..=4 => FormattingResult::success(format!("{}/{}", &raw[..2], &raw[2..])),
+            5..=8 => FormattingResult::success(format!("{}/{}/{}", &raw[..2], &raw[2..4], &raw[4..])),
+            8 => {
+                let month = &raw[..2];
+                let day = &raw[2..4];
+                let year = &raw[4..];
+
+                // Basic validation
+                let m: u32 = month.parse().unwrap_or(0);
+                let d: u32 = day.parse().unwrap_or(0);
+
+                if m == 0 || m > 12 {
+                    FormattingResult::warning(
+                        format!("{month}/{day}/{year}"),
+                        "Invalid month (01-12)"
+                    )
+                } else if d == 0 || d > 31 {
+                    FormattingResult::warning(
+                        format!("{month}/{day}/{year}"),
+                        "Invalid day (01-31)"
+                    )
+                } else {
+                    FormattingResult::success(format!("{month}/{day}/{year}"))
+                }
+            },
+            _ => FormattingResult::error("Date too long (MMDDYYYY format)"),
+        }
+    }
+}
+
+// Enhanced demo data with multiple formatter types
+struct MultiFormatterDemoData {
+    fields: Vec<(String, String)>,
+}
+
+impl MultiFormatterDemoData {
+    fn new() -> Self {
+        Self {
+            fields: vec![
+                ("🏁 PSC (01001)".to_string(), "".to_string()),
+                ("📞 Phone (1234567890)".to_string(), "".to_string()),
+                ("💳 Credit Card (16 digits)".to_string(), "".to_string()),
+                ("📅 Date (12012024)".to_string(), "".to_string()),
+                ("📝 Plain Text".to_string(), "".to_string()),
+            ],
+        }
+    }
+}
+
+impl DataProvider for MultiFormatterDemoData {
+    fn field_count(&self) -> usize {
+        self.fields.len()
+    }
+
+    fn field_name(&self, index: usize) -> &str {
+        &self.fields[index].0
+    }
+
+    fn field_value(&self, index: usize) -> &str {
+        &self.fields[index].1
+    }
+
+    fn set_field_value(&mut self, index: usize, value: String) {
+        self.fields[index].1 = value;
+    }
+
+    #[cfg(feature = "validation")]
+    fn validation_config(&self, field_index: usize) -> Option<ValidationConfig> {
+        match field_index {
+            0 => Some(ValidationConfigBuilder::new()
+                .with_custom_formatter(Arc::new(PSCFormatter))
+                .with_max_length(5)
+                .build()),
+            1 => Some(ValidationConfigBuilder::new()
+                .with_custom_formatter(Arc::new(PhoneFormatter))
+                .with_max_length(12)
+                .build()),
+            2 => Some(ValidationConfigBuilder::new()
+                .with_custom_formatter(Arc::new(CreditCardFormatter))
+                .with_max_length(20)
+                .build()),
+            3 => Some(ValidationConfigBuilder::new()
+                .with_custom_formatter(Arc::new(DateFormatter))
+                .with_max_length(8)
+                .build()),
+            4 => Some(ValidationConfigBuilder::new()
+                .with_custom_formatter(Arc::new(DateFormatter))
+                .with_max_length(8)
+                .build()),
+            _ => None, // Plain text field - no formatter
+        }
+    }
+}
+
+
+Validation5:
+
+
+/// PSC Formatter with enhanced validation context
+struct PSCFormatter;
+
+impl CustomFormatter for PSCFormatter {
+    fn format(&self, raw: &str) -> FormattingResult {
+        if raw.is_empty() {
+            return FormattingResult::success("");
+        }
+
+        if !raw.chars().all(|c| c.is_ascii_digit()) {
+            return FormattingResult::error("PSC must contain only digits");
+        }
+
+        match raw.len() {
+            0 => FormattingResult::success(""),
+            1..=3 => FormattingResult::success(raw.to_string()),
+            4 => FormattingResult::warning(
+                format!("{} ", &raw[..3]),
+                "PSC incomplete - external validation pending"
+            ),
+            5 => FormattingResult::success(format!("{} {}", &raw[..3], &raw[3..])),
+            _ => FormattingResult::error("PSC too long (max 5 digits)"),
+        }
+    }
+}
+
+/// Credit Card Formatter for external validation demo
+struct CreditCardFormatter;
+
+impl CustomFormatter for CreditCardFormatter {
+    fn format(&self, raw: &str) -> FormattingResult {
+        if raw.is_empty() {
+            return FormattingResult::success("");
+        }
+
+        if !raw.chars().all(|c| c.is_ascii_digit()) {
+            return FormattingResult::error("Card number must contain only digits");
+        }
+
+        let mut formatted = String::new();
+        for (i, ch) in raw.chars().enumerate() {
+            if i > 0 && i % 4 == 0 {
+                formatted.push(' ');
+            }
+            formatted.push(ch);
+        }
+
+        match raw.len() {
+            0..=15 => FormattingResult::warning(formatted, "Card incomplete - validation pending"),
+            16 => FormattingResult::success(formatted),
+            _ => FormattingResult::warning(formatted, "Card too long - validation may fail"),
+        }
+    }
+}
+
+/// Comprehensive validation cache
+struct ValidationCache {
+    results: HashMap<String, ExternalValidationState>,
+}
+
+impl ValidationCache {
+    fn new() -> Self {
+        Self {
+            results: HashMap::new(),
+        }
+    }
+
+    fn get(&self, key: &str) -> Option<&ExternalValidationState> {
+        self.results.get(key)
+    }
+
+    fn set(&mut self, key: String, result: ExternalValidationState) {
+        self.results.insert(key, result);
+    }
+
+    fn clear(&mut self) {
+        self.results.clear();
+    }
+}
+
+/// Simulated external validation services
+struct ValidationServices {
+    cache: ValidationCache,
+}
+
+impl ValidationServices {
+    fn new() -> Self {
+        Self {
+            cache: ValidationCache::new(),
+        }
+    }
+
+    /// PSC validation: simulates postal service API lookup
+    fn validate_psc(&mut self, psc: &str) -> ExternalValidationState {
+        let cache_key = format!("psc:{psc}");
+        if let Some(cached) = self.cache.get(&cache_key) {
+            return cached.clone();
+        }
+
+        if psc.is_empty() {
+            return ExternalValidationState::NotValidated;
+        }
+
+        if !psc.chars().all(|c| c.is_ascii_digit()) || psc.len() != 5 {
+            let result = ExternalValidationState::Invalid {
+                message: "Invalid PSC format".to_string(),
+                suggestion: Some("Enter 5 digits".to_string())
+            };
+            self.cache.set(cache_key, result.clone());
+            return result;
+        }
+
+        // Simulate realistic PSC validation scenarios
+        let result = match psc {
+            "00000" | "99999" => ExternalValidationState::Invalid {
+                message: "PSC does not exist".to_string(),
+                suggestion: Some("Check postal code".to_string())
+            },
+            "01001" => ExternalValidationState::Valid(Some("Prague 1 - verified".to_string())),
+            "10000" => ExternalValidationState::Valid(Some("Bratislava - verified".to_string())),
+            "12345" => ExternalValidationState::Warning {
+                message: "PSC region deprecated - still valid".to_string()
+            },
+            "50000" => ExternalValidationState::Invalid {
+                message: "PSC temporarily unavailable".to_string(),
+                suggestion: Some("Try again later".to_string())
+            },
+            _ => {
+                // Most PSCs are valid with generic info
+                let region = match &psc[..2] {
+                    "01" | "02" | "03" => "Prague region",
+                    "10" | "11" | "12" => "Bratislava region",
+                    "20" | "21" => "Brno region",
+                    _ => "Valid postal region"
+                };
+                ExternalValidationState::Valid(Some(format!("{region} - verified")))
+            }
+        };
+
+        self.cache.set(cache_key, result.clone());
+        result
+    }
+
+    /// Email validation: simulates domain checking
+    fn validate_email(&mut self, email: &str) -> ExternalValidationState {
+        let cache_key = format!("email:{email}");
+        if let Some(cached) = self.cache.get(&cache_key) {
+            return cached.clone();
+        }
+
+        if email.is_empty() {
+            return ExternalValidationState::NotValidated;
+        }
+
+        if !email.contains('@') {
+            let result = ExternalValidationState::Invalid {
+                message: "Email must contain @".to_string(),
+                suggestion: Some("Format: user@domain.com".to_string())
+            };
+            self.cache.set(cache_key, result.clone());
+            return result;
+        }
+
+        let parts: Vec<&str> = email.split('@').collect();
+        if parts.len() != 2 || parts[0].is_empty() || parts[1].is_empty() {
+            let result = ExternalValidationState::Invalid {
+                message: "Invalid email format".to_string(),
+                suggestion: Some("Format: user@domain.com".to_string())
+            };
+            self.cache.set(cache_key, result.clone());
+            return result;
+        }
+
+        let domain = parts[1];
+        let result = match domain {
+            "gmail.com" | "outlook.com" | "yahoo.com" => {
+                ExternalValidationState::Valid(Some("Popular email provider - verified".to_string()))
+            },
+            "example.com" | "test.com" => {
+                ExternalValidationState::Warning {
+                    message: "Test domain - email may not be deliverable".to_string()
+                }
+            },
+            "blocked.com" | "spam.com" => {
+                ExternalValidationState::Invalid {
+                    message: "Domain blocked".to_string(),
+                    suggestion: Some("Use different email provider".to_string())
+                }
+            },
+            _ if domain.contains('.') => {
+                ExternalValidationState::Valid(Some("Domain appears valid - not verified".to_string()))
+            },
+            _ => {
+                ExternalValidationState::Invalid {
+                    message: "Invalid domain format".to_string(),
+                    suggestion: Some("Domain must contain '.'".to_string())
+                }
+            }
+        };
+
+        self.cache.set(cache_key, result.clone());
+        result
+    }
+
+    /// Username validation: simulates availability checking
+    fn validate_username(&mut self, username: &str) -> ExternalValidationState {
+        let cache_key = format!("username:{username}");
+        if let Some(cached) = self.cache.get(&cache_key) {
+            return cached.clone();
+        }
+
+        if username.is_empty() {
+            return ExternalValidationState::NotValidated;
+        }
+
+        if username.len() < 3 {
+            let result = ExternalValidationState::Invalid {
+                message: "Username too short".to_string(),
+                suggestion: Some("Minimum 3 characters".to_string())
+            };
+            self.cache.set(cache_key, result.clone());
+            return result;
+        }
+
+        if !username.chars().all(|c| c.is_alphanumeric() || c == '_') {
+            let result = ExternalValidationState::Invalid {
+                message: "Invalid characters".to_string(),
+                suggestion: Some("Use letters, numbers, underscore only".to_string())
+            };
+            self.cache.set(cache_key, result.clone());
+            return result;
+        }
+
+        let result = match username {
+            "admin" | "root" | "user" | "test" => {
+                ExternalValidationState::Invalid {
+                    message: "Username reserved".to_string(),
+                    suggestion: Some("Choose different username".to_string())
+                }
+            },
+            "john123" | "alice_dev" => {
+                ExternalValidationState::Invalid {
+                    message: "Username already taken".to_string(),
+                    suggestion: Some("Try variations or add numbers".to_string())
+                }
+            },
+            username if username.starts_with("temp_") => {
+                ExternalValidationState::Warning {
+                    message: "Temporary username pattern - are you sure?".to_string()
+                }
+            },
+            _ => {
+                ExternalValidationState::Valid(Some("Username available - good choice!".to_string()))
+            }
+        };
+
+        self.cache.set(cache_key, result.clone());
+        result
+    }
+
+    /// API Key validation: simulates authentication service
+    fn validate_api_key(&mut self, key: &str) -> ExternalValidationState {
+        let cache_key = format!("apikey:{key}");
+        if let Some(cached) = self.cache.get(&cache_key) {
+            return cached.clone();
+        }
+
+        if key.is_empty() {
+            return ExternalValidationState::NotValidated;
+        }
+
+        if key.len() < 20 {
+            let result = ExternalValidationState::Invalid {
+                message: "API key too short".to_string(),
+                suggestion: Some("Valid keys are 32+ characters".to_string())
+            };
+            self.cache.set(cache_key, result.clone());
+            return result;
+        }
+
+        let result = match key {
+            "invalid_key_12345678901" => {
+                ExternalValidationState::Invalid {
+                    message: "API key not found".to_string(),
+                    suggestion: Some("Check key and permissions".to_string())
+                }
+            },
+            "expired_key_12345678901" => {
+                ExternalValidationState::Invalid {
+                    message: "API key expired".to_string(),
+                    suggestion: Some("Generate new key".to_string())
+                }
+            },
+            "limited_key_12345678901" => {
+                ExternalValidationState::Warning {
+                    message: "API key has limited permissions".to_string()
+                }
+            },
+            key if key.starts_with("test_") => {
+                ExternalValidationState::Warning {
+                    message: "Test API key - limited functionality".to_string()
+                }
+            },
+            _ if key.len() >= 32 => {
+                ExternalValidationState::Valid(Some("API key authenticated - full access".to_string()))
+            },
+            _ => {
+                ExternalValidationState::Invalid {
+                    message: "Invalid API key format".to_string(),
+                    suggestion: Some("Keys should be 32+ alphanumeric characters".to_string())
+                }
+            }
+        };
+
+        self.cache.set(cache_key, result.clone());
+        result
+    }
+
+    /// Credit Card validation: simulates bank verification
+    fn validate_credit_card(&mut self, card: &str) -> ExternalValidationState {
+        let cache_key = format!("card:{card}");
+        if let Some(cached) = self.cache.get(&cache_key) {
+            return cached.clone();
+        }
+
+        if card.is_empty() {
+            return ExternalValidationState::NotValidated;
+        }
+
+        if !card.chars().all(|c| c.is_ascii_digit()) || card.len() != 16 {
+            let result = ExternalValidationState::Invalid {
+                message: "Invalid card format".to_string(),
+                suggestion: Some("Enter 16 digits".to_string())
+            };
+            self.cache.set(cache_key, result.clone());
+            return result;
+        }
+
+        // Basic Luhn algorithm check (simplified)
+        let sum: u32 = card.chars()
+            .filter_map(|c| c.to_digit(10))
+            .enumerate()
+            .map(|(i, digit)| {
+                if i % 2 == 0 {
+                    let doubled = digit * 2;
+                    if doubled > 9 { doubled - 9 } else { doubled }
+                } else {
+                    digit
+                }
+            })
+            .sum();
+
+        if sum % 10 != 0 {
+            let result = ExternalValidationState::Invalid {
+                message: "Invalid card number (failed checksum)".to_string(),
+                suggestion: Some("Check card number".to_string())
+            };
+            self.cache.set(cache_key, result.clone());
+            return result;
+        }
+
+        let result = match &card[..4] {
+            "4000" => ExternalValidationState::Valid(Some("Visa - card verified".to_string())),
+            "5555" => ExternalValidationState::Valid(Some("Mastercard - card verified".to_string())),
+            "4111" => ExternalValidationState::Warning {
+                message: "Test card number - not for real transactions".to_string()
+            },
+            "0000" => ExternalValidationState::Invalid {
+                message: "Card declined by issuer".to_string(),
+                suggestion: Some("Contact your bank".to_string())
+            },
+            _ => ExternalValidationState::Valid(Some("Card number valid - bank not verified".to_string()))
+        };
+
+        self.cache.set(cache_key, result.clone());
+        result
+    }
+
+    fn clear_cache(&mut self) {
+        self.cache.clear();
+    }
+}
+
+/// Rich demo data with multiple validation types
+struct ValidationDemoData {
+    fields: Vec<(String, String)>,
+}
+
+impl ValidationDemoData {
+    fn new() -> Self {
+        Self {
+            fields: vec![
+                ("🏁 PSC (01001)".to_string(), "".to_string()),
+                ("📧 Email (user@domain.com)".to_string(), "".to_string()),
+                ("👤 Username (3+ chars)".to_string(), "".to_string()),
+                ("🔑 API Key (32+ chars)".to_string(), "".to_string()),
+                ("💳 Credit Card (16 digits)".to_string(), "".to_string()),
+                ("📝 Notes (no validation)".to_string(), "".to_string()),
+            ],
+        }
+    }
+}
+

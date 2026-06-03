@@ -60,68 +60,73 @@ all-nontextmodes = [
 ]
 
 [[example]]
-name = "suggestions"
-required-features = ["suggestions", "gui", "cursor-style"]
-path = "examples/suggestions.rs"
-
-[[example]]
-name = "suggestions2"
-required-features = ["suggestions", "gui", "cursor-style"]
-path = "examples/suggestions2.rs"
-
-[[example]]
 name = "canvas_cursor_auto"
 required-features = ["gui", "cursor-style"]
 path = "examples/canvas_cursor_auto.rs"
 
 [[example]]
-name = "validation_1"
-required-features = ["gui", "validation", "cursor-style"]
-
-[[example]]
-name = "validation_2"
-required-features = ["gui", "validation", "cursor-style"]
-
-[[example]]
-name = "validation_3"
-required-features = ["gui", "validation", "cursor-style"]
-
-[[example]]
-name = "validation_4"
-required-features = ["gui", "validation", "cursor-style"]
-
-[[example]]
-name = "validation_5"
-required-features = ["gui", "validation", "cursor-style"]
+name = "canvas_keybindings"
+required-features = ["gui", "keybindings", "cursor-style"]
+path = "examples/canvas_keybindings.rs"
 
 [[example]]
 name = "computed_fields"
 required-features = ["gui", "computed"]
 
 [[example]]
+name = "validation_1"
+required-features = ["gui", "validation", "cursor-style"]
+path = "examples/validation/validation_1.rs"
+
+[[example]]
+name = "validation_2"
+required-features = ["gui", "validation", "cursor-style"]
+path = "examples/validation/validation_2.rs"
+
+[[example]]
+name = "validation_3"
+required-features = ["gui", "validation", "cursor-style"]
+path = "examples/validation/validation_3.rs"
+
+[[example]]
+name = "validation_4"
+required-features = ["gui", "validation", "cursor-style"]
+path = "examples/validation/validation_4.rs"
+
+[[example]]
+name = "validation_5"
+required-features = ["gui", "validation", "cursor-style"]
+path = "examples/validation/validation_5.rs"
+
+[[example]]
+name = "suggestions"
+required-features = ["suggestions", "gui", "cursor-style"]
+path = "examples/suggestions/suggestions.rs"
+
+[[example]]
+name = "suggestions2"
+required-features = ["suggestions", "gui", "cursor-style"]
+path = "examples/suggestions/suggestions2.rs"
+
+[[example]]
 name = "textarea_vim"
 required-features = ["gui", "cursor-style", "textarea", "textmode-vim"]
-path = "examples/textarea_vim.rs"
+path = "examples/textarea/textarea_vim.rs"
 
 [[example]]
 name = "textarea_normal"
 required-features = ["gui", "cursor-style", "textarea", "textmode-normal"]
-path = "examples/textarea_normal.rs"
+path = "examples/textarea/textarea_normal.rs"
 
 [[example]]
 name = "textarea_syntax"
 required-features = ["gui", "cursor-style", "textarea", "textmode-normal", "syntect"]
-path = "examples/textarea_syntax.rs"
+path = "examples/textarea/textarea_syntax.rs"
 
 [[example]]
 name = "textinput_normal"
 required-features = ["gui", "cursor-style", "textinput", "textmode-normal"]
-path = "examples/textinput_normal.rs"
-
-[[example]]
-name = "canvas_keybindings"
-required-features = ["gui", "keybindings", "cursor-style"]
-path = "examples/canvas_keybindings.rs"
+path = "examples/textarea/textinput_normal.rs"
 
 [[example]]
 name = "undo_redo"
