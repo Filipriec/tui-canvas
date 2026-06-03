@@ -5,6 +5,8 @@ use crate::canvas::CursorManager;
 use crate::canvas::modes::AppMode;
 use crate::canvas::state::EditorState;
 use crate::DataProvider;
+#[cfg(feature = "keybindings")]
+use crate::editor::behavior::EditorBehaviorState;
 #[cfg(feature = "suggestions")]
 use crate::SuggestionItem;
 use derivative::Derivative;
@@ -33,6 +35,9 @@ pub struct FormEditor<D: DataProvider> {
     #[cfg(feature = "keybindings")]
     #[derivative(Default(value = "KeySequenceTracker::new(400)"))]
     pub(crate) seq_tracker: KeySequenceTracker,
+
+    #[cfg(feature = "keybindings")]
+    pub(crate) behavior_state: EditorBehaviorState,
 
     pub(crate) undo_stack: Vec<crate::editor::history::EditSnapshot>,
     pub(crate) redo_stack: Vec<crate::editor::history::EditSnapshot>,
@@ -68,6 +73,8 @@ impl<D: DataProvider> FormEditor<D> {
             keybindings: None,
             #[cfg(feature = "keybindings")]
             seq_tracker: KeySequenceTracker::new(400),
+            #[cfg(feature = "keybindings")]
+            behavior_state: EditorBehaviorState::default(),
             undo_stack: Vec::new(),
             redo_stack: Vec::new(),
             history_limit: crate::editor::history::DEFAULT_HISTORY_LIMIT,

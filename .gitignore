@@ -3,3 +3,4 @@ examples/validation_eg.txt
 ui_debug.log
 .codex
 analysis/
+*.md

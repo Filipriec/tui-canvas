@@ -1,6 +1,8 @@
 // src/textarea/mod.rs
 //! Text area convenience exports.
 
+mod actions;
+mod input;
 pub mod provider;
 pub mod state;
 

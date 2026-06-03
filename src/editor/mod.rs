@@ -6,6 +6,8 @@
 //! computed field helpers). Only module declarations and re-exports live here.
 
 pub mod core;
+#[cfg(feature = "keybindings")]
+pub(crate) mod behavior;
 pub mod display;
 pub mod editing;
 #[cfg(feature = "crossterm")]
