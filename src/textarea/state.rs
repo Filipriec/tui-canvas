@@ -122,10 +122,20 @@ pub struct TextAreaState<P: TextAreaDataProvider = TextAreaProvider> {
     pub(crate) placeholder: Option<String>,
     pub(crate) overflow_mode: TextOverflowMode,
     pub(crate) h_scroll: u16,
+    #[cfg(feature = "keybindings")]
+    vim_count: Option<usize>,
+    #[cfg(feature = "keybindings")]
+    yank_buffer: Option<YankBuffer>,
     #[cfg(feature = "gui")]
     pub(crate) wrap_indent_cols: u16,
     #[cfg(feature = "gui")]
     pub(crate) edited_this_frame: bool,
+}
+
+#[cfg(feature = "keybindings")]
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum YankBuffer {
+    Lines(Vec<String>),
 }
 
 impl<P: TextAreaDataProvider + Default> Default for TextAreaState<P> {
@@ -136,6 +146,10 @@ impl<P: TextAreaDataProvider + Default> Default for TextAreaState<P> {
             placeholder: None,
             overflow_mode: TextOverflowMode::Indicator { ch: '$' },
             h_scroll: 0,
+            #[cfg(feature = "keybindings")]
+            vim_count: None,
+            #[cfg(feature = "keybindings")]
+            yank_buffer: None,
             #[cfg(feature = "gui")]
             wrap_indent_cols: 0,
             #[cfg(feature = "gui")]
@@ -166,6 +180,10 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
             placeholder: None,
             overflow_mode: TextOverflowMode::Indicator { ch: '$' },
             h_scroll: 0,
+            #[cfg(feature = "keybindings")]
+            vim_count: None,
+            #[cfg(feature = "keybindings")]
+            yank_buffer: None,
             #[cfg(feature = "gui")]
             wrap_indent_cols: 0,
             #[cfg(feature = "gui")]
@@ -350,18 +368,27 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
     }
 
     pub fn delete_current_line(&mut self) {
+        self.delete_current_lines(1);
+    }
+
+    pub fn delete_current_lines(&mut self, count: usize) {
         self.editor
             .record_checkpoint(crate::editor::history::EditKind::Other);
 
         let current_line = self.current_field();
         let mut lines = self.editor.data_provider().capture_content();
+        let count = count.max(1);
 
         if lines.len() <= 1 {
             self.editor.data_provider_mut().set_text(String::new());
             self.set_cursor_position(0);
         } else {
             let remove_idx = current_line.min(lines.len() - 1);
-            lines.remove(remove_idx);
+            let end = remove_idx.saturating_add(count).min(lines.len());
+            lines.drain(remove_idx..end);
+            if lines.is_empty() {
+                lines.push(String::new());
+            }
             self.editor.data_provider_mut().restore_content(&lines);
             let target = remove_idx.min(lines.len() - 1);
             let _ = self.transition_to_field(target);
@@ -392,6 +419,10 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
     }
 
     pub fn join_line_below(&mut self) {
+        self.join_lines_below(1);
+    }
+
+    pub fn join_lines_below(&mut self, count: usize) {
         let line_idx = self.current_field();
         if line_idx + 1 >= self.editor.data_provider().field_count() {
             return;
@@ -400,12 +431,86 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         self.editor
             .record_checkpoint(crate::editor::history::EditKind::Other);
 
-        if let Some(new_col) = self.editor.data_provider_mut().join_with_next(line_idx) {
+        let mut last_col = None;
+        for _ in 0..count.max(1) {
+            if let Some(new_col) = self.editor.data_provider_mut().join_with_next(line_idx) {
+                last_col = Some(new_col);
+            } else {
+                break;
+            }
+        }
+
+        if let Some(new_col) = last_col {
             self.set_cursor_position(new_col);
-            self.set_mode(AppMode::ReadOnly);
-            #[cfg(feature = "gui")]
-            {
-                self.edited_this_frame = true;
+        }
+        self.set_mode(AppMode::ReadOnly);
+        #[cfg(feature = "gui")]
+        {
+            self.edited_this_frame = true;
+        }
+    }
+
+    #[cfg(feature = "keybindings")]
+    pub fn yank_current_lines(&mut self, count: usize) {
+        let current = self.current_field();
+        let lines = self.editor.data_provider().capture_content();
+        if lines.is_empty() {
+            self.yank_buffer = Some(YankBuffer::Lines(vec![String::new()]));
+            return;
+        }
+
+        let end = current.saturating_add(count.max(1)).min(lines.len());
+        self.yank_buffer = Some(YankBuffer::Lines(lines[current..end].to_vec()));
+    }
+
+    #[cfg(feature = "keybindings")]
+    pub fn paste_after(&mut self, count: usize) {
+        self.paste_yank(true, count);
+    }
+
+    #[cfg(feature = "keybindings")]
+    pub fn paste_before(&mut self, count: usize) {
+        self.paste_yank(false, count);
+    }
+
+    #[cfg(feature = "keybindings")]
+    fn paste_yank(&mut self, after: bool, count: usize) {
+        let Some(buffer) = self.yank_buffer.clone() else {
+            return;
+        };
+
+        match buffer {
+            YankBuffer::Lines(lines) => {
+                if lines.is_empty() {
+                    return;
+                }
+
+                self.editor
+                    .record_checkpoint(crate::editor::history::EditKind::Other);
+
+                let mut content = self.editor.data_provider().capture_content();
+                let current = self.current_field().min(content.len().saturating_sub(1));
+                let insert_at = if after {
+                    current.saturating_add(1).min(content.len())
+                } else {
+                    current
+                };
+
+                let repeat = count.max(1);
+                let mut insert = Vec::with_capacity(lines.len() * repeat);
+                for _ in 0..repeat {
+                    insert.extend(lines.iter().cloned());
+                }
+
+                content.splice(insert_at..insert_at, insert);
+                self.editor.data_provider_mut().restore_content(&content);
+                let _ = self.transition_to_field(insert_at.min(content.len().saturating_sub(1)));
+                self.move_line_start();
+                self.set_mode(AppMode::ReadOnly);
+                #[cfg(feature = "gui")]
+                {
+                    self.edited_this_frame = true;
+                }
             }
         }
     }
@@ -550,6 +655,22 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
 
         let mode = self.editor.ui_state.mode();
 
+        if mode != AppMode::Edit {
+            if let KeyCode::Char(ch) = evt.code {
+                if let Some(digit) = ch.to_digit(10) {
+                    if digit > 0 || self.vim_count.is_some() {
+                        let current = self.vim_count.unwrap_or(0);
+                        self.vim_count = Some(
+                            current
+                                .saturating_mul(10)
+                                .saturating_add(digit as usize),
+                        );
+                        return KeyEventOutcome::Pending;
+                    }
+                }
+            }
+        }
+
         let stroke = crate::keybindings::KeyStroke {
             code: evt.code,
             modifiers: evt.modifiers,
@@ -563,8 +684,9 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         let (matched, is_prefix) = keybindings.lookup_action(mode, self.editor.seq_tracker.sequence());
 
         if let Some(action) = matched.cloned() {
+            let count = self.take_vim_count();
             self.editor.seq_tracker.reset();
-            return self.dispatch_textarea_key_action(&action);
+            return self.dispatch_textarea_key_action(&action, count);
         }
 
         if is_prefix {
@@ -572,6 +694,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         }
 
         self.editor.seq_tracker.reset();
+        self.vim_count = None;
 
         if mode == AppMode::Edit {
             match evt.code {
@@ -605,9 +728,15 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
     }
 
     #[cfg(feature = "keybindings")]
+    fn take_vim_count(&mut self) -> usize {
+        self.vim_count.take().unwrap_or(1).max(1)
+    }
+
+    #[cfg(feature = "keybindings")]
     fn dispatch_textarea_key_action(
         &mut self,
         action: &crate::keybindings::CanvasKeyAction,
+        count: usize,
     ) -> KeyEventOutcome {
         use crate::keybindings::CanvasKeyAction;
 
@@ -617,19 +746,27 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
                 KeyEventOutcome::Consumed(None)
             }
             CanvasKeyAction::DeleteCharBackward => {
-                self.delete_backward_preserving_mode();
+                for _ in 0..count {
+                    self.delete_backward_preserving_mode();
+                }
                 KeyEventOutcome::Consumed(None)
             }
             CanvasKeyAction::DeleteCharForward => {
-                self.delete_forward_preserving_mode();
+                for _ in 0..count {
+                    self.delete_forward_preserving_mode();
+                }
                 KeyEventOutcome::Consumed(None)
             }
             CanvasKeyAction::OpenLineBelow => {
-                self.open_line_below();
+                for _ in 0..count {
+                    self.open_line_below();
+                }
                 KeyEventOutcome::Consumed(None)
             }
             CanvasKeyAction::OpenLineAbove => {
-                self.open_line_above();
+                for _ in 0..count {
+                    self.open_line_above();
+                }
                 KeyEventOutcome::Consumed(None)
             }
             CanvasKeyAction::EnterEditModeLineStart => {
@@ -641,7 +778,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
                 KeyEventOutcome::Consumed(None)
             }
             CanvasKeyAction::DeleteLine => {
-                self.delete_current_line();
+                self.delete_current_lines(count);
                 KeyEventOutcome::Consumed(None)
             }
             CanvasKeyAction::DeleteToLineEnd => {
@@ -657,14 +794,29 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
                 KeyEventOutcome::Consumed(None)
             }
             CanvasKeyAction::JoinLineBelow => {
-                self.join_line_below();
+                self.join_lines_below(count);
+                KeyEventOutcome::Consumed(None)
+            }
+            CanvasKeyAction::YankLine => {
+                self.yank_current_lines(count);
+                KeyEventOutcome::Consumed(None)
+            }
+            CanvasKeyAction::PasteAfter => {
+                self.paste_after(count);
+                KeyEventOutcome::Consumed(None)
+            }
+            CanvasKeyAction::PasteBefore => {
+                self.paste_before(count);
                 KeyEventOutcome::Consumed(None)
             }
             _ => {
                 let Some(canvas_action) = action.to_canvas_action() else {
                     return KeyEventOutcome::NotMatched;
                 };
-                let result = self.editor.execute(canvas_action);
+                let mut result = crate::canvas::actions::ActionResult::Success;
+                for _ in 0..count {
+                    result = self.editor.execute(canvas_action.clone());
+                }
                 match result {
                     crate::canvas::actions::ActionResult::Success => {
                         KeyEventOutcome::Consumed(None)
@@ -1505,5 +1657,93 @@ mod tests {
         assert_eq!(textarea.current_field(), 0);
         assert_eq!(textarea.cursor_position(), 3);
         assert_eq!(textarea.mode(), crate::canvas::modes::AppMode::ReadOnly);
+    }
+
+    #[cfg(all(feature = "keybindings", feature = "crossterm"))]
+    #[test]
+    fn vim_counts_repeat_motion_and_delete_actions() {
+        use crate::keybindings::{CanvasKeyBindings, KeyEventOutcome};
+        use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+
+        let mut textarea = TextAreaState::<TextAreaProvider>::from_text("abcde\none\ntwo\nthree");
+        textarea.set_keybindings(CanvasKeyBindings::vim_defaults());
+
+        assert!(matches!(
+            textarea.handle_key_event(KeyEvent::new(KeyCode::Char('3'), KeyModifiers::NONE)),
+            KeyEventOutcome::Pending
+        ));
+        let out = textarea.handle_key_event(KeyEvent::new(KeyCode::Char('l'), KeyModifiers::NONE));
+        assert!(matches!(out, KeyEventOutcome::Consumed(None)));
+        assert_eq!(textarea.cursor_position(), 3);
+
+        assert!(matches!(
+            textarea.handle_key_event(KeyEvent::new(KeyCode::Char('2'), KeyModifiers::NONE)),
+            KeyEventOutcome::Pending
+        ));
+        assert!(matches!(
+            textarea.handle_key_event(KeyEvent::new(KeyCode::Char('d'), KeyModifiers::NONE)),
+            KeyEventOutcome::Pending
+        ));
+        let out = textarea.handle_key_event(KeyEvent::new(KeyCode::Char('d'), KeyModifiers::NONE));
+        assert!(matches!(out, KeyEventOutcome::Consumed(None)));
+        assert_eq!(textarea.text(), "two\nthree");
+        assert_eq!(textarea.current_field(), 0);
+    }
+
+    #[cfg(all(feature = "keybindings", feature = "crossterm"))]
+    #[test]
+    fn vim_yank_line_and_paste_after_or_before() {
+        use crate::keybindings::{CanvasKeyBindings, KeyEventOutcome};
+        use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+
+        let mut textarea = TextAreaState::<TextAreaProvider>::from_text("one\ntwo\nthree");
+        textarea.set_keybindings(CanvasKeyBindings::vim_defaults());
+        let _ = textarea.move_down();
+
+        assert!(matches!(
+            textarea.handle_key_event(KeyEvent::new(KeyCode::Char('y'), KeyModifiers::NONE)),
+            KeyEventOutcome::Pending
+        ));
+        let out = textarea.handle_key_event(KeyEvent::new(KeyCode::Char('y'), KeyModifiers::NONE));
+        assert!(matches!(out, KeyEventOutcome::Consumed(None)));
+
+        let out = textarea.handle_key_event(KeyEvent::new(KeyCode::Char('p'), KeyModifiers::NONE));
+        assert!(matches!(out, KeyEventOutcome::Consumed(None)));
+        assert_eq!(textarea.text(), "one\ntwo\ntwo\nthree");
+        assert_eq!(textarea.current_field(), 2);
+
+        let out = textarea.handle_key_event(KeyEvent::new(KeyCode::Char('P'), KeyModifiers::NONE));
+        assert!(matches!(out, KeyEventOutcome::Consumed(None)));
+        assert_eq!(textarea.text(), "one\ntwo\ntwo\ntwo\nthree");
+        assert_eq!(textarea.current_field(), 2);
+    }
+
+    #[cfg(all(feature = "keybindings", feature = "crossterm"))]
+    #[test]
+    fn vim_counted_yank_and_paste_repeat_lines() {
+        use crate::keybindings::{CanvasKeyBindings, KeyEventOutcome};
+        use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+
+        let mut textarea = TextAreaState::<TextAreaProvider>::from_text("one\ntwo\nthree\nfour");
+        textarea.set_keybindings(CanvasKeyBindings::vim_defaults());
+
+        assert!(matches!(
+            textarea.handle_key_event(KeyEvent::new(KeyCode::Char('2'), KeyModifiers::NONE)),
+            KeyEventOutcome::Pending
+        ));
+        assert!(matches!(
+            textarea.handle_key_event(KeyEvent::new(KeyCode::Char('y'), KeyModifiers::NONE)),
+            KeyEventOutcome::Pending
+        ));
+        let out = textarea.handle_key_event(KeyEvent::new(KeyCode::Char('y'), KeyModifiers::NONE));
+        assert!(matches!(out, KeyEventOutcome::Consumed(None)));
+
+        assert!(matches!(
+            textarea.handle_key_event(KeyEvent::new(KeyCode::Char('2'), KeyModifiers::NONE)),
+            KeyEventOutcome::Pending
+        ));
+        let out = textarea.handle_key_event(KeyEvent::new(KeyCode::Char('p'), KeyModifiers::NONE));
+        assert!(matches!(out, KeyEventOutcome::Consumed(None)));
+        assert_eq!(textarea.text(), "one\none\ntwo\none\ntwo\ntwo\nthree\nfour");
     }
 }

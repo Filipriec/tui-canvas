@@ -33,6 +33,9 @@ pub enum CanvasKeyAction {
     ChangeLine,
     ChangeToLineEnd,
     JoinLineBelow,
+    YankLine,
+    PasteAfter,
+    PasteBefore,
     OpenSuggestions,
     ApplySuggestion,
     EnterDecider,
@@ -82,6 +85,9 @@ impl CanvasKeyAction {
             "change_line" => Self::ChangeLine,
             "change_to_line_end" => Self::ChangeToLineEnd,
             "join_line_below" => Self::JoinLineBelow,
+            "yank_line" => Self::YankLine,
+            "paste_after" => Self::PasteAfter,
+            "paste_before" => Self::PasteBefore,
             "open_suggestions" => Self::OpenSuggestions,
             "apply_suggestion" => Self::ApplySuggestion,
             "enter_decider" => Self::EnterDecider,
@@ -131,6 +137,9 @@ impl CanvasKeyAction {
             Self::ChangeLine => "change_line",
             Self::ChangeToLineEnd => "change_to_line_end",
             Self::JoinLineBelow => "join_line_below",
+            Self::YankLine => "yank_line",
+            Self::PasteAfter => "paste_after",
+            Self::PasteBefore => "paste_before",
             Self::OpenSuggestions => "open_suggestions",
             Self::ApplySuggestion => "apply_suggestion",
             Self::EnterDecider => "enter_decider",
@@ -189,7 +198,10 @@ impl CanvasKeyAction {
             | Self::DeleteToLineEnd
             | Self::ChangeLine
             | Self::ChangeToLineEnd
-            | Self::JoinLineBelow => return None,
+            | Self::JoinLineBelow
+            | Self::YankLine
+            | Self::PasteAfter
+            | Self::PasteBefore => return None,
             Self::EnterDecider | Self::Exit | Self::Unknown(_) => return None,
         })
     }

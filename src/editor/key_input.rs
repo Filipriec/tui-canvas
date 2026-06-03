@@ -124,7 +124,10 @@ impl<D: DataProvider> FormEditor<D> {
             | CanvasKeyAction::DeleteToLineEnd
             | CanvasKeyAction::ChangeLine
             | CanvasKeyAction::ChangeToLineEnd
-            | CanvasKeyAction::JoinLineBelow => None,
+            | CanvasKeyAction::JoinLineBelow
+            | CanvasKeyAction::YankLine
+            | CanvasKeyAction::PasteAfter
+            | CanvasKeyAction::PasteBefore => None,
             #[cfg(feature = "suggestions")]
             CanvasKeyAction::OpenSuggestions => Some(CanvasAction::TriggerSuggestions),
             #[cfg(feature = "suggestions")]
