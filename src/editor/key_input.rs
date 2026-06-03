@@ -118,6 +118,13 @@ impl<D: DataProvider> FormEditor<D> {
                 Some(CanvasAction::EnterHighlightModeLinewise)
             }
             CanvasKeyAction::ExitHighlightMode => Some(CanvasAction::ExitHighlightMode),
+            CanvasKeyAction::EnterEditModeLineStart
+            | CanvasKeyAction::EnterEditModeLineEnd
+            | CanvasKeyAction::DeleteLine
+            | CanvasKeyAction::DeleteToLineEnd
+            | CanvasKeyAction::ChangeLine
+            | CanvasKeyAction::ChangeToLineEnd
+            | CanvasKeyAction::JoinLineBelow => None,
             #[cfg(feature = "suggestions")]
             CanvasKeyAction::OpenSuggestions => Some(CanvasAction::TriggerSuggestions),
             #[cfg(feature = "suggestions")]

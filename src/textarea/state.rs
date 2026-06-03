@@ -310,6 +310,106 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         }
     }
 
+    pub fn enter_line_start_insert_mode(&mut self) {
+        self.move_line_start();
+        self.enter_edit_mode();
+    }
+
+    pub fn enter_line_end_insert_mode(&mut self) {
+        self.enter_edit_mode();
+        self.move_line_end();
+    }
+
+    pub fn delete_to_line_end(&mut self) {
+        let line_idx = self.current_field();
+        let cursor = self.cursor_position();
+        let current = self.current_text().to_string();
+        let line_len = current.chars().count();
+
+        if cursor >= line_len {
+            return;
+        }
+
+        self.editor
+            .record_checkpoint(crate::editor::history::EditKind::Delete);
+
+        let kept: String = current.chars().take(cursor).collect();
+        self.editor.data_provider_mut().set_field_value(line_idx, kept);
+        self.set_cursor_position(cursor);
+        #[cfg(feature = "gui")]
+        {
+            self.edited_this_frame = true;
+        }
+    }
+
+    pub fn change_to_line_end(&mut self) {
+        let cursor = self.cursor_position();
+        self.delete_to_line_end();
+        self.enter_edit_mode();
+        self.set_cursor_position(cursor);
+    }
+
+    pub fn delete_current_line(&mut self) {
+        self.editor
+            .record_checkpoint(crate::editor::history::EditKind::Other);
+
+        let current_line = self.current_field();
+        let mut lines = self.editor.data_provider().capture_content();
+
+        if lines.len() <= 1 {
+            self.editor.data_provider_mut().set_text(String::new());
+            self.set_cursor_position(0);
+        } else {
+            let remove_idx = current_line.min(lines.len() - 1);
+            lines.remove(remove_idx);
+            self.editor.data_provider_mut().restore_content(&lines);
+            let target = remove_idx.min(lines.len() - 1);
+            let _ = self.transition_to_field(target);
+            self.move_line_start();
+        }
+
+        self.set_mode(AppMode::ReadOnly);
+        #[cfg(feature = "gui")]
+        {
+            self.edited_this_frame = true;
+        }
+    }
+
+    pub fn change_current_line(&mut self) {
+        self.editor
+            .record_checkpoint(crate::editor::history::EditKind::Other);
+
+        let line_idx = self.current_field();
+        self.editor
+            .data_provider_mut()
+            .set_field_value(line_idx, String::new());
+        self.move_line_start();
+        self.enter_edit_mode();
+        #[cfg(feature = "gui")]
+        {
+            self.edited_this_frame = true;
+        }
+    }
+
+    pub fn join_line_below(&mut self) {
+        let line_idx = self.current_field();
+        if line_idx + 1 >= self.editor.data_provider().field_count() {
+            return;
+        }
+
+        self.editor
+            .record_checkpoint(crate::editor::history::EditKind::Other);
+
+        if let Some(new_col) = self.editor.data_provider_mut().join_with_next(line_idx) {
+            self.set_cursor_position(new_col);
+            self.set_mode(AppMode::ReadOnly);
+            #[cfg(feature = "gui")]
+            {
+                self.edited_this_frame = true;
+            }
+        }
+    }
+
     pub fn open_line_below(&mut self) {
         #[cfg(feature = "gui")]
         {
@@ -530,6 +630,34 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
             }
             CanvasKeyAction::OpenLineAbove => {
                 self.open_line_above();
+                KeyEventOutcome::Consumed(None)
+            }
+            CanvasKeyAction::EnterEditModeLineStart => {
+                self.enter_line_start_insert_mode();
+                KeyEventOutcome::Consumed(None)
+            }
+            CanvasKeyAction::EnterEditModeLineEnd => {
+                self.enter_line_end_insert_mode();
+                KeyEventOutcome::Consumed(None)
+            }
+            CanvasKeyAction::DeleteLine => {
+                self.delete_current_line();
+                KeyEventOutcome::Consumed(None)
+            }
+            CanvasKeyAction::DeleteToLineEnd => {
+                self.delete_to_line_end();
+                KeyEventOutcome::Consumed(None)
+            }
+            CanvasKeyAction::ChangeLine => {
+                self.change_current_line();
+                KeyEventOutcome::Consumed(None)
+            }
+            CanvasKeyAction::ChangeToLineEnd => {
+                self.change_to_line_end();
+                KeyEventOutcome::Consumed(None)
+            }
+            CanvasKeyAction::JoinLineBelow => {
+                self.join_line_below();
                 KeyEventOutcome::Consumed(None)
             }
             _ => {
@@ -1280,5 +1408,102 @@ mod tests {
         assert!(matches!(out, KeyEventOutcome::Consumed(None)));
         assert_eq!(textarea.current_field(), 2);
         assert_eq!(textarea.cursor_position(), 4);
+    }
+
+    #[cfg(all(feature = "keybindings", feature = "crossterm"))]
+    #[test]
+    fn vim_capital_i_and_a_enter_insert_at_line_edges() {
+        use crate::keybindings::{CanvasKeyBindings, KeyEventOutcome};
+        use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+
+        let mut textarea = TextAreaState::<TextAreaProvider>::from_text("abcd");
+        textarea.set_keybindings(CanvasKeyBindings::vim_defaults());
+        textarea.set_cursor_position(2);
+
+        let out = textarea.handle_key_event(KeyEvent::new(KeyCode::Char('I'), KeyModifiers::NONE));
+        assert!(matches!(out, KeyEventOutcome::Consumed(None)));
+        assert_eq!(textarea.cursor_position(), 0);
+        assert_eq!(textarea.mode(), crate::canvas::modes::AppMode::Edit);
+
+        let _ = textarea.exit_edit_mode();
+        let out = textarea.handle_key_event(KeyEvent::new(KeyCode::Char('A'), KeyModifiers::NONE));
+        assert!(matches!(out, KeyEventOutcome::Consumed(None)));
+        assert_eq!(textarea.cursor_position(), 4);
+        assert_eq!(textarea.mode(), crate::canvas::modes::AppMode::Edit);
+    }
+
+    #[cfg(all(feature = "keybindings", feature = "crossterm"))]
+    #[test]
+    fn vim_d_and_c_change_to_line_end() {
+        use crate::keybindings::{CanvasKeyBindings, KeyEventOutcome};
+        use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+
+        let mut textarea = TextAreaState::<TextAreaProvider>::from_text("abcdef");
+        textarea.set_keybindings(CanvasKeyBindings::vim_defaults());
+        textarea.set_cursor_position(2);
+
+        let out = textarea.handle_key_event(KeyEvent::new(KeyCode::Char('D'), KeyModifiers::NONE));
+        assert!(matches!(out, KeyEventOutcome::Consumed(None)));
+        assert_eq!(textarea.text(), "ab");
+        assert_eq!(textarea.cursor_position(), 1);
+        assert_eq!(textarea.mode(), crate::canvas::modes::AppMode::ReadOnly);
+
+        textarea.set_text("abcdef");
+        textarea.set_cursor_position(2);
+        let out = textarea.handle_key_event(KeyEvent::new(KeyCode::Char('C'), KeyModifiers::NONE));
+        assert!(matches!(out, KeyEventOutcome::Consumed(None)));
+        assert_eq!(textarea.text(), "ab");
+        assert_eq!(textarea.cursor_position(), 2);
+        assert_eq!(textarea.mode(), crate::canvas::modes::AppMode::Edit);
+    }
+
+    #[cfg(all(feature = "keybindings", feature = "crossterm"))]
+    #[test]
+    fn vim_dd_and_cc_delete_or_change_current_line() {
+        use crate::keybindings::{CanvasKeyBindings, KeyEventOutcome};
+        use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+
+        let mut textarea = TextAreaState::<TextAreaProvider>::from_text("one\ntwo\nthree");
+        textarea.set_keybindings(CanvasKeyBindings::vim_defaults());
+        let _ = textarea.move_down();
+
+        assert!(matches!(
+            textarea.handle_key_event(KeyEvent::new(KeyCode::Char('d'), KeyModifiers::NONE)),
+            KeyEventOutcome::Pending
+        ));
+        let out = textarea.handle_key_event(KeyEvent::new(KeyCode::Char('d'), KeyModifiers::NONE));
+        assert!(matches!(out, KeyEventOutcome::Consumed(None)));
+        assert_eq!(textarea.text(), "one\nthree");
+        assert_eq!(textarea.current_field(), 1);
+        assert_eq!(textarea.mode(), crate::canvas::modes::AppMode::ReadOnly);
+
+        assert!(matches!(
+            textarea.handle_key_event(KeyEvent::new(KeyCode::Char('c'), KeyModifiers::NONE)),
+            KeyEventOutcome::Pending
+        ));
+        let out = textarea.handle_key_event(KeyEvent::new(KeyCode::Char('c'), KeyModifiers::NONE));
+        assert!(matches!(out, KeyEventOutcome::Consumed(None)));
+        assert_eq!(textarea.text(), "one\n");
+        assert_eq!(textarea.current_field(), 1);
+        assert_eq!(textarea.cursor_position(), 0);
+        assert_eq!(textarea.mode(), crate::canvas::modes::AppMode::Edit);
+    }
+
+    #[cfg(all(feature = "keybindings", feature = "crossterm"))]
+    #[test]
+    fn vim_j_joins_line_below() {
+        use crate::keybindings::{CanvasKeyBindings, KeyEventOutcome};
+        use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+
+        let mut textarea = TextAreaState::<TextAreaProvider>::from_text("one\ntwo");
+        textarea.set_keybindings(CanvasKeyBindings::vim_defaults());
+
+        let out = textarea.handle_key_event(KeyEvent::new(KeyCode::Char('J'), KeyModifiers::NONE));
+
+        assert!(matches!(out, KeyEventOutcome::Consumed(None)));
+        assert_eq!(textarea.text(), "onetwo");
+        assert_eq!(textarea.current_field(), 0);
+        assert_eq!(textarea.cursor_position(), 3);
+        assert_eq!(textarea.mode(), crate::canvas::modes::AppMode::ReadOnly);
     }
 }

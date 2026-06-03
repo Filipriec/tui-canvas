@@ -26,6 +26,13 @@ pub enum CanvasKeyAction {
     Redo,
     OpenLineBelow,
     OpenLineAbove,
+    EnterEditModeLineStart,
+    EnterEditModeLineEnd,
+    DeleteLine,
+    DeleteToLineEnd,
+    ChangeLine,
+    ChangeToLineEnd,
+    JoinLineBelow,
     OpenSuggestions,
     ApplySuggestion,
     EnterDecider,
@@ -68,6 +75,13 @@ impl CanvasKeyAction {
             "redo" => Self::Redo,
             "open_line_below" => Self::OpenLineBelow,
             "open_line_above" => Self::OpenLineAbove,
+            "enter_edit_mode_line_start" => Self::EnterEditModeLineStart,
+            "enter_edit_mode_line_end" => Self::EnterEditModeLineEnd,
+            "delete_line" => Self::DeleteLine,
+            "delete_to_line_end" => Self::DeleteToLineEnd,
+            "change_line" => Self::ChangeLine,
+            "change_to_line_end" => Self::ChangeToLineEnd,
+            "join_line_below" => Self::JoinLineBelow,
             "open_suggestions" => Self::OpenSuggestions,
             "apply_suggestion" => Self::ApplySuggestion,
             "enter_decider" => Self::EnterDecider,
@@ -110,6 +124,13 @@ impl CanvasKeyAction {
             Self::Redo => "redo",
             Self::OpenLineBelow => "open_line_below",
             Self::OpenLineAbove => "open_line_above",
+            Self::EnterEditModeLineStart => "enter_edit_mode_line_start",
+            Self::EnterEditModeLineEnd => "enter_edit_mode_line_end",
+            Self::DeleteLine => "delete_line",
+            Self::DeleteToLineEnd => "delete_to_line_end",
+            Self::ChangeLine => "change_line",
+            Self::ChangeToLineEnd => "change_to_line_end",
+            Self::JoinLineBelow => "join_line_below",
             Self::OpenSuggestions => "open_suggestions",
             Self::ApplySuggestion => "apply_suggestion",
             Self::EnterDecider => "enter_decider",
@@ -162,6 +183,13 @@ impl CanvasKeyAction {
             Self::ExitHighlightMode => CanvasAction::ExitHighlightMode,
             Self::OpenLineBelow => CanvasAction::OpenLineBelow,
             Self::OpenLineAbove => CanvasAction::OpenLineAbove,
+            Self::EnterEditModeLineStart
+            | Self::EnterEditModeLineEnd
+            | Self::DeleteLine
+            | Self::DeleteToLineEnd
+            | Self::ChangeLine
+            | Self::ChangeToLineEnd
+            | Self::JoinLineBelow => return None,
             Self::EnterDecider | Self::Exit | Self::Unknown(_) => return None,
         })
     }
