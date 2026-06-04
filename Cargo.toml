@@ -41,6 +41,7 @@ validation = ["regex", "validation-core", "validation-core/regex"]
 computed = []
 textarea = ["dep:ropey","gui"]
 textinput = ["gui"]
+commandline = ["textinput"]
 syntect = ["dep:syntect", "gui", "textarea"]
 keybindings = ["gui"]
 
@@ -56,6 +57,7 @@ all-nontextmodes = [
     "computed",
     "textarea",
     "textinput",
+    "commandline",
     "keybindings"
 ]
 
@@ -115,7 +117,7 @@ path = "examples/textarea/textarea_vim.rs"
 
 [[example]]
 name = "textarea_normal"
-required-features = ["gui", "cursor-style", "textarea", "textmode-normal"]
+required-features = ["gui", "cursor-style", "textarea", "textmode-normal", "commandline"]
 path = "examples/textarea/textarea_normal.rs"
 
 [[example]]

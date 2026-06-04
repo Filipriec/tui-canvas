@@ -30,6 +30,8 @@ use ratatui::{
 };
 
 use canvas::{
+    CommandLine, CommandLineCommand, CommandLineEventOutcome, CommandLineRegistry,
+    CommandLineState, CommandLineSubmit,
     integration::crossterm_input::{CrosstermInputOptions, CrosstermInputSession},
     CursorManager, TextArea, TextAreaState,
 };
@@ -37,6 +39,8 @@ use canvas::{
 /// TextArea demo adapted for NORMALMODE (always editing)
 struct AutoCursorTextArea {
     textarea: TextAreaState,
+    commandline: CommandLineState,
+    commands: CommandLineRegistry,
     has_unsaved_changes: bool,
     debug_message: String,
     command_buffer: String,
@@ -67,6 +71,8 @@ Press ? for help, Ctrl+Q to quit.";
 
         Self {
             textarea,
+            commandline: CommandLineState::new(),
+            commands: textarea_commands(),
             has_unsaved_changes: false,
             debug_message: "🎯 NORMALMODE Demo - always editing".to_string(),
             command_buffer: String::new(),
@@ -193,10 +199,117 @@ Press ? for help, Ctrl+Q to quit.";
         self.textarea.move_big_word_end_prev();
         self.debug_message = "gE: previous WORD end".to_string();
     }
+
+    fn apply_commandline_submit(&mut self, submit: CommandLineSubmit) {
+        match submit {
+            CommandLineSubmit::SearchForward(query) => {
+                self.textarea.set_search_query(query.clone());
+                let found = self.textarea.find_next();
+                self.debug_message = if found {
+                    format!("Search: /{query}")
+                } else {
+                    format!("Search: no matches for /{query}")
+                };
+            }
+            CommandLineSubmit::SearchBackward(query) => {
+                self.textarea.set_search_query(query.clone());
+                let found = self.textarea.find_previous();
+                self.debug_message = if found {
+                    format!("Search: ?{query}")
+                } else {
+                    format!("Search: no matches for ?{query}")
+                };
+            }
+            CommandLineSubmit::Command(command) => {
+                self.apply_command(&command);
+            }
+        }
+    }
+
+    fn apply_command(&mut self, command: &str) {
+        let invocation = match self.commands.dispatch_pattern(command) {
+            Ok(invocation) => invocation,
+            Err(err) => {
+                self.debug_message = format!("Command error: {err:?}");
+                return;
+            }
+        };
+
+        match invocation.command.name.as_str() {
+            "set-number" => {
+                self.textarea.show_absolute_line_numbers();
+                self.debug_message = "Command: line numbers absolute".to_string();
+            }
+            "set-relative-number" => {
+                self.textarea.show_relative_line_numbers();
+                self.debug_message = "Command: line numbers relative".to_string();
+            }
+            "set-no-number" => {
+                self.textarea.hide_line_numbers();
+                self.debug_message = "Command: line numbers none".to_string();
+            }
+            "no-highlight" => {
+                self.textarea.clear_search();
+                self.debug_message = "Command: search cleared".to_string();
+            }
+            other => {
+                self.debug_message = format!("Command not handled: {other}");
+            }
+        }
+    }
+}
+
+fn textarea_commands() -> CommandLineRegistry {
+    let mut registry = CommandLineRegistry::new();
+    registry
+        .register(
+            CommandLineCommand::new("set-number")
+                .alias("number")
+                .alias("nu")
+                .pattern(["set", "number"])
+                .pattern(["set", "nu"])
+                .description("Show absolute line numbers"),
+        )
+        .register(
+            CommandLineCommand::new("set-relative-number")
+                .alias("relativenumber")
+                .alias("rnu")
+                .pattern(["set", "relativenumber"])
+                .pattern(["set", "rnu"])
+                .description("Show relative line numbers"),
+        )
+        .register(
+            CommandLineCommand::new("set-no-number")
+                .alias("nonumber")
+                .alias("nonu")
+                .pattern(["set", "nonumber"])
+                .pattern(["set", "nonu"])
+                .description("Hide line numbers"),
+        )
+        .register(
+            CommandLineCommand::new("no-highlight")
+                .alias("noh")
+                .alias("nohlsearch")
+                .description("Clear search highlights"),
+        );
+    registry
 }
 
 /// Handle key press in NORMALMODE (always editing, casual editor style)
 fn handle_key_press(key_event: KeyEvent, editor: &mut AutoCursorTextArea) -> anyhow::Result<bool> {
+    match editor.commandline.input_key(key_event) {
+        CommandLineEventOutcome::Ignored => {}
+        CommandLineEventOutcome::Handled => return Ok(true),
+        CommandLineEventOutcome::Cancelled => {
+            editor.set_debug_message("Command line cancelled".to_string());
+            return Ok(true);
+        }
+        CommandLineEventOutcome::Submitted(submit) => {
+            editor.apply_commandline_submit(submit);
+            return Ok(true);
+        }
+    }
+
     let KeyEvent {
         code: key,
         modifiers,
@@ -296,15 +409,6 @@ fn handle_key_press(key_event: KeyEvent, editor: &mut AutoCursorTextArea) -> any
             });
         }
 
-        // Debug/info
-        (KeyCode::Char('?'), _) => {
-            editor.set_debug_message(format!(
-                "{}, Mode: NORMALMODE (casual editor, underscore cursor)",
-                editor.get_cursor_info()
-            ));
-            editor.clear_command_buffer();
-        }
-
         // Default: treat as text input
         _ => editor.handle_textarea_input(key_event),
     }
@@ -347,6 +451,20 @@ fn ui(f: &mut Frame, editor: &mut AutoCursorTextArea) {
 
     render_textarea(f, chunks[0], editor);
     render_status_and_help(f, chunks[1], editor);
+
+    if editor.commandline.is_active() {
+        let commandline_area = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Min(8),
+                Constraint::Length(1),
+                Constraint::Length(3),
+                Constraint::Length(4),
+            ])
+            .split(f.area())[1];
+        let (cx, cy) = editor.commandline.cursor(commandline_area);
+        f.set_cursor_position((cx, cy));
+    }
 }
 
 fn render_textarea(f: &mut Frame, area: ratatui::layout::Rect, editor: &mut AutoCursorTextArea) {
@@ -361,11 +479,17 @@ fn render_textarea(f: &mut Frame, area: ratatui::layout::Rect, editor: &mut Auto
     f.set_cursor_position((cx, cy));
 }
 
-fn render_status_and_help(f: &mut Frame, area: ratatui::layout::Rect, editor: &AutoCursorTextArea) {
+fn render_status_and_help(f: &mut Frame, area: ratatui::layout::Rect, editor: &mut AutoCursorTextArea) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([Constraint::Length(3), Constraint::Length(5)])
+        .constraints([
+            Constraint::Length(1),
+            Constraint::Length(3),
+            Constraint::Length(4),
+        ])
         .split(area);
+
+    f.render_stateful_widget(CommandLine::default(), chunks[0], &mut editor.commandline);
 
     let status_text = if editor.has_pending_command() {
         format!(
@@ -393,18 +517,18 @@ fn render_status_and_help(f: &mut Frame, area: ratatui::layout::Rect, editor: &A
             .title("🎯 Cursor Status"),
     );
 
-    f.render_widget(status, chunks[0]);
+    f.render_widget(status, chunks[1]);
 
     let help_text = "🎯 NORMALMODE (always editing)\n\
 hjkl/arrows=move, w/b/e=words, W/B/E=WORDS, 0/$=line, g/G=first/last\n\
 x/X=delete, typing inserts text\n\
-F5/F6/F7=line numbers, F8/F9=search/clear, n/N=next/previous, ?=info, Ctrl+Q=quit";
+:/?=command/search, n/N=next/previous, :noh clears search, Ctrl+Q=quit";
 
     let help = Paragraph::new(help_text)
         .block(Block::default().borders(Borders::ALL).title("🚀 Help"))
         .style(Style::default().fg(Color::Gray));
 
-    f.render_widget(help, chunks[1]);
+    f.render_widget(help, chunks[2]);
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {

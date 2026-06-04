@@ -30,6 +30,9 @@ pub mod textarea;
 #[cfg(feature = "textinput")]
 pub mod textinput;
 
+#[cfg(feature = "commandline")]
+pub mod commandline;
+
 #[cfg(feature = "cursor-style")]
 pub mod cursor;
 
@@ -106,4 +109,12 @@ pub use textarea::{
 pub use textinput::{
     TextInput, TextInputDataProvider, TextInputEditor, TextInputEventOutcome, TextInputProvider,
     TextInputState,
+};
+
+#[cfg(feature = "commandline")]
+pub use commandline::{
+    parse_command_args, parse_command_line, CommandLine, CommandLineCommand,
+    CommandLineCommandInvocation, CommandLineDispatchError, CommandLineEventOutcome,
+    CommandLineMode, CommandLineParseError, CommandLineParsedCommand, CommandLineRegistry,
+    CommandLineState, CommandLineSubmit,
 };
