@@ -30,7 +30,7 @@ use ratatui::{
 use std::io;
 
 use canvas::{
-    widgets::textarea::highlight::{TextAreaSyntax, TextAreaSyntaxState},
+    textarea::highlight::{TextAreaSyntax, TextAreaSyntaxState},
     CursorManager,
 };
 

@@ -20,7 +20,15 @@ pub mod canvas;
 pub mod data_provider;
 pub mod editor;
 pub mod integration;
-pub mod widgets;
+
+#[cfg(feature = "gui")]
+pub mod form;
+
+#[cfg(feature = "textarea")]
+pub mod textarea;
+
+#[cfg(feature = "textinput")]
+pub mod textinput;
 
 #[cfg(feature = "cursor-style")]
 pub mod cursor;
@@ -70,13 +78,13 @@ pub use computed::{ComputedContext, ComputedProvider, ComputedState};
 pub use canvas::theme::{CanvasTheme, DefaultCanvasTheme};
 
 #[cfg(feature = "gui")]
-pub use widgets::form::{render_canvas, render_canvas_default};
+pub use form::{render_canvas, render_canvas_default};
 
 #[cfg(feature = "gui")]
-pub use widgets::form::render_canvas_with_options;
+pub use form::render_canvas_with_options;
 
 #[cfg(feature = "gui")]
-pub use widgets::form::{CanvasDisplayOptions, OverflowMode};
+pub use form::{CanvasDisplayOptions, OverflowMode};
 
 #[cfg(all(feature = "gui", feature = "suggestions"))]
 pub use suggestions::render::render_suggestions_dropdown;
@@ -89,12 +97,12 @@ pub use keybindings::{
 };
 
 #[cfg(feature = "textarea")]
-pub use widgets::textarea::{
+pub use textarea::{
     TextArea, TextAreaDataProvider, TextAreaEditor, TextAreaProvider, TextAreaState,
 };
 
 #[cfg(feature = "textinput")]
-pub use widgets::textinput::{
+pub use textinput::{
     TextInput, TextInputDataProvider, TextInputEditor, TextInputEventOutcome, TextInputProvider,
     TextInputState,
 };

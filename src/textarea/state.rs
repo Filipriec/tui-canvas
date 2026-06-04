@@ -6,7 +6,7 @@ use crate::cursor::CursorManager;
 use crate::editor::FormEditor;
 #[cfg(feature = "gui")]
 use crate::gui_utils::{compute_h_scroll_with_padding, RIGHT_PAD};
-use crate::widgets::textarea::provider::{TextAreaDataProvider, TextAreaProvider};
+use crate::textarea::provider::{TextAreaDataProvider, TextAreaProvider};
 #[cfg(feature = "cursor-style")]
 use std::io;
 
@@ -707,7 +707,7 @@ mod tests {
     #[cfg(feature = "crossterm")]
     use super::TextAreaEventOutcome;
     use super::TextAreaState;
-    use crate::widgets::textarea::provider::TextAreaProvider;
+    use crate::textarea::provider::TextAreaProvider;
 
     #[test]
     fn paste_splits_lines() {

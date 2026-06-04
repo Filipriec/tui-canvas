@@ -7,14 +7,12 @@ use ratatui::{
     widgets::{Block, BorderType, Borders, Paragraph, StatefulWidget, Widget},
 };
 
-use unicode_width::UnicodeWidthChar;
-
 use super::chunks::{clip_chunks_window_with_indicator_padded, wrap_chunks_indented};
 use super::state::TextAreaSyntaxState;
 
 use crate::data_provider::DataProvider;
 use crate::gui_utils::{compute_h_scroll_with_padding, display_cols_up_to, display_width};
-use crate::widgets::textarea::state::{count_wrapped_rows_indented, TextOverflowMode};
+use crate::textarea::state::{count_wrapped_rows_indented, TextOverflowMode};
 
 #[derive(Debug, Clone)]
 pub struct TextAreaSyntax<'a> {

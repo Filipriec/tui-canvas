@@ -13,10 +13,10 @@ use crate::canvas::state::SelectionState;
 #[cfg(feature = "gui")]
 use crate::gui_utils::{compute_h_scroll_with_padding, display_cols_up_to, display_width};
 #[cfg(feature = "gui")]
-use crate::widgets::textarea::provider::{TextAreaDataProvider, TextAreaProvider};
+use crate::textarea::provider::{TextAreaDataProvider, TextAreaProvider};
 
 #[cfg(feature = "gui")]
-use crate::widgets::textarea::state::{
+use crate::textarea::state::{
     count_wrapped_rows_indented, TextAreaState, TextOverflowMode,
 };
 

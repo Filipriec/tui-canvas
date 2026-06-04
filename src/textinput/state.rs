@@ -6,13 +6,13 @@ use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use std::io;
 
 #[cfg(feature = "cursor-style")]
-use crate::canvas::{modes::AppMode, CursorManager};
+use crate::{canvas::modes::AppMode, CursorManager};
 use crate::editor::FormEditor;
 #[cfg(feature = "gui")]
 use crate::gui_utils::{
     compute_h_scroll_with_padding, display_cols_up_to, display_width, RIGHT_PAD,
 };
-use crate::widgets::textinput::provider::{TextInputDataProvider, TextInputProvider};
+use crate::textinput::provider::{TextInputDataProvider, TextInputProvider};
 
 #[cfg(feature = "gui")]
 use ratatui::{layout::Rect, widgets::Block};
@@ -645,7 +645,7 @@ mod tests {
     use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
     use super::{TextInputEventOutcome, TextInputState};
-    use crate::widgets::textinput::provider::TextInputProvider;
+    use crate::textinput::provider::TextInputProvider;
 
     #[test]
     fn enter_submits_without_mutating_text() {

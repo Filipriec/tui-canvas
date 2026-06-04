@@ -1,4 +1,4 @@
-use crate::widgets::textarea::{TextAreaDataProvider, TextAreaState};
+use crate::textarea::{TextAreaDataProvider, TextAreaState};
 
 impl<P: TextAreaDataProvider> TextAreaState<P> {
     pub fn insert_newline(&mut self) {
