@@ -28,7 +28,7 @@ use ratatui::{
 use std::io;
 
 use canvas::{
-    canvas::{gui::render_canvas_default, modes::AppMode},
+    render_canvas_default, AppMode,
     computed::{ComputedContext, ComputedProvider},
     DataProvider, FormEditor,
 };
@@ -431,47 +431,47 @@ fn handle_key_press(
     }
 
     match (mode, key, modifiers) {
-        (AppMode::ReadOnly, KeyCode::Char('i'), _) => {
+        (AppMode::Nor, KeyCode::Char('i'), _) => {
             editor.enter_edit_mode();
         }
-        (AppMode::ReadOnly, KeyCode::Char('a'), _) => {
+        (AppMode::Nor, KeyCode::Char('a'), _) => {
             editor.enter_append_mode();
         }
-        (AppMode::ReadOnly, KeyCode::Char('A'), _) => {
+        (AppMode::Nor, KeyCode::Char('A'), _) => {
             editor.editor.move_line_end();
             editor.enter_edit_mode();
         }
         (_, KeyCode::Esc, _) => {
-            if mode == AppMode::Edit {
+            if mode == AppMode::Ins {
                 editor.exit_edit_mode();
             }
         }
 
         // Movement
-        (AppMode::ReadOnly, KeyCode::Char('h'), _) | (AppMode::ReadOnly, KeyCode::Left, _) => {
+        (AppMode::Nor, KeyCode::Char('h'), _) | (AppMode::Nor, KeyCode::Left, _) => {
             editor.move_left();
         }
-        (AppMode::ReadOnly, KeyCode::Char('l'), _) | (AppMode::ReadOnly, KeyCode::Right, _) => {
+        (AppMode::Nor, KeyCode::Char('l'), _) | (AppMode::Nor, KeyCode::Right, _) => {
             editor.move_right();
         }
-        (AppMode::ReadOnly, KeyCode::Char('j'), _) | (AppMode::ReadOnly, KeyCode::Down, _) => {
+        (AppMode::Nor, KeyCode::Char('j'), _) | (AppMode::Nor, KeyCode::Down, _) => {
             editor.move_down();
         }
-        (AppMode::ReadOnly, KeyCode::Char('k'), _) | (AppMode::ReadOnly, KeyCode::Up, _) => {
+        (AppMode::Nor, KeyCode::Char('k'), _) | (AppMode::Nor, KeyCode::Up, _) => {
             editor.move_up();
         }
 
         // Edit mode movement
-        (AppMode::Edit, KeyCode::Left, _) => {
+        (AppMode::Ins, KeyCode::Left, _) => {
             editor.move_left();
         }
-        (AppMode::Edit, KeyCode::Right, _) => {
+        (AppMode::Ins, KeyCode::Right, _) => {
             editor.move_right();
         }
-        (AppMode::Edit, KeyCode::Up, _) => {
+        (AppMode::Ins, KeyCode::Up, _) => {
             editor.move_up();
         }
-        (AppMode::Edit, KeyCode::Down, _) => {
+        (AppMode::Ins, KeyCode::Down, _) => {
             editor.move_down();
         }
 
@@ -484,18 +484,18 @@ fn handle_key_press(
         }
 
         // Editing
-        (AppMode::Edit, KeyCode::Char(c), m) if !m.contains(KeyModifiers::CONTROL) => {
+        (AppMode::Ins, KeyCode::Char(c), m) if !m.contains(KeyModifiers::CONTROL) => {
             editor.insert_char(c)?;
         }
-        (AppMode::Edit, KeyCode::Backspace, _) => {
+        (AppMode::Ins, KeyCode::Backspace, _) => {
             editor.delete_backward()?;
         }
-        (AppMode::Edit, KeyCode::Delete, _) => {
+        (AppMode::Ins, KeyCode::Delete, _) => {
             editor.delete_forward()?;
         }
 
         // Debug info
-        (AppMode::ReadOnly, KeyCode::Char('?'), _) => {
+        (AppMode::Nor, KeyCode::Char('?'), _) => {
             let current = editor.current_field();
             let field_name = editor.data_provider().field_name(current);
             let field_type = if editor.is_computed_field(current) {
@@ -565,8 +565,8 @@ fn render_computed_status(f: &mut Frame, area: Rect, editor: &ComputedFieldsEdit
         .split(area);
 
     let mode_text = match editor.mode() {
-        AppMode::Edit => "INSERT",
-        AppMode::ReadOnly => "NORMAL",
+        AppMode::Ins => "INSERT",
+        AppMode::Nor => "NORMAL",
         _ => "OTHER",
     };
 
@@ -591,7 +591,7 @@ fn render_computed_status(f: &mut Frame, area: Rect, editor: &ComputedFieldsEdit
     f.render_widget(status, chunks[0]);
 
     let help_text = match editor.mode() {
-        AppMode::ReadOnly => {
+        AppMode::Nor => {
             "💰 COMPUTED FIELDS DEMO: Real-time invoice calculations!\n\
              🔢 EDITABLE: Product, Quantity, Unit Price, Tax Rate, Notes\n\
              📊 COMPUTED: Subtotal, Tax Amount, Total (calculated automatically)\n\
@@ -600,7 +600,7 @@ fn render_computed_status(f: &mut Frame, area: Rect, editor: &ComputedFieldsEdit
              Watch Subtotal and Total appear! Add Tax Rate to see tax calculations.\n\
              Navigation: Tab/Shift+Tab skips computed fields automatically"
         }
-        AppMode::Edit => {
+        AppMode::Ins => {
             "✏️ EDIT MODE: Type numbers to see calculations appear!\n\
              \n\
              💡 EXAMPLE: Type '5' in Quantity, then Tab to Unit Price and type '19.99'\n\

@@ -31,9 +31,9 @@ use std::io;
 use std::sync::Arc;
 
 use canvas::{
-    canvas::{gui::render_canvas_default, modes::AppMode, CursorManager},
-    CharacterFilter, DataProvider, FormEditor, PatternFilters, PositionFilter, PositionRange,
-    ValidationConfig, ValidationConfigBuilder,
+    render_canvas_default, AppMode, CursorManager, CharacterFilter, DataProvider,
+    FormEditor, PatternFilters, PositionFilter, PositionRange, ValidationConfig,
+    ValidationConfigBuilder,
 };
 
 struct AdvancedPatternFormEditor<D: DataProvider> {
@@ -544,21 +544,21 @@ fn handle_key_press(
 
     match (mode, key, modifiers) {
         // Mode transitions
-        (AppMode::ReadOnly, KeyCode::Char('i'), _) => {
+        (AppMode::Nor, KeyCode::Char('i'), _) => {
             editor.enter_edit_mode();
             editor.clear_command_buffer();
         }
-        (AppMode::ReadOnly, KeyCode::Char('a'), _) => {
+        (AppMode::Nor, KeyCode::Char('a'), _) => {
             editor.enter_append_mode();
             editor.clear_command_buffer();
         }
-        (AppMode::ReadOnly, KeyCode::Char('A'), _) => {
+        (AppMode::Nor, KeyCode::Char('A'), _) => {
             editor.move_line_end();
             editor.enter_edit_mode();
             editor.clear_command_buffer();
         }
         (_, KeyCode::Esc, _) => {
-            if mode == AppMode::Edit {
+            if mode == AppMode::Ins {
                 editor.exit_edit_mode();
             } else {
                 editor.clear_command_buffer();
@@ -566,47 +566,47 @@ fn handle_key_press(
         }
 
         // Validation commands
-        (AppMode::ReadOnly, KeyCode::F(1), _) => {
+        (AppMode::Nor, KeyCode::F(1), _) => {
             editor.toggle_validation();
         }
 
         // Movement in ReadOnly mode
-        (AppMode::ReadOnly, KeyCode::Char('h'), _) | (AppMode::ReadOnly, KeyCode::Left, _) => {
+        (AppMode::Nor, KeyCode::Char('h'), _) | (AppMode::Nor, KeyCode::Left, _) => {
             editor.move_left();
             editor.clear_command_buffer();
         }
-        (AppMode::ReadOnly, KeyCode::Char('l'), _) | (AppMode::ReadOnly, KeyCode::Right, _) => {
+        (AppMode::Nor, KeyCode::Char('l'), _) | (AppMode::Nor, KeyCode::Right, _) => {
             editor.move_right();
             editor.clear_command_buffer();
         }
-        (AppMode::ReadOnly, KeyCode::Char('j'), _) | (AppMode::ReadOnly, KeyCode::Down, _) => {
+        (AppMode::Nor, KeyCode::Char('j'), _) | (AppMode::Nor, KeyCode::Down, _) => {
             editor.move_down();
             editor.clear_command_buffer();
         }
-        (AppMode::ReadOnly, KeyCode::Char('k'), _) | (AppMode::ReadOnly, KeyCode::Up, _) => {
+        (AppMode::Nor, KeyCode::Char('k'), _) | (AppMode::Nor, KeyCode::Up, _) => {
             editor.move_up();
             editor.clear_command_buffer();
         }
 
         // Movement in Edit mode
-        (AppMode::Edit, KeyCode::Left, _) => {
+        (AppMode::Ins, KeyCode::Left, _) => {
             editor.move_left();
         }
-        (AppMode::Edit, KeyCode::Right, _) => {
+        (AppMode::Ins, KeyCode::Right, _) => {
             editor.move_right();
         }
-        (AppMode::Edit, KeyCode::Up, _) => {
+        (AppMode::Ins, KeyCode::Up, _) => {
             editor.move_up();
         }
-        (AppMode::Edit, KeyCode::Down, _) => {
+        (AppMode::Ins, KeyCode::Down, _) => {
             editor.move_down();
         }
 
         // Delete operations
-        (AppMode::Edit, KeyCode::Backspace, _) => {
+        (AppMode::Ins, KeyCode::Backspace, _) => {
             editor.delete_backward()?;
         }
-        (AppMode::Edit, KeyCode::Delete, _) => {
+        (AppMode::Ins, KeyCode::Delete, _) => {
             editor.delete_forward()?;
         }
 
@@ -619,12 +619,12 @@ fn handle_key_press(
         }
 
         // Character input
-        (AppMode::Edit, KeyCode::Char(c), m) if !m.contains(KeyModifiers::CONTROL) => {
+        (AppMode::Ins, KeyCode::Char(c), m) if !m.contains(KeyModifiers::CONTROL) => {
             editor.insert_char(c)?;
         }
 
         // Debug info
-        (AppMode::ReadOnly, KeyCode::Char('?'), _) => {
+        (AppMode::Nor, KeyCode::Char('?'), _) => {
             let summary = editor.editor.validation_summary();
             editor.set_debug_message(format!(
                 "Field {}/{}, Pos {}, Mode: {:?}, Advanced patterns: {} configured",
@@ -697,8 +697,8 @@ fn render_advanced_validation_status(
 
     // Status bar
     let mode_text = match editor.mode() {
-        AppMode::Edit => "INSERT | (bar cursor)",
-        AppMode::ReadOnly => "NORMAL █ (block cursor)",
+        AppMode::Ins => "INSERT | (bar cursor)",
+        AppMode::Nor => "NORMAL █ (block cursor)",
         _ => "NORMAL █ (block cursor)",
     };
 
@@ -772,7 +772,7 @@ fn render_advanced_validation_status(
 
     // Help text
     let help_text = match editor.mode() {
-        AppMode::ReadOnly => {
+        AppMode::Nor => {
             "🚀 ADVANCED PATTERN SHOWCASE - Each field demonstrates different edge cases!\n\
              🕐 Time: Numeric+exact chars  🎨 Hex: OneOf with case-insensitive  🌐 IPv4: Complex positioning\n\
              🏷️  Product: Multi-section rules  📅 Date: From-position filtering  🔢 Binary: Limited charset\n\
@@ -780,7 +780,7 @@ fn render_advanced_validation_status(
              \n\
              Movement: hjkl/arrows=move, Tab/Shift+Tab=fields, i/a=insert, F1=toggle, ?=info"
         }
-        AppMode::Edit => {
+        AppMode::Ins => {
             "✏️  INSERT MODE - Testing advanced pattern validation!\n\
              Each character is validated against complex rules in real-time\n\
              Try entering invalid characters to see detailed error messages\n\
@@ -821,9 +821,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut editor = AdvancedPatternFormEditor::new(data);
 
     // Initialize with normal mode - library automatically sets block cursor
-    editor.set_mode(AppMode::ReadOnly);
+    editor.set_mode(AppMode::Nor);
 
-    CursorManager::update_for_mode(AppMode::ReadOnly)?;
+    CursorManager::update_for_mode(AppMode::Nor)?;
 
     let res = run_app(&mut terminal, editor);
 

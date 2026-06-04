@@ -17,9 +17,8 @@ compile_error!(
 );
 
 use canvas::{
-    canvas::{gui::render_canvas_default, modes::AppMode, CursorManager},
-    CharacterLimits, DataProvider, FormEditor, ValidationConfig, ValidationConfigBuilder,
-    ValidationResult,
+    render_canvas_default, AppMode, CursorManager, CharacterLimits, DataProvider,
+    FormEditor, ValidationConfig, ValidationConfigBuilder, ValidationResult,
 };
 use crossterm::{
     event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyModifiers},
@@ -494,22 +493,22 @@ fn handle_key_press(
 
     match (mode, key, modifiers) {
         // Mode transitions
-        (AppMode::ReadOnly, KeyCode::Char('i'), _) => {
+        (AppMode::Nor, KeyCode::Char('i'), _) => {
             editor.enter_edit_mode();
             editor.clear_command_buffer();
         }
-        (AppMode::ReadOnly, KeyCode::Char('a'), _) => {
+        (AppMode::Nor, KeyCode::Char('a'), _) => {
             editor.enter_append_mode();
             editor.clear_command_buffer();
         }
-        (AppMode::ReadOnly, KeyCode::Char('A'), _) => {
+        (AppMode::Nor, KeyCode::Char('A'), _) => {
             editor.move_line_end();
             editor.enter_edit_mode();
             editor.clear_command_buffer();
         }
         // Escape: Exit edit mode
         (_, KeyCode::Esc, _) => {
-            if mode == AppMode::Edit {
+            if mode == AppMode::Ins {
                 editor.exit_edit_mode();
             } else {
                 editor.clear_command_buffer();
@@ -517,59 +516,59 @@ fn handle_key_press(
         }
 
         // Validation commands
-        (AppMode::ReadOnly, KeyCode::Char('v'), _) => {
+        (AppMode::Nor, KeyCode::Char('v'), _) => {
             editor.validate_current_field();
             editor.clear_command_buffer();
         }
-        (AppMode::ReadOnly, KeyCode::Char('V'), _) => {
+        (AppMode::Nor, KeyCode::Char('V'), _) => {
             editor.validate_all_fields();
             editor.clear_command_buffer();
         }
-        (AppMode::ReadOnly, KeyCode::Char('c'), _) => {
+        (AppMode::Nor, KeyCode::Char('c'), _) => {
             editor.clear_validation_results();
             editor.clear_command_buffer();
         }
-        (AppMode::ReadOnly, KeyCode::F(1), _) => {
+        (AppMode::Nor, KeyCode::F(1), _) => {
             editor.toggle_validation();
         }
 
         // Movement
-        (AppMode::ReadOnly, KeyCode::Char('h'), _) | (AppMode::ReadOnly, KeyCode::Left, _) => {
+        (AppMode::Nor, KeyCode::Char('h'), _) | (AppMode::Nor, KeyCode::Left, _) => {
             editor.move_left();
             editor.clear_command_buffer();
         }
-        (AppMode::ReadOnly, KeyCode::Char('l'), _) | (AppMode::ReadOnly, KeyCode::Right, _) => {
+        (AppMode::Nor, KeyCode::Char('l'), _) | (AppMode::Nor, KeyCode::Right, _) => {
             editor.move_right();
             editor.clear_command_buffer();
         }
-        (AppMode::ReadOnly, KeyCode::Char('j'), _) | (AppMode::ReadOnly, KeyCode::Down, _) => {
+        (AppMode::Nor, KeyCode::Char('j'), _) | (AppMode::Nor, KeyCode::Down, _) => {
             editor.move_down();
             editor.clear_command_buffer();
         }
-        (AppMode::ReadOnly, KeyCode::Char('k'), _) | (AppMode::ReadOnly, KeyCode::Up, _) => {
+        (AppMode::Nor, KeyCode::Char('k'), _) | (AppMode::Nor, KeyCode::Up, _) => {
             editor.move_up();
             editor.clear_command_buffer();
         }
 
         // Edit mode movement
-        (AppMode::Edit, KeyCode::Left, _) => {
+        (AppMode::Ins, KeyCode::Left, _) => {
             editor.move_left();
         }
-        (AppMode::Edit, KeyCode::Right, _) => {
+        (AppMode::Ins, KeyCode::Right, _) => {
             editor.move_right();
         }
-        (AppMode::Edit, KeyCode::Up, _) => {
+        (AppMode::Ins, KeyCode::Up, _) => {
             editor.move_up();
         }
-        (AppMode::Edit, KeyCode::Down, _) => {
+        (AppMode::Ins, KeyCode::Down, _) => {
             editor.move_down();
         }
 
         // Delete operations
-        (AppMode::Edit, KeyCode::Backspace, _) => {
+        (AppMode::Ins, KeyCode::Backspace, _) => {
             editor.delete_backward()?;
         }
-        (AppMode::Edit, KeyCode::Delete, _) => {
+        (AppMode::Ins, KeyCode::Delete, _) => {
             editor.delete_forward()?;
         }
 
@@ -582,12 +581,12 @@ fn handle_key_press(
         }
 
         // Character input
-        (AppMode::Edit, KeyCode::Char(c), m) if !m.contains(KeyModifiers::CONTROL) => {
+        (AppMode::Ins, KeyCode::Char(c), m) if !m.contains(KeyModifiers::CONTROL) => {
             editor.insert_char(c)?;
         }
 
         // Debug info commands
-        (AppMode::ReadOnly, KeyCode::Char('?'), _) => {
+        (AppMode::Nor, KeyCode::Char('?'), _) => {
             let summary = editor.editor.validation_summary();
             editor.set_debug_message(format!(
                 "Field {}/{}, Pos {}, Mode: {:?}, Validation: {} fields configured, {} validated",
@@ -667,8 +666,8 @@ fn render_validation_status(
 
     // Status bar with validation information
     let mode_text = match editor.mode() {
-        AppMode::Edit => "INSERT | (bar cursor)",
-        AppMode::ReadOnly => "NORMAL █ (block cursor)",
+        AppMode::Ins => "INSERT | (bar cursor)",
+        AppMode::Nor => "NORMAL █ (block cursor)",
         _ => "NORMAL █ (block cursor)",
     };
 
@@ -760,7 +759,7 @@ fn render_validation_status(
 
     // Help text
     let help_text = match editor.mode() {
-        AppMode::ReadOnly => {
+        AppMode::Nor => {
             "🎯 CURSOR-STYLE: Normal █ | Insert |\n\
              🔍 VALIDATION: Different fields have different limits (some block field switching)!\n\
              Movement: hjkl/arrows=move, Tab/Shift+Tab=fields\n\
@@ -768,7 +767,7 @@ fn render_validation_status(
              Validation: v=validate current, V=validate all, c=clear results, F1=toggle\n\
              ?=info, Ctrl+C/Ctrl+Q=quit"
         }
-        AppMode::Edit => {
+        AppMode::Ins => {
             "🎯 INSERT MODE - Cursor: | (bar)\n\
              🔍 Type to test validation limits (some fields have MIN requirements)!\n\
              Try typing 1-2 chars in Password/ID/Comment fields, then try to switch!\n\
@@ -812,9 +811,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut editor = ValidationFormEditor::new(data);
 
     // Initialize with normal mode - library automatically sets block cursor
-    editor.set_mode(AppMode::ReadOnly);
+    editor.set_mode(AppMode::Nor);
 
-    CursorManager::update_for_mode(AppMode::ReadOnly)?;
+    CursorManager::update_for_mode(AppMode::Nor)?;
 
     let res = run_app(&mut terminal, editor);
 

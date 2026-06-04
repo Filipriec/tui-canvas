@@ -37,9 +37,8 @@ use ratatui::{
 };
 
 use canvas::{
-    canvas::{gui::render_canvas_default, modes::AppMode, CursorManager},
-    CustomFormatter, DataProvider, FormEditor, FormattingResult, ValidationConfig,
-    ValidationConfigBuilder,
+    render_canvas_default, AppMode, CursorManager, CustomFormatter, DataProvider,
+    FormEditor, FormattingResult, ValidationConfig, ValidationConfigBuilder,
 };
 
 /// PSC (Postal Code) Formatter: "01001" -> "010 01"
@@ -407,7 +406,7 @@ impl<D: DataProvider> EnhancedDemoEditor<D> {
 
         let status = if raw == display {
             if self.has_formatter() {
-                if self.mode() == AppMode::Edit {
+                if self.mode() == AppMode::Ins {
                     "Raw (editing)".to_string()
                 } else {
                     "No formatting needed".to_string()
@@ -570,8 +569,8 @@ fn handle_key_press(
 
     match (mode, key, modifiers) {
         // Mode transitions
-        (AppMode::ReadOnly, KeyCode::Char('i'), _) => editor.enter_edit_mode(),
-        (AppMode::ReadOnly, KeyCode::Char('a'), _) => {
+        (AppMode::Nor, KeyCode::Char('i'), _) => editor.enter_edit_mode(),
+        (AppMode::Nor, KeyCode::Char('a'), _) => {
             editor.editor.enter_append_mode();
             editor.debug_message = format!(
                 "✏️ APPEND {} - {}",
@@ -582,33 +581,33 @@ fn handle_key_press(
         (_, KeyCode::Esc, _) => editor.exit_edit_mode(),
 
         // Demo features
-        (AppMode::ReadOnly, KeyCode::Char('e'), _) => editor.cycle_example_data(),
-        (AppMode::ReadOnly, KeyCode::Char('r'), _) => editor.toggle_raw_data_view(),
-        (AppMode::ReadOnly, KeyCode::Char('c'), _) => editor.toggle_cursor_details(),
-        (AppMode::ReadOnly, KeyCode::Char('m'), _) => editor.show_position_mapping(),
-        (AppMode::ReadOnly, KeyCode::F(1), _) => editor.toggle_validation(),
+        (AppMode::Nor, KeyCode::Char('e'), _) => editor.cycle_example_data(),
+        (AppMode::Nor, KeyCode::Char('r'), _) => editor.toggle_raw_data_view(),
+        (AppMode::Nor, KeyCode::Char('c'), _) => editor.toggle_cursor_details(),
+        (AppMode::Nor, KeyCode::Char('m'), _) => editor.show_position_mapping(),
+        (AppMode::Nor, KeyCode::F(1), _) => editor.toggle_validation(),
 
         // Movement
-        (_, KeyCode::Up, _) | (AppMode::ReadOnly, KeyCode::Char('k'), _) => editor.move_up(),
-        (_, KeyCode::Down, _) | (AppMode::ReadOnly, KeyCode::Char('j'), _) => editor.move_down(),
-        (_, KeyCode::Left, _) | (AppMode::ReadOnly, KeyCode::Char('h'), _) => editor.move_left(),
-        (_, KeyCode::Right, _) | (AppMode::ReadOnly, KeyCode::Char('l'), _) => editor.move_right(),
+        (_, KeyCode::Up, _) | (AppMode::Nor, KeyCode::Char('k'), _) => editor.move_up(),
+        (_, KeyCode::Down, _) | (AppMode::Nor, KeyCode::Char('j'), _) => editor.move_down(),
+        (_, KeyCode::Left, _) | (AppMode::Nor, KeyCode::Char('h'), _) => editor.move_left(),
+        (_, KeyCode::Right, _) | (AppMode::Nor, KeyCode::Char('l'), _) => editor.move_right(),
         (_, KeyCode::Tab, _) => editor.next_field(),
         (_, KeyCode::BackTab, _) => editor.prev_field(),
 
         // Editing
-        (AppMode::Edit, KeyCode::Char(c), m) if !m.contains(KeyModifiers::CONTROL) => {
+        (AppMode::Ins, KeyCode::Char(c), m) if !m.contains(KeyModifiers::CONTROL) => {
             editor.insert_char(c)?;
         }
-        (AppMode::Edit, KeyCode::Backspace, _) => {
+        (AppMode::Ins, KeyCode::Backspace, _) => {
             editor.delete_backward()?;
         }
-        (AppMode::Edit, KeyCode::Delete, _) => {
+        (AppMode::Ins, KeyCode::Delete, _) => {
             editor.delete_forward()?;
         }
 
         // Field analysis
-        (AppMode::ReadOnly, KeyCode::Char('?'), _) => {
+        (AppMode::Nor, KeyCode::Char('?'), _) => {
             let (raw, display, status, warning) = editor.get_current_field_analysis();
             let warning_text = warning.map(|w| format!(" ⚠️ {w}")).unwrap_or_default();
             editor.debug_message = format!(
@@ -676,8 +675,8 @@ fn render_enhanced_status(
 
     // Status bar
     let mode_text = match editor.mode() {
-        AppMode::Edit => "INSERT | (bar cursor)",
-        AppMode::ReadOnly => "NORMAL █ (block cursor)",
+        AppMode::Ins => "INSERT | (bar cursor)",
+        AppMode::Nor => "NORMAL █ (block cursor)",
         _ => "NORMAL █ (block cursor)",
     };
 
@@ -721,7 +720,7 @@ fn render_enhanced_status(
         format!("🔧 Status: {}", status),
     ];
 
-    if editor.show_raw_data || editor.mode() == AppMode::Edit {
+    if editor.show_raw_data || editor.mode() == AppMode::Ins {
         analysis_lines.push(format!("💾 Raw Data: '{raw}'"));
         analysis_lines.push(format!("✨ Display: '{display}'"));
     } else {
@@ -762,7 +761,7 @@ fn render_enhanced_status(
 
     // Help
     let help_text = match editor.mode() {
-        AppMode::ReadOnly => {
+        AppMode::Nor => {
             "🎯 CURSOR-STYLE: Normal █ | Insert |\n\
              🧩 ENHANCED CUSTOM FORMATTER DEMO\n\
              \n\
@@ -774,7 +773,7 @@ fn render_enhanced_status(
              Movement: hjkl/arrows, Tab=next field, ?=analyze current field, F1=toggle formatters\n\
              Ctrl+C/F10=quit"
         }
-        AppMode::Edit => {
+        AppMode::Ins => {
             "🎯 INSERT MODE - Cursor: | (bar)\n\
              ✏️ Real-time formatting as you type!\n\
              \n\
@@ -788,7 +787,7 @@ fn render_enhanced_status(
         _ => "🧩 Enhanced Custom Formatter Demo"
     };
 
-    let formatted_help = if editor.mode() == AppMode::Edit {
+    let formatted_help = if editor.mode() == AppMode::Ins {
         help_text.replace("{}", editor.get_input_rules())
     } else {
         help_text.to_string()
@@ -829,9 +828,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut editor = EnhancedDemoEditor::new(data);
 
     // Initialize with normal mode - library automatically sets block cursor
-    editor.editor.set_mode(AppMode::ReadOnly);
+    editor.editor.set_mode(AppMode::Nor);
 
-    CursorManager::update_for_mode(AppMode::ReadOnly)?;
+    CursorManager::update_for_mode(AppMode::Nor)?;
 
     let res = run_app(&mut terminal, editor);
 

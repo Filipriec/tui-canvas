@@ -30,7 +30,8 @@ use ratatui::{
 use std::io;
 
 use canvas::{
-    canvas::{gui::render_canvas_default, modes::AppMode},
+    render_canvas_default,
+    AppMode,
     keybindings::{CanvasKeyBindings, KeyEventOutcome},
     DataProvider, FormEditor,
 };
@@ -96,7 +97,7 @@ impl KeybindingDemoApp {
                 // Demonstrate saving
                 self.message = "💾 F2: Save action (client-side)".to_string();
             }
-            (KeyCode::Char('?'), _) if self.editor.mode() == AppMode::ReadOnly => {
+            (KeyCode::Char('?'), _) if self.editor.mode() == AppMode::Nor => {
                 self.show_help();
             }
             _ => {
@@ -250,7 +251,7 @@ fn render_status_and_help(f: &mut Frame, area: ratatui::layout::Rect, app: &Keyb
 
     // Help text based on current mode
     let help_text = match app.editor().mode() {
-        AppMode::ReadOnly => {
+        AppMode::Nor => {
             "🎯 KEYBINDING DEMO - All keys handled by centralized keybinding system!\n\
              \n\
              📍 MOVEMENT: hjkl(basic) | w/b/e(words) | W/B/E(WORDS) | 0/$(line) | gg/G(fields)\n\
@@ -262,7 +263,7 @@ fn render_status_and_help(f: &mut Frame, area: ratatui::layout::Rect, app: &Keyb
              💡 Try multi-key sequences like 'gg' or 'ge' - watch the status for 'Waiting...'\n\
              🚪 Ctrl+C=quit | ?=help | F1/F2=client actions (not canvas)"
         }
-        AppMode::Edit => {
+        AppMode::Ins => {
             "✏️  INSERT MODE - Keys handled by keybinding system\n\
              \n\
              🔄 NAVIGATION: arrows | Ctrl+arrows(words) | Home/End(line) | Tab/Shift+Tab(fields)\n\
@@ -271,7 +272,7 @@ fn render_status_and_help(f: &mut Frame, area: ratatui::layout::Rect, app: &Keyb
              \n\
              💡 Type text normally - the keybindings handle navigation!"
         }
-        AppMode::Highlight => {
+        AppMode::Sel => {
             "🎯 VISUAL MODE - Selection extended by keybinding movements\n\
              \n\
              📍 EXTEND: hjkl(basic) | w/b/e(words) | 0/$(line) | gg/G(fields)\n\

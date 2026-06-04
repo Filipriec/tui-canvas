@@ -33,11 +33,9 @@ use ratatui::{
 use std::io;
 
 use canvas::{
-    canvas::{
-        gui::render_canvas_default,
-        modes::AppMode,
-        CursorManager, // This import only exists when cursor-style feature is enabled
-    },
+    render_canvas_default,
+    AppMode,
+    CursorManager, // This import only exists when cursor-style feature is enabled
     suggestions::render::render_suggestions_dropdown,
     DataProvider, FormEditor, SuggestionItem,
 };
@@ -310,7 +308,7 @@ impl<D: DataProvider> AutoCursorFormEditor<D> {
 
     fn set_mode(&mut self, mode: AppMode) {
         self.editor.set_mode(mode); // 🎯 Library automatically updates cursor
-        if mode != AppMode::Highlight {
+        if mode != AppMode::Sel {
             self.exit_visual_mode();
         }
     }
@@ -629,10 +627,10 @@ fn handle_key_press(
                 editor.set_debug_message("❌ Suggestions closed".to_string());
             } else {
                 match mode {
-                    AppMode::Edit => {
+                    AppMode::Ins => {
                         editor.exit_edit_mode();
                     }
-                    AppMode::Highlight => {
+                    AppMode::Sel => {
                         editor.exit_visual_mode();
                     }
                     _ => {
@@ -643,16 +641,16 @@ fn handle_key_press(
         }
 
         // Mode transitions with manual suggestions
-        (AppMode::ReadOnly, KeyCode::Char('i'), _) => {
+        (AppMode::Nor, KeyCode::Char('i'), _) => {
             editor.enter_edit_mode();
             editor.clear_command_buffer();
         }
-        (AppMode::ReadOnly, KeyCode::Char('a'), _) => {
+        (AppMode::Nor, KeyCode::Char('a'), _) => {
             editor.enter_append_mode();
             editor.set_debug_message("✏️  INSERT (append) - Cursor: Steady Bar |".to_string());
             editor.clear_command_buffer();
         }
-        (AppMode::ReadOnly, KeyCode::Char('A'), _) => {
+        (AppMode::Nor, KeyCode::Char('A'), _) => {
             editor.move_line_end();
             editor.enter_edit_mode();
             editor.set_debug_message("✏️  INSERT (end of line) - Cursor: Steady Bar |".to_string());
@@ -660,48 +658,48 @@ fn handle_key_press(
         }
 
         // From Normal Mode: Enter visual modes
-        (AppMode::ReadOnly, KeyCode::Char('v'), _) => {
+        (AppMode::Nor, KeyCode::Char('v'), _) => {
             editor.enter_visual_mode();
             editor.clear_command_buffer();
         }
-        (AppMode::ReadOnly, KeyCode::Char('V'), _) => {
+        (AppMode::Nor, KeyCode::Char('V'), _) => {
             editor.enter_visual_line_mode();
             editor.clear_command_buffer();
         }
 
         // Cursor management demonstration
-        (AppMode::ReadOnly, KeyCode::F(1), _) => {
+        (AppMode::Nor, KeyCode::F(1), _) => {
             editor.demo_manual_cursor_control()?;
         }
-        (AppMode::ReadOnly, KeyCode::F(2), _) => {
+        (AppMode::Nor, KeyCode::F(2), _) => {
             editor.restore_automatic_cursor()?;
         }
 
         // Movement vim style navigation
 
         // Basic movement (hjkl and arrows)
-        (AppMode::ReadOnly | AppMode::Highlight, KeyCode::Char('h'), _)
-        | (AppMode::ReadOnly | AppMode::Highlight, KeyCode::Left, _) => {
+        (AppMode::Nor | AppMode::Sel, KeyCode::Char('h'), _)
+        | (AppMode::Nor | AppMode::Sel, KeyCode::Left, _) => {
             editor.move_left();
             editor.set_debug_message("← left".to_string());
             editor.clear_command_buffer();
         }
-        (AppMode::ReadOnly | AppMode::Highlight, KeyCode::Char('l'), _)
-        | (AppMode::ReadOnly | AppMode::Highlight, KeyCode::Right, _) => {
+        (AppMode::Nor | AppMode::Sel, KeyCode::Char('l'), _)
+        | (AppMode::Nor | AppMode::Sel, KeyCode::Right, _) => {
             editor.move_right();
             editor.set_debug_message("→ right".to_string());
             editor.clear_command_buffer();
         }
-        (AppMode::ReadOnly | AppMode::Highlight, KeyCode::Char('j'), _)
-        | (AppMode::ReadOnly | AppMode::Highlight, KeyCode::Down, _) => {
+        (AppMode::Nor | AppMode::Sel, KeyCode::Char('j'), _)
+        | (AppMode::Nor | AppMode::Sel, KeyCode::Down, _) => {
             editor.move_down();
             let field_names = ["Fruit", "Job", "Language", "Country", "Color"];
             let field_name = field_names.get(editor.current_field()).unwrap_or(&"Field");
             editor.set_debug_message(format!("↓ moved to {field_name} field"));
             editor.clear_command_buffer();
         }
-        (AppMode::ReadOnly | AppMode::Highlight, KeyCode::Char('k'), _)
-        | (AppMode::ReadOnly | AppMode::Highlight, KeyCode::Up, _) => {
+        (AppMode::Nor | AppMode::Sel, KeyCode::Char('k'), _)
+        | (AppMode::Nor | AppMode::Sel, KeyCode::Up, _) => {
             editor.move_up();
             let field_names = ["Fruit", "Job", "Language", "Country", "Color"];
             let field_name = field_names.get(editor.current_field()).unwrap_or(&"Field");
@@ -710,36 +708,36 @@ fn handle_key_press(
         }
 
         // Word movement
-        (AppMode::ReadOnly | AppMode::Highlight, KeyCode::Char('w'), _) => {
+        (AppMode::Nor | AppMode::Sel, KeyCode::Char('w'), _) => {
             editor.move_word_next();
             editor.set_debug_message("w: next word start".to_string());
             editor.clear_command_buffer();
         }
-        (AppMode::ReadOnly | AppMode::Highlight, KeyCode::Char('b'), _) => {
+        (AppMode::Nor | AppMode::Sel, KeyCode::Char('b'), _) => {
             editor.move_word_prev();
             editor.set_debug_message("b: previous word start".to_string());
             editor.clear_command_buffer();
         }
-        (AppMode::ReadOnly | AppMode::Highlight, KeyCode::Char('e'), _) => {
+        (AppMode::Nor | AppMode::Sel, KeyCode::Char('e'), _) => {
             editor.move_word_end();
             editor.set_debug_message("e: word end".to_string());
             editor.clear_command_buffer();
         }
 
         // Line movement
-        (AppMode::ReadOnly | AppMode::Highlight, KeyCode::Char('0'), _)
-        | (AppMode::ReadOnly | AppMode::Highlight, KeyCode::Home, _) => {
+        (AppMode::Nor | AppMode::Sel, KeyCode::Char('0'), _)
+        | (AppMode::Nor | AppMode::Sel, KeyCode::Home, _) => {
             editor.move_line_start();
             editor.set_debug_message("0: line start".to_string());
         }
-        (AppMode::ReadOnly | AppMode::Highlight, KeyCode::Char('$'), _)
-        | (AppMode::ReadOnly | AppMode::Highlight, KeyCode::End, _) => {
+        (AppMode::Nor | AppMode::Sel, KeyCode::Char('$'), _)
+        | (AppMode::Nor | AppMode::Sel, KeyCode::End, _) => {
             editor.move_line_end();
             editor.set_debug_message("$: line end".to_string());
         }
 
         // Document movement
-        (AppMode::ReadOnly | AppMode::Highlight, KeyCode::Char('g'), _) => {
+        (AppMode::Nor | AppMode::Sel, KeyCode::Char('g'), _) => {
             if editor.get_command_buffer() == "g" {
                 editor.move_first_line();
                 editor.set_debug_message("gg: first field (Fruit)".to_string());
@@ -750,42 +748,42 @@ fn handle_key_press(
                 editor.set_debug_message("g".to_string());
             }
         }
-        (AppMode::ReadOnly | AppMode::Highlight, KeyCode::Char('G'), _) => {
+        (AppMode::Nor | AppMode::Sel, KeyCode::Char('G'), _) => {
             editor.move_last_line();
             editor.set_debug_message("G: last field (Color)".to_string());
             editor.clear_command_buffer();
         }
 
         // Edit mode movement
-        (AppMode::Edit, KeyCode::Left, m) if m.contains(KeyModifiers::CONTROL) => {
+        (AppMode::Ins, KeyCode::Left, m) if m.contains(KeyModifiers::CONTROL) => {
             editor.move_word_prev();
             editor.set_debug_message("Ctrl+← word back".to_string());
         }
-        (AppMode::Edit, KeyCode::Right, m) if m.contains(KeyModifiers::CONTROL) => {
+        (AppMode::Ins, KeyCode::Right, m) if m.contains(KeyModifiers::CONTROL) => {
             editor.move_word_next();
             editor.set_debug_message("Ctrl+→ word forward".to_string());
         }
-        (AppMode::Edit, KeyCode::Left, _) => {
+        (AppMode::Ins, KeyCode::Left, _) => {
             editor.move_left();
         }
-        (AppMode::Edit, KeyCode::Right, _) => {
+        (AppMode::Ins, KeyCode::Right, _) => {
             editor.move_right();
         }
-        (AppMode::Edit, KeyCode::Up, _) => {
+        (AppMode::Ins, KeyCode::Up, _) => {
             editor.move_up();
         }
-        (AppMode::Edit, KeyCode::Down, _) => {
+        (AppMode::Ins, KeyCode::Down, _) => {
             editor.move_down();
         }
-        (AppMode::Edit, KeyCode::Home, _) => {
+        (AppMode::Ins, KeyCode::Home, _) => {
             editor.move_line_start();
         }
-        (AppMode::Edit, KeyCode::End, _) => {
+        (AppMode::Ins, KeyCode::End, _) => {
             editor.move_line_end();
         }
 
         // Delete operations with autosuggestions
-        (AppMode::Edit, KeyCode::Backspace, _) => {
+        (AppMode::Ins, KeyCode::Backspace, _) => {
             editor.delete_backward()?;
             // Trigger suggestions after deletion
             let field_index = editor.current_field();
@@ -797,7 +795,7 @@ fn handle_key_press(
                 }
             }
         }
-        (AppMode::Edit, KeyCode::Delete, _) => {
+        (AppMode::Ins, KeyCode::Delete, _) => {
             editor.delete_forward()?;
             // Trigger suggestions after deletion
             let field_index = editor.current_field();
@@ -811,17 +809,17 @@ fn handle_key_press(
         }
 
         // Delete operations in normal mode (vim x)
-        (AppMode::ReadOnly, KeyCode::Char('x'), _) => {
+        (AppMode::Nor, KeyCode::Char('x'), _) => {
             editor.delete_forward()?;
             editor.set_debug_message("x: deleted character".to_string());
         }
-        (AppMode::ReadOnly, KeyCode::Char('X'), _) => {
+        (AppMode::Nor, KeyCode::Char('X'), _) => {
             editor.delete_backward()?;
             editor.set_debug_message("X: deleted character backward".to_string());
         }
 
         // Character input with realtime suggestions
-        (AppMode::Edit, KeyCode::Char(c), m) if !m.contains(KeyModifiers::CONTROL) => {
+        (AppMode::Ins, KeyCode::Char(c), m) if !m.contains(KeyModifiers::CONTROL) => {
             editor.insert_char(c)?;
             // Real-time suggestions using the library API
             let field_index = editor.current_field();
@@ -835,7 +833,7 @@ fn handle_key_press(
         }
 
         // Debug info commands
-        (AppMode::ReadOnly, KeyCode::Char('?'), _) => {
+        (AppMode::Nor, KeyCode::Char('?'), _) => {
             let field_names = ["Fruit🍎", "Job💼", "Language💻", "Country🌍", "Color🎨"];
             let current_field_name = field_names
                 .get(editor.current_field())
@@ -945,9 +943,9 @@ fn render_status_and_help(
         .unwrap_or(&"Unknown");
 
     let mode_text = match editor.mode() {
-        AppMode::Edit => "INSERT | (bar cursor)",
-        AppMode::ReadOnly => "NORMAL █ (block cursor)",
-        AppMode::Highlight => "VISUAL █ (blinking block)",
+        AppMode::Ins => "INSERT | (bar cursor)",
+        AppMode::Nor => "NORMAL █ (block cursor)",
+        AppMode::Sel => "VISUAL █ (blinking block)",
         _ => "NORMAL █ (block cursor)",
     };
 
@@ -981,7 +979,7 @@ fn render_status_and_help(
 
     // Production help text
     let help_text = match editor.mode() {
-        AppMode::ReadOnly => {
+        AppMode::Nor => {
             "🚀 PRODUCTION-READY SUGGESTIONS: Copy this architecture for your app!\n\
              Movement: j/k or ↑↓=fields, h/l or ←→=chars, gg/G=first/last, w/b/e=words\n\
              Actions: i/a/A=insert, v/V=visual, x/X=delete, ?=info, Enter=next field\n\
@@ -989,14 +987,14 @@ fn render_status_and_help(
              Architecture: Non-blocking • Instant UI • Stale protection • Professional UX\n\
              Tab=suggestions, Enter=select • Ready for: REST, GraphQL, SQL, Redis, etc."
         }
-        AppMode::Edit => {
+        AppMode::Ins => {
             "🚀 INSERT MODE - Type for instant suggestions!\n\
              Real-time search-as-you-type with non-blocking architecture\n\
              Perfect for: User search, autocomplete, typeahead, smart suggestions\n\
              Navigation: arrows=move, Ctrl+arrows=words, Home/End=line edges\n\
              Copy this pattern for production: API calls, database queries, cache lookups"
         }
-        AppMode::Highlight => {
+        AppMode::Sel => {
             "🚀 VISUAL MODE - Selection with suggestions support\n\
              Selection: hjkl/arrows=extend, w/b/e=word selection, Esc=normal\n\
              Professional editor experience with modern autocomplete!"
@@ -1047,9 +1045,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut editor = AutoCursorFormEditor::new(data);
 
     // Initialize with normal mode - library automatically sets block cursor
-    editor.set_mode(AppMode::ReadOnly);
+    editor.set_mode(AppMode::Nor);
 
-    CursorManager::update_for_mode(AppMode::ReadOnly)?;
+    CursorManager::update_for_mode(AppMode::Nor)?;
 
     let res = run_app(&mut terminal, editor);
 

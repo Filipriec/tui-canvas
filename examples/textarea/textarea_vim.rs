@@ -38,11 +38,7 @@ use std::io;
 use std::time::Duration;
 
 use canvas::{
-    canvas::{
-        modes::AppMode,
-        CursorManager, // This import only exists when cursor-style feature is enabled
-    },
-    TextArea, TextAreaState,
+    render_canvas_default, AppMode, CursorManager, TextArea, TextAreaState,
 };
 
 /// TextArea demo with automatic cursor management.
@@ -92,21 +88,21 @@ Terminal cursor changes automatically!
 
     fn enter_insert_mode(&mut self) -> std::io::Result<()> {
         self.textarea.enter_edit_mode(); // Direct FormEditor method call via Deref!
-        CursorManager::update_for_mode(AppMode::Edit)?; // Automatic: cursor becomes bar |
+        CursorManager::update_for_mode(AppMode::Ins)?; // Automatic: cursor becomes bar |
         self.debug_message = "INSERT MODE - Cursor: |".to_string();
         Ok(())
     }
 
     fn enter_append_mode(&mut self) -> std::io::Result<()> {
         self.textarea.enter_append_mode(); // Direct FormEditor method call!
-        CursorManager::update_for_mode(AppMode::Edit)?;
+        CursorManager::update_for_mode(AppMode::Ins)?;
         self.debug_message = "INSERT (append) - Cursor: |".to_string();
         Ok(())
     }
 
     fn exit_to_normal_mode(&mut self) -> std::io::Result<()> {
         self.textarea.exit_edit_mode(); // Direct FormEditor method call!
-        CursorManager::update_for_mode(AppMode::ReadOnly)?; // Automatic: cursor becomes steady block
+        CursorManager::update_for_mode(AppMode::Nor)?; // Automatic: cursor becomes steady block
         self.debug_message = "NORMAL MODE - Cursor: █".to_string();
         Ok(())
     }
@@ -240,24 +236,18 @@ Terminal cursor changes automatically!
 
     // Vim style editing
 
-    fn open_line_below(&mut self) -> anyhow::Result<()> {
-        let result = self.textarea.open_line_below();
-        if result.is_ok() {
-            CursorManager::update_for_mode(AppMode::Edit)?;
-            self.debug_message = "INSERT - Cursor: |".to_string();
-            self.has_unsaved_changes = true;
-        }
-        result
+    fn open_line_below(&mut self) {
+        self.textarea.open_line_below();
+        CursorManager::update_for_mode(AppMode::Ins).ok();
+        self.debug_message = "INSERT - Cursor: |".to_string();
+        self.has_unsaved_changes = true;
     }
 
-    fn open_line_above(&mut self) -> anyhow::Result<()> {
-        let result = self.textarea.open_line_above();
-        if result.is_ok() {
-            CursorManager::update_for_mode(AppMode::Edit)?;
-            self.debug_message = "INSERT - Cursor: |".to_string();
-            self.has_unsaved_changes = true;
-        }
-        result
+    fn open_line_above(&mut self) {
+        self.textarea.open_line_above();
+        CursorManager::update_for_mode(AppMode::Ins).ok();
+        self.debug_message = "INSERT - Cursor: |".to_string();
+        self.has_unsaved_changes = true;
     }
 
     // Command buffer handling
@@ -324,80 +314,76 @@ fn handle_key_press(key_event: KeyEvent, editor: &mut AutoCursorTextArea) -> any
 
     match (mode, key, modifiers) {
         // Mode transitions with automatic cursor management
-        (AppMode::ReadOnly, KeyCode::Char('i'), _) => {
+        (AppMode::Nor, KeyCode::Char('i'), _) => {
             editor.enter_insert_mode()?;
             editor.clear_command_buffer();
         }
-        (AppMode::ReadOnly, KeyCode::Char('a'), _) => {
+        (AppMode::Nor, KeyCode::Char('a'), _) => {
             editor.enter_append_mode()?;
             editor.clear_command_buffer();
         }
-        (AppMode::ReadOnly, KeyCode::Char('A'), _) => {
+        (AppMode::Nor, KeyCode::Char('A'), _) => {
             editor.move_line_end();
             editor.enter_insert_mode()?;
             editor.clear_command_buffer();
         }
 
         // Vim o/O commands
-        (AppMode::ReadOnly, KeyCode::Char('o'), _) => {
-            if let Err(e) = editor.open_line_below() {
-                editor.set_debug_message(format!("Error opening line below: {e}"));
-            }
+        (AppMode::Nor, KeyCode::Char('o'), _) => {
+            editor.open_line_below();
             editor.clear_command_buffer();
         }
-        (AppMode::ReadOnly, KeyCode::Char('O'), _) => {
-            if let Err(e) = editor.open_line_above() {
-                editor.set_debug_message(format!("Error opening line above: {e}"));
-            }
+        (AppMode::Nor, KeyCode::Char('O'), _) => {
+            editor.open_line_above();
             editor.clear_command_buffer();
         }
 
         // Escape: Exit any mode back to normal
-        (AppMode::Edit, KeyCode::Esc, _) => {
+        (AppMode::Ins, KeyCode::Esc, _) => {
             editor.exit_to_normal_mode()?;
         }
 
         // Insert mode pass to textarea
-        (AppMode::Edit, _, _) => {
+        (AppMode::Ins, _, _) => {
             editor.handle_textarea_input(key_event);
         }
 
         // Cursor management demonstration
-        (AppMode::ReadOnly, KeyCode::F(1), _) => {
+        (AppMode::Nor, KeyCode::F(1), _) => {
             editor.demo_manual_cursor_control()?;
         }
-        (AppMode::ReadOnly, KeyCode::F(2), _) => {
+        (AppMode::Nor, KeyCode::F(2), _) => {
             editor.restore_automatic_cursor()?;
         }
 
         // Movement vim style navigation normal mode
-        (AppMode::ReadOnly, KeyCode::Char('h'), _) | (AppMode::ReadOnly, KeyCode::Left, _) => {
+        (AppMode::Nor, KeyCode::Char('h'), _) | (AppMode::Nor, KeyCode::Left, _) => {
             editor.move_left();
             editor.clear_command_buffer();
         }
-        (AppMode::ReadOnly, KeyCode::Char('l'), _) | (AppMode::ReadOnly, KeyCode::Right, _) => {
+        (AppMode::Nor, KeyCode::Char('l'), _) | (AppMode::Nor, KeyCode::Right, _) => {
             editor.move_right();
             editor.clear_command_buffer();
         }
-        (AppMode::ReadOnly, KeyCode::Char('j'), _) | (AppMode::ReadOnly, KeyCode::Down, _) => {
+        (AppMode::Nor, KeyCode::Char('j'), _) | (AppMode::Nor, KeyCode::Down, _) => {
             editor.move_down();
             editor.clear_command_buffer();
         }
-        (AppMode::ReadOnly, KeyCode::Char('k'), _) | (AppMode::ReadOnly, KeyCode::Up, _) => {
+        (AppMode::Nor, KeyCode::Char('k'), _) | (AppMode::Nor, KeyCode::Up, _) => {
             editor.move_up();
             editor.clear_command_buffer();
         }
 
         // Word movement
-        (AppMode::ReadOnly, KeyCode::Char('w'), _) => {
+        (AppMode::Nor, KeyCode::Char('w'), _) => {
             editor.move_word_next();
             editor.clear_command_buffer();
         }
-        (AppMode::ReadOnly, KeyCode::Char('b'), _) => {
+        (AppMode::Nor, KeyCode::Char('b'), _) => {
             editor.move_word_prev();
             editor.clear_command_buffer();
         }
-        (AppMode::ReadOnly, KeyCode::Char('e'), _) => {
+        (AppMode::Nor, KeyCode::Char('e'), _) => {
             if editor.get_command_buffer() == "g" {
                 editor.move_word_end_prev();
                 editor.clear_command_buffer();
@@ -408,15 +394,15 @@ fn handle_key_press(key_event: KeyEvent, editor: &mut AutoCursorTextArea) -> any
         }
 
         // Big word movement (vim W/B/E commands)
-        (AppMode::ReadOnly, KeyCode::Char('W'), _) => {
+        (AppMode::Nor, KeyCode::Char('W'), _) => {
             editor.move_big_word_next();
             editor.clear_command_buffer();
         }
-        (AppMode::ReadOnly, KeyCode::Char('B'), _) => {
+        (AppMode::Nor, KeyCode::Char('B'), _) => {
             editor.move_big_word_prev();
             editor.clear_command_buffer();
         }
-        (AppMode::ReadOnly, KeyCode::Char('E'), _) => {
+        (AppMode::Nor, KeyCode::Char('E'), _) => {
             if editor.get_command_buffer() == "g" {
                 editor.move_big_word_end_prev();
                 editor.clear_command_buffer();
@@ -427,17 +413,17 @@ fn handle_key_press(key_event: KeyEvent, editor: &mut AutoCursorTextArea) -> any
         }
 
         // Line movement
-        (AppMode::ReadOnly, KeyCode::Char('0'), _) | (AppMode::ReadOnly, KeyCode::Home, _) => {
+        (AppMode::Nor, KeyCode::Char('0'), _) | (AppMode::Nor, KeyCode::Home, _) => {
             editor.move_line_start();
             editor.clear_command_buffer();
         }
-        (AppMode::ReadOnly, KeyCode::Char('$'), _) | (AppMode::ReadOnly, KeyCode::End, _) => {
+        (AppMode::Nor, KeyCode::Char('$'), _) | (AppMode::Nor, KeyCode::End, _) => {
             editor.move_line_end();
             editor.clear_command_buffer();
         }
 
         // Document movement with command buffer
-        (AppMode::ReadOnly, KeyCode::Char('g'), _) => {
+        (AppMode::Nor, KeyCode::Char('g'), _) => {
             if editor.get_command_buffer() == "g" {
                 editor.move_first_line();
                 editor.clear_command_buffer();
@@ -447,23 +433,23 @@ fn handle_key_press(key_event: KeyEvent, editor: &mut AutoCursorTextArea) -> any
                 editor.set_debug_message("g".to_string());
             }
         }
-        (AppMode::ReadOnly, KeyCode::Char('G'), _) => {
+        (AppMode::Nor, KeyCode::Char('G'), _) => {
             editor.move_last_line();
             editor.clear_command_buffer();
         }
 
         // Delete operations normal mode
-        (AppMode::ReadOnly, KeyCode::Char('x'), _) => {
+        (AppMode::Nor, KeyCode::Char('x'), _) => {
             editor.delete_char_forward();
             editor.clear_command_buffer();
         }
-        (AppMode::ReadOnly, KeyCode::Char('X'), _) => {
+        (AppMode::Nor, KeyCode::Char('X'), _) => {
             editor.delete_char_backward();
             editor.clear_command_buffer();
         }
 
         // Debug info commands
-        (AppMode::ReadOnly, KeyCode::Char('?'), _) => {
+        (AppMode::Nor, KeyCode::Char('?'), _) => {
             editor.set_debug_message(format!(
                 "{}, Mode: {:?} - Cursor managed automatically",
                 editor.get_cursor_info(),
@@ -546,9 +532,9 @@ fn render_status_and_help(f: &mut Frame, area: ratatui::layout::Rect, editor: &A
 
     // Status bar with cursor information
     let mode_text = match editor.mode() {
-        AppMode::Edit => "INSERT | (bar)",
-        AppMode::ReadOnly => "NORMAL █ (block)",
-        AppMode::Highlight => "VISUAL █ (blinking block)",
+        AppMode::Ins => "INSERT | (bar)",
+        AppMode::Nor => "NORMAL █ (block)",
+        AppMode::Sel => "VISUAL █ (blinking block)",
         _ => "NORMAL █ (block)",
     };
 
@@ -584,7 +570,7 @@ fn render_status_and_help(f: &mut Frame, area: ratatui::layout::Rect, editor: &A
     f.render_widget(status, chunks[0]);
 
     let help_text = match editor.mode() {
-        AppMode::ReadOnly => {
+        AppMode::Nor => {
             if editor.has_pending_command() {
                 match editor.get_command_buffer() {
                     "g" => "Press 'g' again for first line, or any other key to cancel",
@@ -597,12 +583,12 @@ fn render_status_and_help(f: &mut Frame, area: ratatui::layout::Rect, editor: &A
                 F1=demo manual cursor, F2=restore automatic, Ctrl+Q=quit"
             }
         }
-        AppMode::Edit => {
+        AppMode::Ins => {
             "INSERT MODE - Cursor: | (bar)\n\
             Type to edit text, arrows=move, Enter=new line\n\
             Esc=normal mode"
         }
-        AppMode::Highlight => {
+        AppMode::Sel => {
             "VISUAL MODE - Cursor: █ (blinking block)\n\
             hjkl/arrows=extend selection\n\
             Esc=normal mode"

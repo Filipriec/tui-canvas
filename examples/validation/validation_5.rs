@@ -59,25 +59,24 @@ use ratatui::{
 };
 
 use canvas::{
-    canvas::{gui::render_canvas_default, modes::AppMode, CursorManager},
-    validation::ExternalValidationState,
+    render_canvas_default, AppMode, CursorManager,
     CustomFormatter, DataProvider, FormEditor, FormattingResult, ValidationConfigBuilder,
 };
 
 /// External validation state with timing and context
 #[derive(Debug, Clone)]
-struct ValidationResult {
-    state: ExternalValidationState,
+struct TimedValidationResult {
+    state: canvas::validation::ExternalValidationState,
     started_at: Instant,
     completed_at: Option<Instant>,
     validation_type: String,
     cached: bool,
 }
 
-impl ValidationResult {
+impl TimedValidationResult {
     fn new(validation_type: String) -> Self {
         Self {
-            state: ExternalValidationState::Validating,
+            state: canvas::validation::ExternalValidationState::Validating,
             started_at: Instant::now(),
             completed_at: None,
             validation_type,
@@ -85,13 +84,13 @@ impl ValidationResult {
         }
     }
 
-    fn complete(mut self, state: ExternalValidationState) -> Self {
+    fn complete(mut self, state: canvas::validation::ExternalValidationState) -> Self {
         self.state = state;
         self.completed_at = Some(Instant::now());
         self
     }
 
-    fn from_cache(state: ExternalValidationState, validation_type: String) -> Self {
+    fn from_cache(state: canvas::validation::ExternalValidationState, validation_type: String) -> Self {
         Self {
             state,
             started_at: Instant::now(),
@@ -165,7 +164,7 @@ impl CustomFormatter for CreditCardFormatter {
 
 /// Comprehensive validation cache
 struct ValidationCache {
-    results: HashMap<String, ExternalValidationState>,
+    results: HashMap<String, canvas::validation::ExternalValidationState>,
 }
 
 impl ValidationCache {
@@ -175,11 +174,11 @@ impl ValidationCache {
         }
     }
 
-    fn get(&self, key: &str) -> Option<&ExternalValidationState> {
+    fn get(&self, key: &str) -> Option<&canvas::validation::ExternalValidationState> {
         self.results.get(key)
     }
 
-    fn set(&mut self, key: String, result: ExternalValidationState) {
+    fn set(&mut self, key: String, result: canvas::validation::ExternalValidationState) {
         self.results.insert(key, result);
     }
 
@@ -201,18 +200,18 @@ impl ValidationServices {
     }
 
     /// PSC validation: simulates postal service API lookup
-    fn validate_psc(&mut self, psc: &str) -> ExternalValidationState {
+    fn validate_psc(&mut self, psc: &str) -> canvas::validation::ExternalValidationState {
         let cache_key = format!("psc:{psc}");
         if let Some(cached) = self.cache.get(&cache_key) {
             return cached.clone();
         }
 
         if psc.is_empty() {
-            return ExternalValidationState::NotValidated;
+            return canvas::validation::ExternalValidationState::NotValidated;
         }
 
         if !psc.chars().all(|c| c.is_ascii_digit()) || psc.len() != 5 {
-            let result = ExternalValidationState::Invalid {
+            let result = canvas::validation::ExternalValidationState::Invalid {
                 message: "Invalid PSC format".to_string(),
                 suggestion: Some("Enter 5 digits".to_string()),
             };
@@ -222,16 +221,16 @@ impl ValidationServices {
 
         // Simulate realistic PSC validation scenarios
         let result = match psc {
-            "00000" | "99999" => ExternalValidationState::Invalid {
+            "00000" | "99999" => canvas::validation::ExternalValidationState::Invalid {
                 message: "PSC does not exist".to_string(),
                 suggestion: Some("Check postal code".to_string()),
             },
-            "01001" => ExternalValidationState::Valid(Some("Prague 1 - verified".to_string())),
-            "10000" => ExternalValidationState::Valid(Some("Bratislava - verified".to_string())),
-            "12345" => ExternalValidationState::Warning {
+            "01001" => canvas::validation::ExternalValidationState::Valid(Some("Prague 1 - verified".to_string())),
+            "10000" => canvas::validation::ExternalValidationState::Valid(Some("Bratislava - verified".to_string())),
+            "12345" => canvas::validation::ExternalValidationState::Warning {
                 message: "PSC region deprecated - still valid".to_string(),
             },
-            "50000" => ExternalValidationState::Invalid {
+            "50000" => canvas::validation::ExternalValidationState::Invalid {
                 message: "PSC temporarily unavailable".to_string(),
                 suggestion: Some("Try again later".to_string()),
             },
@@ -243,7 +242,7 @@ impl ValidationServices {
                     "20" | "21" => "Brno region",
                     _ => "Valid postal region",
                 };
-                ExternalValidationState::Valid(Some(format!("{region} - verified")))
+                canvas::validation::ExternalValidationState::Valid(Some(format!("{region} - verified")))
             }
         };
 
@@ -252,18 +251,18 @@ impl ValidationServices {
     }
 
     /// Email validation: simulates domain checking
-    fn validate_email(&mut self, email: &str) -> ExternalValidationState {
+    fn validate_email(&mut self, email: &str) -> canvas::validation::ExternalValidationState {
         let cache_key = format!("email:{email}");
         if let Some(cached) = self.cache.get(&cache_key) {
             return cached.clone();
         }
 
         if email.is_empty() {
-            return ExternalValidationState::NotValidated;
+            return canvas::validation::ExternalValidationState::NotValidated;
         }
 
         if !email.contains('@') {
-            let result = ExternalValidationState::Invalid {
+            let result = canvas::validation::ExternalValidationState::Invalid {
                 message: "Email must contain @".to_string(),
                 suggestion: Some("Format: user@domain.com".to_string()),
             };
@@ -273,7 +272,7 @@ impl ValidationServices {
 
         let parts: Vec<&str> = email.split('@').collect();
         if parts.len() != 2 || parts[0].is_empty() || parts[1].is_empty() {
-            let result = ExternalValidationState::Invalid {
+            let result = canvas::validation::ExternalValidationState::Invalid {
                 message: "Invalid email format".to_string(),
                 suggestion: Some("Format: user@domain.com".to_string()),
             };
@@ -283,20 +282,20 @@ impl ValidationServices {
 
         let domain = parts[1];
         let result = match domain {
-            "gmail.com" | "outlook.com" | "yahoo.com" => ExternalValidationState::Valid(Some(
+            "gmail.com" | "outlook.com" | "yahoo.com" => canvas::validation::ExternalValidationState::Valid(Some(
                 "Popular email provider - verified".to_string(),
             )),
-            "example.com" | "test.com" => ExternalValidationState::Warning {
+            "example.com" | "test.com" => canvas::validation::ExternalValidationState::Warning {
                 message: "Test domain - email may not be deliverable".to_string(),
             },
-            "blocked.com" | "spam.com" => ExternalValidationState::Invalid {
+            "blocked.com" | "spam.com" => canvas::validation::ExternalValidationState::Invalid {
                 message: "Domain blocked".to_string(),
                 suggestion: Some("Use different email provider".to_string()),
             },
-            _ if domain.contains('.') => ExternalValidationState::Valid(Some(
+            _ if domain.contains('.') => canvas::validation::ExternalValidationState::Valid(Some(
                 "Domain appears valid - not verified".to_string(),
             )),
-            _ => ExternalValidationState::Invalid {
+            _ => canvas::validation::ExternalValidationState::Invalid {
                 message: "Invalid domain format".to_string(),
                 suggestion: Some("Domain must contain '.'".to_string()),
             },
@@ -307,18 +306,18 @@ impl ValidationServices {
     }
 
     /// Username validation: simulates availability checking
-    fn validate_username(&mut self, username: &str) -> ExternalValidationState {
+    fn validate_username(&mut self, username: &str) -> canvas::validation::ExternalValidationState {
         let cache_key = format!("username:{username}");
         if let Some(cached) = self.cache.get(&cache_key) {
             return cached.clone();
         }
 
         if username.is_empty() {
-            return ExternalValidationState::NotValidated;
+            return canvas::validation::ExternalValidationState::NotValidated;
         }
 
         if username.len() < 3 {
-            let result = ExternalValidationState::Invalid {
+            let result = canvas::validation::ExternalValidationState::Invalid {
                 message: "Username too short".to_string(),
                 suggestion: Some("Minimum 3 characters".to_string()),
             };
@@ -327,7 +326,7 @@ impl ValidationServices {
         }
 
         if !username.chars().all(|c| c.is_alphanumeric() || c == '_') {
-            let result = ExternalValidationState::Invalid {
+            let result = canvas::validation::ExternalValidationState::Invalid {
                 message: "Invalid characters".to_string(),
                 suggestion: Some("Use letters, numbers, underscore only".to_string()),
             };
@@ -336,18 +335,18 @@ impl ValidationServices {
         }
 
         let result = match username {
-            "admin" | "root" | "user" | "test" => ExternalValidationState::Invalid {
+            "admin" | "root" | "user" | "test" => canvas::validation::ExternalValidationState::Invalid {
                 message: "Username reserved".to_string(),
                 suggestion: Some("Choose different username".to_string()),
             },
-            "john123" | "alice_dev" => ExternalValidationState::Invalid {
+            "john123" | "alice_dev" => canvas::validation::ExternalValidationState::Invalid {
                 message: "Username already taken".to_string(),
                 suggestion: Some("Try variations or add numbers".to_string()),
             },
-            username if username.starts_with("temp_") => ExternalValidationState::Warning {
+            username if username.starts_with("temp_") => canvas::validation::ExternalValidationState::Warning {
                 message: "Temporary username pattern - are you sure?".to_string(),
             },
-            _ => ExternalValidationState::Valid(Some(
+            _ => canvas::validation::ExternalValidationState::Valid(Some(
                 "Username available - good choice!".to_string(),
             )),
         };
@@ -357,18 +356,18 @@ impl ValidationServices {
     }
 
     /// API Key validation: simulates authentication service
-    fn validate_api_key(&mut self, key: &str) -> ExternalValidationState {
+    fn validate_api_key(&mut self, key: &str) -> canvas::validation::ExternalValidationState {
         let cache_key = format!("apikey:{key}");
         if let Some(cached) = self.cache.get(&cache_key) {
             return cached.clone();
         }
 
         if key.is_empty() {
-            return ExternalValidationState::NotValidated;
+            return canvas::validation::ExternalValidationState::NotValidated;
         }
 
         if key.len() < 20 {
-            let result = ExternalValidationState::Invalid {
+            let result = canvas::validation::ExternalValidationState::Invalid {
                 message: "API key too short".to_string(),
                 suggestion: Some("Valid keys are 32+ characters".to_string()),
             };
@@ -377,24 +376,24 @@ impl ValidationServices {
         }
 
         let result = match key {
-            "invalid_key_12345678901" => ExternalValidationState::Invalid {
+            "invalid_key_12345678901" => canvas::validation::ExternalValidationState::Invalid {
                 message: "API key not found".to_string(),
                 suggestion: Some("Check key and permissions".to_string()),
             },
-            "expired_key_12345678901" => ExternalValidationState::Invalid {
+            "expired_key_12345678901" => canvas::validation::ExternalValidationState::Invalid {
                 message: "API key expired".to_string(),
                 suggestion: Some("Generate new key".to_string()),
             },
-            "limited_key_12345678901" => ExternalValidationState::Warning {
+            "limited_key_12345678901" => canvas::validation::ExternalValidationState::Warning {
                 message: "API key has limited permissions".to_string(),
             },
-            key if key.starts_with("test_") => ExternalValidationState::Warning {
+            key if key.starts_with("test_") => canvas::validation::ExternalValidationState::Warning {
                 message: "Test API key - limited functionality".to_string(),
             },
-            _ if key.len() >= 32 => ExternalValidationState::Valid(Some(
+            _ if key.len() >= 32 => canvas::validation::ExternalValidationState::Valid(Some(
                 "API key authenticated - full access".to_string(),
             )),
-            _ => ExternalValidationState::Invalid {
+            _ => canvas::validation::ExternalValidationState::Invalid {
                 message: "Invalid API key format".to_string(),
                 suggestion: Some("Keys should be 32+ alphanumeric characters".to_string()),
             },
@@ -405,18 +404,18 @@ impl ValidationServices {
     }
 
     /// Credit Card validation: simulates bank verification
-    fn validate_credit_card(&mut self, card: &str) -> ExternalValidationState {
+    fn validate_credit_card(&mut self, card: &str) -> canvas::validation::ExternalValidationState {
         let cache_key = format!("card:{card}");
         if let Some(cached) = self.cache.get(&cache_key) {
             return cached.clone();
         }
 
         if card.is_empty() {
-            return ExternalValidationState::NotValidated;
+            return canvas::validation::ExternalValidationState::NotValidated;
         }
 
         if !card.chars().all(|c| c.is_ascii_digit()) || card.len() != 16 {
-            let result = ExternalValidationState::Invalid {
+            let result = canvas::validation::ExternalValidationState::Invalid {
                 message: "Invalid card format".to_string(),
                 suggestion: Some("Enter 16 digits".to_string()),
             };
@@ -444,7 +443,7 @@ impl ValidationServices {
             .sum();
 
         if sum % 10 != 0 {
-            let result = ExternalValidationState::Invalid {
+            let result = canvas::validation::ExternalValidationState::Invalid {
                 message: "Invalid card number (failed checksum)".to_string(),
                 suggestion: Some("Check card number".to_string()),
             };
@@ -453,18 +452,18 @@ impl ValidationServices {
         }
 
         let result = match &card[..4] {
-            "4000" => ExternalValidationState::Valid(Some("Visa - card verified".to_string())),
+            "4000" => canvas::validation::ExternalValidationState::Valid(Some("Visa - card verified".to_string())),
             "5555" => {
-                ExternalValidationState::Valid(Some("Mastercard - card verified".to_string()))
+                canvas::validation::ExternalValidationState::Valid(Some("Mastercard - card verified".to_string()))
             }
-            "4111" => ExternalValidationState::Warning {
+            "4111" => canvas::validation::ExternalValidationState::Warning {
                 message: "Test card number - not for real transactions".to_string(),
             },
-            "0000" => ExternalValidationState::Invalid {
+            "0000" => canvas::validation::ExternalValidationState::Invalid {
                 message: "Card declined by issuer".to_string(),
                 suggestion: Some("Contact your bank".to_string()),
             },
-            _ => ExternalValidationState::Valid(Some(
+            _ => canvas::validation::ExternalValidationState::Valid(Some(
                 "Card number valid - bank not verified".to_string(),
             )),
         };
@@ -556,7 +555,7 @@ impl DataProvider for ValidationDemoData {
 struct ValidationDemoEditor<D: DataProvider> {
     editor: FormEditor<D>,
     services: Arc<Mutex<ValidationServices>>,
-    validation_history: Vec<(usize, String, ValidationResult)>,
+    validation_history: Vec<(usize, String, TimedValidationResult)>,
     debug_message: String,
     show_history: bool,
     example_mode: usize,
@@ -574,7 +573,7 @@ impl<D: DataProvider> ValidationDemoEditor<D> {
         let services_for_history = Arc::clone(&services);
 
         // Create a history tracker that we'll share between callback and editor
-        let validation_history: Arc<Mutex<Vec<(usize, String, ValidationResult)>>> =
+        let validation_history: Arc<Mutex<Vec<(usize, String, TimedValidationResult)>>> =
             Arc::new(Mutex::new(Vec::new()));
         let history_for_cb = Arc::clone(&validation_history);
 
@@ -600,13 +599,13 @@ impl<D: DataProvider> ValidationDemoEditor<D> {
                 2 => svc.validate_username(text),
                 3 => svc.validate_api_key(text),
                 4 => svc.validate_credit_card(text),
-                _ => ExternalValidationState::NotValidated,
+                _ => canvas::validation::ExternalValidationState::NotValidated,
             };
 
             // Record in shared history (if we can lock it)
             if let Ok(mut history) = history_for_cb.try_lock() {
                 let duration = start_time.elapsed();
-                let result = ValidationResult {
+                let result = TimedValidationResult {
                     state: validation_result.clone(),
                     started_at: start_time,
                     completed_at: Some(Instant::now()),
@@ -696,7 +695,7 @@ impl<D: DataProvider> ValidationDemoEditor<D> {
 
         // Set to validating state first
         self.editor
-            .set_external_validation(field_index, ExternalValidationState::Validating);
+            .set_external_validation(field_index, canvas::validation::ExternalValidationState::Validating);
 
         let validation_type = match field_index {
             0 => "PSC Lookup",
@@ -708,7 +707,7 @@ impl<D: DataProvider> ValidationDemoEditor<D> {
         }
         .to_string();
 
-        let mut result = ValidationResult::new(validation_type.clone());
+        let mut result = TimedValidationResult::new(validation_type.clone());
 
         // Perform validation using the shared services
         let validation_result = {
@@ -719,7 +718,7 @@ impl<D: DataProvider> ValidationDemoEditor<D> {
                 2 => svc.validate_username(&raw_value),
                 3 => svc.validate_api_key(&raw_value),
                 4 => svc.validate_credit_card(&raw_value),
-                _ => ExternalValidationState::NotValidated,
+                _ => canvas::validation::ExternalValidationState::NotValidated,
             }
         };
 
@@ -878,7 +877,7 @@ impl<D: DataProvider> ValidationDemoEditor<D> {
         format!("Total: {total_validations} validations, Avg: {avg_time_ms}ms")
     }
 
-    fn get_field_validation_state(&self, field_index: usize) -> ExternalValidationState {
+    fn get_field_validation_state(&self, field_index: usize) -> canvas::validation::ExternalValidationState {
         self.editor
             .ui_state()
             .validation_state()
@@ -969,8 +968,8 @@ fn run_app<B: Backend>(
 
             match (mode, kc, km) {
                 // Mode transitions
-                (AppMode::ReadOnly, KeyCode::Char('i'), _) => editor.enter_edit_mode(),
-                (AppMode::ReadOnly, KeyCode::Char('a'), _) => {
+                (AppMode::Nor, KeyCode::Char('i'), _) => editor.enter_edit_mode(),
+                (AppMode::Nor, KeyCode::Char('a'), _) => {
                     editor.editor.enter_append_mode();
                     let rules = editor.field_validation_rules();
                     editor.debug_message = format!("✏️ APPEND {} - {}", editor.field_type(), rules);
@@ -978,16 +977,16 @@ fn run_app<B: Backend>(
                 (_, KeyCode::Esc, _) => editor.exit_edit_mode(),
 
                 // Movement - these now trigger automatic validation via the library!
-                (_, KeyCode::Left, _) | (AppMode::ReadOnly, KeyCode::Char('h'), _) => {
+                (_, KeyCode::Left, _) | (AppMode::Nor, KeyCode::Char('h'), _) => {
                     let _ = editor.editor.move_left();
                 }
-                (_, KeyCode::Right, _) | (AppMode::ReadOnly, KeyCode::Char('l'), _) => {
+                (_, KeyCode::Right, _) | (AppMode::Nor, KeyCode::Char('l'), _) => {
                     let _ = editor.editor.move_right();
                 }
-                (_, KeyCode::Up, _) | (AppMode::ReadOnly, KeyCode::Char('k'), _) => {
+                (_, KeyCode::Up, _) | (AppMode::Nor, KeyCode::Char('k'), _) => {
                     editor.move_up(); // Use wrapper to get debug message
                 }
-                (_, KeyCode::Down, _) | (AppMode::ReadOnly, KeyCode::Char('j'), _) => {
+                (_, KeyCode::Down, _) | (AppMode::Nor, KeyCode::Char('j'), _) => {
                     editor.move_down(); // Use wrapper to get debug message
                 }
 
@@ -996,42 +995,42 @@ fn run_app<B: Backend>(
                 (_, KeyCode::BackTab, _) => editor.prev_field(),
 
                 // Manual validation commands (ONLY in ReadOnly mode)
-                (AppMode::ReadOnly, KeyCode::Char('v'), _) => {
+                (AppMode::Nor, KeyCode::Char('v'), _) => {
                     let field = editor.current_field();
                     editor.validate_field(field);
                 }
-                (AppMode::ReadOnly, KeyCode::Char('V'), _) => editor.validate_all_fields(),
-                (AppMode::ReadOnly, KeyCode::Char('c'), _) => {
+                (AppMode::Nor, KeyCode::Char('V'), _) => editor.validate_all_fields(),
+                (AppMode::Nor, KeyCode::Char('c'), _) => {
                     let field = editor.current_field();
                     editor.clear_validation_state(Some(field));
                 }
-                (AppMode::ReadOnly, KeyCode::Char('C'), _) => editor.clear_validation_state(None),
+                (AppMode::Nor, KeyCode::Char('C'), _) => editor.clear_validation_state(None),
 
                 // UI toggles (ONLY in ReadOnly mode for alpha keys to avoid blocking text input)
-                (AppMode::ReadOnly, KeyCode::Char('r'), _) => editor.toggle_history_view(),
-                (AppMode::ReadOnly, KeyCode::Char('e'), _) => editor.cycle_examples(),
+                (AppMode::Nor, KeyCode::Char('r'), _) => editor.toggle_history_view(),
+                (AppMode::Nor, KeyCode::Char('e'), _) => editor.cycle_examples(),
                 (_, KeyCode::F(1), _) => editor.toggle_validation(),
 
                 // Editing
-                (AppMode::Edit, KeyCode::Left, _) => {
+                (AppMode::Ins, KeyCode::Left, _) => {
                     let _ = editor.editor.move_left();
                 }
-                (AppMode::Edit, KeyCode::Right, _) => {
+                (AppMode::Ins, KeyCode::Right, _) => {
                     let _ = editor.editor.move_right();
                 }
-                (AppMode::Edit, KeyCode::Up, _) => {
+                (AppMode::Ins, KeyCode::Up, _) => {
                     editor.move_up();
                 }
-                (AppMode::Edit, KeyCode::Down, _) => {
+                (AppMode::Ins, KeyCode::Down, _) => {
                     editor.move_down();
                 }
-                (AppMode::Edit, KeyCode::Char(c), m) if !m.contains(KeyModifiers::CONTROL) => {
+                (AppMode::Ins, KeyCode::Char(c), m) if !m.contains(KeyModifiers::CONTROL) => {
                     let _ = editor.insert_char(c);
                 }
-                (AppMode::Edit, KeyCode::Backspace, _) => {
+                (AppMode::Ins, KeyCode::Backspace, _) => {
                     let _ = editor.delete_backward();
                 }
-                (AppMode::Edit, KeyCode::Delete, _) => {
+                (AppMode::Ins, KeyCode::Delete, _) => {
                     let _ = editor.delete_forward();
                 }
 
@@ -1074,8 +1073,8 @@ fn render_validation_panel(
 
     // Status bar
     let mode_text = match editor.mode() {
-        AppMode::Edit => "INSERT | (bar cursor)",
-        AppMode::ReadOnly => "NORMAL █ (block cursor)",
+        AppMode::Ins => "INSERT | (bar cursor)",
+        AppMode::Nor => "NORMAL █ (block cursor)",
         _ => "NORMAL █ (block cursor)",
     };
 
@@ -1107,12 +1106,12 @@ fn render_validation_panel(
         let state = editor.get_field_validation_state(i);
 
         let (state_text, color) = match state {
-            ExternalValidationState::NotValidated => ("Not validated", Color::Gray),
-            ExternalValidationState::Validating => ("Validating…", Color::Blue),
-            ExternalValidationState::Valid(Some(ref msg)) => (msg.as_str(), Color::Green),
-            ExternalValidationState::Valid(None) => ("Valid ✓", Color::Green),
-            ExternalValidationState::Invalid { ref message, .. } => (message.as_str(), Color::Red),
-            ExternalValidationState::Warning { ref message } => (message.as_str(), Color::Yellow),
+            canvas::validation::ExternalValidationState::NotValidated => ("Not validated", Color::Gray),
+            canvas::validation::ExternalValidationState::Validating => ("Validating…", Color::Blue),
+            canvas::validation::ExternalValidationState::Valid(Some(ref msg)) => (msg.as_str(), Color::Green),
+            canvas::validation::ExternalValidationState::Valid(None) => ("Valid ✓", Color::Green),
+            canvas::validation::ExternalValidationState::Invalid { ref message, .. } => (message.as_str(), Color::Red),
+            canvas::validation::ExternalValidationState::Warning { ref message } => (message.as_str(), Color::Yellow),
         };
 
         let indicator = if i == editor.current_field() {
@@ -1174,11 +1173,11 @@ fn render_validation_panel(
                 };
 
                 let state_summary = match &result.state {
-                    ExternalValidationState::Valid(_) => "✓ Valid",
-                    ExternalValidationState::Invalid { .. } => "✖ Invalid",
-                    ExternalValidationState::Warning { .. } => "⚠ Warning",
-                    ExternalValidationState::Validating => "… Validating",
-                    ExternalValidationState::NotValidated => "○ Not validated",
+                    canvas::validation::ExternalValidationState::Valid(_) => "✓ Valid",
+                    canvas::validation::ExternalValidationState::Invalid { .. } => "✖ Invalid",
+                    canvas::validation::ExternalValidationState::Warning { .. } => "⚠ Warning",
+                    canvas::validation::ExternalValidationState::Validating => "… Validating",
+                    canvas::validation::ExternalValidationState::NotValidated => "○ Not validated",
                 };
 
                 ListItem::new(format!(
@@ -1195,7 +1194,7 @@ fn render_validation_panel(
         f.render_widget(history, chunks[2]);
     } else {
         let help_text = match editor.mode() {
-            AppMode::ReadOnly => {
+            AppMode::Nor => {
                 "🎯 FULLY AUTOMATIC VALIDATION: Library handles all validation on field transitions!\n\
                  🧪 EXTERNAL VALIDATION DEMO - No manual triggers needed, just navigate!\n\
                  \n\
@@ -1205,7 +1204,7 @@ fn render_validation_panel(
                  \n\
                  Just load examples and navigate - validation happens automatically!"
             }
-            AppMode::Edit => {
+            AppMode::Ins => {
                 "🎯 INSERT MODE - Cursor: | (bar)\n\
                  ✏️ Type to edit field content\n\
                  \n\
@@ -1257,9 +1256,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut editor = ValidationDemoEditor::new(data);
 
     // Initialize with normal mode - library automatically sets block cursor
-    editor.editor.set_mode(AppMode::ReadOnly);
+    editor.editor.set_mode(AppMode::Nor);
 
-    CursorManager::update_for_mode(AppMode::ReadOnly)?;
+    CursorManager::update_for_mode(AppMode::Nor)?;
 
     let res = run_app(&mut terminal, editor);
 
