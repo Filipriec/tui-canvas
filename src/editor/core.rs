@@ -1,12 +1,12 @@
 // src/editor/core.rs
 #[cfg(feature = "cursor-style")]
-use crate::canvas::CursorManager;
+use crate::cursor::CursorManager;
 
 use crate::canvas::modes::AppMode;
 use crate::canvas::state::EditorState;
-use crate::DataProvider;
 #[cfg(feature = "keybindings")]
 use crate::editor::behavior::EditorBehaviorState;
+use crate::DataProvider;
 #[cfg(feature = "suggestions")]
 use crate::SuggestionItem;
 use derivative::Derivative;
@@ -39,11 +39,11 @@ pub struct FormEditor<D: DataProvider> {
     #[cfg(feature = "keybindings")]
     pub(crate) behavior_state: EditorBehaviorState,
 
-    pub(crate) undo_stack: Vec<crate::editor::history::EditSnapshot>,
-    pub(crate) redo_stack: Vec<crate::editor::history::EditSnapshot>,
-    #[derivative(Default(value = "crate::editor::history::DEFAULT_HISTORY_LIMIT"))]
+    pub(crate) undo_stack: Vec<crate::editor::features::history::EditSnapshot>,
+    pub(crate) redo_stack: Vec<crate::editor::features::history::EditSnapshot>,
+    #[derivative(Default(value = "crate::editor::features::history::DEFAULT_HISTORY_LIMIT"))]
     pub(crate) history_limit: usize,
-    pub(crate) history_last_kind: Option<crate::editor::history::EditKind>,
+    pub(crate) history_last_kind: Option<crate::editor::features::history::EditKind>,
     #[derivative(Default(value = "true"))]
     pub(crate) history_enabled: bool,
 }
@@ -77,7 +77,7 @@ impl<D: DataProvider> FormEditor<D> {
             behavior_state: EditorBehaviorState::default(),
             undo_stack: Vec::new(),
             redo_stack: Vec::new(),
-            history_limit: crate::editor::history::DEFAULT_HISTORY_LIMIT,
+            history_limit: crate::editor::features::history::DEFAULT_HISTORY_LIMIT,
             history_last_kind: None,
             history_enabled: true,
         };

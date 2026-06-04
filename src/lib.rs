@@ -20,6 +20,10 @@ pub mod canvas;
 pub mod data_provider;
 pub mod editor;
 pub mod integration;
+pub mod widgets;
+
+#[cfg(feature = "cursor-style")]
+pub mod cursor;
 
 #[cfg(feature = "gui")]
 mod gui_utils;
@@ -30,12 +34,6 @@ pub mod suggestions;
 #[cfg(feature = "validation")]
 pub mod validation;
 
-#[cfg(feature = "textarea")]
-pub mod textarea;
-
-#[cfg(feature = "textinput")]
-pub mod textinput;
-
 #[cfg(feature = "computed")]
 pub mod computed;
 
@@ -43,13 +41,13 @@ pub mod computed;
 pub mod keybindings;
 
 #[cfg(feature = "cursor-style")]
-pub use canvas::CursorManager;
+pub use cursor::CursorManager;
 
 pub use data_provider::DataProvider;
 #[cfg(feature = "suggestions")]
 pub use data_provider::{SuggestionItem, SuggestionQuery, SuggestionTrigger};
 #[cfg(feature = "crossterm")]
-pub use editor::event_input::FormInputEventOutcome;
+pub use editor::input::normal::FormInputEventOutcome;
 pub use editor::FormEditor;
 
 pub use canvas::modes::AppMode;
@@ -72,32 +70,31 @@ pub use computed::{ComputedContext, ComputedProvider, ComputedState};
 pub use canvas::theme::{CanvasTheme, DefaultCanvasTheme};
 
 #[cfg(feature = "gui")]
-pub use canvas::gui::{render_canvas, render_canvas_default};
+pub use widgets::form::{render_canvas, render_canvas_default};
 
 #[cfg(feature = "gui")]
-pub use canvas::gui::render_canvas_with_options;
+pub use widgets::form::render_canvas_with_options;
 
 #[cfg(feature = "gui")]
-pub use canvas::gui::{CanvasDisplayOptions, OverflowMode};
+pub use widgets::form::{CanvasDisplayOptions, OverflowMode};
 
 #[cfg(all(feature = "gui", feature = "suggestions"))]
-pub use suggestions::gui::render_suggestions_dropdown;
+pub use suggestions::render::render_suggestions_dropdown;
 
 #[cfg(feature = "keybindings")]
 pub use keybindings::{
-    default_builtin_action_bindings, default_emacs_action_bindings,
-    default_helix_action_bindings, default_vim_action_bindings, preset,
-    BuiltinCanvasKeybindingPreset, CanvasActionBinding, CanvasActionKeyBinding,
-    CanvasKeyBindings, KeyEventOutcome,
+    default_builtin_action_bindings, default_emacs_action_bindings, default_helix_action_bindings,
+    default_vim_action_bindings, preset, BuiltinCanvasKeybindingPreset, CanvasActionBinding,
+    CanvasActionKeyBinding, CanvasKeyBindings, KeyEventOutcome,
 };
 
 #[cfg(feature = "textarea")]
-pub use textarea::{
+pub use widgets::textarea::{
     TextArea, TextAreaDataProvider, TextAreaEditor, TextAreaProvider, TextAreaState,
 };
 
 #[cfg(feature = "textinput")]
-pub use textinput::{
+pub use widgets::textinput::{
     TextInput, TextInputDataProvider, TextInputEditor, TextInputEventOutcome, TextInputProvider,
     TextInputState,
 };

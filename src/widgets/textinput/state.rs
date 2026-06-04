@@ -12,7 +12,7 @@ use crate::editor::FormEditor;
 use crate::gui_utils::{
     compute_h_scroll_with_padding, display_cols_up_to, display_width, RIGHT_PAD,
 };
-use crate::textinput::provider::{TextInputDataProvider, TextInputProvider};
+use crate::widgets::textinput::provider::{TextInputDataProvider, TextInputProvider};
 
 #[cfg(feature = "gui")]
 use ratatui::{layout::Rect, widgets::Block};
@@ -583,7 +583,7 @@ impl<P: TextInputDataProvider> TextInputState<P> {
 /// Dropdown suggestions, re-exposed from the underlying [`FormEditor`] so that
 /// `TextInput`, `TextArea`, and `FormEditor` all share one suggestions
 /// mechanism. Render the dropdown with
-/// `canvas::suggestions::gui::render_suggestions_dropdown(.., self.editor())`.
+/// `canvas::suggestions::render::render_suggestions_dropdown(.., self.editor())`.
 ///
 /// This is distinct from the lightweight inline-suffix completion
 /// ([`TextInputState::set_suggestion_suffix`]), which `TextInput` also offers.
@@ -645,7 +645,7 @@ mod tests {
     use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
     use super::{TextInputEventOutcome, TextInputState};
-    use crate::textinput::provider::TextInputProvider;
+    use crate::widgets::textinput::provider::TextInputProvider;
 
     #[test]
     fn enter_submits_without_mutating_text() {

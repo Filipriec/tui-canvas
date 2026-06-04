@@ -103,7 +103,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
                 }
 
                 self.editor
-                    .record_checkpoint(crate::editor::history::EditKind::Other);
+                    .record_checkpoint(crate::editor::features::history::EditKind::Other);
 
                 let mut content = self.editor.data_provider().capture_content();
                 let current = self.current_field().min(content.len().saturating_sub(1));

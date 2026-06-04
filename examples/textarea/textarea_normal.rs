@@ -30,9 +30,8 @@ use ratatui::{
 };
 
 use canvas::{
-    canvas::CursorManager,
     integration::crossterm_input::{CrosstermInputOptions, CrosstermInputSession},
-    textarea::{TextArea, TextAreaState},
+    CursorManager, TextArea, TextAreaState,
 };
 
 /// TextArea demo adapted for NORMALMODE (always editing)

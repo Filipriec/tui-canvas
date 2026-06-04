@@ -38,7 +38,7 @@ use canvas::{
         modes::AppMode,
         CursorManager, // This import only exists when cursor-style feature is enabled
     },
-    suggestions::gui::render_suggestions_dropdown,
+    suggestions::render::render_suggestions_dropdown,
     DataProvider, FormEditor, SuggestionItem,
 };
 

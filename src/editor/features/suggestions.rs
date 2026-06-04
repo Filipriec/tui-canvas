@@ -1,4 +1,4 @@
-// src/editor/suggestions.rs
+// src/editor/features/suggestions.rs
 
 use crate::editor::FormEditor;
 use crate::{DataProvider, SuggestionItem, SuggestionQuery};
@@ -229,7 +229,7 @@ impl<D: DataProvider> FormEditor<D> {
                         .unwrap_or_else(|| self.current_text().to_string()),
                     replace_range: self.ui_state.suggestions.replace_range,
                 };
-                self.record_checkpoint(crate::editor::history::EditKind::Other);
+                self.record_checkpoint(crate::editor::features::history::EditKind::Other);
 
                 let cursor = self.data_provider.accept_suggestion(
                     field_index,

@@ -39,7 +39,8 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         let Some(keybindings) = self.editor.keybindings.as_ref() else {
             return KeyEventOutcome::NotMatched;
         };
-        let (matched, is_prefix) = keybindings.lookup_action(mode, self.editor.seq_tracker.sequence());
+        let (matched, is_prefix) =
+            keybindings.lookup_action(mode, self.editor.seq_tracker.sequence());
 
         if let Some(action) = matched.cloned() {
             let count = self.take_vim_count();

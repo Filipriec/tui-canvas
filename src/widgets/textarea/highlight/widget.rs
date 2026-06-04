@@ -14,7 +14,7 @@ use super::state::TextAreaSyntaxState;
 
 use crate::data_provider::DataProvider;
 use crate::gui_utils::{compute_h_scroll_with_padding, display_cols_up_to, display_width};
-use crate::textarea::state::{count_wrapped_rows_indented, TextOverflowMode};
+use crate::widgets::textarea::state::{count_wrapped_rows_indented, TextOverflowMode};
 
 #[derive(Debug, Clone)]
 pub struct TextAreaSyntax<'a> {

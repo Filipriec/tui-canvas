@@ -9,14 +9,6 @@ pub mod modes;
 pub mod state;
 
 #[cfg(feature = "gui")]
-pub mod gui;
-#[cfg(feature = "gui")]
 pub mod theme;
 
-#[cfg(feature = "cursor-style")]
-pub mod cursor;
-
 pub use modes::{AppMode, HighlightState};
-
-#[cfg(feature = "cursor-style")]
-pub use cursor::CursorManager;

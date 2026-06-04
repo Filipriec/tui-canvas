@@ -2,7 +2,7 @@
 use std::ops::{Deref, DerefMut};
 
 use super::engine::SyntectEngine;
-use crate::textarea::state::TextAreaState;
+use crate::widgets::textarea::state::TextAreaState;
 
 #[derive(Default)]
 pub struct TextAreaSyntaxState {

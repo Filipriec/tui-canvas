@@ -21,8 +21,7 @@ use ratatui::{
 
 use canvas::{
     integration::crossterm_input::{CrosstermInputOptions, CrosstermInputSession},
-    textinput::{TextInput, TextInputState},
-    CursorManager,
+    CursorManager, TextInput, TextInputState,
 };
 
 struct Demo {

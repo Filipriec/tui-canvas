@@ -4,3 +4,4 @@ ui_debug.log
 .codex
 analysis/
 *.md
+!CHANGELOG.md

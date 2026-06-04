@@ -34,10 +34,7 @@ use ratatui::{
     Frame, Terminal,
 };
 
-use canvas::{
-    keybindings::CanvasKeyBindings,
-    textarea::{TextArea, TextAreaState},
-};
+use canvas::{keybindings::CanvasKeyBindings, TextArea, TextAreaState};
 
 fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut textarea: TextAreaState) -> io::Result<()> {
     loop {

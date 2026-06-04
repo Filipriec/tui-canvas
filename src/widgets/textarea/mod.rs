@@ -1,4 +1,4 @@
-// src/textarea/mod.rs
+// src/widgets/textarea/mod.rs
 //! Text area convenience exports.
 
 mod actions;

@@ -1,4 +1,4 @@
-// src/editor/validation_helpers.rs
+// src/editor/features/validation.rs
 
 use crate::editor::FormEditor;
 use crate::DataProvider;

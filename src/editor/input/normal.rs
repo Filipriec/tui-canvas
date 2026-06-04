@@ -1,3 +1,4 @@
+// src/editor/input/normal.rs
 #[cfg(feature = "crossterm")]
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 
@@ -27,8 +28,6 @@ impl<D: DataProvider> FormEditor<D> {
         FormInputEventOutcome::Handled
     }
 
-    // TODO: Replace direct crossterm event coupling with a backend-agnostic
-    // input abstraction so terminal input backends can be swapped cleanly.
     #[cfg(feature = "crossterm")]
     pub fn handle_event(&mut self, event: Event) -> FormInputEventOutcome {
         match event {

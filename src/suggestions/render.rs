@@ -1,4 +1,4 @@
-// src/suggestions/gui.rs
+// src/suggestions/render.rs
 //! Suggestions dropdown rendering helpers.
 
 #[cfg(feature = "gui")]

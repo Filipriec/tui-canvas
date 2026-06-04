@@ -13,10 +13,10 @@ use crate::gui_utils::{
     compute_h_scroll_with_padding, display_cols_up_to, display_width,
 };
 #[cfg(feature = "gui")]
-use crate::textinput::provider::{TextInputDataProvider, TextInputProvider};
+use crate::widgets::textinput::provider::{TextInputDataProvider, TextInputProvider};
 
 #[cfg(feature = "gui")]
-use crate::textinput::state::TextInputState;
+use crate::widgets::textinput::state::TextInputState;
 
 #[cfg(feature = "gui")]
 #[derive(Debug, Clone)]

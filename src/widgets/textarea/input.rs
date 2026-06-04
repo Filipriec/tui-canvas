@@ -1,7 +1,7 @@
 #[cfg(feature = "crossterm")]
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 
-use crate::textarea::{TextAreaDataProvider, TextAreaEventOutcome, TextAreaState};
+use crate::widgets::textarea::{TextAreaDataProvider, TextAreaEventOutcome, TextAreaState};
 
 impl<P: TextAreaDataProvider> TextAreaState<P> {
     pub fn paste(&mut self, text: &str) -> TextAreaEventOutcome {

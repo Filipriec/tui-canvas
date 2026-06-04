@@ -1,7 +1,7 @@
 // src/editor/mode.rs
 
 #[cfg(feature = "cursor-style")]
-use crate::canvas::CursorManager;
+use crate::cursor::CursorManager;
 
 use crate::canvas::modes::AppMode;
 use crate::canvas::state::SelectionState;

@@ -2,11 +2,11 @@
 use std::ops::{Deref, DerefMut};
 
 #[cfg(feature = "cursor-style")]
-use crate::canvas::CursorManager;
+use crate::cursor::CursorManager;
 use crate::editor::FormEditor;
 #[cfg(feature = "gui")]
 use crate::gui_utils::{compute_h_scroll_with_padding, RIGHT_PAD};
-use crate::textarea::provider::{TextAreaDataProvider, TextAreaProvider};
+use crate::widgets::textarea::provider::{TextAreaDataProvider, TextAreaProvider};
 #[cfg(feature = "cursor-style")]
 use std::io;
 
@@ -650,7 +650,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
 /// Dropdown suggestions, re-exposed from the underlying [`FormEditor`] so that
 /// `TextInput`, `TextArea`, and `FormEditor` all share one suggestions
 /// mechanism. Render the dropdown with
-/// `canvas::suggestions::gui::render_suggestions_dropdown(.., self.editor())`.
+/// `canvas::suggestions::render::render_suggestions_dropdown(.., self.editor())`.
 #[cfg(feature = "suggestions")]
 impl<P: TextAreaDataProvider> TextAreaState<P> {
     pub fn open_suggestions(&mut self, field_index: usize) {
@@ -707,7 +707,7 @@ mod tests {
     #[cfg(feature = "crossterm")]
     use super::TextAreaEventOutcome;
     use super::TextAreaState;
-    use crate::textarea::provider::TextAreaProvider;
+    use crate::widgets::textarea::provider::TextAreaProvider;
 
     #[test]
     fn paste_splits_lines() {
@@ -1079,17 +1079,13 @@ mod tests {
         textarea.set_keybindings(CanvasKeyBindings::vim_defaults());
         textarea.viewport_height = 6;
 
-        let out = textarea.handle_key_event(KeyEvent::new(
-            KeyCode::Char('d'),
-            KeyModifiers::CONTROL,
-        ));
+        let out =
+            textarea.handle_key_event(KeyEvent::new(KeyCode::Char('d'), KeyModifiers::CONTROL));
         assert!(matches!(out, KeyEventOutcome::Consumed(None)));
         assert_eq!(textarea.current_field(), 3);
 
-        let out = textarea.handle_key_event(KeyEvent::new(
-            KeyCode::Char('u'),
-            KeyModifiers::CONTROL,
-        ));
+        let out =
+            textarea.handle_key_event(KeyEvent::new(KeyCode::Char('u'), KeyModifiers::CONTROL));
         assert!(matches!(out, KeyEventOutcome::Consumed(None)));
         assert_eq!(textarea.current_field(), 0);
 
@@ -1097,10 +1093,8 @@ mod tests {
             textarea.handle_key_event(KeyEvent::new(KeyCode::Char('2'), KeyModifiers::NONE)),
             KeyEventOutcome::Pending
         ));
-        let out = textarea.handle_key_event(KeyEvent::new(
-            KeyCode::Char('d'),
-            KeyModifiers::CONTROL,
-        ));
+        let out =
+            textarea.handle_key_event(KeyEvent::new(KeyCode::Char('d'), KeyModifiers::CONTROL));
         assert!(matches!(out, KeyEventOutcome::Consumed(None)));
         assert_eq!(textarea.current_field(), 6);
     }

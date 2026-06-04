@@ -1,4 +1,4 @@
-use crate::textarea::{TextAreaDataProvider, TextAreaState};
+use crate::widgets::textarea::{TextAreaDataProvider, TextAreaState};
 
 impl<P: TextAreaDataProvider> TextAreaState<P> {
     pub fn insert_newline(&mut self) {
@@ -10,7 +10,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         let col = self.cursor_position();
 
         self.editor
-            .record_checkpoint(crate::editor::history::EditKind::Other);
+            .record_checkpoint(crate::editor::features::history::EditKind::Other);
 
         let new_idx = self.editor.data_provider_mut().split_line_at(line_idx, col);
 
@@ -36,7 +36,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         }
 
         self.editor
-            .record_checkpoint(crate::editor::history::EditKind::Other);
+            .record_checkpoint(crate::editor::features::history::EditKind::Other);
 
         if let Some((prev_idx, new_col)) = self.editor.data_provider_mut().join_with_prev(line_idx)
         {
@@ -66,7 +66,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
 
         if line_idx + 1 < self.editor.data_provider().field_count() {
             self.editor
-                .record_checkpoint(crate::editor::history::EditKind::Other);
+                .record_checkpoint(crate::editor::features::history::EditKind::Other);
         }
 
         if let Some(new_col) = self.editor.data_provider_mut().join_with_next(line_idx) {
@@ -113,7 +113,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         }
 
         self.editor
-            .record_checkpoint(crate::editor::history::EditKind::Other);
+            .record_checkpoint(crate::editor::features::history::EditKind::Other);
 
         let line_idx = self.current_field();
         let new_idx = self
@@ -133,7 +133,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         }
 
         self.editor
-            .record_checkpoint(crate::editor::history::EditKind::Other);
+            .record_checkpoint(crate::editor::features::history::EditKind::Other);
 
         let line_idx = self.current_field();
         let new_idx = self

@@ -1,4 +1,4 @@
-// src/canvas/cursor.rs
+// src/cursor/terminal.rs
 //! Cursor style management for different canvas modes
 //!
 //! Provides helpers to update and reset terminal cursor style when the

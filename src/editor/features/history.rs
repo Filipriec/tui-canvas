@@ -1,4 +1,4 @@
-// src/editor/history.rs
+// src/editor/features/history.rs
 //! Snapshot-based undo/redo history for [`FormEditor`].
 //!
 //! See `analysis/UNDO_REDO_DESIGN.md` for the rationale. In short: each

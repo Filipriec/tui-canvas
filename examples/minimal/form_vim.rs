@@ -30,9 +30,8 @@ use ratatui::{
 };
 
 use canvas::{
-    canvas::gui::render_canvas_default,
-    keybindings::CanvasKeyBindings,
-    DataProvider, FormEditor,
+    canvas::widgets::form::render_canvas_default, keybindings::CanvasKeyBindings, DataProvider,
+    FormEditor,
 };
 
 struct App {

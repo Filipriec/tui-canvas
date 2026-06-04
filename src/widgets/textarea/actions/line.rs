@@ -1,4 +1,7 @@
-use crate::{canvas::modes::AppMode, textarea::{TextAreaDataProvider, TextAreaState}};
+use crate::{
+    canvas::modes::AppMode,
+    textarea::{TextAreaDataProvider, TextAreaState},
+};
 
 impl<P: TextAreaDataProvider> TextAreaState<P> {
     pub fn enter_line_start_insert_mode(&mut self) {
@@ -22,10 +25,12 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         }
 
         self.editor
-            .record_checkpoint(crate::editor::history::EditKind::Delete);
+            .record_checkpoint(crate::editor::features::history::EditKind::Delete);
 
         let kept: String = current.chars().take(cursor).collect();
-        self.editor.data_provider_mut().set_field_value(line_idx, kept);
+        self.editor
+            .data_provider_mut()
+            .set_field_value(line_idx, kept);
         self.set_cursor_position(cursor);
         #[cfg(feature = "gui")]
         {
@@ -46,7 +51,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
 
     pub fn delete_current_lines(&mut self, count: usize) {
         self.editor
-            .record_checkpoint(crate::editor::history::EditKind::Other);
+            .record_checkpoint(crate::editor::features::history::EditKind::Other);
 
         let current_line = self.current_field();
         let mut lines = self.editor.data_provider().capture_content();
@@ -77,7 +82,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
 
     pub fn change_current_line(&mut self) {
         self.editor
-            .record_checkpoint(crate::editor::history::EditKind::Other);
+            .record_checkpoint(crate::editor::features::history::EditKind::Other);
 
         let line_idx = self.current_field();
         self.editor
@@ -102,7 +107,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         }
 
         self.editor
-            .record_checkpoint(crate::editor::history::EditKind::Other);
+            .record_checkpoint(crate::editor::features::history::EditKind::Other);
 
         let mut last_col = None;
         for _ in 0..count.max(1) {

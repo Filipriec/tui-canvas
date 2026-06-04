@@ -5,10 +5,10 @@
 //! feature is enabled, the rendering helpers for the suggestions dropdown.
 
 #[cfg(feature = "gui")]
-pub mod gui;
+pub mod render;
 pub mod state;
 
 pub use state::SuggestionItem;
 
 #[cfg(feature = "gui")]
-pub use gui::render_suggestions_dropdown;
+pub use render::render_suggestions_dropdown;

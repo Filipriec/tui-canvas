@@ -1,4 +1,4 @@
-// src/canvas/gui.rs
+// src/widgets/form/render.rs
 //! Canvas GUI rendering helpers.
 
 #[cfg(feature = "gui")]

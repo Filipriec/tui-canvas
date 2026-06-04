@@ -9,16 +9,16 @@ use ratatui::{
 };
 
 #[cfg(feature = "gui")]
-use crate::gui_utils::{
-    compute_h_scroll_with_padding, display_cols_up_to, display_width,
-};
-#[cfg(feature = "gui")]
 use crate::canvas::state::SelectionState;
 #[cfg(feature = "gui")]
-use crate::textarea::provider::{TextAreaDataProvider, TextAreaProvider};
+use crate::gui_utils::{compute_h_scroll_with_padding, display_cols_up_to, display_width};
+#[cfg(feature = "gui")]
+use crate::widgets::textarea::provider::{TextAreaDataProvider, TextAreaProvider};
 
 #[cfg(feature = "gui")]
-use crate::textarea::state::{count_wrapped_rows_indented, TextAreaState, TextOverflowMode};
+use crate::widgets::textarea::state::{
+    count_wrapped_rows_indented, TextAreaState, TextOverflowMode,
+};
 
 #[cfg(feature = "gui")]
 use unicode_width::UnicodeWidthChar;
@@ -146,18 +146,16 @@ fn styled_segment_line<'a, P: TextAreaDataProvider>(
             visible
         };
         spans.push(Span::styled(selected_text, selected));
-    } else if let Some((start, end)) =
-        char_selection_range(
-            state,
-            line_idx,
-            state
-                .editor
-                .data_provider()
-                .field_value(line_idx)
-                .chars()
-                .count(),
-        )
-    {
+    } else if let Some((start, end)) = char_selection_range(
+        state,
+        line_idx,
+        state
+            .editor
+            .data_provider()
+            .field_value(line_idx)
+            .chars()
+            .count(),
+    ) {
         let mut before = String::new();
         let mut highlighted = String::new();
         let mut after = String::new();

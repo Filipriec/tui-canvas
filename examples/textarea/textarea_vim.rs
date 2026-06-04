@@ -42,7 +42,7 @@ use canvas::{
         modes::AppMode,
         CursorManager, // This import only exists when cursor-style feature is enabled
     },
-    textarea::{TextArea, TextAreaState},
+    TextArea, TextAreaState,
 };
 
 /// TextArea demo with automatic cursor management.

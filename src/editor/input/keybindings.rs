@@ -1,4 +1,4 @@
-// src/editor/key_input.rs
+// src/editor/input/keybindings.rs
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 #[cfg(feature = "keybindings")]
@@ -30,8 +30,7 @@ impl<D: DataProvider> FormEditor<D> {
         let Some(keybindings) = self.keybindings.as_ref() else {
             return KeyEventOutcome::NotMatched;
         };
-        let (matched, is_prefix) =
-            keybindings.lookup_action(mode, self.seq_tracker.sequence());
+        let (matched, is_prefix) = keybindings.lookup_action(mode, self.seq_tracker.sequence());
 
         if let Some(action) = matched.cloned() {
             let outcome = self.dispatch_canvas_action(&action);
