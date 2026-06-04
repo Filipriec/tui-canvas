@@ -4,6 +4,12 @@
 
 ### Added
 
+- Added opt-in default textarea command-line integration through `TextAreaState::use_default_commandline()`, including built-in `:set number`, `:set relativenumber`, `:set nonumber`, `:noh`, `/`, and `?` behavior with automatic bottom-row reservation and cursor routing.
+
+## v0.7.2
+
+### Added
+
 - Added runtime-toggleable textarea line numbers with none, absolute, and relative modes. Line numbers are hidden by default.
 - Added textarea search APIs for setting a query, clearing search, navigating to next/previous matches, and highlighting visible matches.
 - Added a reusable Vim/Helix-style command line component with `:`, `/`, and `?` modes, submit/cancel events, command history, command registration/parsing helpers, and default bottom-row rendering.
