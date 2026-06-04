@@ -38,6 +38,8 @@ pub struct CanvasDisplayOptions {
     pub overflow: OverflowMode,
     /// Maximum label column width, including the trailing space before the input.
     pub max_label_width: u16,
+    /// Maximum visual width of the input column. `None` uses all remaining space.
+    pub max_input_width: Option<u16>,
 }
 
 impl Default for CanvasDisplayOptions {
@@ -45,6 +47,7 @@ impl Default for CanvasDisplayOptions {
         Self {
             overflow: OverflowMode::Indicator('$'),
             max_label_width: 24,
+            max_input_width: Some(25),
         }
     }
 }
@@ -300,7 +303,11 @@ where
     F2: Fn(usize) -> bool,
 {
     let label_width = form_label_width(fields, opts.max_label_width, area.width);
-    let input_width = area.width.saturating_sub(label_width);
+    let available_input_width = area.width.saturating_sub(label_width);
+    let input_width = opts
+        .max_input_width
+        .map(|max_width| max_width.min(available_input_width))
+        .unwrap_or(available_input_width);
 
     let input_rows = Layout::default()
         .direction(Direction::Vertical)
