@@ -78,6 +78,19 @@ fn selection_style() -> Style {
 }
 
 #[cfg(feature = "gui")]
+fn search_match_style() -> Style {
+    Style::default().fg(Color::Black).bg(Color::Yellow)
+}
+
+#[cfg(feature = "gui")]
+fn active_search_match_style() -> Style {
+    Style::default()
+        .fg(Color::Black)
+        .bg(Color::LightYellow)
+        .add_modifier(Modifier::BOLD)
+}
+
+#[cfg(feature = "gui")]
 fn char_selection_range<P: TextAreaDataProvider>(
     state: &TextAreaState<P>,
     line_idx: usize,
@@ -133,57 +146,84 @@ fn styled_segment_line<'a, P: TextAreaDataProvider>(
 ) -> Line<'a> {
     let normal = Style::default();
     let selected = selection_style();
+    let search = search_match_style();
+    let active_search = active_search_match_style();
     let mut spans = Vec::new();
 
     if let Some(prefix) = prefix {
         spans.push(Span::styled(prefix, normal));
     }
 
-    if line_is_linewise_selected(state, line_idx) {
+    let linewise_selected = line_is_linewise_selected(state, line_idx);
+    if linewise_selected {
         let selected_text = if visible.is_empty() {
             " ".to_string()
         } else {
             visible
         };
         spans.push(Span::styled(selected_text, selected));
-    } else if let Some((start, end)) = char_selection_range(
-        state,
-        line_idx,
-        state
-            .editor
-            .data_provider()
-            .field_value(line_idx)
-            .chars()
-            .count(),
-    ) {
-        let mut before = String::new();
-        let mut highlighted = String::new();
-        let mut after = String::new();
+    } else {
+        let char_selection = char_selection_range(
+            state,
+            line_idx,
+            state
+                .editor
+                .data_provider()
+                .field_value(line_idx)
+                .chars()
+                .count(),
+        );
+        let search_matches = state.search_matches_in_line(line_idx);
+        let active_match = state.active_search_match();
 
-        for (i, ch) in visible.chars().enumerate() {
-            let original_idx = original_char_offset + i;
-            if original_idx >= start && original_idx <= end {
-                highlighted.push(ch);
-            } else if original_idx < start {
-                before.push(ch);
+        if visible.is_empty() {
+            if char_selection == Some((0, 0)) {
+                spans.push(Span::styled(" ", selected));
             } else {
-                after.push(ch);
+                spans.push(Span::styled(visible, normal));
+            }
+        } else {
+            let mut current_text = String::new();
+            let mut current_style: Option<Style> = None;
+
+            for (i, ch) in visible.chars().enumerate() {
+                let original_idx = original_char_offset + i;
+                let style = if char_selection
+                    .map(|(start, end)| original_idx >= start && original_idx <= end)
+                    .unwrap_or(false)
+                {
+                    selected
+                } else if active_match
+                    .map(|m| {
+                        m.line == line_idx && original_idx >= m.start && original_idx < m.end
+                    })
+                    .unwrap_or(false)
+                {
+                    active_search
+                } else if search_matches
+                    .iter()
+                    .any(|m| original_idx >= m.start && original_idx < m.end)
+                {
+                    search
+                } else {
+                    normal
+                };
+
+                if current_style == Some(style) {
+                    current_text.push(ch);
+                } else {
+                    if !current_text.is_empty() {
+                        spans.push(Span::styled(current_text, current_style.unwrap_or(normal)));
+                    }
+                    current_text = ch.to_string();
+                    current_style = Some(style);
+                }
+            }
+
+            if !current_text.is_empty() {
+                spans.push(Span::styled(current_text, current_style.unwrap_or(normal)));
             }
         }
-
-        if !before.is_empty() {
-            spans.push(Span::styled(before, normal));
-        }
-        if highlighted.is_empty() && visible.is_empty() {
-            spans.push(Span::styled(" ", selected));
-        } else if !highlighted.is_empty() {
-            spans.push(Span::styled(highlighted, selected));
-        }
-        if !after.is_empty() {
-            spans.push(Span::styled(after, normal));
-        }
-    } else {
-        spans.push(Span::styled(visible, normal));
     }
 
     if let Some(suffix) = suffix {

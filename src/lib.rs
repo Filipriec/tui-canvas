@@ -99,7 +99,7 @@ pub use keybindings::{
 #[cfg(feature = "textarea")]
 pub use textarea::{
     TextArea, TextAreaDataProvider, TextAreaEditor, TextAreaLineNumberMode, TextAreaProvider,
-    TextAreaState,
+    TextAreaSearchMatch, TextAreaState,
 };
 
 #[cfg(feature = "textinput")]

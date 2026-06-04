@@ -266,6 +266,35 @@ fn handle_key_press(key_event: KeyEvent, editor: &mut AutoCursorTextArea) -> any
             editor.textarea.show_relative_line_numbers();
             editor.set_debug_message("Line numbers: relative".to_string());
         }
+        (KeyCode::F(8), _) => {
+            editor.textarea.set_search_query("textarea");
+            let found = editor.textarea.find_next();
+            editor.set_debug_message(if found {
+                "Search: textarea".to_string()
+            } else {
+                "Search: no matches for textarea".to_string()
+            });
+        }
+        (KeyCode::F(9), _) => {
+            editor.textarea.clear_search();
+            editor.set_debug_message("Search cleared".to_string());
+        }
+        (KeyCode::Char('n'), _) => {
+            let found = editor.textarea.find_next();
+            editor.set_debug_message(if found {
+                "Search: next match".to_string()
+            } else {
+                "Search: no next match".to_string()
+            });
+        }
+        (KeyCode::Char('N'), _) => {
+            let found = editor.textarea.find_previous();
+            editor.set_debug_message(if found {
+                "Search: previous match".to_string()
+            } else {
+                "Search: no previous match".to_string()
+            });
+        }
 
         // Debug/info
         (KeyCode::Char('?'), _) => {
@@ -369,7 +398,7 @@ fn render_status_and_help(f: &mut Frame, area: ratatui::layout::Rect, editor: &A
     let help_text = "🎯 NORMALMODE (always editing)\n\
 hjkl/arrows=move, w/b/e=words, W/B/E=WORDS, 0/$=line, g/G=first/last\n\
 x/X=delete, typing inserts text\n\
-F5/F6/F7=line numbers none/absolute/relative, ?=info, Ctrl+Q=quit";
+F5/F6/F7=line numbers, F8/F9=search/clear, n/N=next/previous, ?=info, Ctrl+Q=quit";
 
     let help = Paragraph::new(help_text)
         .block(Block::default().borders(Borders::ALL).title("🚀 Help"))

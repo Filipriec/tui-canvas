@@ -2,12 +2,14 @@
 use ratatui::{
     buffer::Buffer,
     layout::{Alignment, Rect},
-    style::Style,
+    style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, BorderType, Borders, Paragraph, StatefulWidget, Widget},
 };
 
-use super::chunks::{clip_chunks_window_with_indicator_padded, wrap_chunks_indented};
+use super::chunks::{
+    clip_chunks_window_with_indicator_padded, wrap_chunks_indented, StyledChunk,
+};
 use super::state::TextAreaSyntaxState;
 
 use crate::data_provider::DataProvider;
@@ -93,6 +95,78 @@ fn prepend_line_prefix(mut line: Line<'static>, prefix: String) -> Line<'static>
     line
 }
 
+fn search_match_style() -> Style {
+    Style::default().fg(Color::Black).bg(Color::Yellow)
+}
+
+fn active_search_match_style() -> Style {
+    Style::default()
+        .fg(Color::Black)
+        .bg(Color::LightYellow)
+        .add_modifier(Modifier::BOLD)
+}
+
+fn chunks_with_search_highlights(
+    chunks: &[StyledChunk],
+    line_idx: usize,
+    state: &TextAreaSyntaxState,
+) -> Vec<StyledChunk> {
+    let matches = state.textarea.search_matches_in_line(line_idx);
+    if matches.is_empty() {
+        return chunks.to_vec();
+    }
+
+    let active = state.textarea.active_search_match();
+    let search_style = search_match_style();
+    let active_style = active_search_match_style();
+    let mut out = Vec::new();
+    let mut char_idx = 0;
+
+    for chunk in chunks {
+        let mut buf = String::new();
+        let mut current_style: Option<Style> = None;
+
+        for ch in chunk.text.chars() {
+            let style = if active
+                .map(|m| m.line == line_idx && char_idx >= m.start && char_idx < m.end)
+                .unwrap_or(false)
+            {
+                active_style
+            } else if matches
+                .iter()
+                .any(|m| char_idx >= m.start && char_idx < m.end)
+            {
+                search_style
+            } else {
+                chunk.style
+            };
+
+            if current_style == Some(style) {
+                buf.push(ch);
+            } else {
+                if !buf.is_empty() {
+                    out.push(StyledChunk {
+                        text: buf,
+                        style: current_style.unwrap_or(chunk.style),
+                    });
+                }
+                buf = ch.to_string();
+                current_style = Some(style);
+            }
+            char_idx += 1;
+        }
+
+        if !buf.is_empty() {
+            out.push(StyledChunk {
+                text: buf,
+                style: current_style.unwrap_or(chunk.style),
+            });
+        }
+    }
+
+    out
+}
+
 impl<'a> StatefulWidget for TextAreaSyntax<'a> {
     type State = TextAreaSyntaxState;
 
@@ -137,6 +211,7 @@ impl<'a> StatefulWidget for TextAreaSyntax<'a> {
                 let s = provider.field_value(i);
 
                 let chunks = state.engine.highlight_line_cached(i, s, provider);
+                let chunks = chunks_with_search_highlights(&chunks, i, state);
 
                 let lines = wrap_chunks_indented(&chunks, content.width, indent);
                 let skip = if i == start { intra as usize } else { 0 };
@@ -157,6 +232,7 @@ impl<'a> StatefulWidget for TextAreaSyntax<'a> {
                 let s = provider.field_value(i);
 
                 let chunks = state.engine.highlight_line_cached(i, s, provider);
+                let chunks = chunks_with_search_highlights(&chunks, i, state);
 
                 let fits = display_width(s) <= content.width;
                 let start_cols = if i == state.textarea.current_field() {

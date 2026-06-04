@@ -104,6 +104,13 @@ pub enum TextOverflowMode {
     Wrap,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TextAreaSearchMatch {
+    pub line: usize,
+    pub start: usize,
+    pub end: usize,
+}
+
 #[cfg(feature = "gui")]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TextAreaLineNumberMode {
@@ -125,6 +132,8 @@ pub struct TextAreaState<P: TextAreaDataProvider = TextAreaProvider> {
     pub(crate) placeholder: Option<String>,
     pub(crate) overflow_mode: TextOverflowMode,
     pub(crate) h_scroll: u16,
+    pub(crate) search_query: Option<String>,
+    pub(crate) active_search_match: Option<TextAreaSearchMatch>,
     #[cfg(feature = "gui")]
     pub(crate) line_number_mode: TextAreaLineNumberMode,
     #[cfg(feature = "gui")]
@@ -143,6 +152,8 @@ impl<P: TextAreaDataProvider + Default> Default for TextAreaState<P> {
             placeholder: None,
             overflow_mode: TextOverflowMode::Indicator { ch: '$' },
             h_scroll: 0,
+            search_query: None,
+            active_search_match: None,
             #[cfg(feature = "gui")]
             line_number_mode: TextAreaLineNumberMode::None,
             #[cfg(feature = "gui")]
@@ -177,6 +188,8 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
             placeholder: None,
             overflow_mode: TextOverflowMode::Indicator { ch: '$' },
             h_scroll: 0,
+            search_query: None,
+            active_search_match: None,
             #[cfg(feature = "gui")]
             line_number_mode: TextAreaLineNumberMode::None,
             #[cfg(feature = "gui")]
@@ -200,6 +213,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         self.editor.data_provider_mut().set_text(text.into());
         self.editor.ui_state.current_field = 0;
         self.editor.set_cursor_raw(0);
+        self.active_search_match = None;
     }
 
     pub fn set_placeholder<S: Into<String>>(&mut self, s: S) {
@@ -212,6 +226,103 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
 
     pub fn use_wrap(&mut self) {
         self.overflow_mode = TextOverflowMode::Wrap;
+    }
+
+    pub fn set_search_query<S: Into<String>>(&mut self, query: S) {
+        let query = query.into();
+        if query.is_empty() {
+            self.clear_search();
+        } else {
+            self.search_query = Some(query);
+            self.active_search_match = None;
+        }
+    }
+
+    pub fn clear_search(&mut self) {
+        self.search_query = None;
+        self.active_search_match = None;
+    }
+
+    pub fn search_query(&self) -> Option<&str> {
+        self.search_query.as_deref()
+    }
+
+    pub fn active_search_match(&self) -> Option<TextAreaSearchMatch> {
+        self.active_search_match
+    }
+
+    pub fn search_matches_in_line(&self, line_idx: usize) -> Vec<TextAreaSearchMatch> {
+        let Some(query) = self.search_query.as_deref() else {
+            return Vec::new();
+        };
+        if query.is_empty() || line_idx >= self.editor.data_provider().line_count() {
+            return Vec::new();
+        }
+
+        let line = self.editor.data_provider().field_value(line_idx);
+        line.match_indices(query)
+            .map(|(byte_start, matched)| {
+                let start = line[..byte_start].chars().count();
+                let end = start + matched.chars().count();
+                TextAreaSearchMatch {
+                    line: line_idx,
+                    start,
+                    end,
+                }
+            })
+            .collect()
+    }
+
+    pub fn search_matches(&self) -> Vec<TextAreaSearchMatch> {
+        let mut matches = Vec::new();
+        let total = self.editor.data_provider().line_count();
+        for line_idx in 0..total {
+            matches.extend(self.search_matches_in_line(line_idx));
+        }
+        matches
+    }
+
+    pub fn find_next(&mut self) -> bool {
+        let matches = self.search_matches();
+        if matches.is_empty() {
+            self.active_search_match = None;
+            return false;
+        }
+
+        let cursor = (self.current_field(), self.cursor_position());
+        let target = matches
+            .iter()
+            .copied()
+            .find(|m| (m.line, m.start) > cursor)
+            .unwrap_or(matches[0]);
+        self.move_to_search_match(target)
+    }
+
+    pub fn find_previous(&mut self) -> bool {
+        let matches = self.search_matches();
+        if matches.is_empty() {
+            self.active_search_match = None;
+            return false;
+        }
+
+        let cursor = (self.current_field(), self.cursor_position());
+        let target = matches
+            .iter()
+            .rev()
+            .copied()
+            .find(|m| (m.line, m.start) < cursor)
+            .unwrap_or(*matches.last().unwrap());
+        self.move_to_search_match(target)
+    }
+
+    fn move_to_search_match(&mut self, target: TextAreaSearchMatch) -> bool {
+        let moved = self.editor.transition_to_field(target.line).is_ok();
+        self.editor.set_cursor_for_mode(
+            target.start,
+            self.editor.current_text().chars().count(),
+        );
+        self.active_search_match = Some(target);
+        moved
     }
 
     pub fn set_wrap_indent_cols(&mut self, cols: u16) {
@@ -1268,5 +1379,62 @@ mod tests {
         let out = textarea.handle_key_event(KeyEvent::new(KeyCode::Char('p'), KeyModifiers::NONE));
         assert!(matches!(out, KeyEventOutcome::Consumed(None)));
         assert_eq!(textarea.text(), "one\none\ntwo\none\ntwo\ntwo\nthree\nfour");
+    }
+
+    #[test]
+    fn textarea_search_collects_matches_by_line_and_char_offsets() {
+        let mut textarea = TextAreaState::<TextAreaProvider>::from_text("alpha beta\nbeta alpha");
+        textarea.set_search_query("alpha");
+
+        assert_eq!(
+            textarea.search_matches(),
+            vec![
+                super::TextAreaSearchMatch {
+                    line: 0,
+                    start: 0,
+                    end: 5,
+                },
+                super::TextAreaSearchMatch {
+                    line: 1,
+                    start: 5,
+                    end: 10,
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn textarea_find_next_and_previous_wrap() {
+        let mut textarea = TextAreaState::<TextAreaProvider>::from_text("one two\nthree two\none");
+        textarea.set_search_query("two");
+
+        assert!(textarea.find_next());
+        assert_eq!(textarea.current_field(), 0);
+        assert_eq!(textarea.cursor_position(), 4);
+
+        assert!(textarea.find_next());
+        assert_eq!(textarea.current_field(), 1);
+        assert_eq!(textarea.cursor_position(), 6);
+
+        assert!(textarea.find_next());
+        assert_eq!(textarea.current_field(), 0);
+        assert_eq!(textarea.cursor_position(), 4);
+
+        assert!(textarea.find_previous());
+        assert_eq!(textarea.current_field(), 1);
+        assert_eq!(textarea.cursor_position(), 6);
+    }
+
+    #[test]
+    fn textarea_clear_search_removes_query_and_active_match() {
+        let mut textarea = TextAreaState::<TextAreaProvider>::from_text("one two");
+        textarea.set_search_query("two");
+        assert!(textarea.find_next());
+
+        textarea.clear_search();
+
+        assert_eq!(textarea.search_query(), None);
+        assert_eq!(textarea.active_search_match(), None);
+        assert!(textarea.search_matches().is_empty());
     }
 }
