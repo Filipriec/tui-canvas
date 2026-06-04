@@ -125,7 +125,7 @@ impl<D: DataProvider> FormEditor<D> {
     }
 
     /// Check suggestion trigger condition and update suggestions accordingly.
-    /// This is called automatically when entering edit mode or changing text.
+    /// This is called automatically when entering insert mode or changing text.
     #[cfg(feature = "suggestions")]
     pub fn check_suggestion_trigger(&mut self) {
         let idx = self.current_field();
@@ -146,7 +146,7 @@ impl<D: DataProvider> FormEditor<D> {
         let query_text = query.query.as_str();
         let should_show = match trigger {
             crate::SuggestionTrigger::None => false,
-            // WhenFieldStarts: show when in edit mode (empty shows all, typed filters)
+            // WhenFieldStarts: show when in insert mode (empty shows all, typed filters)
             crate::SuggestionTrigger::WhenFieldStarts => true,
             crate::SuggestionTrigger::SpecialChar(ch) => query_text.starts_with(ch),
         };
@@ -173,7 +173,7 @@ impl<D: DataProvider> FormEditor<D> {
         }
     }
 
-    /// Handle Escape key in ReadOnly mode (closes suggestions if active)
+    /// Handle Escape key in normal mode (closes suggestions if active)
     pub fn handle_escape_readonly(&mut self) {
         if self.ui_state.suggestions.is_active {
             self.dismiss_suggestions();

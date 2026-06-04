@@ -1,5 +1,5 @@
-[read_only]
-mode = "read_only"
+[nor]
+mode = "nor"
 move_left = ["Left", "Ctrl+b"]
 move_right = ["Right", "Ctrl+f"]
 move_up = ["Up", "Ctrl+p"]
@@ -15,8 +15,8 @@ enter_highlight_mode = ["Ctrl+space"]
 undo = ["Ctrl+/"]
 redo = ["Alt+/"]
 
-[edit]
-mode = "edit"
+[ins]
+mode = "ins"
 exit_edit_mode = ["esc"]
 move_left = ["Left", "Ctrl+b"]
 move_right = ["Right", "Ctrl+f"]
@@ -35,8 +35,8 @@ suggestion_down = ["Alt+n"]
 suggestion_up = ["Alt+p"]
 apply_suggestion = ["Enter"]
 
-[highlight]
-mode = "highlight"
+[sel]
+mode = "sel"
 exit_highlight_mode = ["esc"]
 move_left = ["Left", "Ctrl+b"]
 move_right = ["Right", "Ctrl+f"]

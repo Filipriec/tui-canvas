@@ -132,9 +132,9 @@ impl CanvasKeyBindings {
                 .expect("canvas keybinding preset was validated");
 
             match section.mode {
-                AppMode::ReadOnly => bindings.ro.extend(section_bindings),
-                AppMode::Edit => bindings.edit.extend(section_bindings),
-                AppMode::Highlight => bindings.hl.extend(section_bindings),
+                AppMode::Nor => bindings.ro.extend(section_bindings),
+                AppMode::Ins => bindings.edit.extend(section_bindings),
+                AppMode::Sel => bindings.hl.extend(section_bindings),
                 _ => {}
             }
         }
@@ -168,9 +168,9 @@ impl CanvasKeyBindings {
         seq: &[KeyStroke],
     ) -> (Option<&CanvasKeyAction>, bool) {
         let bindings = match mode {
-            AppMode::ReadOnly => &self.ro,
-            AppMode::Edit => &self.edit,
-            AppMode::Highlight => &self.hl,
+            AppMode::Nor => &self.ro,
+            AppMode::Ins => &self.edit,
+            AppMode::Sel => &self.hl,
             _ => return (None, false),
         };
 
@@ -242,11 +242,11 @@ mod tests {
         }];
 
         assert_eq!(
-            keybindings.lookup_action(AppMode::ReadOnly, &undo).0,
+            keybindings.lookup_action(AppMode::Nor, &undo).0,
             Some(&CanvasKeyAction::Undo)
         );
         assert_eq!(
-            keybindings.lookup_action(AppMode::ReadOnly, &redo).0,
+            keybindings.lookup_action(AppMode::Nor, &redo).0,
             Some(&CanvasKeyAction::Redo)
         );
     }

@@ -17,7 +17,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
 
         let mode = self.editor.ui_state.mode();
 
-        if mode != AppMode::Edit {
+        if mode != AppMode::Ins {
             if let KeyCode::Char(ch) = evt.code {
                 if let Some(digit) = ch.to_digit(10) {
                     let vim = self.editor.behavior_state.vim_mut();
@@ -55,7 +55,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         self.editor.seq_tracker.reset();
         self.editor.behavior_state.vim_mut().reset_count();
 
-        if mode == AppMode::Edit {
+        if mode == AppMode::Ins {
             match evt.code {
                 KeyCode::Enter => {
                     self.insert_newline();
@@ -96,7 +96,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         count: usize,
     ) -> KeyEventOutcome {
         match action {
-            CanvasKeyAction::NextField if self.mode() == AppMode::Edit => {
+            CanvasKeyAction::NextField if self.mode() == AppMode::Ins => {
                 self.insert_tab_spaces();
                 KeyEventOutcome::Consumed(None)
             }

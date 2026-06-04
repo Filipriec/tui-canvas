@@ -131,11 +131,11 @@ mod tests {
         }];
 
         assert_eq!(
-            keybindings.lookup_action(AppMode::ReadOnly, &undo).0,
+            keybindings.lookup_action(AppMode::Nor, &undo).0,
             Some(&CanvasKeyAction::Undo)
         );
         assert_eq!(
-            keybindings.lookup_action(AppMode::ReadOnly, &redo).0,
+            keybindings.lookup_action(AppMode::Nor, &redo).0,
             Some(&CanvasKeyAction::Redo)
         );
     }
@@ -154,7 +154,7 @@ mod tests {
                 modifiers: KeyModifiers::empty(),
             }];
             assert_eq!(
-                keybindings.lookup_action(AppMode::Highlight, &stroke).0,
+                keybindings.lookup_action(AppMode::Sel, &stroke).0,
                 Some(&action)
             );
         }
@@ -165,7 +165,7 @@ mod tests {
         let bindings = default_vim_action_bindings();
 
         assert!(bindings.iter().any(|binding| {
-            binding.mode == AppMode::ReadOnly
+            binding.mode == AppMode::Nor
                 && binding.action == CanvasAction::Undo
                 && binding.sequence
                     == vec![KeyStroke {
@@ -174,7 +174,7 @@ mod tests {
                     }]
         }));
         assert!(bindings.iter().any(|binding| {
-            binding.mode == AppMode::ReadOnly
+            binding.mode == AppMode::Nor
                 && binding.action == CanvasAction::Redo
                 && binding.sequence
                     == vec![KeyStroke {
@@ -191,11 +191,11 @@ mod tests {
 
         assert!(helix
             .iter()
-            .any(|binding| binding.mode == AppMode::ReadOnly
+            .any(|binding| binding.mode == AppMode::Nor
                 && binding.action == CanvasAction::Undo));
         assert!(emacs
             .iter()
-            .any(|binding| binding.mode == AppMode::Edit
+            .any(|binding| binding.mode == AppMode::Ins
                 && binding.action == CanvasAction::DeleteForward));
     }
 
@@ -215,7 +215,7 @@ mod tests {
                 assert!(
                     bindings
                         .iter()
-                        .any(|binding| binding.mode == AppMode::Edit
+                        .any(|binding| binding.mode == AppMode::Ins
                             && binding.action == action),
                     "missing edit mode binding for {action:?}"
                 );
@@ -226,7 +226,7 @@ mod tests {
     #[test]
     fn builtin_presets_include_undo_redo_in_command_modes() {
         for bindings in [default_vim_action_bindings()] {
-            for mode in [AppMode::ReadOnly] {
+            for mode in [AppMode::Nor] {
                 for action in [CanvasAction::Undo, CanvasAction::Redo] {
                     assert!(
                         bindings
@@ -239,7 +239,7 @@ mod tests {
         }
 
         for bindings in [default_helix_action_bindings(), default_emacs_action_bindings()] {
-            for mode in [AppMode::ReadOnly, AppMode::Highlight] {
+            for mode in [AppMode::Nor, AppMode::Sel] {
                 for action in [CanvasAction::Undo, CanvasAction::Redo] {
                     assert!(
                         bindings

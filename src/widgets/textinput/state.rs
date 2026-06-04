@@ -169,10 +169,10 @@ impl<P: TextInputDataProvider> TextInputState<P> {
     /// Update terminal cursor style for this single-line input.
     ///
     /// Text input is treated as insert-style editing, so this reuses the
-    /// Canvas cursor policy for `AppMode::Edit`.
+    /// Canvas cursor policy for `AppMode::Ins`.
     #[cfg(feature = "cursor-style")]
     pub fn update_cursor_style(&self) -> io::Result<()> {
-        CursorManager::update_for_mode(AppMode::Edit)
+        CursorManager::update_for_mode(AppMode::Ins)
     }
 
     #[cfg(not(feature = "cursor-style"))]

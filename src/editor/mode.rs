@@ -10,19 +10,19 @@ use crate::DataProvider;
 
 impl<D: DataProvider> FormEditor<D> {
     fn set_highlight_mode_selection(&mut self, selection: SelectionState) {
-        self.ui_state.current_mode = AppMode::Highlight;
+        self.ui_state.current_mode = AppMode::Sel;
         self.ui_state.selection = selection;
 
         #[cfg(feature = "cursor-style")]
         {
-            let _ = CursorManager::update_for_mode(AppMode::Highlight);
+            let _ = CursorManager::update_for_mode(AppMode::Sel);
         }
     }
 
     /// Change mode
     pub fn set_mode(&mut self, mode: AppMode) {
         // A genuine mode change ends any in-progress undo-coalescing run. In
-        // normal mode the mode never actually changes (always Edit), and the
+        // normal mode the mode never actually changes (always Ins), and the
         // wrappers call `enter_edit_mode` on every keystroke, so we must only
         // break on a real transition to keep typing coalesced.
         #[cfg(not(feature = "textmode-normal"))]
@@ -34,30 +34,30 @@ impl<D: DataProvider> FormEditor<D> {
         #[cfg(feature = "textmode-normal")]
         let _ = mode;
 
-        // NORMALMODE: force Edit, ignore requested mode
+        // NORMALMODE: force Ins, ignore requested mode
         #[cfg(feature = "textmode-normal")]
         {
-            self.ui_state.current_mode = AppMode::Edit;
+            self.ui_state.current_mode = AppMode::Ins;
             self.ui_state.selection = SelectionState::None;
 
             #[cfg(feature = "cursor-style")]
             {
-                let _ = CursorManager::update_for_mode(AppMode::Edit);
+                let _ = CursorManager::update_for_mode(AppMode::Ins);
             }
         }
 
         // Default (not normal): original vim behavior
         #[cfg(not(feature = "textmode-normal"))]
         match (self.ui_state.current_mode, mode) {
-            (AppMode::ReadOnly, AppMode::Highlight) => {
+            (AppMode::Nor, AppMode::Sel) => {
                 self.enter_highlight_mode();
             }
-            (AppMode::Highlight, AppMode::ReadOnly) => {
+            (AppMode::Sel, AppMode::Nor) => {
                 self.exit_highlight_mode();
             }
             (_, new_mode) => {
                 self.ui_state.current_mode = new_mode;
-                if new_mode != AppMode::Highlight {
+                if new_mode != AppMode::Sel {
                     self.ui_state.selection = SelectionState::None;
                 }
                 #[cfg(feature = "cursor-style")]
@@ -68,7 +68,7 @@ impl<D: DataProvider> FormEditor<D> {
         }
     }
 
-    /// Exit edit mode to read-only mode
+    /// Exit insert mode to normal mode
     pub fn exit_edit_mode(&mut self) -> anyhow::Result<()> {
         #[cfg(feature = "validation")]
         {
@@ -119,7 +119,7 @@ impl<D: DataProvider> FormEditor<D> {
             }
         }
 
-        // NORMALMODE: stay in Edit (do not switch to ReadOnly)
+        // NORMALMODE: stay in Ins (do not switch to Nor)
         #[cfg(feature = "textmode-normal")]
         {
             #[cfg(feature = "suggestions")]
@@ -132,7 +132,7 @@ impl<D: DataProvider> FormEditor<D> {
         // Default (not normal): original vim behavior
         #[cfg(not(feature = "textmode-normal"))]
         {
-            self.set_mode(AppMode::ReadOnly);
+            self.set_mode(AppMode::Nor);
             #[cfg(feature = "suggestions")]
             {
                 self.dismiss_suggestions();
@@ -141,7 +141,7 @@ impl<D: DataProvider> FormEditor<D> {
         }
     }
 
-    /// Enter edit mode
+    /// Enter insert mode
     pub fn enter_edit_mode(&mut self) {
         #[cfg(feature = "computed")]
         {
@@ -152,30 +152,30 @@ impl<D: DataProvider> FormEditor<D> {
             }
         }
 
-        // NORMALMODE: already in Edit, but enforce it
+        // NORMALMODE: already in Ins, but enforce it
         #[cfg(feature = "textmode-normal")]
         {
-            self.ui_state.current_mode = AppMode::Edit;
+            self.ui_state.current_mode = AppMode::Ins;
             self.ui_state.selection = SelectionState::None;
             #[cfg(feature = "cursor-style")]
             {
-                let _ = CursorManager::update_for_mode(AppMode::Edit);
+                let _ = CursorManager::update_for_mode(AppMode::Ins);
             }
         }
 
         // Default (not normal): vim behavior
         #[cfg(not(feature = "textmode-normal"))]
-        self.set_mode(AppMode::Edit);
+        self.set_mode(AppMode::Ins);
 
         // Check if suggestions should be shown based on trigger
         #[cfg(feature = "suggestions")]
         self.check_suggestion_trigger();
     }
 
-    // Highlight/Visual mode
+    // Selection/visual mode
 
     pub fn enter_highlight_mode(&mut self) {
-        // NORMALMODE: ignore request (stay in Edit)
+        // NORMALMODE: ignore request (stay in Ins)
         #[cfg(feature = "textmode-normal")]
         {}
 
@@ -183,15 +183,15 @@ impl<D: DataProvider> FormEditor<D> {
         #[cfg(not(feature = "textmode-normal"))]
         {
             match (&self.ui_state.current_mode, &self.ui_state.selection) {
-                (AppMode::ReadOnly, _) => {
+                (AppMode::Nor, _) => {
                     self.set_highlight_mode_selection(SelectionState::Characterwise {
                         anchor: (self.ui_state.current_field, self.ui_state.cursor_pos),
                     });
                 }
-                (AppMode::Highlight, SelectionState::Characterwise { .. }) => {
+                (AppMode::Sel, SelectionState::Characterwise { .. }) => {
                     self.exit_highlight_mode();
                 }
-                (AppMode::Highlight, _) => {
+                (AppMode::Sel, _) => {
                     self.set_highlight_mode_selection(SelectionState::Characterwise {
                         anchor: (self.ui_state.current_field, self.ui_state.cursor_pos),
                     });
@@ -210,20 +210,20 @@ impl<D: DataProvider> FormEditor<D> {
         #[cfg(not(feature = "textmode-normal"))]
         {
             match (&self.ui_state.current_mode, &self.ui_state.selection) {
-                (AppMode::ReadOnly, _) => {
+                (AppMode::Nor, _) => {
                     self.set_highlight_mode_selection(SelectionState::Linewise {
                         anchor_field: self.ui_state.current_field,
                     });
                 }
-                (AppMode::Highlight, SelectionState::Linewise { .. }) => {
+                (AppMode::Sel, SelectionState::Linewise { .. }) => {
                     self.exit_highlight_mode();
                 }
-                (AppMode::Highlight, SelectionState::Characterwise { anchor }) => {
+                (AppMode::Sel, SelectionState::Characterwise { anchor }) => {
                     self.set_highlight_mode_selection(SelectionState::Linewise {
                         anchor_field: anchor.0,
                     });
                 }
-                (AppMode::Highlight, _) => {
+                (AppMode::Sel, _) => {
                     self.set_highlight_mode_selection(SelectionState::Linewise {
                         anchor_field: self.ui_state.current_field,
                     });
@@ -241,13 +241,13 @@ impl<D: DataProvider> FormEditor<D> {
         // Default (not normal): original vim
         #[cfg(not(feature = "textmode-normal"))]
         {
-            if self.ui_state.current_mode == AppMode::Highlight {
-                self.ui_state.current_mode = AppMode::ReadOnly;
+            if self.ui_state.current_mode == AppMode::Sel {
+                self.ui_state.current_mode = AppMode::Nor;
                 self.ui_state.selection = SelectionState::None;
 
                 #[cfg(feature = "cursor-style")]
                 {
-                    let _ = CursorManager::update_for_mode(AppMode::ReadOnly);
+                    let _ = CursorManager::update_for_mode(AppMode::Nor);
                 }
             }
         }
@@ -260,7 +260,7 @@ impl<D: DataProvider> FormEditor<D> {
         }
         #[cfg(not(feature = "textmode-normal"))]
         {
-            return self.ui_state.current_mode == AppMode::Highlight;
+            return self.ui_state.current_mode == AppMode::Sel;
         }
     }
 
@@ -380,14 +380,14 @@ mod tests {
         let mut editor = FormEditor::new(TestProvider::new(&["alpha", "beta"]));
 
         editor.enter_highlight_mode();
-        assert_eq!(editor.mode(), AppMode::Highlight);
+        assert_eq!(editor.mode(), AppMode::Sel);
         assert!(matches!(
             editor.selection_state(),
             SelectionState::Characterwise { anchor: (0, 0) }
         ));
 
         editor.enter_highlight_mode();
-        assert_eq!(editor.mode(), AppMode::ReadOnly);
+        assert_eq!(editor.mode(), AppMode::Nor);
         assert!(matches!(editor.selection_state(), SelectionState::None));
 
         editor.enter_highlight_line_mode();
@@ -409,14 +409,14 @@ mod tests {
         let mut editor = FormEditor::new(TestProvider::new(&["alpha", "beta"]));
 
         editor.enter_highlight_line_mode();
-        assert_eq!(editor.mode(), AppMode::Highlight);
+        assert_eq!(editor.mode(), AppMode::Sel);
         assert!(matches!(
             editor.selection_state(),
             SelectionState::Linewise { anchor_field: 0 }
         ));
 
         editor.enter_highlight_line_mode();
-        assert_eq!(editor.mode(), AppMode::ReadOnly);
+        assert_eq!(editor.mode(), AppMode::Nor);
         assert!(matches!(editor.selection_state(), SelectionState::None));
 
         editor.enter_highlight_mode();

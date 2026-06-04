@@ -9,12 +9,12 @@
 pub enum AppMode {
     /// For intro and admin screens
     General,
-    /// Canvas read-only mode (navigation)
-    ReadOnly,
-    /// Canvas edit mode (insertion/modification)
-    Edit,
-    /// Canvas highlight/visual mode (selection)
-    Highlight,
+    /// Canvas insert mode (insertion/modification)
+    Ins,
+    /// Canvas selection mode (visual selection)
+    Sel,
+    /// Canvas normal mode (navigation)
+    Nor,
     /// Command mode overlay (for commands)
     Command,
 }

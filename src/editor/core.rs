@@ -136,7 +136,7 @@ impl<D: DataProvider> FormEditor<D> {
 
     pub(crate) fn set_cursor_for_mode(&mut self, pos: usize, max_len: usize) {
         self.ui_state
-            .set_cursor(pos, max_len, self.ui_state.current_mode == AppMode::Edit);
+            .set_cursor(pos, max_len, self.ui_state.current_mode == AppMode::Ins);
     }
 
     pub fn current_field(&self) -> usize {

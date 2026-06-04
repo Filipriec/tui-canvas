@@ -30,7 +30,7 @@ pub enum HostActionOutcome {
 ///
 /// Boundary exits are emitted only when:
 /// - the action is `MoveUp`/`PrevField` at top or `MoveDown`/`NextField` at bottom
-/// - editor is in `ReadOnly` mode
+/// - editor is in `Nor` mode
 pub fn execute_action_for_host<D: DataProvider>(
     editor: &mut FormEditor<D>,
     action: CanvasAction,
@@ -44,7 +44,7 @@ pub fn execute_action_for_host_with_options<D: DataProvider>(
     action: CanvasAction,
     allow_exit_in_read_only: bool,
 ) -> HostActionOutcome {
-    let allow_exit = allow_exit_in_read_only && editor.mode() == AppMode::ReadOnly;
+    let allow_exit = allow_exit_in_read_only && editor.mode() == AppMode::Nor;
 
     match action {
         CanvasAction::MoveDown | CanvasAction::NextField => {
@@ -106,8 +106,8 @@ pub fn handle_key_event_for_host<D: DataProvider>(
     let outcome = map_key_event_outcome_for_host(editor.handle_key_event(evt));
 
     // Preserve common host expectation: boundary exits are only meaningful for
-    // outer focus handoff when the editor is in read-only navigation mode.
-    if editor.mode() != AppMode::ReadOnly && matches!(outcome, HostKeyEventOutcome::ExitCanvas(_)) {
+    // outer focus handoff when the editor is in normal navigation mode.
+    if editor.mode() != AppMode::Nor && matches!(outcome, HostKeyEventOutcome::ExitCanvas(_)) {
         HostKeyEventOutcome::NotHandled
     } else {
         outcome

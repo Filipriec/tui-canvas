@@ -27,7 +27,7 @@ impl<D: DataProvider> FormEditor<D> {
 
     /// Handle character insertion (mask/limit-aware)
     pub fn insert_char(&mut self, ch: char) -> anyhow::Result<()> {
-        if self.ui_state.current_mode != crate::canvas::modes::AppMode::Edit {
+        if self.ui_state.current_mode != crate::canvas::modes::AppMode::Ins {
             return Ok(());
         }
 
@@ -155,7 +155,7 @@ impl<D: DataProvider> FormEditor<D> {
 
     /// Delete backward (backspace)
     pub fn delete_backward(&mut self) -> anyhow::Result<()> {
-        if self.ui_state.current_mode != crate::canvas::modes::AppMode::Edit {
+        if self.ui_state.current_mode != crate::canvas::modes::AppMode::Ins {
             return Ok(());
         }
         if self.ui_state.cursor_pos == 0 {
@@ -211,7 +211,7 @@ impl<D: DataProvider> FormEditor<D> {
 
     /// Delete forward (Delete key)
     pub fn delete_forward(&mut self) -> anyhow::Result<()> {
-        if self.ui_state.current_mode != crate::canvas::modes::AppMode::Edit {
+        if self.ui_state.current_mode != crate::canvas::modes::AppMode::Ins {
             return Ok(());
         }
 
@@ -276,7 +276,7 @@ impl<D: DataProvider> FormEditor<D> {
 
         self.set_cursor_raw(append_pos);
 
-        self.set_mode(crate::canvas::modes::AppMode::Edit);
+        self.set_mode(crate::canvas::modes::AppMode::Ins);
     }
 
     /// Set current field value (validates under feature flag)

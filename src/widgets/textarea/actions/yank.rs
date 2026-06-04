@@ -7,7 +7,7 @@ use crate::{
 impl<P: TextAreaDataProvider> TextAreaState<P> {
     #[cfg(feature = "keybindings")]
     pub fn yank_current_lines(&mut self, count: usize) {
-        if self.mode() == AppMode::Highlight {
+        if self.mode() == AppMode::Sel {
             self.yank_selection();
             self.exit_highlight_mode();
             return;
@@ -123,7 +123,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
                 self.editor.data_provider_mut().restore_content(&content);
                 let _ = self.transition_to_field(insert_at.min(content.len().saturating_sub(1)));
                 self.move_line_start();
-                self.set_mode(AppMode::ReadOnly);
+                self.set_mode(AppMode::Nor);
                 #[cfg(feature = "gui")]
                 {
                     self.edited_this_frame = true;

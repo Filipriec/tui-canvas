@@ -241,9 +241,9 @@ impl CanvasKeybindingPreset {
         let mut sections = Vec::new();
         let mut issues = Vec::new();
         for section in [
-            section_from_mode_map("read_only", AppMode::ReadOnly, read_only),
-            section_from_mode_map("edit", AppMode::Edit, edit),
-            section_from_mode_map("highlight", AppMode::Highlight, highlight),
+            section_from_mode_map("nor", AppMode::Nor, read_only),
+            section_from_mode_map("ins", AppMode::Ins, edit),
+            section_from_mode_map("sel", AppMode::Sel, highlight),
         ] {
             match section {
                 Ok(section) => sections.push(section),
@@ -420,9 +420,9 @@ fn parse_string_list_value(value: &Value) -> Option<Vec<String>> {
 
 pub(crate) fn app_mode_from_name(name: &str) -> Option<AppMode> {
     match name {
-        "read_only" | "normal" => Some(AppMode::ReadOnly),
-        "edit" | "insert" => Some(AppMode::Edit),
-        "highlight" | "select" => Some(AppMode::Highlight),
+        "nor" | "read_only" | "normal" => Some(AppMode::Nor),
+        "ins" | "edit" | "insert" => Some(AppMode::Ins),
+        "sel" | "highlight" | "select" => Some(AppMode::Sel),
         "command" => Some(AppMode::Command),
         "general" => Some(AppMode::General),
         _ => None,
@@ -431,9 +431,9 @@ pub(crate) fn app_mode_from_name(name: &str) -> Option<AppMode> {
 
 pub(crate) fn app_mode_name(mode: AppMode) -> &'static str {
     match mode {
-        AppMode::ReadOnly => "read_only",
-        AppMode::Edit => "edit",
-        AppMode::Highlight => "highlight",
+        AppMode::Nor => "nor",
+        AppMode::Ins => "ins",
+        AppMode::Sel => "sel",
         AppMode::Command => "command",
         AppMode::General => "general",
     }

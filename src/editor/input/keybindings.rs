@@ -46,7 +46,7 @@ impl<D: DataProvider> FormEditor<D> {
         // No match: reset sequence and try insert-char fallback in Edit
         self.seq_tracker.reset();
 
-        if mode == AppMode::Edit {
+        if mode == AppMode::Ins {
             if let KeyCode::Char(c) = evt.code {
                 // Skip control/alt combos
                 let m = evt.modifiers;

@@ -73,7 +73,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
             self.move_line_start();
         }
 
-        self.set_mode(AppMode::ReadOnly);
+        self.set_mode(AppMode::Nor);
         #[cfg(feature = "gui")]
         {
             self.edited_this_frame = true;
@@ -121,7 +121,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         if let Some(new_col) = last_col {
             self.set_cursor_position(new_col);
         }
-        self.set_mode(AppMode::ReadOnly);
+        self.set_mode(AppMode::Nor);
         #[cfg(feature = "gui")]
         {
             self.edited_this_frame = true;

@@ -33,9 +33,9 @@ impl CursorManager {
         #[cfg(not(feature = "textmode-normal"))]
         {
             let style = match mode {
-                AppMode::Edit => SetCursorStyle::SteadyBar, // Thin line for insert
-                AppMode::ReadOnly => SetCursorStyle::SteadyBlock, // Block for normal
-                AppMode::Highlight => SetCursorStyle::BlinkingBlock, // Blinking for visual
+                AppMode::Ins => SetCursorStyle::SteadyBar, // Thin line for insert
+                AppMode::Nor => SetCursorStyle::SteadyBlock, // Block for normal
+                AppMode::Sel => SetCursorStyle::BlinkingBlock, // Blinking for visual
                 AppMode::General => SetCursorStyle::SteadyBlock, // Block for general
                 AppMode::Command => SetCursorStyle::SteadyUnderScore, // Underscore for command
             };

@@ -114,7 +114,7 @@ impl<D: DataProvider> FormEditor<D> {
                 FormInputEventOutcome::Handled
             }
             (KeyCode::Esc, _) => {
-                if self.mode() == crate::canvas::modes::AppMode::Edit {
+                if self.mode() == crate::canvas::modes::AppMode::Ins {
                     let _ = self.exit_edit_mode();
                     FormInputEventOutcome::Handled
                 } else {

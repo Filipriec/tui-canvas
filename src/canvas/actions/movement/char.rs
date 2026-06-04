@@ -16,7 +16,7 @@ pub fn move_right(current_pos: usize, text: &str, for_edit_mode: bool) -> usize 
         // Can move past end of text
         (current_pos + 1).min(text.len())
     } else {
-        // Read-only/highlight mode: stays within text bounds
+        // Normal/selection mode: stays within text bounds
         if current_pos < text.len().saturating_sub(1) {
             current_pos + 1
         } else {

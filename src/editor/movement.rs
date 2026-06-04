@@ -85,7 +85,7 @@ impl<D: DataProvider> FormEditor<D> {
     /// Move to end of current field (vim $)
     pub fn move_line_end(&mut self) {
         let current_text = self.current_text();
-        let is_edit_mode = self.ui_state.current_mode == AppMode::Edit;
+        let is_edit_mode = self.ui_state.current_mode == AppMode::Ins;
 
         let new_pos = line_end_position(current_text, is_edit_mode);
         self.set_cursor_raw(new_pos);

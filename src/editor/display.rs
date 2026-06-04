@@ -23,7 +23,7 @@ impl<D: DataProvider> FormEditor<D> {
             }
 
             if cfg.custom_formatter.is_some() {
-                if matches!(self.ui_state.current_mode, AppMode::Edit) {
+                if matches!(self.ui_state.current_mode, AppMode::Ins) {
                     return raw.to_string();
                 }
                 if let Some((formatted, _mapper, _warning)) = cfg.run_custom_formatter(raw) {
@@ -57,7 +57,7 @@ impl<D: DataProvider> FormEditor<D> {
 
             if cfg.custom_formatter.is_some() {
                 if field_index == self.ui_state.current_field
-                    && matches!(self.ui_state.current_mode, AppMode::Edit)
+                    && matches!(self.ui_state.current_mode, AppMode::Ins)
                 {
                     return raw.to_string();
                 }
@@ -80,7 +80,7 @@ impl<D: DataProvider> FormEditor<D> {
         let char_count = current_text.chars().count();
 
         let raw_pos = match self.ui_state.current_mode {
-            AppMode::Edit => self.ui_state.cursor_pos.min(char_count),
+            AppMode::Ins => self.ui_state.cursor_pos.min(char_count),
             _ => {
                 if char_count == 0 {
                     0
@@ -94,7 +94,7 @@ impl<D: DataProvider> FormEditor<D> {
         {
             let field_index = self.ui_state.current_field;
             if let Some(cfg) = self.ui_state.validation.get_field_config(field_index) {
-                if !matches!(self.ui_state.current_mode, AppMode::Edit) {
+                if !matches!(self.ui_state.current_mode, AppMode::Ins) {
                     if let Some((formatted, mapper, _)) = cfg.run_custom_formatter(current_text) {
                         return mapper.raw_to_formatted(current_text, &formatted, raw_pos);
                     }

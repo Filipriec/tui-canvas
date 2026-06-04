@@ -468,7 +468,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
     ///
     /// Unlike the single-line input (which is always insert-style), the textarea
     /// honours the editor's mode: in vim mode this yields a steady block cursor
-    /// in normal/read-only mode and a bar cursor in edit mode. With the
+    /// in normal mode and a bar cursor in insert mode. With the
     /// `cursor-style` feature disabled this is a no-op.
     #[cfg(feature = "cursor-style")]
     pub fn update_cursor_style(&self) -> io::Result<()> {
@@ -778,7 +778,7 @@ mod tests {
         assert_eq!(textarea.text(), "one\n\ntwo");
         assert_eq!(textarea.current_field(), 1);
         assert_eq!(textarea.cursor_position(), 0);
-        assert_eq!(textarea.mode(), crate::canvas::modes::AppMode::Edit);
+        assert_eq!(textarea.mode(), crate::canvas::modes::AppMode::Ins);
     }
 
     #[cfg(all(feature = "keybindings", feature = "crossterm"))]
@@ -797,7 +797,7 @@ mod tests {
         assert_eq!(textarea.text(), "one\n\ntwo");
         assert_eq!(textarea.current_field(), 1);
         assert_eq!(textarea.cursor_position(), 0);
-        assert_eq!(textarea.mode(), crate::canvas::modes::AppMode::Edit);
+        assert_eq!(textarea.mode(), crate::canvas::modes::AppMode::Ins);
     }
 
     #[cfg(all(feature = "keybindings", feature = "crossterm"))]
@@ -817,7 +817,7 @@ mod tests {
         assert_eq!(textarea.text(), "one\n");
         assert_eq!(textarea.current_field(), 1);
         assert_eq!(textarea.cursor_position(), 0);
-        assert_eq!(textarea.mode(), crate::canvas::modes::AppMode::Edit);
+        assert_eq!(textarea.mode(), crate::canvas::modes::AppMode::Ins);
     }
 
     #[cfg(all(feature = "keybindings", feature = "crossterm"))]
@@ -865,14 +865,14 @@ mod tests {
         assert!(matches!(out, KeyEventOutcome::Consumed(None)));
         assert_eq!(textarea.text(), "ac");
         assert_eq!(textarea.cursor_position(), 1);
-        assert_eq!(textarea.mode(), crate::canvas::modes::AppMode::ReadOnly);
+        assert_eq!(textarea.mode(), crate::canvas::modes::AppMode::Nor);
 
         let out = textarea.handle_key_event(KeyEvent::new(KeyCode::Char('X'), KeyModifiers::SHIFT));
 
         assert!(matches!(out, KeyEventOutcome::Consumed(None)));
         assert_eq!(textarea.text(), "c");
         assert_eq!(textarea.cursor_position(), 0);
-        assert_eq!(textarea.mode(), crate::canvas::modes::AppMode::ReadOnly);
+        assert_eq!(textarea.mode(), crate::canvas::modes::AppMode::Nor);
     }
 
     #[cfg(all(feature = "keybindings", feature = "crossterm"))]
@@ -891,7 +891,7 @@ mod tests {
         assert!(matches!(out, KeyEventOutcome::Consumed(None)));
         assert_eq!(textarea.text(), "a    b");
         assert_eq!(textarea.cursor_position(), 5);
-        assert_eq!(textarea.mode(), crate::canvas::modes::AppMode::Edit);
+        assert_eq!(textarea.mode(), crate::canvas::modes::AppMode::Ins);
     }
 
     #[cfg(all(feature = "keybindings", feature = "crossterm"))]
@@ -953,13 +953,13 @@ mod tests {
         let out = textarea.handle_key_event(KeyEvent::new(KeyCode::Char('I'), KeyModifiers::NONE));
         assert!(matches!(out, KeyEventOutcome::Consumed(None)));
         assert_eq!(textarea.cursor_position(), 0);
-        assert_eq!(textarea.mode(), crate::canvas::modes::AppMode::Edit);
+        assert_eq!(textarea.mode(), crate::canvas::modes::AppMode::Ins);
 
         let _ = textarea.exit_edit_mode();
         let out = textarea.handle_key_event(KeyEvent::new(KeyCode::Char('A'), KeyModifiers::NONE));
         assert!(matches!(out, KeyEventOutcome::Consumed(None)));
         assert_eq!(textarea.cursor_position(), 4);
-        assert_eq!(textarea.mode(), crate::canvas::modes::AppMode::Edit);
+        assert_eq!(textarea.mode(), crate::canvas::modes::AppMode::Ins);
     }
 
     #[cfg(all(feature = "keybindings", feature = "crossterm"))]
@@ -976,7 +976,7 @@ mod tests {
         assert!(matches!(out, KeyEventOutcome::Consumed(None)));
         assert_eq!(textarea.text(), "ab");
         assert_eq!(textarea.cursor_position(), 1);
-        assert_eq!(textarea.mode(), crate::canvas::modes::AppMode::ReadOnly);
+        assert_eq!(textarea.mode(), crate::canvas::modes::AppMode::Nor);
 
         textarea.set_text("abcdef");
         textarea.set_cursor_position(2);
@@ -984,7 +984,7 @@ mod tests {
         assert!(matches!(out, KeyEventOutcome::Consumed(None)));
         assert_eq!(textarea.text(), "ab");
         assert_eq!(textarea.cursor_position(), 2);
-        assert_eq!(textarea.mode(), crate::canvas::modes::AppMode::Edit);
+        assert_eq!(textarea.mode(), crate::canvas::modes::AppMode::Ins);
     }
 
     #[cfg(all(feature = "keybindings", feature = "crossterm"))]
@@ -1005,7 +1005,7 @@ mod tests {
         assert!(matches!(out, KeyEventOutcome::Consumed(None)));
         assert_eq!(textarea.text(), "one\nthree");
         assert_eq!(textarea.current_field(), 1);
-        assert_eq!(textarea.mode(), crate::canvas::modes::AppMode::ReadOnly);
+        assert_eq!(textarea.mode(), crate::canvas::modes::AppMode::Nor);
 
         assert!(matches!(
             textarea.handle_key_event(KeyEvent::new(KeyCode::Char('c'), KeyModifiers::NONE)),
@@ -1016,7 +1016,7 @@ mod tests {
         assert_eq!(textarea.text(), "one\n");
         assert_eq!(textarea.current_field(), 1);
         assert_eq!(textarea.cursor_position(), 0);
-        assert_eq!(textarea.mode(), crate::canvas::modes::AppMode::Edit);
+        assert_eq!(textarea.mode(), crate::canvas::modes::AppMode::Ins);
     }
 
     #[cfg(all(feature = "keybindings", feature = "crossterm"))]
@@ -1034,7 +1034,7 @@ mod tests {
         assert_eq!(textarea.text(), "onetwo");
         assert_eq!(textarea.current_field(), 0);
         assert_eq!(textarea.cursor_position(), 3);
-        assert_eq!(textarea.mode(), crate::canvas::modes::AppMode::ReadOnly);
+        assert_eq!(textarea.mode(), crate::canvas::modes::AppMode::Nor);
     }
 
     #[cfg(all(feature = "keybindings", feature = "crossterm"))]
@@ -1138,20 +1138,20 @@ mod tests {
 
         let out = textarea.handle_key_event(KeyEvent::new(KeyCode::Char('V'), KeyModifiers::NONE));
         assert!(matches!(out, KeyEventOutcome::Consumed(None)));
-        assert_eq!(textarea.mode(), crate::canvas::modes::AppMode::Highlight);
+        assert_eq!(textarea.mode(), crate::canvas::modes::AppMode::Sel);
 
         let out = textarea.handle_key_event(KeyEvent::new(KeyCode::Char('j'), KeyModifiers::NONE));
         assert!(matches!(out, KeyEventOutcome::Consumed(None)));
 
         let out = textarea.handle_key_event(KeyEvent::new(KeyCode::Char('y'), KeyModifiers::NONE));
         assert!(matches!(out, KeyEventOutcome::Consumed(None)));
-        assert_eq!(textarea.mode(), crate::canvas::modes::AppMode::ReadOnly);
+        assert_eq!(textarea.mode(), crate::canvas::modes::AppMode::Nor);
         assert_eq!(textarea.text(), "one\ntwo\nthree");
 
         let out = textarea.handle_key_event(KeyEvent::new(KeyCode::Char('p'), KeyModifiers::NONE));
         assert!(matches!(out, KeyEventOutcome::Consumed(None)));
         assert_eq!(textarea.text(), "one\ntwo\none\ntwo\nthree");
-        assert_eq!(textarea.mode(), crate::canvas::modes::AppMode::ReadOnly);
+        assert_eq!(textarea.mode(), crate::canvas::modes::AppMode::Nor);
     }
 
     #[cfg(all(feature = "keybindings", feature = "crossterm"))]

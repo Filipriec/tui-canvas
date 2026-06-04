@@ -196,7 +196,7 @@ fn render_canvas_with_highlight_and_options<T: CanvasTheme, D: DataProvider>(
     }
 
     let current_field_idx = ui_state.current_field();
-    let is_edit_mode = matches!(ui_state.mode(), crate::canvas::modes::AppMode::Edit);
+    let is_edit_mode = matches!(ui_state.mode(), crate::canvas::modes::AppMode::Ins);
 
     render_canvas_fields_with_options(
         f,
