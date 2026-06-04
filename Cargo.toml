@@ -49,7 +49,7 @@ keybindings = ["gui"]
 textmode-vim = []
 textmode-normal = []
 
-all-nontextmodes = [
+full = [
     "gui",
     "suggestions",
     "cursor-style",

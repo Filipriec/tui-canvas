@@ -33,12 +33,29 @@ pub enum OverflowMode {
 
 #[derive(Debug, Clone, Copy)]
 /// Display options controlling canvas rendering behavior.
+///
+/// Override visual form widths with struct update syntax:
+///
+/// ```rust
+/// # use canvas::{CanvasDisplayOptions, OverflowMode};
+/// let opts = CanvasDisplayOptions {
+///     max_label_width: 18,
+///     max_input_width: Some(40),
+///     ..Default::default()
+/// };
+/// ```
 pub struct CanvasDisplayOptions {
     /// How to handle horizontal overflow for fields.
     pub overflow: OverflowMode,
     /// Maximum label column width, including the trailing space before the input.
+    ///
+    /// Change this by setting `CanvasDisplayOptions::max_label_width`.
+    /// Labels wider than this are visually truncated with `...`.
     pub max_label_width: u16,
-    /// Maximum visual width of the input column. `None` uses all remaining space.
+    /// Maximum visual width of the input column.
+    ///
+    /// Change this by setting `CanvasDisplayOptions::max_input_width`.
+    /// `Some(width)` caps the rendered input width; `None` uses all remaining space.
     pub max_input_width: Option<u16>,
 }
 
