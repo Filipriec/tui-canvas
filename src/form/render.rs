@@ -36,12 +36,15 @@ pub enum OverflowMode {
 pub struct CanvasDisplayOptions {
     /// How to handle horizontal overflow for fields.
     pub overflow: OverflowMode,
+    /// Maximum label column width, including the trailing space before the input.
+    pub max_label_width: u16,
 }
 
 impl Default for CanvasDisplayOptions {
     fn default() -> Self {
         Self {
             overflow: OverflowMode::Indicator('$'),
+            max_label_width: 24,
         }
     }
 }
@@ -66,6 +69,49 @@ fn clip_with_indicator_line<'a>(s: &'a str, width: u16, indicator: char) -> Line
         used = used.saturating_add(w);
     }
     Line::from(vec![Span::raw(out), Span::raw(indicator.to_string())])
+}
+
+fn clip_label_with_ellipsis(s: &str, width: u16) -> String {
+    if width == 0 {
+        return String::new();
+    }
+    if display_width(s) <= width {
+        return s.to_string();
+    }
+    if width <= 3 {
+        return ".".repeat(width as usize);
+    }
+
+    let budget = width - 3;
+    let mut out = String::new();
+    let mut used: u16 = 0;
+
+    for ch in s.chars() {
+        let ch_width = UnicodeWidthChar::width(ch).unwrap_or(0) as u16;
+        if used + ch_width > budget {
+            break;
+        }
+        out.push(ch);
+        used = used.saturating_add(ch_width);
+    }
+
+    out.push_str("...");
+    out
+}
+
+fn form_label_width(fields: &[&str], max_label_width: u16, area_width: u16) -> u16 {
+    if area_width == 0 {
+        return 0;
+    }
+
+    let longest = fields
+        .iter()
+        .map(|field| display_width(field))
+        .max()
+        .unwrap_or(0)
+        .saturating_add(1);
+
+    longest.min(max_label_width).min(area_width)
 }
 
 fn render_active_line_with_indicator<T: CanvasTheme>(
@@ -253,24 +299,20 @@ where
     F1: Fn(usize) -> String,
     F2: Fn(usize) -> bool,
 {
-    let columns = Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints([Constraint::Percentage(30), Constraint::Percentage(70)])
-        .split(area);
-
-    let input_block = Rect {
-        x: columns[1].x,
-        y: columns[1].y,
-        width: columns[1].width,
-        height: fields.len() as u16,
-    };
+    let label_width = form_label_width(fields, opts.max_label_width, area.width);
+    let input_width = area.width.saturating_sub(label_width);
 
     let input_rows = Layout::default()
         .direction(Direction::Vertical)
         .constraints(vec![Constraint::Length(1); fields.len()])
-        .split(input_block);
+        .split(Rect {
+            x: area.x + label_width,
+            y: area.y,
+            width: input_width,
+            height: fields.len() as u16,
+        });
 
-    render_field_labels(f, columns[0], input_block, fields, theme);
+    render_field_labels(f, area, label_width, fields, theme);
 
     let mut active_field_input_rect = None;
 
@@ -367,22 +409,29 @@ where
 /// Render field labels
 fn render_field_labels<T: CanvasTheme>(
     f: &mut Frame,
-    label_area: Rect,
-    input_block: Rect,
+    area: Rect,
+    label_width: u16,
     fields: &[&str],
     theme: &T,
 ) {
+    if label_width == 0 {
+        return;
+    }
+
+    let label_text_width = label_width.saturating_sub(1);
+
     for (i, field) in fields.iter().enumerate() {
+        let clipped_label = clip_label_with_ellipsis(field, label_text_width);
         let label = Paragraph::new(Line::from(Span::styled(
-            format!("{field}:"),
+            clipped_label,
             Style::default().fg(theme.fg()),
         )));
         f.render_widget(
             label,
             Rect {
-                x: label_area.x,
-                y: input_block.y + i as u16,
-                width: label_area.width,
+                x: area.x,
+                y: area.y + i as u16,
+                width: label_text_width,
                 height: 1,
             },
         );
