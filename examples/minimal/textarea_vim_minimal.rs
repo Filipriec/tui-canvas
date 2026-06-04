@@ -1,24 +1,30 @@
 //! Minimal multi-line textarea example.
 //!
 //! Run with:
-//!   cargo run --example textarea_vim_minimal --features "textarea,keybindings,cursor-style"
+//!   cargo run --example textarea_vim_minimal --features "textarea,keybindings,cursor-style,commandline"
 
 #[cfg(not(feature = "keybindings"))]
 compile_error!(
     "This example requires the 'keybindings' feature. \
-     Run with: cargo run --example textarea_vim_minimal --features \"textarea,keybindings,cursor-style\""
+     Run with: cargo run --example textarea_vim_minimal --features \"textarea,keybindings,cursor-style,commandline\""
 );
 
 #[cfg(not(feature = "textarea"))]
 compile_error!(
     "This example requires the 'textarea' feature. \
-     Run with: cargo run --example textarea_vim_minimal --features \"textarea,keybindings,cursor-style\""
+     Run with: cargo run --example textarea_vim_minimal --features \"textarea,keybindings,cursor-style,commandline\""
 );
 
 #[cfg(not(feature = "cursor-style"))]
 compile_error!(
     "This example requires the 'cursor-style' feature. \
-     Run with: cargo run --example textarea_vim_minimal --features \"textarea,keybindings,cursor-style\""
+     Run with: cargo run --example textarea_vim_minimal --features \"textarea,keybindings,cursor-style,commandline\""
+);
+
+#[cfg(not(feature = "commandline"))]
+compile_error!(
+    "This example requires the 'commandline' feature. \
+     Run with: cargo run --example textarea_vim_minimal --features \"textarea,keybindings,cursor-style,commandline\""
 );
 
 use std::io;
@@ -72,6 +78,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut textarea = TextAreaState::from_text("A simple textarea.\nType here.");
     textarea.use_wrap();
     textarea.set_keybindings(CanvasKeyBindings::vim_defaults());
+    textarea.use_default_commandline();
     textarea.update_cursor_style()?;
 
     let res = run_app(&mut terminal, textarea);

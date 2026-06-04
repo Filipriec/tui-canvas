@@ -4,6 +4,14 @@ use std::ops::{Deref, DerefMut};
 #[cfg(feature = "cursor-style")]
 use crate::cursor::CursorManager;
 use crate::editor::FormEditor;
+#[cfg(feature = "commandline")]
+use crate::{
+    commandline::{CommandLineCommand, CommandLineRegistry, CommandLineState},
+};
+#[cfg(all(feature = "commandline", feature = "keybindings"))]
+use crate::commandline::CommandLineSubmit;
+#[cfg(all(feature = "commandline", feature = "keybindings"))]
+use crate::keybindings::KeyEventOutcome;
 #[cfg(feature = "gui")]
 use crate::gui_utils::{compute_h_scroll_with_padding, RIGHT_PAD};
 use crate::textarea::provider::{TextAreaDataProvider, TextAreaProvider};
@@ -111,6 +119,74 @@ pub struct TextAreaSearchMatch {
     pub end: usize,
 }
 
+#[cfg(feature = "commandline")]
+pub struct TextAreaCommandLineState {
+    state: CommandLineState,
+    commands: CommandLineRegistry,
+}
+
+#[cfg(feature = "commandline")]
+impl Default for TextAreaCommandLineState {
+    fn default() -> Self {
+        Self {
+            state: CommandLineState::new(),
+            commands: default_textarea_commandline_commands(),
+        }
+    }
+}
+
+#[cfg(feature = "commandline")]
+impl TextAreaCommandLineState {
+    pub fn state(&self) -> &CommandLineState {
+        &self.state
+    }
+
+    pub fn state_mut(&mut self) -> &mut CommandLineState {
+        &mut self.state
+    }
+
+    pub fn commands(&self) -> &CommandLineRegistry {
+        &self.commands
+    }
+
+    pub fn commands_mut(&mut self) -> &mut CommandLineRegistry {
+        &mut self.commands
+    }
+}
+
+#[cfg(feature = "commandline")]
+fn default_textarea_commandline_commands() -> CommandLineRegistry {
+    let mut registry = CommandLineRegistry::new();
+    registry
+        .register(
+            CommandLineCommand::new("set-number")
+                .alias("number")
+                .alias("nu")
+                .pattern(["set", "number"])
+                .pattern(["set", "nu"]),
+        )
+        .unwrap()
+        .register(
+            CommandLineCommand::new("set-relative-number")
+                .alias("relativenumber")
+                .alias("rnu")
+                .pattern(["set", "relativenumber"])
+                .pattern(["set", "rnu"]),
+        )
+        .unwrap()
+        .register(
+            CommandLineCommand::new("set-no-number")
+                .alias("nonumber")
+                .alias("nonu")
+                .pattern(["set", "nonumber"])
+                .pattern(["set", "nonu"]),
+        )
+        .unwrap()
+        .register(CommandLineCommand::new("no-highlight").alias("noh").alias("nohlsearch"))
+        .unwrap();
+    registry
+}
+
 #[cfg(feature = "gui")]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TextAreaLineNumberMode {
@@ -142,6 +218,8 @@ pub struct TextAreaState<P: TextAreaDataProvider = TextAreaProvider> {
     pub(crate) viewport_height: u16,
     #[cfg(feature = "gui")]
     pub(crate) edited_this_frame: bool,
+    #[cfg(feature = "commandline")]
+    pub(crate) commandline: Option<TextAreaCommandLineState>,
 }
 
 impl<P: TextAreaDataProvider + Default> Default for TextAreaState<P> {
@@ -162,6 +240,8 @@ impl<P: TextAreaDataProvider + Default> Default for TextAreaState<P> {
             viewport_height: 10,
             #[cfg(feature = "gui")]
             edited_this_frame: false,
+            #[cfg(feature = "commandline")]
+            commandline: None,
         }
     }
 }
@@ -198,11 +278,89 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
             viewport_height: 10,
             #[cfg(feature = "gui")]
             edited_this_frame: false,
+            #[cfg(feature = "commandline")]
+            commandline: None,
         }
     }
 
     pub fn from_text<S: Into<String>>(text: S) -> Self {
         Self::with_provider(P::from_text(text.into()))
+    }
+
+    #[cfg(feature = "commandline")]
+    pub fn use_default_commandline(&mut self) {
+        self.commandline = Some(TextAreaCommandLineState::default());
+    }
+
+    #[cfg(feature = "commandline")]
+    pub fn commandline(&self) -> Option<&TextAreaCommandLineState> {
+        self.commandline.as_ref()
+    }
+
+    #[cfg(feature = "commandline")]
+    pub fn commandline_mut(&mut self) -> Option<&mut TextAreaCommandLineState> {
+        self.commandline.as_mut()
+    }
+
+    #[cfg(all(feature = "gui", feature = "commandline"))]
+    pub fn commandline_textarea_area(&self, area: Rect) -> Rect {
+        if self.commandline.is_some() {
+            Rect {
+                height: area.height.saturating_sub(1),
+                ..area
+            }
+        } else {
+            area
+        }
+    }
+
+    #[cfg(all(feature = "gui", feature = "commandline"))]
+    pub fn cursor_with_commandline(&self, area: Rect, block: Option<&Block<'_>>) -> (u16, u16) {
+        self.cursor(area, block)
+    }
+
+    #[cfg(all(feature = "commandline", feature = "keybindings", feature = "crossterm"))]
+    pub fn handle_key_event_with_commandline(
+        &mut self,
+        key: crossterm::event::KeyEvent,
+    ) -> KeyEventOutcome {
+        self.handle_key_event(key)
+    }
+
+    #[cfg(all(feature = "commandline", feature = "keybindings"))]
+    pub(crate) fn apply_default_commandline_submit(&mut self, submit: CommandLineSubmit) {
+        match submit {
+            CommandLineSubmit::SearchForward(query) => {
+                self.set_search_query(query);
+                self.find_next();
+            }
+            CommandLineSubmit::SearchBackward(query) => {
+                self.set_search_query(query);
+                self.find_previous();
+            }
+            CommandLineSubmit::Command(command) => self.apply_default_commandline_command(&command),
+        }
+    }
+
+    #[cfg(all(feature = "commandline", feature = "keybindings"))]
+    pub(crate) fn apply_default_commandline_command(&mut self, command: &str) {
+        let Some(commandline) = &self.commandline else {
+            return;
+        };
+        let Ok(invocation) = commandline.commands.dispatch(command) else {
+            return;
+        };
+
+        match invocation.command.name.as_str() {
+            #[cfg(feature = "gui")]
+            "set-number" => self.show_absolute_line_numbers(),
+            #[cfg(feature = "gui")]
+            "set-relative-number" => self.show_relative_line_numbers(),
+            #[cfg(feature = "gui")]
+            "set-no-number" => self.hide_line_numbers(),
+            "no-highlight" => self.clear_search(),
+            _ => {}
+        }
     }
 
     pub fn text(&self) -> String {
@@ -418,6 +576,18 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
 
     #[cfg(feature = "gui")]
     pub fn cursor(&self, area: Rect, block: Option<&Block<'_>>) -> (u16, u16) {
+        #[cfg(feature = "commandline")]
+        {
+            if let Some(commandline) = &self.commandline {
+                if commandline.state.is_active() {
+                    return commandline.state.cursor(area);
+                }
+            }
+        }
+
+        #[cfg(feature = "commandline")]
+        let area = self.commandline_textarea_area(area);
+
         let inner = if let Some(b) = block {
             b.inner(area)
         } else {

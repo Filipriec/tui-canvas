@@ -1,6 +1,9 @@
 #[cfg(feature = "keybindings")]
 use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 
+#[cfg(all(feature = "keybindings", feature = "commandline"))]
+use crate::commandline::CommandLineEventOutcome;
+
 #[cfg(feature = "keybindings")]
 use crate::{
     canvas::modes::AppMode,
@@ -11,6 +14,42 @@ use crate::{
 #[cfg(feature = "keybindings")]
 impl<P: TextAreaDataProvider> TextAreaState<P> {
     pub fn handle_key_event(&mut self, evt: KeyEvent) -> KeyEventOutcome {
+        #[cfg(feature = "commandline")]
+        {
+            let should_route_commandline = self
+                .commandline
+                .as_ref()
+                .map(|commandline| {
+                    commandline.state().is_active()
+                        || matches!(self.mode(), AppMode::Nor | AppMode::Sel)
+                })
+                .unwrap_or(false);
+
+            if should_route_commandline {
+                let outcome = self
+                    .commandline
+                    .as_mut()
+                    .expect("checked commandline presence")
+                    .state_mut()
+                    .input_key(evt);
+
+                match outcome {
+                    CommandLineEventOutcome::Ignored => {}
+                    CommandLineEventOutcome::Handled | CommandLineEventOutcome::Cancelled => {
+                        return KeyEventOutcome::Consumed(None);
+                    }
+                    CommandLineEventOutcome::Submitted(submit) => {
+                        self.apply_default_commandline_submit(submit);
+                        return KeyEventOutcome::Consumed(None);
+                    }
+                }
+            }
+        }
+
+        self.handle_key_event_inner(evt)
+    }
+
+    fn handle_key_event_inner(&mut self, evt: KeyEvent) -> KeyEventOutcome {
         if evt.kind != KeyEventKind::Press {
             return KeyEventOutcome::NotMatched;
         }

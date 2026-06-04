@@ -10,6 +10,8 @@ use ratatui::{
 
 #[cfg(feature = "gui")]
 use crate::canvas::state::SelectionState;
+#[cfg(all(feature = "gui", feature = "commandline"))]
+use crate::commandline::CommandLine;
 #[cfg(feature = "gui")]
 use crate::gui_utils::{compute_h_scroll_with_padding, display_cols_up_to, display_width};
 #[cfg(feature = "gui")]
@@ -414,13 +416,18 @@ impl<'a, P: TextAreaDataProvider> StatefulWidget for TextArea<'a, P> {
     type State = TextAreaState<P>;
 
     fn render(self, area: Rect, buf: &mut Buffer, state: &mut Self::State) {
-        state.ensure_visible(area, self.block.as_ref());
+        #[cfg(feature = "commandline")]
+        let textarea_area = state.commandline_textarea_area(area);
+        #[cfg(not(feature = "commandline"))]
+        let textarea_area = area;
+
+        state.ensure_visible(textarea_area, self.block.as_ref());
 
         let inner = if let Some(b) = &self.block {
-            b.clone().render(area, buf);
-            b.inner(area)
+            b.clone().render(textarea_area, buf);
+            b.inner(textarea_area)
         } else {
-            area
+            textarea_area
         };
         let content = state.content_area(inner);
 
@@ -520,5 +527,10 @@ impl<'a, P: TextAreaDataProvider> StatefulWidget for TextArea<'a, P> {
 
         // No Paragraph::wrap/scroll in wrap mode — we pre-wrap.
         p.render(inner, buf);
+
+        #[cfg(feature = "commandline")]
+        if let Some(commandline) = state.commandline_mut() {
+            CommandLine::default().render(area, buf, commandline.state_mut());
+        }
     }
 }
