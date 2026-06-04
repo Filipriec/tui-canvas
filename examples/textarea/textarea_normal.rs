@@ -457,16 +457,7 @@ fn ui(f: &mut Frame, editor: &mut AutoCursorTextArea) {
     render_status_and_help(f, chunks[1], editor);
 
     if editor.commandline.is_active() {
-        let commandline_area = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([
-                Constraint::Min(8),
-                Constraint::Length(1),
-                Constraint::Length(3),
-                Constraint::Length(4),
-            ])
-            .split(f.area())[1];
-        let (cx, cy) = editor.commandline.cursor(commandline_area);
+        let (cx, cy) = editor.commandline.cursor(f.area());
         f.set_cursor_position((cx, cy));
     }
 }
@@ -493,7 +484,7 @@ fn render_status_and_help(f: &mut Frame, area: ratatui::layout::Rect, editor: &m
         ])
         .split(area);
 
-    f.render_stateful_widget(CommandLine::default(), chunks[0], &mut editor.commandline);
+    f.render_stateful_widget(CommandLine::default(), f.area(), &mut editor.commandline);
 
     let status_text = if editor.has_pending_command() {
         format!(

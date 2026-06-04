@@ -17,4 +17,4 @@ pub use state::{
 };
 
 #[cfg(feature = "gui")]
-pub use widget::CommandLine;
+pub use widget::{CommandLine, CommandLinePlacement};

@@ -115,6 +115,6 @@ pub use textinput::{
 pub use commandline::{
     parse_command_args, parse_command_line, CommandLine, CommandLineCommand,
     CommandLineCommandInvocation, CommandLineDispatchError, CommandLineEventOutcome,
-    CommandLineMode, CommandLineParseError, CommandLineParsedCommand, CommandLineRegistry,
-    CommandLineRegistrationError, CommandLineState, CommandLineSubmit,
+    CommandLineMode, CommandLineParseError, CommandLineParsedCommand, CommandLinePlacement,
+    CommandLineRegistry, CommandLineRegistrationError, CommandLineState, CommandLineSubmit,
 };

@@ -13,17 +13,28 @@ use crate::gui_utils::{
 
 use super::state::CommandLineState;
 
+/// Placement policy for [`CommandLine`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CommandLinePlacement {
+    /// Render into the last row of the provided area.
+    Bottom,
+    /// Render into the provided area exactly.
+    Inline,
+}
+
 /// Renderable command-line prompt.
 ///
-/// This widget draws nothing while [`CommandLineState`] is inactive. Hosts can
-/// place it in a bottom status row and set the terminal cursor from
-/// [`CommandLineState::cursor`].
+/// This widget draws nothing while [`CommandLineState`] is inactive. By
+/// default it renders into the last row of the provided area, so rendering it
+/// over the terminal frame reserves the terminal's bottom row for command
+/// input. Use [`CommandLine::inline`] when an app wants to place it manually.
 #[derive(Debug, Clone)]
 pub struct CommandLine {
     pub(crate) style: Style,
     pub(crate) prompt_style: Style,
     pub(crate) placeholder_style: Style,
     pub(crate) overflow_indicator: char,
+    pub(crate) placement: CommandLinePlacement,
 }
 
 impl Default for CommandLine {
@@ -33,11 +44,42 @@ impl Default for CommandLine {
             prompt_style: Style::default().fg(Color::Yellow),
             placeholder_style: Style::default().fg(Color::DarkGray),
             overflow_indicator: '$',
+            placement: CommandLinePlacement::Bottom,
         }
     }
 }
 
 impl CommandLine {
+    pub(crate) fn placement_area(area: Rect, placement: CommandLinePlacement) -> Rect {
+        match placement {
+            CommandLinePlacement::Bottom => Rect {
+                x: area.x,
+                y: area.y.saturating_add(area.height.saturating_sub(1)),
+                width: area.width,
+                height: area.height.min(1),
+            },
+            CommandLinePlacement::Inline => area,
+        }
+    }
+
+    /// Render into the last row of the provided area.
+    pub fn bottom(mut self) -> Self {
+        self.placement = CommandLinePlacement::Bottom;
+        self
+    }
+
+    /// Render into the provided area exactly.
+    pub fn inline(mut self) -> Self {
+        self.placement = CommandLinePlacement::Inline;
+        self
+    }
+
+    /// Set the placement policy.
+    pub fn placement(mut self, placement: CommandLinePlacement) -> Self {
+        self.placement = placement;
+        self
+    }
+
     /// Style applied to the input text.
     pub fn style(mut self, style: Style) -> Self {
         self.style = style;
@@ -71,6 +113,7 @@ impl StatefulWidget for CommandLine {
             return;
         }
 
+        let area = Self::placement_area(area, self.placement);
         let prompt = state.prompt();
         let prompt_width = display_width(prompt);
         let input_width = area.width.saturating_sub(prompt_width);

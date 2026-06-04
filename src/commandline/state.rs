@@ -276,8 +276,18 @@ impl CommandLineState {
     }
 
     #[cfg(feature = "gui")]
-    /// Cursor position for rendering the active input.
+    /// Cursor position for the default bottom-row command-line placement.
     pub fn cursor(&self, area: ratatui::layout::Rect) -> (u16, u16) {
+        let area = crate::commandline::CommandLine::placement_area(
+            area,
+            crate::commandline::CommandLinePlacement::Bottom,
+        );
+        self.cursor_inline(area)
+    }
+
+    #[cfg(feature = "gui")]
+    /// Cursor position when the command line is rendered into the given area exactly.
+    pub fn cursor_inline(&self, area: ratatui::layout::Rect) -> (u16, u16) {
         let prompt_width = crate::gui_utils::display_width(self.prompt());
         let input_area = ratatui::layout::Rect {
             x: area.x.saturating_add(prompt_width),
