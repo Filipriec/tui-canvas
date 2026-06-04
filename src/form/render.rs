@@ -1,32 +1,26 @@
 // src/form/render.rs
 //! Canvas GUI rendering helpers.
 
-#[cfg(feature = "gui")]
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, BorderType, Borders, Paragraph, Wrap},
+    widgets::{Paragraph, Wrap},
     Frame,
 };
 
 use crate::canvas::modes::HighlightState;
-#[cfg(feature = "gui")]
 use crate::canvas::theme::{CanvasTheme, DefaultCanvasTheme};
 use crate::data_provider::DataProvider;
 use crate::editor::FormEditor;
-#[cfg(feature = "gui")]
 use crate::gui_utils::{
     clip_inline_completion_with_indicator_padded, compute_h_scroll_with_padding, display_width,
     RIGHT_PAD,
 };
-#[cfg(feature = "gui")]
 use unicode_width::UnicodeWidthChar;
 
-#[cfg(feature = "gui")]
 use std::cmp::{max, min};
 
-#[cfg(feature = "gui")]
 #[derive(Debug, Clone, Copy)]
 /// How to handle overflow when rendering a field's content.
 pub enum OverflowMode {
@@ -37,7 +31,6 @@ pub enum OverflowMode {
     Wrap,
 }
 
-#[cfg(feature = "gui")]
 #[derive(Debug, Clone, Copy)]
 /// Display options controlling canvas rendering behavior.
 pub struct CanvasDisplayOptions {
@@ -45,7 +38,6 @@ pub struct CanvasDisplayOptions {
     pub overflow: OverflowMode,
 }
 
-#[cfg(feature = "gui")]
 impl Default for CanvasDisplayOptions {
     fn default() -> Self {
         Self {
@@ -55,7 +47,6 @@ impl Default for CanvasDisplayOptions {
 }
 
 /// Utility: clip a string to fit width, append indicator if overflow
-#[cfg(feature = "gui")]
 fn clip_with_indicator_line<'a>(s: &'a str, width: u16, indicator: char) -> Line<'a> {
     if width == 0 {
         return Line::from("");
@@ -77,7 +68,6 @@ fn clip_with_indicator_line<'a>(s: &'a str, width: u16, indicator: char) -> Line
     Line::from(vec![Span::raw(out), Span::raw(indicator.to_string())])
 }
 
-#[cfg(feature = "gui")]
 fn render_active_line_with_indicator<T: CanvasTheme>(
     typed_text: &str,
     completion: Option<&str>,
@@ -116,7 +106,6 @@ fn render_active_line_with_indicator<T: CanvasTheme>(
     )
 }
 
-#[cfg(feature = "gui")]
 /// Render the canvas into the provided frame using default display options.
 ///
 /// Returns the rectangle of the active input field if present.
@@ -130,7 +119,6 @@ pub fn render_canvas<T: CanvasTheme, D: DataProvider>(
     render_canvas_with_options(f, area, editor, theme, opts)
 }
 
-#[cfg(feature = "gui")]
 /// Render the canvas into the provided frame with explicit display options.
 ///
 /// This is the more configurable entrypoint for rendering and is useful for
@@ -166,7 +154,6 @@ pub fn render_canvas_with_options<T: CanvasTheme, D: DataProvider>(
     )
 }
 
-#[cfg(feature = "gui")]
 fn render_canvas_with_highlight_and_options<T: CanvasTheme, D: DataProvider>(
     f: &mut Frame,
     area: Rect,
@@ -229,7 +216,6 @@ fn render_canvas_with_highlight_and_options<T: CanvasTheme, D: DataProvider>(
     )
 }
 
-#[cfg(feature = "gui")]
 fn convert_selection_to_highlight(
     selection: &crate::canvas::state::SelectionState,
 ) -> HighlightState {
@@ -247,7 +233,6 @@ fn convert_selection_to_highlight(
 }
 
 /// Core canvas field rendering with options
-#[cfg(feature = "gui")]
 fn render_canvas_fields_with_options<T: CanvasTheme, F1, F2>(
     f: &mut Frame,
     area: Rect,
@@ -273,35 +258,17 @@ where
         .constraints([Constraint::Percentage(30), Constraint::Percentage(70)])
         .split(area);
 
-    let border_style = if has_unsaved_changes {
-        Style::default().fg(theme.warning())
-    } else if is_edit_mode {
-        Style::default().fg(theme.accent())
-    } else {
-        Style::default().fg(theme.secondary())
-    };
-
-    let input_container = Block::default()
-        .borders(Borders::ALL)
-        .border_type(BorderType::Rounded)
-        .border_style(border_style)
-        .style(Style::default().bg(theme.bg()));
-
     let input_block = Rect {
         x: columns[1].x,
         y: columns[1].y,
         width: columns[1].width,
-        height: fields.len() as u16 + 2,
+        height: fields.len() as u16,
     };
-
-    f.render_widget(&input_container, input_block);
-
-    let input_area = input_container.inner(input_block);
 
     let input_rows = Layout::default()
         .direction(Direction::Vertical)
         .constraints(vec![Constraint::Length(1); fields.len()])
-        .split(input_area);
+        .split(input_block);
 
     render_field_labels(f, columns[0], input_block, fields, theme);
 
@@ -398,7 +365,6 @@ where
 }
 
 /// Render field labels
-#[cfg(feature = "gui")]
 fn render_field_labels<T: CanvasTheme>(
     f: &mut Frame,
     label_area: Rect,
@@ -415,7 +381,7 @@ fn render_field_labels<T: CanvasTheme>(
             label,
             Rect {
                 x: label_area.x,
-                y: input_block.y + 1 + i as u16,
+                y: input_block.y + i as u16,
                 width: label_area.width,
                 height: 1,
             },
@@ -424,7 +390,6 @@ fn render_field_labels<T: CanvasTheme>(
 }
 
 /// Apply highlighting based on highlight state
-#[cfg(feature = "gui")]
 fn apply_highlighting<'a, T: CanvasTheme>(
     text: &'a str,
     field_index: usize,
@@ -460,7 +425,6 @@ fn apply_highlighting<'a, T: CanvasTheme>(
 }
 
 /// Apply characterwise highlighting.
-#[cfg(feature = "gui")]
 fn apply_characterwise_highlighting<'a, T: CanvasTheme>(
     text: &'a str,
     text_len: usize,
@@ -560,7 +524,6 @@ fn apply_characterwise_highlighting<'a, T: CanvasTheme>(
 }
 
 /// Apply linewise highlighting.
-#[cfg(feature = "gui")]
 fn apply_linewise_highlighting<'a, T: CanvasTheme>(
     text: &'a str,
     field_index: usize,
@@ -587,7 +550,6 @@ fn apply_linewise_highlighting<'a, T: CanvasTheme>(
 }
 
 /// Set cursor position (x clamp only; no Y offset with wrap in this version)
-#[cfg(feature = "gui")]
 fn set_cursor_position_scrolled(
     f: &mut Frame,
     field_rect: Rect,
@@ -617,7 +579,6 @@ fn set_cursor_position_scrolled(
     f.set_cursor_position((cursor_x, cursor_y));
 }
 
-#[cfg(feature = "gui")]
 pub fn render_canvas_default<D: DataProvider>(
     f: &mut Frame,
     area: Rect,
