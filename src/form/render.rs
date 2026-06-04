@@ -2,7 +2,7 @@
 //! Canvas GUI rendering helpers.
 
 use ratatui::{
-    layout::{Alignment, Constraint, Direction, Layout, Rect},
+    layout::{Alignment, Rect},
     style::{Modifier, Style},
     text::{Line, Span},
     widgets::{Paragraph, Wrap},
@@ -44,6 +44,20 @@ pub enum OverflowMode {
 ///     ..Default::default()
 /// };
 /// ```
+///
+/// Override individual row widths with `row_input_width`:
+///
+/// ```rust
+/// # use canvas::CanvasDisplayOptions;
+/// let opts = CanvasDisplayOptions {
+///     row_input_width: Some(|row, available| match row {
+///         0 => 12.min(available),
+///         1 => 40.min(available),
+///         _ => available,
+///     }),
+///     ..Default::default()
+/// };
+/// ```
 pub struct CanvasDisplayOptions {
     /// How to handle horizontal overflow for fields.
     pub overflow: OverflowMode,
@@ -57,6 +71,12 @@ pub struct CanvasDisplayOptions {
     /// Change this by setting `CanvasDisplayOptions::max_input_width`.
     /// `Some(width)` caps the rendered input width; `None` uses all remaining space.
     pub max_input_width: Option<u16>,
+    /// Optional per-row input width override.
+    ///
+    /// Change this by setting `CanvasDisplayOptions::row_input_width`.
+    /// The callback receives `(row_index, available_width)` and returns the visual
+    /// input width for that row.
+    pub row_input_width: Option<fn(usize, u16) -> u16>,
 }
 
 impl Default for CanvasDisplayOptions {
@@ -65,7 +85,22 @@ impl Default for CanvasDisplayOptions {
             overflow: OverflowMode::Indicator('$'),
             max_label_width: 24,
             max_input_width: Some(25),
+            row_input_width: None,
         }
+    }
+}
+
+impl CanvasDisplayOptions {
+    fn input_width_for_row(self, row_index: usize, available_width: u16) -> u16 {
+        let width = if let Some(row_input_width) = self.row_input_width {
+            row_input_width(row_index, available_width)
+        } else {
+            self.max_input_width
+                .map(|max_width| max_width.min(available_width))
+                .unwrap_or(available_width)
+        };
+
+        width.min(available_width)
     }
 }
 
@@ -321,20 +356,6 @@ where
 {
     let label_width = form_label_width(fields, opts.max_label_width, area.width);
     let available_input_width = area.width.saturating_sub(label_width);
-    let input_width = opts
-        .max_input_width
-        .map(|max_width| max_width.min(available_input_width))
-        .unwrap_or(available_input_width);
-
-    let input_rows = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints(vec![Constraint::Length(1); fields.len()])
-        .split(Rect {
-            x: area.x + label_width,
-            y: area.y,
-            width: input_width,
-            height: fields.len() as u16,
-        });
 
     render_field_labels(f, area, label_width, fields, theme);
 
@@ -343,7 +364,13 @@ where
     for i in 0..inputs.len() {
         let is_active = i == *current_field_idx;
         let typed_text = get_display_value(i);
-        let inner_width = input_rows[i].width;
+        let input_row = Rect {
+            x: area.x + label_width,
+            y: area.y + i as u16,
+            width: opts.input_width_for_row(i, available_input_width),
+            height: 1,
+        };
+        let inner_width = input_row.width;
 
         let mut h_scroll_for_cursor: u16 = 0;
         let mut left_offset_for_cursor: u16 = 0;
@@ -411,13 +438,13 @@ where
             p = p.wrap(Wrap { trim: false });
         }
 
-        f.render_widget(p, input_rows[i]);
+        f.render_widget(p, input_row);
 
         if is_active {
-            active_field_input_rect = Some(input_rows[i]);
+            active_field_input_rect = Some(input_row);
             set_cursor_position_scrolled(
                 f,
-                input_rows[i],
+                input_row,
                 &typed_text,
                 current_cursor_pos,
                 has_display_override(i),

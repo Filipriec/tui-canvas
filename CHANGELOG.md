@@ -10,7 +10,7 @@
 
 ### Changed
 
-- Form label and input visual widths are now configurable through `CanvasDisplayOptions`; see `src/form/render.rs`.
+- Form label, default input, and per-row input visual widths are now configurable through `CanvasDisplayOptions`; see `src/form/render.rs`.
 - Reorganized public modules around feature ownership:
   - Cursor terminal integration moved from `canvas::canvas::cursor` to `canvas::cursor::terminal`.
   - Form rendering moved from `canvas::canvas::gui` to `canvas::form`.
