@@ -1,13 +1,18 @@
 use crate::TextInputState;
 
+/// Active prompt mode for the command line.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CommandLineMode {
+    /// `:` command prompt.
     Command,
+    /// `/` forward search prompt.
     SearchForward,
+    /// `?` backward search prompt.
     SearchBackward,
 }
 
 impl CommandLineMode {
+    /// Prompt text shown for this mode.
     pub fn prompt(self) -> &'static str {
         match self {
             Self::Command => ":",
@@ -17,6 +22,10 @@ impl CommandLineMode {
     }
 }
 
+/// Submitted command-line input.
+///
+/// The command line captures input and reports what was submitted. The host
+/// application decides how to execute commands and search requests.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CommandLineSubmit {
     Command(String),
@@ -25,6 +34,7 @@ pub enum CommandLineSubmit {
 }
 
 impl CommandLineSubmit {
+    /// Mode used when the input was submitted.
     pub fn mode(&self) -> CommandLineMode {
         match self {
             Self::Command(_) => CommandLineMode::Command,
@@ -33,6 +43,7 @@ impl CommandLineSubmit {
         }
     }
 
+    /// Submitted input without the prompt prefix.
     pub fn input(&self) -> &str {
         match self {
             Self::Command(input) => input,
@@ -42,11 +53,16 @@ impl CommandLineSubmit {
     }
 }
 
+/// Result of feeding input to a [`CommandLineState`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CommandLineEventOutcome {
+    /// The command line did not consume the event.
     Ignored,
+    /// The command line consumed the event without submitting or cancelling.
     Handled,
+    /// The active prompt was cancelled.
     Cancelled,
+    /// Input was submitted.
     Submitted(CommandLineSubmit),
 }
 
@@ -77,43 +93,53 @@ impl Default for CommandLineState {
 }
 
 impl CommandLineState {
+    /// Create an inactive command-line state.
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// Whether the command line is currently accepting input.
     pub fn is_active(&self) -> bool {
         self.mode.is_some()
     }
 
+    /// Active command-line mode.
     pub fn mode(&self) -> Option<CommandLineMode> {
         self.mode
     }
 
+    /// Active prompt text, or an empty string when inactive.
     pub fn prompt(&self) -> &'static str {
         self.mode.map(CommandLineMode::prompt).unwrap_or("")
     }
 
+    /// Current input without the prompt prefix.
     pub fn input(&self) -> &str {
         self.input.current_text()
     }
 
+    /// Replace the current input and reset history navigation.
     pub fn set_input<S: Into<String>>(&mut self, input: S) {
         self.input.set_text(input);
         self.history_cursor = None;
     }
 
+    /// Access the embedded single-line text input state.
     pub fn text_input(&self) -> &TextInputState {
         &self.input
     }
 
+    /// Mutably access the embedded single-line text input state.
     pub fn text_input_mut(&mut self) -> &mut TextInputState {
         &mut self.input
     }
 
+    /// Maximum number of submitted entries retained in history.
     pub fn history_limit(&self) -> usize {
         self.history_limit
     }
 
+    /// Set the maximum number of submitted entries retained in history.
     pub fn set_history_limit(&mut self, limit: usize) {
         self.history_limit = limit;
         if self.history.len() > limit {
@@ -123,6 +149,7 @@ impl CommandLineState {
         self.history_cursor = None;
     }
 
+    /// Open the command line in the requested mode with empty input.
     pub fn open(&mut self, mode: CommandLineMode) {
         self.mode = Some(mode);
         self.input.set_text("");
@@ -130,6 +157,7 @@ impl CommandLineState {
         self.history_cursor = None;
     }
 
+    /// Open the command line in the requested mode with prefilled input.
     pub fn open_with_input<S: Into<String>>(&mut self, mode: CommandLineMode, input: S) {
         self.mode = Some(mode);
         self.input.set_text(input);
@@ -137,18 +165,22 @@ impl CommandLineState {
         self.history_cursor = None;
     }
 
+    /// Open `:` command mode.
     pub fn open_command(&mut self) {
         self.open(CommandLineMode::Command);
     }
 
+    /// Open `/` forward search mode.
     pub fn open_search_forward(&mut self) {
         self.open(CommandLineMode::SearchForward);
     }
 
+    /// Open `?` backward search mode.
     pub fn open_search_backward(&mut self) {
         self.open(CommandLineMode::SearchBackward);
     }
 
+    /// Cancel the active command line.
     pub fn cancel(&mut self) -> CommandLineEventOutcome {
         if !self.is_active() {
             return CommandLineEventOutcome::Ignored;
@@ -157,12 +189,14 @@ impl CommandLineState {
         CommandLineEventOutcome::Cancelled
     }
 
+    /// Close the command line and clear current input.
     pub fn close(&mut self) {
         self.mode = None;
         self.input.set_text("");
         self.history_cursor = None;
     }
 
+    /// Submit the active command-line input.
     pub fn submit(&mut self) -> CommandLineEventOutcome {
         let Some(mode) = self.mode else {
             return CommandLineEventOutcome::Ignored;
@@ -182,6 +216,7 @@ impl CommandLineState {
         CommandLineEventOutcome::Submitted(submitted)
     }
 
+    /// Move to the previous history entry.
     pub fn history_previous(&mut self) -> CommandLineEventOutcome {
         if !self.is_active() || self.history.is_empty() {
             return CommandLineEventOutcome::Ignored;
@@ -194,6 +229,7 @@ impl CommandLineState {
         self.apply_history_entry(next)
     }
 
+    /// Move to the next history entry.
     pub fn history_next(&mut self) -> CommandLineEventOutcome {
         if !self.is_active() || self.history.is_empty() {
             return CommandLineEventOutcome::Ignored;
@@ -240,6 +276,7 @@ impl CommandLineState {
     }
 
     #[cfg(feature = "gui")]
+    /// Cursor position for rendering the active input.
     pub fn cursor(&self, area: ratatui::layout::Rect) -> (u16, u16) {
         let prompt_width = crate::gui_utils::display_width(self.prompt());
         let input_area = ratatui::layout::Rect {

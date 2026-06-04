@@ -116,5 +116,5 @@ pub use commandline::{
     parse_command_args, parse_command_line, CommandLine, CommandLineCommand,
     CommandLineCommandInvocation, CommandLineDispatchError, CommandLineEventOutcome,
     CommandLineMode, CommandLineParseError, CommandLineParsedCommand, CommandLineRegistry,
-    CommandLineState, CommandLineSubmit,
+    CommandLineRegistrationError, CommandLineState, CommandLineSubmit,
 };

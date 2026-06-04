@@ -227,7 +227,7 @@ Press ? for help, Ctrl+Q to quit.";
     }
 
     fn apply_command(&mut self, command: &str) {
-        let invocation = match self.commands.dispatch_pattern(command) {
+        let invocation = match self.commands.dispatch(command) {
             Ok(invocation) => invocation,
             Err(err) => {
                 self.debug_message = format!("Command error: {err:?}");
@@ -270,6 +270,7 @@ fn textarea_commands() -> CommandLineRegistry {
                 .pattern(["set", "nu"])
                 .description("Show absolute line numbers"),
         )
+        .unwrap()
         .register(
             CommandLineCommand::new("set-relative-number")
                 .alias("relativenumber")
@@ -278,6 +279,7 @@ fn textarea_commands() -> CommandLineRegistry {
                 .pattern(["set", "rnu"])
                 .description("Show relative line numbers"),
         )
+        .unwrap()
         .register(
             CommandLineCommand::new("set-no-number")
                 .alias("nonumber")
@@ -286,12 +288,14 @@ fn textarea_commands() -> CommandLineRegistry {
                 .pattern(["set", "nonu"])
                 .description("Hide line numbers"),
         )
+        .unwrap()
         .register(
             CommandLineCommand::new("no-highlight")
                 .alias("noh")
                 .alias("nohlsearch")
                 .description("Clear search highlights"),
-        );
+        )
+        .unwrap();
     registry
 }
 

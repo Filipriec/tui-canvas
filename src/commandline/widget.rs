@@ -13,6 +13,11 @@ use crate::gui_utils::{
 
 use super::state::CommandLineState;
 
+/// Renderable command-line prompt.
+///
+/// This widget draws nothing while [`CommandLineState`] is inactive. Hosts can
+/// place it in a bottom status row and set the terminal cursor from
+/// [`CommandLineState::cursor`].
 #[derive(Debug, Clone)]
 pub struct CommandLine {
     pub(crate) style: Style,
@@ -33,21 +38,25 @@ impl Default for CommandLine {
 }
 
 impl CommandLine {
+    /// Style applied to the input text.
     pub fn style(mut self, style: Style) -> Self {
         self.style = style;
         self
     }
 
+    /// Style applied to the prompt prefix (`:`, `/`, or `?`).
     pub fn prompt_style(mut self, style: Style) -> Self {
         self.prompt_style = style;
         self
     }
 
+    /// Reserved for empty-input placeholder styling.
     pub fn placeholder_style(mut self, style: Style) -> Self {
         self.placeholder_style = style;
         self
     }
 
+    /// Character shown when input is horizontally clipped.
     pub fn overflow_indicator(mut self, ch: char) -> Self {
         self.overflow_indicator = ch;
         self

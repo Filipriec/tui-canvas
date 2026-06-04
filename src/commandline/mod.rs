@@ -10,7 +10,7 @@ pub mod widget;
 pub use registry::{
     parse_command_args, parse_command_line, CommandLineCommand, CommandLineCommandInvocation,
     CommandLineDispatchError, CommandLineParseError, CommandLineParsedCommand,
-    CommandLineRegistry,
+    CommandLineRegistrationError, CommandLineRegistry,
 };
 pub use state::{
     CommandLineEventOutcome, CommandLineMode, CommandLineState, CommandLineSubmit,

@@ -1,11 +1,16 @@
 use std::collections::HashMap;
 
+/// Parsed command-line input split into a command name and raw arguments.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CommandLineParsedCommand {
     pub name: String,
     pub args: Vec<String>,
 }
 
+/// A command that an application can register for command-line dispatch.
+///
+/// The registry resolves command names, aliases, and optional multi-token
+/// patterns. It does not execute commands; host applications own behavior.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CommandLineCommand {
     pub name: String,
@@ -55,6 +60,17 @@ impl CommandLineCommand {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CommandLineRegistrationError {
+    EmptyName,
+    EmptyAlias,
+    NameOrAliasContainsWhitespace { value: String },
+    DuplicateNameOrAlias { value: String },
+    EmptyPattern,
+    EmptyPatternPart { pattern: Vec<String> },
+    DuplicatePattern { pattern: Vec<String> },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CommandLineParseError {
     Empty,
     UnterminatedQuote { quote: char },
@@ -66,17 +82,24 @@ pub enum CommandLineDispatchError {
     UnknownCommand { name: String },
 }
 
+/// A registered command resolved from user-entered command-line text.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CommandLineCommandInvocation {
     pub command: CommandLineCommand,
     pub parsed: CommandLineParsedCommand,
-    pub args: Vec<String>,
+    pub remaining_args: Vec<String>,
 }
 
+/// Registry for app-owned command-line commands.
+///
+/// `dispatch` parses user input and resolves it to a registered command by
+/// trying the longest registered pattern first, then falling back to the first
+/// token as a command name or alias.
 #[derive(Debug, Default, Clone)]
 pub struct CommandLineRegistry {
     commands: Vec<CommandLineCommand>,
     aliases: HashMap<String, usize>,
+    patterns: Vec<Vec<String>>,
 }
 
 impl CommandLineRegistry {
@@ -84,14 +107,22 @@ impl CommandLineRegistry {
         Self::default()
     }
 
-    pub fn register(&mut self, command: CommandLineCommand) -> &mut Self {
+    pub fn register(
+        &mut self,
+        command: CommandLineCommand,
+    ) -> Result<&mut Self, CommandLineRegistrationError> {
+        self.validate_command(&command)?;
+
         let idx = self.commands.len();
         self.aliases.insert(command.name.clone(), idx);
         for alias in &command.aliases {
             self.aliases.insert(alias.clone(), idx);
         }
+        for pattern in &command.patterns {
+            self.patterns.push(pattern.clone());
+        }
         self.commands.push(command);
-        self
+        Ok(self)
     }
 
     pub fn command(&self, name_or_alias: &str) -> Option<&CommandLineCommand> {
@@ -108,27 +139,38 @@ impl CommandLineRegistry {
         &self,
         input: &str,
     ) -> Result<CommandLineCommandInvocation, CommandLineDispatchError> {
-        let parsed = parse_command_line(input).map_err(CommandLineDispatchError::Parse)?;
+        let args = parse_command_args(input).map_err(CommandLineDispatchError::Parse)?;
+        if args.is_empty() {
+            return Err(CommandLineDispatchError::Parse(CommandLineParseError::Empty));
+        }
+
+        if let Some((matched_len, command)) = self.longest_pattern_match(&args) {
+            return Ok(CommandLineCommandInvocation {
+                command: command.clone(),
+                parsed: CommandLineParsedCommand {
+                    name: args[0].clone(),
+                    args: args[1..].to_vec(),
+                },
+                remaining_args: args[matched_len..].to_vec(),
+            });
+        }
+
+        let parsed = CommandLineParsedCommand {
+            name: args[0].clone(),
+            args: args[1..].to_vec(),
+        };
         let Some(command) = self.command(&parsed.name) else {
             return Err(CommandLineDispatchError::UnknownCommand { name: parsed.name });
         };
 
         Ok(CommandLineCommandInvocation {
             command: command.clone(),
-            args: parsed.args.clone(),
+            remaining_args: parsed.args.clone(),
             parsed,
         })
     }
 
-    pub fn dispatch_pattern(
-        &self,
-        input: &str,
-    ) -> Result<CommandLineCommandInvocation, CommandLineDispatchError> {
-        let args = parse_command_args(input).map_err(CommandLineDispatchError::Parse)?;
-        if args.is_empty() {
-            return Err(CommandLineDispatchError::Parse(CommandLineParseError::Empty));
-        }
-
+    fn longest_pattern_match(&self, args: &[String]) -> Option<(usize, &CommandLineCommand)> {
         let mut best: Option<(usize, &CommandLineCommand)> = None;
         for command in &self.commands {
             for pattern in &command.patterns {
@@ -147,20 +189,76 @@ impl CommandLineRegistry {
                 }
             }
         }
+        best
+    }
 
-        if let Some((matched_len, command)) = best {
-            return Ok(CommandLineCommandInvocation {
-                command: command.clone(),
-                parsed: CommandLineParsedCommand {
-                    name: args[0].clone(),
-                    args: args[1..].to_vec(),
-                },
-                args: args[matched_len..].to_vec(),
+    fn validate_command(
+        &self,
+        command: &CommandLineCommand,
+    ) -> Result<(), CommandLineRegistrationError> {
+        validate_name_or_alias(&command.name, true)?;
+        if self.aliases.contains_key(&command.name) {
+            return Err(CommandLineRegistrationError::DuplicateNameOrAlias {
+                value: command.name.clone(),
             });
         }
 
-        self.dispatch(input)
+        let mut local_aliases = vec![command.name.clone()];
+        for alias in &command.aliases {
+            validate_name_or_alias(alias, false)?;
+            if self.aliases.contains_key(alias)
+                || local_aliases.iter().any(|existing| existing == alias)
+            {
+                return Err(CommandLineRegistrationError::DuplicateNameOrAlias {
+                    value: alias.clone(),
+                });
+            }
+            local_aliases.push(alias.clone());
+        }
+
+        let mut local_patterns: Vec<Vec<String>> = Vec::new();
+        for pattern in &command.patterns {
+            if pattern.is_empty() {
+                return Err(CommandLineRegistrationError::EmptyPattern);
+            }
+            if pattern.iter().any(|part| part.is_empty()) {
+                return Err(CommandLineRegistrationError::EmptyPatternPart {
+                    pattern: pattern.clone(),
+                });
+            }
+            if self.patterns.iter().any(|existing| existing == pattern)
+                || local_patterns.iter().any(|existing| existing == pattern)
+            {
+                return Err(CommandLineRegistrationError::DuplicatePattern {
+                    pattern: pattern.clone(),
+                });
+            }
+            local_patterns.push(pattern.clone());
+        }
+
+        Ok(())
     }
+}
+
+fn validate_name_or_alias(
+    value: &str,
+    is_name: bool,
+) -> Result<(), CommandLineRegistrationError> {
+    if value.is_empty() {
+        return if is_name {
+            Err(CommandLineRegistrationError::EmptyName)
+        } else {
+            Err(CommandLineRegistrationError::EmptyAlias)
+        };
+    }
+
+    if value.chars().any(char::is_whitespace) {
+        return Err(CommandLineRegistrationError::NameOrAliasContainsWhitespace {
+            value: value.to_string(),
+        });
+    }
+
+    Ok(())
 }
 
 pub fn parse_command_line(input: &str) -> Result<CommandLineParsedCommand, CommandLineParseError> {
@@ -180,19 +278,32 @@ pub fn parse_command_args(input: &str) -> Result<Vec<String>, CommandLineParseEr
     let mut current = String::new();
     let mut chars = input.chars().peekable();
     let mut quote: Option<char> = None;
+    let mut arg_started = false;
 
     while let Some(ch) = chars.next() {
         match quote {
             Some(q) if ch == q => {
                 quote = None;
+                arg_started = true;
+            }
+            Some(_) if ch == '\\' => {
+                arg_started = true;
+                if let Some(next) = chars.next() {
+                    current.push(next);
+                } else {
+                    current.push(ch);
+                }
             }
             Some(_) => {
+                arg_started = true;
                 current.push(ch);
             }
             None if ch == '\'' || ch == '"' || ch == '`' => {
                 quote = Some(ch);
+                arg_started = true;
             }
             None if ch == '\\' => {
+                arg_started = true;
                 if let Some(next) = chars.next() {
                     current.push(next);
                 } else {
@@ -200,11 +311,13 @@ pub fn parse_command_args(input: &str) -> Result<Vec<String>, CommandLineParseEr
                 }
             }
             None if ch.is_whitespace() => {
-                if !current.is_empty() {
+                if arg_started {
                     args.push(std::mem::take(&mut current));
+                    arg_started = false;
                 }
             }
             None => {
+                arg_started = true;
                 current.push(ch);
             }
         }
@@ -214,7 +327,7 @@ pub fn parse_command_args(input: &str) -> Result<Vec<String>, CommandLineParseEr
         return Err(CommandLineParseError::UnterminatedQuote { quote });
     }
 
-    if !current.is_empty() {
+    if arg_started {
         args.push(current);
     }
 
@@ -225,7 +338,7 @@ pub fn parse_command_args(input: &str) -> Result<Vec<String>, CommandLineParseEr
 mod tests {
     use super::{
         parse_command_args, parse_command_line, CommandLineCommand, CommandLineDispatchError,
-        CommandLineParseError, CommandLineRegistry,
+        CommandLineParseError, CommandLineRegistrationError, CommandLineRegistry,
     };
 
     #[test]
@@ -239,10 +352,26 @@ mod tests {
     }
 
     #[test]
+    fn parses_empty_quoted_arguments() {
+        assert_eq!(
+            parse_command_args("set-option title \"\"").unwrap(),
+            vec!["set-option".to_string(), "title".to_string(), String::new()]
+        );
+    }
+
+    #[test]
     fn parses_backslash_escaped_spaces() {
         assert_eq!(
             parse_command_args("open a\\ b.txt").unwrap(),
             vec!["open".to_string(), "a b.txt".to_string()]
+        );
+    }
+
+    #[test]
+    fn parses_backslash_escapes_inside_quotes() {
+        assert_eq!(
+            parse_command_args("open \"a \\\"quoted\\\" file\"").unwrap(),
+            vec!["open".to_string(), "a \"quoted\" file".to_string()]
         );
     }
 
@@ -257,29 +386,47 @@ mod tests {
     #[test]
     fn registry_dispatch_resolves_aliases() {
         let mut registry = CommandLineRegistry::new();
-        registry.register(CommandLineCommand::new("set-number").alias("nu"));
+        registry
+            .register(CommandLineCommand::new("set-number").alias("nu"))
+            .unwrap();
 
         let invocation = registry.dispatch("nu relative").unwrap();
 
         assert_eq!(invocation.command.name, "set-number");
         assert_eq!(invocation.parsed.name, "nu");
         assert_eq!(invocation.parsed.args, vec!["relative".to_string()]);
-        assert_eq!(invocation.args, vec!["relative".to_string()]);
+        assert_eq!(invocation.remaining_args, vec!["relative".to_string()]);
     }
 
     #[test]
-    fn registry_dispatch_pattern_resolves_multi_word_commands() {
+    fn registry_dispatch_resolves_multi_word_commands() {
         let mut registry = CommandLineRegistry::new();
-        registry.register(
-            CommandLineCommand::new("set-number").pattern(["set", "number"]),
-        );
+        registry
+            .register(CommandLineCommand::new("set-number").pattern(["set", "number"]))
+            .unwrap();
 
-        let invocation = registry.dispatch_pattern("set number now").unwrap();
+        let invocation = registry.dispatch("set number now").unwrap();
 
         assert_eq!(invocation.command.name, "set-number");
         assert_eq!(invocation.parsed.name, "set");
         assert_eq!(invocation.parsed.args, vec!["number".to_string(), "now".to_string()]);
-        assert_eq!(invocation.args, vec!["now".to_string()]);
+        assert_eq!(invocation.remaining_args, vec!["now".to_string()]);
+    }
+
+    #[test]
+    fn registry_dispatch_uses_longest_pattern() {
+        let mut registry = CommandLineRegistry::new();
+        registry
+            .register(CommandLineCommand::new("set").pattern(["set"]))
+            .unwrap();
+        registry
+            .register(CommandLineCommand::new("set-number").pattern(["set", "number"]))
+            .unwrap();
+
+        let invocation = registry.dispatch("set number").unwrap();
+
+        assert_eq!(invocation.command.name, "set-number");
+        assert!(invocation.remaining_args.is_empty());
     }
 
     #[test]
@@ -290,6 +437,40 @@ mod tests {
             registry.dispatch("missing").unwrap_err(),
             CommandLineDispatchError::UnknownCommand {
                 name: "missing".to_string()
+            }
+        );
+    }
+
+    #[test]
+    fn registry_rejects_duplicate_aliases() {
+        let mut registry = CommandLineRegistry::new();
+        registry
+            .register(CommandLineCommand::new("write").alias("w"))
+            .unwrap();
+
+        assert_eq!(
+            registry
+                .register(CommandLineCommand::new("other").alias("w"))
+                .unwrap_err(),
+            CommandLineRegistrationError::DuplicateNameOrAlias {
+                value: "w".to_string()
+            }
+        );
+    }
+
+    #[test]
+    fn registry_rejects_duplicate_patterns() {
+        let mut registry = CommandLineRegistry::new();
+        registry
+            .register(CommandLineCommand::new("set-number").pattern(["set", "number"]))
+            .unwrap();
+
+        assert_eq!(
+            registry
+                .register(CommandLineCommand::new("other").pattern(["set", "number"]))
+                .unwrap_err(),
+            CommandLineRegistrationError::DuplicatePattern {
+                pattern: vec!["set".to_string(), "number".to_string()]
             }
         );
     }
