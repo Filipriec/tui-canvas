@@ -13,6 +13,8 @@ pub mod widget;
 pub mod highlight;
 
 pub use provider::{TextAreaDataProvider, TextAreaProvider};
+#[cfg(feature = "gui")]
+pub use state::TextAreaLineNumberMode;
 pub use state::{TextAreaEditor, TextAreaEventOutcome, TextAreaState, TextOverflowMode};
 
 #[cfg(feature = "gui")]

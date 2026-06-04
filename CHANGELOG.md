@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Added
+
+- Added runtime-toggleable textarea line numbers with none, absolute, and relative modes. Line numbers are hidden by default.
+
 ### Changed
 
 - Reorganized public modules around feature ownership:

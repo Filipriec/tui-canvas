@@ -254,6 +254,18 @@ fn handle_key_press(key_event: KeyEvent, editor: &mut AutoCursorTextArea) -> any
             editor.textarea.set_wrap_indent_cols(0);
             editor.set_debug_message("Wrap indent: 0 columns".to_string());
         }
+        (KeyCode::F(5), _) => {
+            editor.textarea.hide_line_numbers();
+            editor.set_debug_message("Line numbers: none".to_string());
+        }
+        (KeyCode::F(6), _) => {
+            editor.textarea.show_absolute_line_numbers();
+            editor.set_debug_message("Line numbers: absolute".to_string());
+        }
+        (KeyCode::F(7), _) => {
+            editor.textarea.show_relative_line_numbers();
+            editor.set_debug_message("Line numbers: relative".to_string());
+        }
 
         // Debug/info
         (KeyCode::Char('?'), _) => {
@@ -357,7 +369,7 @@ fn render_status_and_help(f: &mut Frame, area: ratatui::layout::Rect, editor: &A
     let help_text = "🎯 NORMALMODE (always editing)\n\
 hjkl/arrows=move, w/b/e=words, W/B/E=WORDS, 0/$=line, g/G=first/last\n\
 x/X=delete, typing inserts text\n\
-?=info, Ctrl+Q=quit";
+F5/F6/F7=line numbers none/absolute/relative, ?=info, Ctrl+Q=quit";
 
     let help = Paragraph::new(help_text)
         .block(Block::default().borders(Borders::ALL).title("🚀 Help"))

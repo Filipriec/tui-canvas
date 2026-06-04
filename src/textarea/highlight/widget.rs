@@ -86,6 +86,13 @@ fn resolve_start_line_and_intra_indented(state: &TextAreaSyntaxState, inner: Rec
     (total.saturating_sub(1), 0)
 }
 
+fn prepend_line_prefix(mut line: Line<'static>, prefix: String) -> Line<'static> {
+    if !prefix.is_empty() {
+        line.spans.insert(0, Span::raw(prefix));
+    }
+    line
+}
+
 impl<'a> StatefulWidget for TextAreaSyntax<'a> {
     type State = TextAreaSyntaxState;
 
@@ -99,6 +106,7 @@ impl<'a> StatefulWidget for TextAreaSyntax<'a> {
         } else {
             area
         };
+        let content = state.textarea.content_area(inner);
 
         let edited_now = state.textarea.take_edited_flag();
 
@@ -106,16 +114,22 @@ impl<'a> StatefulWidget for TextAreaSyntax<'a> {
         let provider = state.textarea.editor.data_provider();
         let total = provider.line_count();
 
-        let (start, intra) = resolve_start_line_and_intra_indented(state, inner);
+        let (start, intra) = resolve_start_line_and_intra_indented(state, content);
 
         let mut display_lines: Vec<Line> = Vec::new();
 
         if total == 0 || start >= total {
             if let Some(ph) = &state.textarea.placeholder {
-                display_lines.push(Line::from(Span::raw(ph.clone())));
+                let mut spans = Vec::new();
+                let prefix = state.textarea.line_number_prefix(0, true);
+                if !prefix.is_empty() {
+                    spans.push(Span::raw(prefix));
+                }
+                spans.push(Span::raw(ph.clone()));
+                display_lines.push(Line::from(spans));
             }
         } else if wrap_mode {
-            let mut rows_left = inner.height;
+            let mut rows_left = content.height;
             let indent = state.textarea.wrap_indent_cols;
 
             let mut i = start;
@@ -124,10 +138,11 @@ impl<'a> StatefulWidget for TextAreaSyntax<'a> {
 
                 let chunks = state.engine.highlight_line_cached(i, s, provider);
 
-                let lines = wrap_chunks_indented(&chunks, inner.width, indent);
+                let lines = wrap_chunks_indented(&chunks, content.width, indent);
                 let skip = if i == start { intra as usize } else { 0 };
-                for l in lines.into_iter().skip(skip) {
-                    display_lines.push(l);
+                for (line_idx, line) in lines.into_iter().enumerate().skip(skip) {
+                    let prefix = state.textarea.line_number_prefix(i, line_idx == 0);
+                    display_lines.push(prepend_line_prefix(line, prefix));
                     rows_left = rows_left.saturating_sub(1);
                     if rows_left == 0 {
                         break;
@@ -136,19 +151,19 @@ impl<'a> StatefulWidget for TextAreaSyntax<'a> {
                 i += 1;
             }
         } else {
-            let end = (start.saturating_add(inner.height as usize)).min(total);
+            let end = (start.saturating_add(content.height as usize)).min(total);
 
             for i in start..end {
                 let s = provider.field_value(i);
 
                 let chunks = state.engine.highlight_line_cached(i, s, provider);
 
-                let fits = display_width(s) <= inner.width;
+                let fits = display_width(s) <= content.width;
                 let start_cols = if i == state.textarea.current_field() {
                     let col_idx = state.textarea.display_cursor_position();
                     let cursor_cols = display_cols_up_to(s, col_idx);
                     let (target_h, _left_cols) =
-                        compute_h_scroll_with_padding(cursor_cols, inner.width);
+                        compute_h_scroll_with_padding(cursor_cols, content.width);
 
                     if fits {
                         if edited_now {
@@ -164,11 +179,15 @@ impl<'a> StatefulWidget for TextAreaSyntax<'a> {
                 };
 
                 if let TextOverflowMode::Indicator { ch } = state.textarea.overflow_mode {
-                    display_lines.push(clip_chunks_window_with_indicator_padded(
-                        &chunks,
-                        inner.width,
-                        ch,
-                        start_cols,
+                    let prefix = state.textarea.line_number_prefix(i, true);
+                    display_lines.push(prepend_line_prefix(
+                        clip_chunks_window_with_indicator_padded(
+                            &chunks,
+                            content.width,
+                            ch,
+                            start_cols,
+                        ),
+                        prefix,
                     ));
                 }
             }

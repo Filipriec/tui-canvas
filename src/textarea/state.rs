@@ -104,6 +104,14 @@ pub enum TextOverflowMode {
     Wrap,
 }
 
+#[cfg(feature = "gui")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TextAreaLineNumberMode {
+    None,
+    Absolute,
+    Relative,
+}
+
 /// Multi-line textarea widget state.
 ///
 /// Wraps a [`FormEditor`]. Editing, cursor, and movement methods from the engine
@@ -117,6 +125,8 @@ pub struct TextAreaState<P: TextAreaDataProvider = TextAreaProvider> {
     pub(crate) placeholder: Option<String>,
     pub(crate) overflow_mode: TextOverflowMode,
     pub(crate) h_scroll: u16,
+    #[cfg(feature = "gui")]
+    pub(crate) line_number_mode: TextAreaLineNumberMode,
     #[cfg(feature = "gui")]
     pub(crate) wrap_indent_cols: u16,
     #[cfg(feature = "gui")]
@@ -133,6 +143,8 @@ impl<P: TextAreaDataProvider + Default> Default for TextAreaState<P> {
             placeholder: None,
             overflow_mode: TextOverflowMode::Indicator { ch: '$' },
             h_scroll: 0,
+            #[cfg(feature = "gui")]
+            line_number_mode: TextAreaLineNumberMode::None,
             #[cfg(feature = "gui")]
             wrap_indent_cols: 0,
             #[cfg(feature = "gui")]
@@ -165,6 +177,8 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
             placeholder: None,
             overflow_mode: TextOverflowMode::Indicator { ch: '$' },
             h_scroll: 0,
+            #[cfg(feature = "gui")]
+            line_number_mode: TextAreaLineNumberMode::None,
             #[cfg(feature = "gui")]
             wrap_indent_cols: 0,
             #[cfg(feature = "gui")]
@@ -208,6 +222,77 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
     }
 
     #[cfg(feature = "gui")]
+    pub fn set_line_number_mode(&mut self, mode: TextAreaLineNumberMode) {
+        self.line_number_mode = mode;
+        self.h_scroll = 0;
+    }
+
+    #[cfg(feature = "gui")]
+    pub fn line_number_mode(&self) -> TextAreaLineNumberMode {
+        self.line_number_mode
+    }
+
+    #[cfg(feature = "gui")]
+    pub fn show_absolute_line_numbers(&mut self) {
+        self.set_line_number_mode(TextAreaLineNumberMode::Absolute);
+    }
+
+    #[cfg(feature = "gui")]
+    pub fn show_relative_line_numbers(&mut self) {
+        self.set_line_number_mode(TextAreaLineNumberMode::Relative);
+    }
+
+    #[cfg(feature = "gui")]
+    pub fn hide_line_numbers(&mut self) {
+        self.set_line_number_mode(TextAreaLineNumberMode::None);
+    }
+
+    #[cfg(feature = "gui")]
+    pub(crate) fn line_number_gutter_width(&self) -> u16 {
+        if matches!(self.line_number_mode, TextAreaLineNumberMode::None) {
+            return 0;
+        }
+
+        let line_count = self.editor.data_provider().line_count().max(1);
+        let digits = line_count.ilog10() as u16 + 1;
+        digits.saturating_add(1)
+    }
+
+    #[cfg(feature = "gui")]
+    pub(crate) fn content_area(&self, inner: Rect) -> Rect {
+        let gutter_width = self.line_number_gutter_width().min(inner.width);
+        Rect {
+            x: inner.x.saturating_add(gutter_width),
+            y: inner.y,
+            width: inner.width.saturating_sub(gutter_width),
+            height: inner.height,
+        }
+    }
+
+    #[cfg(feature = "gui")]
+    pub(crate) fn line_number_prefix(&self, line_idx: usize, first_visual_row: bool) -> String {
+        let width = self.line_number_gutter_width() as usize;
+        if width == 0 {
+            return String::new();
+        }
+
+        if !first_visual_row {
+            return " ".repeat(width);
+        }
+
+        let number = match self.line_number_mode {
+            TextAreaLineNumberMode::None => return String::new(),
+            TextAreaLineNumberMode::Absolute => line_idx.saturating_add(1),
+            TextAreaLineNumberMode::Relative if line_idx == self.current_field() => {
+                line_idx.saturating_add(1)
+            }
+            TextAreaLineNumberMode::Relative => line_idx.abs_diff(self.current_field()),
+        };
+
+        format!("{number:>digits$} ", digits = width.saturating_sub(1))
+    }
+
+    #[cfg(feature = "gui")]
     fn visual_rows_before_line_and_intra_indented(&self, width: u16, line_idx: usize) -> u16 {
         let provider = self.editor.data_provider();
         let mut acc: u16 = 0;
@@ -227,6 +312,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         } else {
             area
         };
+        let inner = self.content_area(inner);
         let line_idx = self.current_field();
 
         match self.overflow_mode {
@@ -293,6 +379,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         } else {
             area
         };
+        let inner = self.content_area(inner);
         if inner.height == 0 {
             return;
         }

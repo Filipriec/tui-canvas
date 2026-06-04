@@ -279,9 +279,10 @@ fn clipped_line_with_selection<'a, P: TextAreaDataProvider>(
     view_width: u16,
     indicator: char,
     start_cols: u16,
+    prefix: Option<String>,
 ) -> Line<'a> {
     if view_width == 0 {
-        return Line::from("");
+        return Line::from(prefix.unwrap_or_default());
     }
 
     let total = display_width(text);
@@ -317,7 +318,15 @@ fn clipped_line_with_selection<'a, P: TextAreaDataProvider>(
         line_idx,
         char_offset,
         state,
-        show_left.then(|| indicator.to_string()),
+        match (prefix, show_left) {
+            (Some(mut prefix), true) => {
+                prefix.push(indicator);
+                Some(prefix)
+            }
+            (Some(prefix), false) => Some(prefix),
+            (None, true) => Some(indicator.to_string()),
+            (None, false) => None,
+        },
         suffix,
     )
 }
@@ -373,6 +382,7 @@ impl<'a, P: TextAreaDataProvider> StatefulWidget for TextArea<'a, P> {
         } else {
             area
         };
+        let content = state.content_area(inner);
 
         let edited_now = state.take_edited_flag();
 
@@ -380,24 +390,38 @@ impl<'a, P: TextAreaDataProvider> StatefulWidget for TextArea<'a, P> {
         let provider = state.editor.data_provider();
         let total = provider.line_count();
 
-        let (start, intra) = resolve_start_line_and_intra_indented(state, inner);
+        let (start, intra) = resolve_start_line_and_intra_indented(state, content);
 
         let mut display_lines: Vec<Line> = Vec::new();
 
         if total == 0 || start >= total {
             if let Some(ph) = &state.placeholder {
-                display_lines.push(Line::from(Span::raw(ph.clone())));
+                let mut spans = Vec::new();
+                let prefix = state.line_number_prefix(0, true);
+                if !prefix.is_empty() {
+                    spans.push(Span::raw(prefix));
+                }
+                spans.push(Span::raw(ph.clone()));
+                display_lines.push(Line::from(spans));
             }
         } else if wrap_mode {
-            let mut rows_left = inner.height;
+            let mut rows_left = content.height;
             let indent = state.wrap_indent_cols;
             let mut i = start;
             while i < total && rows_left > 0 {
                 let s = provider.field_value(i);
-                let segments = wrap_segments_with_offsets(s, inner.width, indent);
+                let segments = wrap_segments_with_offsets(s, content.width, indent);
                 let skip = if i == start { intra as usize } else { 0 };
-                for (seg, offset) in segments.into_iter().skip(skip) {
-                    display_lines.push(styled_segment_line(seg, i, offset, state, None, None));
+                for (seg_idx, (seg, offset)) in segments.into_iter().enumerate().skip(skip) {
+                    let prefix = state.line_number_prefix(i, seg_idx == 0);
+                    display_lines.push(styled_segment_line(
+                        seg,
+                        i,
+                        offset,
+                        state,
+                        (!prefix.is_empty()).then_some(prefix),
+                        None,
+                    ));
                     rows_left = rows_left.saturating_sub(1);
                     if rows_left == 0 {
                         break;
@@ -407,20 +431,20 @@ impl<'a, P: TextAreaDataProvider> StatefulWidget for TextArea<'a, P> {
             }
         } else {
             // Indicator mode: full inner width; RIGHT_PAD only affects cursor clamp and h-scroll
-            let end = (start.saturating_add(inner.height as usize)).min(total);
+            let end = (start.saturating_add(content.height as usize)).min(total);
 
             for i in start..end {
                 let s = provider.field_value(i);
                 match state.overflow_mode {
                     TextOverflowMode::Wrap => unreachable!(),
                     TextOverflowMode::Indicator { ch } => {
-                        let fits = display_width(s) <= inner.width;
+                        let fits = display_width(s) <= content.width;
 
                         let start_cols = if i == state.current_field() {
                             let col_idx = state.display_cursor_position();
                             let cursor_cols = display_cols_up_to(s, col_idx);
                             let (target_h, _left_cols) =
-                                compute_h_scroll_with_padding(cursor_cols, inner.width);
+                                compute_h_scroll_with_padding(cursor_cols, content.width);
 
                             if fits {
                                 if edited_now {
@@ -435,13 +459,15 @@ impl<'a, P: TextAreaDataProvider> StatefulWidget for TextArea<'a, P> {
                             0
                         };
 
+                        let prefix = state.line_number_prefix(i, true);
                         display_lines.push(clipped_line_with_selection(
                             s,
                             i,
                             state,
-                            inner.width,
+                            content.width,
                             ch,
                             start_cols,
+                            (!prefix.is_empty()).then_some(prefix),
                         ));
                     }
                 }
