@@ -1682,6 +1682,107 @@ mod tests {
         assert_eq!(textarea.text(), "onone\ntwo");
     }
 
+    #[cfg(all(feature = "keybindings", feature = "crossterm"))]
+    #[test]
+    fn emacs_ctrl_space_sets_mark_and_esc_deactivates() {
+        use crate::canvas::state::SelectionState;
+        use crate::keybindings::{BuiltinCanvasKeybindingPreset, KeyEventOutcome};
+        use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+
+        let mut textarea = TextAreaState::<TextAreaProvider>::from_text("abc");
+        textarea.use_keybinding_preset(BuiltinCanvasKeybindingPreset::Emacs);
+
+        let out = textarea.handle_key_event(KeyEvent::new(
+            KeyCode::Char(' '),
+            KeyModifiers::CONTROL,
+        ));
+        assert!(matches!(out, KeyEventOutcome::Consumed(None)));
+        assert_eq!(textarea.mode(), crate::canvas::modes::AppMode::Sel);
+        assert!(matches!(
+            textarea.selection_state(),
+            SelectionState::Characterwise { anchor: (0, 0) }
+        ));
+
+        let out = textarea.handle_key_event(KeyEvent::new(KeyCode::Char('f'), KeyModifiers::CONTROL));
+        assert!(matches!(out, KeyEventOutcome::Consumed(None)));
+
+        let out = textarea.handle_key_event(KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE));
+        assert!(matches!(out, KeyEventOutcome::Consumed(None)));
+        assert_eq!(textarea.mode(), crate::canvas::modes::AppMode::Nor);
+        assert!(matches!(textarea.selection_state(), SelectionState::None));
+    }
+
+    #[cfg(all(feature = "keybindings", feature = "crossterm"))]
+    #[test]
+    fn emacs_ctrl_w_kills_region() {
+        use crate::keybindings::{BuiltinCanvasKeybindingPreset, KeyEventOutcome};
+        use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+
+        let mut textarea = TextAreaState::<TextAreaProvider>::from_text("abc");
+        textarea.use_keybinding_preset(BuiltinCanvasKeybindingPreset::Emacs);
+        let _ = textarea.move_right();
+
+        let _ = textarea.handle_key_event(KeyEvent::new(
+            KeyCode::Char(' '),
+            KeyModifiers::CONTROL,
+        ));
+        let _ = textarea.handle_key_event(KeyEvent::new(KeyCode::Char('f'), KeyModifiers::CONTROL));
+
+        let out = textarea.handle_key_event(KeyEvent::new(KeyCode::Char('w'), KeyModifiers::CONTROL));
+        assert!(matches!(out, KeyEventOutcome::Consumed(None)));
+        assert_eq!(textarea.text(), "ac");
+        assert_eq!(textarea.cursor_position(), 1);
+        assert_eq!(textarea.mode(), crate::canvas::modes::AppMode::Nor);
+    }
+
+    #[cfg(all(feature = "keybindings", feature = "crossterm"))]
+    #[test]
+    fn emacs_alt_w_copies_region_without_deleting() {
+        use crate::keybindings::{BuiltinCanvasKeybindingPreset, KeyEventOutcome};
+        use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+
+        let mut textarea = TextAreaState::<TextAreaProvider>::from_text("abc");
+        textarea.use_keybinding_preset(BuiltinCanvasKeybindingPreset::Emacs);
+        let _ = textarea.move_right();
+
+        let _ = textarea.handle_key_event(KeyEvent::new(
+            KeyCode::Char(' '),
+            KeyModifiers::CONTROL,
+        ));
+        let _ = textarea.handle_key_event(KeyEvent::new(KeyCode::Char('f'), KeyModifiers::CONTROL));
+
+        let out = textarea.handle_key_event(KeyEvent::new(KeyCode::Char('w'), KeyModifiers::ALT));
+        assert!(matches!(out, KeyEventOutcome::Consumed(None)));
+        assert_eq!(textarea.text(), "abc");
+        assert_eq!(textarea.mode(), crate::canvas::modes::AppMode::Sel);
+    }
+
+    #[cfg(all(feature = "keybindings", feature = "crossterm"))]
+    #[test]
+    fn emacs_ctrl_y_yanks_killed_text_in_insert_mode() {
+        use crate::keybindings::{BuiltinCanvasKeybindingPreset, KeyEventOutcome};
+        use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+
+        let mut textarea = TextAreaState::<TextAreaProvider>::from_text("abc");
+        textarea.use_keybinding_preset(BuiltinCanvasKeybindingPreset::Emacs);
+        let _ = textarea.move_right();
+
+        let _ = textarea.handle_key_event(KeyEvent::new(
+            KeyCode::Char(' '),
+            KeyModifiers::CONTROL,
+        ));
+        let _ = textarea.handle_key_event(KeyEvent::new(KeyCode::Char('f'), KeyModifiers::CONTROL));
+        let _ = textarea.handle_key_event(KeyEvent::new(KeyCode::Char('w'), KeyModifiers::CONTROL));
+        assert_eq!(textarea.text(), "ac");
+
+        let _ = textarea.handle_key_event(KeyEvent::new(KeyCode::Char('i'), KeyModifiers::NONE));
+        assert_eq!(textarea.mode(), crate::canvas::modes::AppMode::Ins);
+
+        let out = textarea.handle_key_event(KeyEvent::new(KeyCode::Char('y'), KeyModifiers::CONTROL));
+        assert!(matches!(out, KeyEventOutcome::Consumed(None)));
+        assert_eq!(textarea.text(), "abc");
+    }
+
     #[test]
     fn textarea_search_collects_matches_by_line_and_char_offsets() {
         let mut textarea = TextAreaState::<TextAreaProvider>::from_text("alpha beta\nbeta alpha");

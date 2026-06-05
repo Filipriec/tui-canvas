@@ -57,7 +57,9 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
 
         let mode = self.editor.ui_state.mode();
 
-        if mode != AppMode::Ins {
+        if mode != AppMode::Ins
+            && self.editor.keybinding_paradigm() == KeybindingParadigm::Vim
+        {
             if let KeyCode::Char(ch) = evt.code {
                 if let Some(digit) = ch.to_digit(10) {
                     let vim = self.editor.behavior_state.vim_mut();
@@ -137,9 +139,8 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
     ) -> KeyEventOutcome {
         match self.editor.keybinding_paradigm() {
             KeybindingParadigm::Helix => self.dispatch_textarea_key_action_helix(action, count),
-            KeybindingParadigm::Vim | KeybindingParadigm::Emacs => {
-                self.dispatch_textarea_key_action_vim(action, count)
-            }
+            KeybindingParadigm::Emacs => self.dispatch_textarea_key_action_emacs(action, count),
+            KeybindingParadigm::Vim => self.dispatch_textarea_key_action_vim(action, count),
         }
     }
 }
