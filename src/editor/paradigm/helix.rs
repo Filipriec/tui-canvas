@@ -11,6 +11,9 @@ impl<D: DataProvider> FormEditor<D> {
         if self.ui_state.current_mode != AppMode::Nor {
             return;
         }
+        if !matches!(self.ui_state.selection, SelectionState::None) {
+            return;
+        }
         let anchor = (self.ui_state.current_field, self.ui_state.cursor_pos);
         self.ui_state.selection = SelectionState::Characterwise { anchor };
     }
@@ -138,7 +141,6 @@ impl<D: DataProvider> FormEditor<D> {
     pub(crate) fn exit_highlight_mode_helix(&mut self) {
         if self.ui_state.current_mode == AppMode::Sel {
             self.ui_state.current_mode = AppMode::Nor;
-            self.ui_state.selection = SelectionState::None;
 
             #[cfg(feature = "cursor-style")]
             {
