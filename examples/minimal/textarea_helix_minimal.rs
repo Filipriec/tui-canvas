@@ -40,7 +40,7 @@ use ratatui::{
     Frame, Terminal,
 };
 
-use canvas::{keybindings::CanvasKeyBindings, TextArea, TextAreaState};
+use canvas::{keybindings::BuiltinCanvasKeybindingPreset, TextArea, TextAreaState};
 
 fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut textarea: TextAreaState) -> io::Result<()> {
     loop {
@@ -64,7 +64,7 @@ fn ui(f: &mut Frame, textarea: &mut TextAreaState) {
 
     f.render_stateful_widget(TextArea::default().block(block.clone()), area, textarea);
 
-    let (x, y) = textarea.cursor(area, Some(&block));
+    let (x, y) = textarea.cursor_with_commandline(area, Some(&block));
     f.set_cursor_position((x, y));
 }
 
@@ -77,7 +77,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut textarea = TextAreaState::from_text("A simple Helix textarea.\nType here.");
     textarea.use_wrap();
-    textarea.set_keybindings(CanvasKeyBindings::helix_defaults());
+    textarea.use_keybinding_preset(BuiltinCanvasKeybindingPreset::Helix);
     textarea.use_default_commandline();
     textarea.update_cursor_style()?;
 

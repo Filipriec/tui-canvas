@@ -161,6 +161,33 @@ mod tests {
     }
 
     #[test]
+    fn helix_defaults_use_goto_mode_motions() {
+        let keybindings = CanvasKeyBindings::helix_defaults();
+
+        for (keys, action) in [
+            ("gh", CanvasKeyAction::MoveLineStart),
+            ("gl", CanvasKeyAction::MoveLineEnd),
+            ("ge", CanvasKeyAction::MoveLastLine),
+        ] {
+            let sequence = keys
+                .chars()
+                .map(|key| KeyStroke {
+                    code: KeyCode::Char(key),
+                    modifiers: KeyModifiers::empty(),
+                })
+                .collect::<Vec<_>>();
+            assert_eq!(
+                keybindings.lookup_action(AppMode::Nor, &sequence).0,
+                Some(&action)
+            );
+            assert_eq!(
+                keybindings.lookup_action(AppMode::Sel, &sequence).0,
+                Some(&action)
+            );
+        }
+    }
+
+    #[test]
     fn action_bindings_are_derived_from_builtin_preset() {
         let bindings = default_vim_action_bindings();
 
