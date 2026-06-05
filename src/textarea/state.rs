@@ -1767,7 +1767,7 @@ mod tests {
         use crate::canvas::state::SelectionState;
         use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
-        let mut textarea = TextAreaState::<TextAreaProvider>::from_text("one\ntwo");
+        let mut textarea = TextAreaState::<TextAreaProvider>::from_text("one\ntwo\nthree\nfour");
         textarea.use_keybinding_preset(BuiltinCanvasKeybindingPreset::Helix);
 
         let out = textarea.handle_key_event(KeyEvent::new(KeyCode::Char('x'), KeyModifiers::NONE));
@@ -1783,6 +1783,32 @@ mod tests {
         assert!(matches!(
             textarea.selection_state(),
             SelectionState::Linewise { anchor_field: 0 }
+        ));
+
+        // Third and fourth presses must keep growing downward (anchor stays on
+        // line 0) instead of collapsing onto the current line.
+        let out = textarea.handle_key_event(KeyEvent::new(KeyCode::Char('x'), KeyModifiers::NONE));
+        assert!(matches!(out, KeyEventOutcome::Consumed(None)));
+        assert_eq!(textarea.current_field(), 2);
+        assert!(matches!(
+            textarea.selection_state(),
+            SelectionState::Linewise { anchor_field: 0 }
+        ));
+
+        let out = textarea.handle_key_event(KeyEvent::new(KeyCode::Char('x'), KeyModifiers::NONE));
+        assert!(matches!(out, KeyEventOutcome::Consumed(None)));
+        assert_eq!(textarea.current_field(), 3);
+        assert!(matches!(
+            textarea.selection_state(),
+            SelectionState::Linewise { anchor_field: 0 }
+        ));
+
+        // `;` collapses the line selection back to a single-char cursor.
+        let out = textarea.handle_key_event(KeyEvent::new(KeyCode::Char(';'), KeyModifiers::NONE));
+        assert!(matches!(out, KeyEventOutcome::Consumed(None)));
+        assert!(matches!(
+            textarea.selection_state(),
+            SelectionState::Characterwise { anchor: (3, _) }
         ));
     }
 
