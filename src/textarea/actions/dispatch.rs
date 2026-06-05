@@ -57,6 +57,11 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
 
         let mode = self.editor.ui_state.mode();
 
+        if mode == AppMode::Ins && matches!(evt.code, KeyCode::Enter) {
+            self.insert_newline();
+            return KeyEventOutcome::Consumed(None);
+        }
+
         if mode != AppMode::Ins
             && self.editor.keybinding_paradigm() == KeybindingParadigm::Vim
         {
@@ -99,10 +104,6 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
 
         if mode == AppMode::Ins {
             match evt.code {
-                KeyCode::Enter => {
-                    self.insert_newline();
-                    return KeyEventOutcome::Consumed(None);
-                }
                 KeyCode::Tab => {
                     self.insert_tab_spaces();
                     return KeyEventOutcome::Consumed(None);
