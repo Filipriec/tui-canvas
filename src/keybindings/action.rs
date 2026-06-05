@@ -50,6 +50,14 @@ pub enum CanvasKeyAction {
     EnterHighlightMode,
     EnterHighlightModeLinewise,
     ExitHighlightMode,
+    DeleteSelection,
+    DeleteSelectionNoYank,
+    ChangeSelection,
+    ChangeSelectionNoYank,
+    YankSelection,
+    CollapseSelection,
+    ExtendLineBelow,
+    ExtendToLineBounds,
     Unknown(String),
 }
 
@@ -104,6 +112,14 @@ impl CanvasKeyAction {
             "enter_highlight_mode" => Self::EnterHighlightMode,
             "enter_highlight_mode_linewise" => Self::EnterHighlightModeLinewise,
             "exit_highlight_mode" => Self::ExitHighlightMode,
+            "delete_selection" => Self::DeleteSelection,
+            "delete_selection_noyank" => Self::DeleteSelectionNoYank,
+            "change_selection" => Self::ChangeSelection,
+            "change_selection_noyank" => Self::ChangeSelectionNoYank,
+            "yank_selection" => Self::YankSelection,
+            "collapse_selection" => Self::CollapseSelection,
+            "extend_line_below" => Self::ExtendLineBelow,
+            "extend_to_line_bounds" => Self::ExtendToLineBounds,
             other => Self::Unknown(other.to_string()),
         }
     }
@@ -158,6 +174,14 @@ impl CanvasKeyAction {
             Self::EnterHighlightMode => "enter_highlight_mode",
             Self::EnterHighlightModeLinewise => "enter_highlight_mode_linewise",
             Self::ExitHighlightMode => "exit_highlight_mode",
+            Self::DeleteSelection => "delete_selection",
+            Self::DeleteSelectionNoYank => "delete_selection_noyank",
+            Self::ChangeSelection => "change_selection",
+            Self::ChangeSelectionNoYank => "change_selection_noyank",
+            Self::YankSelection => "yank_selection",
+            Self::CollapseSelection => "collapse_selection",
+            Self::ExtendLineBelow => "extend_line_below",
+            Self::ExtendToLineBounds => "extend_to_line_bounds",
             Self::Unknown(other) => other.as_str(),
         }
     }
@@ -207,8 +231,16 @@ impl CanvasKeyAction {
             | Self::ChangeToLineEnd
             | Self::JoinLineBelow
             | Self::YankLine
-            | Self::PasteAfter
-            | Self::PasteBefore => return None,
+            |             Self::PasteAfter
+            | Self::PasteBefore
+            | Self::DeleteSelection
+            | Self::DeleteSelectionNoYank
+            | Self::ChangeSelection
+            | Self::ChangeSelectionNoYank
+            | Self::YankSelection
+            | Self::CollapseSelection
+            | Self::ExtendLineBelow
+            | Self::ExtendToLineBounds => return None,
             Self::EnterDecider | Self::Exit | Self::Unknown(_) => return None,
         })
     }

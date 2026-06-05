@@ -211,13 +211,57 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
                 self.paste_before(count);
                 KeyEventOutcome::Consumed(None)
             }
+            CanvasKeyAction::DeleteSelection => {
+                self.delete_selection(true, count);
+                KeyEventOutcome::Consumed(None)
+            }
+            CanvasKeyAction::DeleteSelectionNoYank => {
+                self.delete_selection(false, count);
+                KeyEventOutcome::Consumed(None)
+            }
+            CanvasKeyAction::ChangeSelection => {
+                self.change_selection(true, count);
+                KeyEventOutcome::Consumed(None)
+            }
+            CanvasKeyAction::ChangeSelectionNoYank => {
+                self.change_selection(false, count);
+                KeyEventOutcome::Consumed(None)
+            }
+            CanvasKeyAction::YankSelection => {
+                for _ in 0..count {
+                    self.yank_primary_selection();
+                }
+                KeyEventOutcome::Consumed(None)
+            }
+            CanvasKeyAction::CollapseSelection => {
+                self.collapse_selection();
+                KeyEventOutcome::Consumed(None)
+            }
+            CanvasKeyAction::ExtendLineBelow => {
+                for _ in 0..count {
+                    self.extend_line_below();
+                }
+                KeyEventOutcome::Consumed(None)
+            }
+            CanvasKeyAction::ExtendToLineBounds => {
+                for _ in 0..count {
+                    self.extend_to_line_bounds();
+                }
+                KeyEventOutcome::Consumed(None)
+            }
             _ => {
                 let Some(canvas_action) = action.to_canvas_action() else {
                     return KeyEventOutcome::NotMatched;
                 };
+                let collapse_after_movement = self.uses_helix_paradigm()
+                    && self.mode() == AppMode::Nor
+                    && canvas_action.is_movement_action();
                 let mut result = crate::canvas::actions::ActionResult::Success;
                 for _ in 0..count {
                     result = self.editor.execute(canvas_action.clone());
+                }
+                if collapse_after_movement {
+                    self.collapse_selection_to_cursor();
                 }
                 match result {
                     crate::canvas::actions::ActionResult::Success => {

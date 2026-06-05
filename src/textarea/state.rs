@@ -769,6 +769,15 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         &mut self.editor
     }
 
+    /// Install a built-in keybinding preset and its editing paradigm.
+    #[cfg(feature = "keybindings")]
+    pub fn use_keybinding_preset(
+        &mut self,
+        preset: crate::keybindings::BuiltinCanvasKeybindingPreset,
+    ) {
+        self.editor.set_keybinding_preset(preset);
+    }
+
     /// Move to the start of the next word.
     pub fn move_word_next(&mut self) {
         self.editor.move_word_next();
@@ -1549,6 +1558,128 @@ mod tests {
         let out = textarea.handle_key_event(KeyEvent::new(KeyCode::Char('p'), KeyModifiers::NONE));
         assert!(matches!(out, KeyEventOutcome::Consumed(None)));
         assert_eq!(textarea.text(), "one\none\ntwo\none\ntwo\ntwo\nthree\nfour");
+    }
+
+    #[cfg(all(feature = "keybindings", feature = "crossterm"))]
+    #[test]
+    fn helix_d_deletes_primary_selection_without_pending_operator() {
+        use crate::keybindings::{BuiltinCanvasKeybindingPreset, KeyEventOutcome};
+        use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+
+        let mut textarea = TextAreaState::<TextAreaProvider>::from_text("abc");
+        textarea.use_keybinding_preset(BuiltinCanvasKeybindingPreset::Helix);
+        let _ = textarea.move_right();
+
+        let out = textarea.handle_key_event(KeyEvent::new(KeyCode::Char('d'), KeyModifiers::NONE));
+        assert!(matches!(out, KeyEventOutcome::Consumed(None)));
+        assert_eq!(textarea.text(), "ac");
+        assert_eq!(textarea.cursor_position(), 1);
+        assert_eq!(textarea.mode(), crate::canvas::modes::AppMode::Nor);
+    }
+
+    #[cfg(all(feature = "keybindings", feature = "crossterm"))]
+    #[test]
+    fn helix_y_and_p_yank_and_paste_selection() {
+        use crate::keybindings::{BuiltinCanvasKeybindingPreset, KeyEventOutcome};
+        use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+
+        let mut textarea = TextAreaState::<TextAreaProvider>::from_text("one\ntwo");
+        textarea.use_keybinding_preset(BuiltinCanvasKeybindingPreset::Helix);
+        let _ = textarea.move_right();
+
+        let out = textarea.handle_key_event(KeyEvent::new(KeyCode::Char('y'), KeyModifiers::NONE));
+        assert!(matches!(out, KeyEventOutcome::Consumed(None)));
+
+        let out = textarea.handle_key_event(KeyEvent::new(KeyCode::Char('p'), KeyModifiers::NONE));
+        assert!(matches!(out, KeyEventOutcome::Consumed(None)));
+        assert_eq!(textarea.text(), "onne\ntwo");
+    }
+
+    #[cfg(all(feature = "keybindings", feature = "crossterm"))]
+    #[test]
+    fn helix_c_enters_insert_after_deleting_selection() {
+        use crate::keybindings::{BuiltinCanvasKeybindingPreset, KeyEventOutcome};
+        use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+
+        let mut textarea = TextAreaState::<TextAreaProvider>::from_text("abc");
+        textarea.use_keybinding_preset(BuiltinCanvasKeybindingPreset::Helix);
+        let _ = textarea.move_right();
+
+        let out = textarea.handle_key_event(KeyEvent::new(KeyCode::Char('c'), KeyModifiers::NONE));
+        assert!(matches!(out, KeyEventOutcome::Consumed(None)));
+        assert_eq!(textarea.text(), "ac");
+        assert_eq!(textarea.mode(), crate::canvas::modes::AppMode::Ins);
+    }
+
+    #[cfg(all(feature = "keybindings", feature = "crossterm"))]
+    #[test]
+    fn helix_U_redoes_change() {
+        use crate::keybindings::{BuiltinCanvasKeybindingPreset, KeyEventOutcome};
+        use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+
+        let mut textarea = TextAreaState::<TextAreaProvider>::from_text("abc");
+        textarea.use_keybinding_preset(BuiltinCanvasKeybindingPreset::Helix);
+        let _ = textarea.move_right();
+
+        let _ = textarea.handle_key_event(KeyEvent::new(KeyCode::Char('d'), KeyModifiers::NONE));
+        assert_eq!(textarea.text(), "ac");
+        assert!(textarea.undo());
+        assert_eq!(textarea.text(), "abc");
+
+        let out = textarea.handle_key_event(KeyEvent::new(KeyCode::Char('U'), KeyModifiers::SHIFT));
+        assert!(matches!(out, KeyEventOutcome::Consumed(None)));
+        assert_eq!(textarea.text(), "ac");
+    }
+
+    #[cfg(all(feature = "keybindings", feature = "crossterm"))]
+    #[test]
+    fn helix_x_extends_line_selection() {
+        use crate::keybindings::{BuiltinCanvasKeybindingPreset, KeyEventOutcome};
+        use crate::canvas::state::SelectionState;
+        use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+
+        let mut textarea = TextAreaState::<TextAreaProvider>::from_text("one\ntwo");
+        textarea.use_keybinding_preset(BuiltinCanvasKeybindingPreset::Helix);
+
+        let out = textarea.handle_key_event(KeyEvent::new(KeyCode::Char('x'), KeyModifiers::NONE));
+        assert!(matches!(out, KeyEventOutcome::Consumed(None)));
+        assert!(matches!(
+            textarea.selection_state(),
+            SelectionState::Linewise { anchor_field: 0 }
+        ));
+
+        let out = textarea.handle_key_event(KeyEvent::new(KeyCode::Char('x'), KeyModifiers::NONE));
+        assert!(matches!(out, KeyEventOutcome::Consumed(None)));
+        assert_eq!(textarea.current_field(), 1);
+        assert!(matches!(
+            textarea.selection_state(),
+            SelectionState::Linewise { anchor_field: 0 }
+        ));
+    }
+
+    #[cfg(all(feature = "keybindings", feature = "crossterm"))]
+    #[test]
+    fn helix_visual_mode_y_yanks_and_returns_to_normal() {
+        use crate::keybindings::{BuiltinCanvasKeybindingPreset, KeyEventOutcome};
+        use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+
+        let mut textarea = TextAreaState::<TextAreaProvider>::from_text("one\ntwo");
+        textarea.use_keybinding_preset(BuiltinCanvasKeybindingPreset::Helix);
+
+        let out = textarea.handle_key_event(KeyEvent::new(KeyCode::Char('v'), KeyModifiers::NONE));
+        assert!(matches!(out, KeyEventOutcome::Consumed(None)));
+        assert_eq!(textarea.mode(), crate::canvas::modes::AppMode::Sel);
+
+        let out = textarea.handle_key_event(KeyEvent::new(KeyCode::Char('l'), KeyModifiers::NONE));
+        assert!(matches!(out, KeyEventOutcome::Consumed(None)));
+
+        let out = textarea.handle_key_event(KeyEvent::new(KeyCode::Char('y'), KeyModifiers::NONE));
+        assert!(matches!(out, KeyEventOutcome::Consumed(None)));
+        assert_eq!(textarea.mode(), crate::canvas::modes::AppMode::Nor);
+
+        let out = textarea.handle_key_event(KeyEvent::new(KeyCode::Char('p'), KeyModifiers::NONE));
+        assert!(matches!(out, KeyEventOutcome::Consumed(None)));
+        assert_eq!(textarea.text(), "onone\ntwo");
     }
 
     #[test]

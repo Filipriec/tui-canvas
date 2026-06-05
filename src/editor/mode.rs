@@ -64,6 +64,8 @@ impl<D: DataProvider> FormEditor<D> {
                 {
                     let _ = CursorManager::update_for_mode(new_mode);
                 }
+                #[cfg(feature = "keybindings")]
+                self.apply_paradigm_after_mode_change();
             }
         }
     }
@@ -165,7 +167,14 @@ impl<D: DataProvider> FormEditor<D> {
 
         // Default (not normal): vim behavior
         #[cfg(not(feature = "textmode-normal"))]
-        self.set_mode(AppMode::Ins);
+        {
+            #[cfg(feature = "keybindings")]
+            if self.uses_helix_paradigm() {
+                self.enter_insert_at_selection_start();
+            } else {
+                self.set_mode(AppMode::Ins);
+            }
+        }
 
         // Check if suggestions should be shown based on trigger
         #[cfg(feature = "suggestions")]
@@ -184,9 +193,11 @@ impl<D: DataProvider> FormEditor<D> {
         {
             match (&self.ui_state.current_mode, &self.ui_state.selection) {
                 (AppMode::Nor, _) => {
-                    self.set_highlight_mode_selection(SelectionState::Characterwise {
-                        anchor: (self.ui_state.current_field, self.ui_state.cursor_pos),
-                    });
+                    let anchor = match self.ui_state.selection {
+                        SelectionState::Characterwise { anchor } => anchor,
+                        _ => (self.ui_state.current_field, self.ui_state.cursor_pos),
+                    };
+                    self.set_highlight_mode_selection(SelectionState::Characterwise { anchor });
                 }
                 (AppMode::Sel, SelectionState::Characterwise { .. }) => {
                     self.exit_highlight_mode();
@@ -249,6 +260,8 @@ impl<D: DataProvider> FormEditor<D> {
                 {
                     let _ = CursorManager::update_for_mode(AppMode::Nor);
                 }
+                #[cfg(feature = "keybindings")]
+                self.apply_paradigm_after_mode_change();
             }
         }
     }

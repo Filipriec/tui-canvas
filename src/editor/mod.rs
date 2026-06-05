@@ -14,6 +14,8 @@ pub mod features;
 pub mod mode;
 pub mod movement;
 pub mod navigation;
+#[cfg(feature = "keybindings")]
+pub(crate) mod selection;
 
 pub mod input;
 

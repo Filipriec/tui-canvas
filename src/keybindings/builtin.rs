@@ -193,6 +193,14 @@ mod tests {
             .iter()
             .any(|binding| binding.mode == AppMode::Nor
                 && binding.action == CanvasAction::Undo));
+        assert!(helix
+            .iter()
+            .any(|binding| binding.mode == AppMode::Nor
+                && binding.action == CanvasAction::Redo));
+        assert!(!default_helix_action_bindings()
+            .iter()
+            .any(|binding| binding.mode == AppMode::Nor
+                && binding.action == CanvasAction::DeleteLine));
         assert!(emacs
             .iter()
             .any(|binding| binding.mode == AppMode::Ins

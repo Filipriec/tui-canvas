@@ -265,6 +265,12 @@ impl<D: DataProvider> FormEditor<D> {
 
     /// Enter edit mode with cursor positioned for append (vim 'a')
     pub fn enter_append_mode(&mut self) {
+        #[cfg(feature = "keybindings")]
+        if self.uses_helix_paradigm() {
+            self.enter_insert_after_selection();
+            return;
+        }
+
         let current_text = self.current_text();
 
         let char_len = current_text.chars().count();

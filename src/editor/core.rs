@@ -5,7 +5,9 @@ use crate::cursor::CursorManager;
 use crate::canvas::modes::AppMode;
 use crate::canvas::state::EditorState;
 #[cfg(feature = "keybindings")]
-use crate::editor::behavior::EditorBehaviorState;
+use crate::editor::behavior::{EditorBehaviorState, KeybindingParadigm};
+#[cfg(feature = "keybindings")]
+use crate::keybindings::BuiltinCanvasKeybindingPreset;
 use crate::DataProvider;
 #[cfg(feature = "suggestions")]
 use crate::SuggestionItem;
@@ -109,6 +111,20 @@ impl<D: DataProvider> FormEditor<D> {
         self.keybindings = Some(keybindings);
     }
 
+    /// Install a built-in keybinding preset and its editing paradigm.
+    #[cfg(feature = "keybindings")]
+    pub fn set_keybinding_preset(&mut self, preset: BuiltinCanvasKeybindingPreset) {
+        self.keybindings = Some(CanvasKeyBindings::from_preset(&preset.preset()));
+        self.behavior_state
+            .set_paradigm(keybinding_paradigm_for_preset(preset));
+        self.apply_paradigm_after_mode_change();
+    }
+
+    #[cfg(feature = "keybindings")]
+    pub(crate) fn keybinding_paradigm(&self) -> KeybindingParadigm {
+        self.behavior_state.paradigm()
+    }
+
     /// Check if this editor has keybindings configured.
     #[cfg(feature = "keybindings")]
     pub fn has_keybindings(&self) -> bool {
@@ -184,5 +200,14 @@ impl<D: DataProvider> FormEditor<D> {
 impl<D: DataProvider> Drop for FormEditor<D> {
     fn drop(&mut self) {
         let _ = self.cleanup_cursor();
+    }
+}
+
+#[cfg(feature = "keybindings")]
+fn keybinding_paradigm_for_preset(preset: BuiltinCanvasKeybindingPreset) -> KeybindingParadigm {
+    match preset {
+        BuiltinCanvasKeybindingPreset::Vim => KeybindingParadigm::Vim,
+        BuiltinCanvasKeybindingPreset::Helix => KeybindingParadigm::Helix,
+        BuiltinCanvasKeybindingPreset::Emacs => KeybindingParadigm::Emacs,
     }
 }

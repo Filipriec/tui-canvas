@@ -31,7 +31,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
     }
 
     #[cfg(feature = "keybindings")]
-    fn yank_selection(&mut self) {
+    pub(crate) fn yank_selection(&mut self) {
         match self.selection_state().clone() {
             SelectionState::Linewise { anchor_field } => {
                 let current = self.current_field();
@@ -56,12 +56,20 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
 
                 let mut yanked = Vec::new();
                 if start.0 == end.0 {
-                    let text: String = lines[start.0]
-                        .chars()
-                        .skip(start.1)
-                        .take(end.1.saturating_sub(start.1) + 1)
-                        .collect();
-                    yanked.push(text);
+                    if start.1 == end.1 {
+                        let text: String = lines[start.0].chars().skip(start.1).take(1).collect();
+                        if text.is_empty() {
+                            return;
+                        }
+                        yanked.push(text);
+                    } else {
+                        let text: String = lines[start.0]
+                            .chars()
+                            .skip(start.1)
+                            .take(end.1.saturating_sub(start.1) + 1)
+                            .collect();
+                        yanked.push(text);
+                    }
                 } else {
                     let first: String = lines[start.0].chars().skip(start.1).collect();
                     yanked.push(first);
@@ -105,6 +113,42 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
                 self.editor
                     .record_checkpoint(crate::editor::features::history::EditKind::Other);
 
+                let repeat = count.max(1);
+                let mut pasted = String::new();
+                for i in 0..repeat {
+                    if i > 0 {
+                        pasted.push('\n');
+                    }
+                    pasted.push_str(&lines.join("\n"));
+                }
+
+                if lines.len() == 1 {
+                    let field = self.current_field();
+                    let line = self.editor.data_provider().field_value(field);
+                    if lines[0] != line {
+                        let (start, end) = self.selection_endpoints();
+                        let insert_col = if after { end.1 + 1 } else { start.1 };
+                        let mut chars: Vec<char> = line.chars().collect();
+                        let byte_insert = insert_col.min(chars.len());
+                        let insert_chars: Vec<char> = pasted.chars().collect();
+                        chars.splice(byte_insert..byte_insert, insert_chars);
+                        let new_line: String = chars.into_iter().collect();
+                        self.editor
+                            .data_provider_mut()
+                            .set_field_value(field, new_line);
+                        let _ = self.transition_to_field(field);
+                        self.set_cursor_position(insert_col.saturating_add(pasted.chars().count()));
+                        self.set_mode(AppMode::Nor);
+                        #[cfg(feature = "keybindings")]
+                        self.apply_paradigm_after_mode_change();
+                        #[cfg(feature = "gui")]
+                        {
+                            self.edited_this_frame = true;
+                        }
+                        return;
+                    }
+                }
+
                 let mut content = self.editor.data_provider().capture_content();
                 let current = self.current_field().min(content.len().saturating_sub(1));
                 let insert_at = if after {
@@ -113,7 +157,6 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
                     current
                 };
 
-                let repeat = count.max(1);
                 let mut insert = Vec::with_capacity(lines.len() * repeat);
                 for _ in 0..repeat {
                     insert.extend(lines.iter().cloned());
@@ -124,6 +167,8 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
                 let _ = self.transition_to_field(insert_at.min(content.len().saturating_sub(1)));
                 self.move_line_start();
                 self.set_mode(AppMode::Nor);
+                #[cfg(feature = "keybindings")]
+                self.apply_paradigm_after_mode_change();
                 #[cfg(feature = "gui")]
                 {
                     self.edited_this_frame = true;

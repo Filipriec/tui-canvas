@@ -4,6 +4,7 @@
 
 ### Added
 
+- Added full Helix editing paradigm support when using `BuiltinCanvasKeybindingPreset::Helix` via `FormEditor::set_keybinding_preset` or `TextAreaState::use_keybinding_preset`. Helix mode uses selection-first editing (`d`/`c`/`y`/`p` on the primary selection), `U` for redo, `x`/`X` for line selection extension, and collapses the primary selection after normal-mode movements.
 - Added opt-in default textarea command-line integration through `TextAreaState::use_default_commandline()`, including built-in `:set number`, `:set relativenumber`, `:set nonumber`, `:noh`, `/`, and `?` behavior with automatic bottom-row reservation and cursor routing.
 
 ## v0.7.2
