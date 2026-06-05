@@ -266,23 +266,19 @@ impl<D: DataProvider> FormEditor<D> {
     /// Enter edit mode with cursor positioned for append (vim 'a')
     pub fn enter_append_mode(&mut self) {
         #[cfg(feature = "keybindings")]
-        if self.uses_helix_paradigm() {
-            self.enter_insert_after_selection();
+        {
+            use crate::editor::behavior::KeybindingParadigm;
+            match self.keybinding_paradigm() {
+                KeybindingParadigm::Helix => self.enter_append_mode_helix(),
+                KeybindingParadigm::Vim | KeybindingParadigm::Emacs => {
+                    self.enter_append_mode_vim()
+                }
+            }
             return;
         }
 
-        let current_text = self.current_text();
-
-        let char_len = current_text.chars().count();
-        let append_pos = if current_text.is_empty() {
-            0
-        } else {
-            (self.ui_state.cursor_pos + 1).min(char_len)
-        };
-
-        self.set_cursor_raw(append_pos);
-
-        self.set_mode(crate::canvas::modes::AppMode::Ins);
+        #[cfg(not(feature = "keybindings"))]
+        self.enter_append_mode_vim();
     }
 
     /// Set current field value (validates under feature flag)

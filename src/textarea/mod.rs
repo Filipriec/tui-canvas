@@ -2,6 +2,8 @@
 //! Text area convenience exports.
 
 mod actions;
+#[cfg(feature = "keybindings")]
+mod paradigm;
 mod input;
 pub mod provider;
 pub mod state;

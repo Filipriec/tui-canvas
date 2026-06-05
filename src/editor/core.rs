@@ -117,7 +117,7 @@ impl<D: DataProvider> FormEditor<D> {
         self.keybindings = Some(CanvasKeyBindings::from_preset(&preset.preset()));
         self.behavior_state
             .set_paradigm(keybinding_paradigm_for_preset(preset));
-        self.apply_paradigm_after_mode_change();
+        self.apply_after_mode_change_for_paradigm();
     }
 
     #[cfg(feature = "keybindings")]

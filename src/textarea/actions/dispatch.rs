@@ -7,6 +7,7 @@ use crate::commandline::CommandLineEventOutcome;
 #[cfg(feature = "keybindings")]
 use crate::{
     canvas::modes::AppMode,
+    editor::behavior::KeybindingParadigm,
     keybindings::{CanvasKeyAction, KeyEventOutcome},
     textarea::{TextAreaDataProvider, TextAreaState},
 };
@@ -134,144 +135,10 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         action: &CanvasKeyAction,
         count: usize,
     ) -> KeyEventOutcome {
-        match action {
-            CanvasKeyAction::NextField if self.mode() == AppMode::Ins => {
-                self.insert_tab_spaces();
-                KeyEventOutcome::Consumed(None)
-            }
-            CanvasKeyAction::DeleteCharBackward => {
-                for _ in 0..count {
-                    self.delete_backward_preserving_mode();
-                }
-                KeyEventOutcome::Consumed(None)
-            }
-            CanvasKeyAction::DeleteCharForward => {
-                for _ in 0..count {
-                    self.delete_forward_preserving_mode();
-                }
-                KeyEventOutcome::Consumed(None)
-            }
-            CanvasKeyAction::OpenLineBelow => {
-                for _ in 0..count {
-                    self.open_line_below();
-                }
-                KeyEventOutcome::Consumed(None)
-            }
-            CanvasKeyAction::OpenLineAbove => {
-                for _ in 0..count {
-                    self.open_line_above();
-                }
-                KeyEventOutcome::Consumed(None)
-            }
-            CanvasKeyAction::MoveHalfPageUp => {
-                self.move_half_page_up(count);
-                KeyEventOutcome::Consumed(None)
-            }
-            CanvasKeyAction::MoveHalfPageDown => {
-                self.move_half_page_down(count);
-                KeyEventOutcome::Consumed(None)
-            }
-            CanvasKeyAction::EnterEditModeLineStart => {
-                self.enter_line_start_insert_mode();
-                KeyEventOutcome::Consumed(None)
-            }
-            CanvasKeyAction::EnterEditModeLineEnd => {
-                self.enter_line_end_insert_mode();
-                KeyEventOutcome::Consumed(None)
-            }
-            CanvasKeyAction::DeleteLine => {
-                self.delete_current_lines(count);
-                KeyEventOutcome::Consumed(None)
-            }
-            CanvasKeyAction::DeleteToLineEnd => {
-                self.delete_to_line_end();
-                KeyEventOutcome::Consumed(None)
-            }
-            CanvasKeyAction::ChangeLine => {
-                self.change_current_line();
-                KeyEventOutcome::Consumed(None)
-            }
-            CanvasKeyAction::ChangeToLineEnd => {
-                self.change_to_line_end();
-                KeyEventOutcome::Consumed(None)
-            }
-            CanvasKeyAction::JoinLineBelow => {
-                self.join_lines_below(count);
-                KeyEventOutcome::Consumed(None)
-            }
-            CanvasKeyAction::YankLine => {
-                self.yank_current_lines(count);
-                KeyEventOutcome::Consumed(None)
-            }
-            CanvasKeyAction::PasteAfter => {
-                self.paste_after(count);
-                KeyEventOutcome::Consumed(None)
-            }
-            CanvasKeyAction::PasteBefore => {
-                self.paste_before(count);
-                KeyEventOutcome::Consumed(None)
-            }
-            CanvasKeyAction::DeleteSelection => {
-                self.delete_selection(true, count);
-                KeyEventOutcome::Consumed(None)
-            }
-            CanvasKeyAction::DeleteSelectionNoYank => {
-                self.delete_selection(false, count);
-                KeyEventOutcome::Consumed(None)
-            }
-            CanvasKeyAction::ChangeSelection => {
-                self.change_selection(true, count);
-                KeyEventOutcome::Consumed(None)
-            }
-            CanvasKeyAction::ChangeSelectionNoYank => {
-                self.change_selection(false, count);
-                KeyEventOutcome::Consumed(None)
-            }
-            CanvasKeyAction::YankSelection => {
-                for _ in 0..count {
-                    self.yank_primary_selection();
-                }
-                KeyEventOutcome::Consumed(None)
-            }
-            CanvasKeyAction::CollapseSelection => {
-                self.collapse_selection();
-                KeyEventOutcome::Consumed(None)
-            }
-            CanvasKeyAction::ExtendLineBelow => {
-                for _ in 0..count {
-                    self.extend_line_below();
-                }
-                KeyEventOutcome::Consumed(None)
-            }
-            CanvasKeyAction::ExtendToLineBounds => {
-                for _ in 0..count {
-                    self.extend_to_line_bounds();
-                }
-                KeyEventOutcome::Consumed(None)
-            }
-            _ => {
-                let Some(canvas_action) = action.to_canvas_action() else {
-                    return KeyEventOutcome::NotMatched;
-                };
-                let collapse_after_movement = self.uses_helix_paradigm()
-                    && self.mode() == AppMode::Nor
-                    && canvas_action.is_movement_action();
-                let mut result = crate::canvas::actions::ActionResult::Success;
-                for _ in 0..count {
-                    result = self.editor.execute(canvas_action.clone());
-                }
-                if collapse_after_movement {
-                    self.collapse_selection_to_cursor();
-                }
-                match result {
-                    crate::canvas::actions::ActionResult::Success => {
-                        KeyEventOutcome::Consumed(None)
-                    }
-                    crate::canvas::actions::ActionResult::Message(msg)
-                    | crate::canvas::actions::ActionResult::Error(msg) => {
-                        KeyEventOutcome::Consumed(Some(msg))
-                    }
-                }
+        match self.editor.keybinding_paradigm() {
+            KeybindingParadigm::Helix => self.dispatch_textarea_key_action_helix(action, count),
+            KeybindingParadigm::Vim | KeybindingParadigm::Emacs => {
+                self.dispatch_textarea_key_action_vim(action, count)
             }
         }
     }

@@ -5,11 +5,12 @@ use crate::cursor::CursorManager;
 
 use crate::canvas::modes::AppMode;
 use crate::canvas::state::SelectionState;
+use crate::editor::behavior::KeybindingParadigm;
 use crate::editor::FormEditor;
 use crate::DataProvider;
 
 impl<D: DataProvider> FormEditor<D> {
-    fn set_highlight_mode_selection(&mut self, selection: SelectionState) {
+    pub(crate) fn set_highlight_mode_selection(&mut self, selection: SelectionState) {
         self.ui_state.current_mode = AppMode::Sel;
         self.ui_state.selection = selection;
 
@@ -46,27 +47,20 @@ impl<D: DataProvider> FormEditor<D> {
             }
         }
 
-        // Default (not normal): original vim behavior
+        // Default (not normal): paradigm-specific modal behavior
         #[cfg(not(feature = "textmode-normal"))]
-        match (self.ui_state.current_mode, mode) {
-            (AppMode::Nor, AppMode::Sel) => {
-                self.enter_highlight_mode();
-            }
-            (AppMode::Sel, AppMode::Nor) => {
-                self.exit_highlight_mode();
-            }
-            (_, new_mode) => {
-                self.ui_state.current_mode = new_mode;
-                if new_mode != AppMode::Sel {
-                    self.ui_state.selection = SelectionState::None;
+        {
+            #[cfg(feature = "keybindings")]
+            {
+                match self.keybinding_paradigm() {
+                    KeybindingParadigm::Helix => self.set_mode_helix(mode),
+                    KeybindingParadigm::Vim | KeybindingParadigm::Emacs => {
+                        self.set_mode_vim(mode)
+                    }
                 }
-                #[cfg(feature = "cursor-style")]
-                {
-                    let _ = CursorManager::update_for_mode(new_mode);
-                }
-                #[cfg(feature = "keybindings")]
-                self.apply_paradigm_after_mode_change();
             }
+            #[cfg(not(feature = "keybindings"))]
+            self.set_mode_vim(mode);
         }
     }
 
@@ -165,15 +159,16 @@ impl<D: DataProvider> FormEditor<D> {
             }
         }
 
-        // Default (not normal): vim behavior
+        // Default (not normal): paradigm-specific insert entry
         #[cfg(not(feature = "textmode-normal"))]
         {
             #[cfg(feature = "keybindings")]
-            if self.uses_helix_paradigm() {
-                self.enter_insert_at_selection_start();
-            } else {
-                self.set_mode(AppMode::Ins);
+            match self.keybinding_paradigm() {
+                KeybindingParadigm::Helix => self.enter_edit_mode_helix(),
+                KeybindingParadigm::Vim | KeybindingParadigm::Emacs => self.enter_edit_mode_vim(),
             }
+            #[cfg(not(feature = "keybindings"))]
+            self.enter_edit_mode_vim();
         }
 
         // Check if suggestions should be shown based on trigger
@@ -184,85 +179,56 @@ impl<D: DataProvider> FormEditor<D> {
     // Selection/visual mode
 
     pub fn enter_highlight_mode(&mut self) {
-        // NORMALMODE: ignore request (stay in Ins)
         #[cfg(feature = "textmode-normal")]
         {}
 
-        // Default (not normal): original vim
         #[cfg(not(feature = "textmode-normal"))]
         {
-            match (&self.ui_state.current_mode, &self.ui_state.selection) {
-                (AppMode::Nor, _) => {
-                    let anchor = match self.ui_state.selection {
-                        SelectionState::Characterwise { anchor } => anchor,
-                        _ => (self.ui_state.current_field, self.ui_state.cursor_pos),
-                    };
-                    self.set_highlight_mode_selection(SelectionState::Characterwise { anchor });
+            #[cfg(feature = "keybindings")]
+            match self.keybinding_paradigm() {
+                KeybindingParadigm::Helix => self.enter_highlight_mode_helix(),
+                KeybindingParadigm::Vim | KeybindingParadigm::Emacs => {
+                    self.enter_highlight_mode_vim()
                 }
-                (AppMode::Sel, SelectionState::Characterwise { .. }) => {
-                    self.exit_highlight_mode();
-                }
-                (AppMode::Sel, _) => {
-                    self.set_highlight_mode_selection(SelectionState::Characterwise {
-                        anchor: (self.ui_state.current_field, self.ui_state.cursor_pos),
-                    });
-                }
-                _ => {}
             }
+            #[cfg(not(feature = "keybindings"))]
+            self.enter_highlight_mode_vim();
         }
     }
 
     pub fn enter_highlight_line_mode(&mut self) {
-        // NORMALMODE: ignore
         #[cfg(feature = "textmode-normal")]
         {}
 
-        // Default (not normal): original vim
         #[cfg(not(feature = "textmode-normal"))]
         {
-            match (&self.ui_state.current_mode, &self.ui_state.selection) {
-                (AppMode::Nor, _) => {
-                    self.set_highlight_mode_selection(SelectionState::Linewise {
-                        anchor_field: self.ui_state.current_field,
-                    });
+            #[cfg(feature = "keybindings")]
+            match self.keybinding_paradigm() {
+                KeybindingParadigm::Helix => self.enter_highlight_line_mode_helix(),
+                KeybindingParadigm::Vim | KeybindingParadigm::Emacs => {
+                    self.enter_highlight_line_mode_vim()
                 }
-                (AppMode::Sel, SelectionState::Linewise { .. }) => {
-                    self.exit_highlight_mode();
-                }
-                (AppMode::Sel, SelectionState::Characterwise { anchor }) => {
-                    self.set_highlight_mode_selection(SelectionState::Linewise {
-                        anchor_field: anchor.0,
-                    });
-                }
-                (AppMode::Sel, _) => {
-                    self.set_highlight_mode_selection(SelectionState::Linewise {
-                        anchor_field: self.ui_state.current_field,
-                    });
-                }
-                _ => {}
             }
+            #[cfg(not(feature = "keybindings"))]
+            self.enter_highlight_line_mode_vim();
         }
     }
 
     pub fn exit_highlight_mode(&mut self) {
-        // NORMALMODE: ignore
         #[cfg(feature = "textmode-normal")]
         {}
 
-        // Default (not normal): original vim
         #[cfg(not(feature = "textmode-normal"))]
         {
-            if self.ui_state.current_mode == AppMode::Sel {
-                self.ui_state.current_mode = AppMode::Nor;
-                self.ui_state.selection = SelectionState::None;
-
-                #[cfg(feature = "cursor-style")]
-                {
-                    let _ = CursorManager::update_for_mode(AppMode::Nor);
+            #[cfg(feature = "keybindings")]
+            match self.keybinding_paradigm() {
+                KeybindingParadigm::Helix => self.exit_highlight_mode_helix(),
+                KeybindingParadigm::Vim | KeybindingParadigm::Emacs => {
+                    self.exit_highlight_mode_vim()
                 }
-                #[cfg(feature = "keybindings")]
-                self.apply_paradigm_after_mode_change();
             }
+            #[cfg(not(feature = "keybindings"))]
+            self.exit_highlight_mode_vim();
         }
     }
 

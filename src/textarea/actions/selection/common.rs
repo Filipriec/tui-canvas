@@ -1,77 +1,10 @@
 use crate::{
-    canvas::{modes::AppMode, state::SelectionState},
+    canvas::state::SelectionState,
     textarea::{TextAreaDataProvider, TextAreaState},
 };
 
 impl<P: TextAreaDataProvider> TextAreaState<P> {
-    #[cfg(feature = "keybindings")]
-    pub(crate) fn delete_selection(&mut self, yank: bool, count: usize) {
-        for _ in 0..count.max(1) {
-            if !self.delete_selection_once(yank) {
-                break;
-            }
-        }
-        if self.uses_helix_paradigm() && self.mode() == AppMode::Nor {
-            self.ensure_helix_primary_selection();
-        }
-    }
-
-    #[cfg(feature = "keybindings")]
-    pub(crate) fn change_selection(&mut self, yank: bool, count: usize) {
-        for _ in 0..count.max(1) {
-            if !self.delete_selection_once(yank) {
-                break;
-            }
-        }
-        self.enter_edit_mode();
-        #[cfg(feature = "gui")]
-        {
-            self.edited_this_frame = true;
-        }
-    }
-
-    #[cfg(feature = "keybindings")]
-    pub(crate) fn yank_primary_selection(&mut self) {
-        self.yank_selection();
-        if self.uses_helix_paradigm() && self.mode() == AppMode::Sel {
-            self.exit_highlight_mode();
-            self.ensure_helix_primary_selection();
-        }
-    }
-
-    #[cfg(feature = "keybindings")]
-    pub(crate) fn collapse_selection(&mut self) {
-        self.collapse_selection_to_cursor();
-    }
-
-    #[cfg(feature = "keybindings")]
-    pub(crate) fn extend_line_below(&mut self) {
-        let current = self.current_field();
-        match self.selection_state().clone() {
-            SelectionState::Linewise { anchor_field } if anchor_field == current => {
-                let next = current.saturating_add(1);
-                if next < self.editor.data_provider().field_count() {
-                    let _ = self.transition_to_field(next);
-                    self.set_mode(AppMode::Nor);
-                    self.ui_state.selection = SelectionState::Linewise { anchor_field };
-                }
-            }
-            _ => {
-                self.set_mode(AppMode::Nor);
-                self.ui_state.selection = SelectionState::Linewise { anchor_field: current };
-            }
-        }
-    }
-
-    #[cfg(feature = "keybindings")]
-    pub(crate) fn extend_to_line_bounds(&mut self) {
-        let current = self.current_field();
-        self.set_mode(AppMode::Nor);
-        self.ui_state.selection = SelectionState::Linewise { anchor_field: current };
-    }
-
-    #[cfg(feature = "keybindings")]
-    fn delete_selection_once(&mut self, yank: bool) -> bool {
+    pub(crate) fn delete_selection_once(&mut self, yank: bool) -> bool {
         match self.selection_state().clone() {
             SelectionState::Linewise { anchor_field } => {
                 let current = self.current_field();
@@ -175,8 +108,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         }
     }
 
-    #[cfg(feature = "keybindings")]
-    fn delete_primary_character(&mut self, yank: bool) -> bool {
+    pub(crate) fn delete_primary_character(&mut self, yank: bool) -> bool {
         let line_idx = self.current_field();
         let col = self.cursor_position();
         let current = self.current_text().to_string();
@@ -228,8 +160,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         false
     }
 
-    #[cfg(feature = "keybindings")]
-    fn extract_characterwise_text(
+    pub(crate) fn extract_characterwise_text(
         &self,
         lines: &[String],
         start: (usize, usize),
