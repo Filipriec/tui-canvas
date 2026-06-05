@@ -32,7 +32,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
     }
 
     fn paste_yank_vim(&mut self, after: bool, count: usize) {
-        let Some(register) = self.editor.behavior_state.vim().yank_register().cloned() else {
+        let Some(register) = self.editor.behavior_state.yank().register().cloned() else {
             return;
         };
 
@@ -63,7 +63,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
     }
 
     fn paste_yank_helix(&mut self, after: bool, count: usize) {
-        let Some(register) = self.editor.behavior_state.vim().yank_register().cloned() else {
+        let Some(register) = self.editor.behavior_state.yank().register().cloned() else {
             return;
         };
 
@@ -94,7 +94,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
     }
 
     fn paste_yank_emacs(&mut self, after: bool, count: usize) {
-        let Some(register) = self.editor.behavior_state.vim().yank_register().cloned() else {
+        let Some(register) = self.editor.behavior_state.yank().register().cloned() else {
             return;
         };
 

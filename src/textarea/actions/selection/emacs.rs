@@ -76,8 +76,8 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
 
         self.editor
             .behavior_state
-            .vim_mut()
-            .set_text_yank_register(yanked);
+            .yank_mut()
+            .set_text_register(yanked);
         true
     }
 

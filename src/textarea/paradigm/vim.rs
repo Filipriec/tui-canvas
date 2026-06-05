@@ -50,15 +50,15 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         if lines.is_empty() {
             self.editor
                 .behavior_state
-                .vim_mut()
-                .set_line_yank_register(vec![String::new()]);
+                .yank_mut()
+                .set_line_register(vec![String::new()]);
             return;
         }
 
         let end = current.saturating_add(count.max(1)).min(lines.len());
         self.editor
             .behavior_state
-            .vim_mut()
-            .set_line_yank_register(lines[current..end].to_vec());
+            .yank_mut()
+            .set_line_register(lines[current..end].to_vec());
     }
 }

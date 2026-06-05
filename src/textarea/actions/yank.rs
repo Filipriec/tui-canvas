@@ -15,8 +15,8 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
                 if start < lines.len() {
                     self.editor
                         .behavior_state
-                        .vim_mut()
-                        .set_line_yank_register(lines[start..=end.min(lines.len() - 1)].to_vec());
+                        .yank_mut()
+                        .set_line_register(lines[start..=end.min(lines.len() - 1)].to_vec());
                 }
             }
             SelectionState::Characterwise { anchor } => {
@@ -55,8 +55,8 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
                 }
                 self.editor
                     .behavior_state
-                    .vim_mut()
-                    .set_text_yank_register(yanked);
+                    .yank_mut()
+                    .set_text_register(yanked);
             }
             SelectionState::None => {}
         }
