@@ -856,20 +856,26 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         }
 
         let mut moved = false;
+        let target_col = self
+            .editor
+            .ui_state
+            .ideal_cursor_column
+            .min(u16::MAX as usize) as u16;
         for _ in 0..count.max(1) {
-            moved |= self.move_visual_line_once(down);
+            moved |= self.move_visual_line_once(down, target_col);
         }
+        self.editor.ui_state.ideal_cursor_column = target_col as usize;
         moved
     }
 
     #[cfg(feature = "gui")]
-    fn move_visual_line_once(&mut self, down: bool) -> bool {
+    fn move_visual_line_once(&mut self, down: bool, target_col: u16) -> bool {
         let width = self.viewport_width;
         let indent = self.wrap_indent_cols;
         let line_idx = self.current_field();
         let current_line = self.current_text().to_string();
         let cursor = self.display_cursor_position();
-        let (subrow, target_col) =
+        let (subrow, _cursor_col) =
             wrapped_rows_to_cursor_indented(&current_line, width, indent, cursor);
         let current_ranges = wrap_segment_ranges(&current_line, width, indent);
 
@@ -924,7 +930,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         }
         let char_len = self.current_text().chars().count();
         self.editor.set_cursor_for_mode(target_pos, char_len);
-        self.editor.ui_state.ideal_cursor_column = target_pos;
+        self.editor.ui_state.ideal_cursor_column = target_col as usize;
         true
     }
 
