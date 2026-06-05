@@ -14,62 +14,62 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
     ) -> Option<KeyEventOutcome> {
         match action {
             CanvasKeyAction::NextField if self.mode() == AppMode::Ins => {
-                Some(self.consume_action(|| self.insert_tab_spaces()))
+                Some(self.consume_action(|this| this.insert_tab_spaces()))
             }
             CanvasKeyAction::DeleteCharBackward => {
-                Some(self.consume_action(|| {
+                Some(self.consume_action(|this| {
                     for _ in 0..count {
-                        self.delete_backward_preserving_mode();
+                        this.delete_backward_preserving_mode();
                     }
                 }))
             }
             CanvasKeyAction::DeleteCharForward => {
-                Some(self.consume_action(|| {
+                Some(self.consume_action(|this| {
                     for _ in 0..count {
-                        self.delete_forward_preserving_mode();
+                        this.delete_forward_preserving_mode();
                     }
                 }))
             }
             CanvasKeyAction::OpenLineBelow => {
-                Some(self.consume_action(|| {
+                Some(self.consume_action(|this| {
                     for _ in 0..count {
-                        self.open_line_below();
+                        this.open_line_below();
                     }
                 }))
             }
             CanvasKeyAction::OpenLineAbove => {
-                Some(self.consume_action(|| {
+                Some(self.consume_action(|this| {
                     for _ in 0..count {
-                        self.open_line_above();
+                        this.open_line_above();
                     }
                 }))
             }
             CanvasKeyAction::MoveHalfPageUp => {
-                Some(self.consume_action(|| self.move_half_page_up(count)))
+                Some(self.consume_action(|this| this.move_half_page_up(count)))
             }
             CanvasKeyAction::MoveHalfPageDown => {
-                Some(self.consume_action(|| self.move_half_page_down(count)))
+                Some(self.consume_action(|this| this.move_half_page_down(count)))
             }
             CanvasKeyAction::EnterEditModeLineStart => {
-                Some(self.consume_action(|| self.enter_line_start_insert_mode()))
+                Some(self.consume_action(|this| this.enter_line_start_insert_mode()))
             }
             CanvasKeyAction::EnterEditModeLineEnd => {
-                Some(self.consume_action(|| self.enter_line_end_insert_mode()))
+                Some(self.consume_action(|this| this.enter_line_end_insert_mode()))
             }
             CanvasKeyAction::DeleteLine => {
-                Some(self.consume_action(|| self.delete_current_lines(count)))
+                Some(self.consume_action(|this| this.delete_current_lines(count)))
             }
             CanvasKeyAction::DeleteToLineEnd => {
-                Some(self.consume_action(|| self.delete_to_line_end()))
+                Some(self.consume_action(|this| this.delete_to_line_end()))
             }
             CanvasKeyAction::ChangeLine => {
-                Some(self.consume_action(|| self.change_current_line()))
+                Some(self.consume_action(|this| this.change_current_line()))
             }
             CanvasKeyAction::ChangeToLineEnd => {
-                Some(self.consume_action(|| self.change_to_line_end()))
+                Some(self.consume_action(|this| this.change_to_line_end()))
             }
             CanvasKeyAction::JoinLineBelow => {
-                Some(self.consume_action(|| self.join_lines_below(count)))
+                Some(self.consume_action(|this| this.join_lines_below(count)))
             }
             _ => None,
         }

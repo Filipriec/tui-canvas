@@ -2,7 +2,7 @@ mod paradigm;
 mod vim;
 
 pub(crate) use paradigm::KeybindingParadigm;
-pub(crate) use vim::{VimBehaviorState, VimRegister};
+pub(crate) use vim::{VimBehaviorState, YankRegister};
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub(crate) struct EditorBehaviorState {

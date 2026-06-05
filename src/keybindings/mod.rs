@@ -8,6 +8,8 @@ use std::time::{Duration, Instant};
 
 use crate::canvas::actions::CanvasAction;
 use crate::canvas::modes::AppMode;
+#[cfg(feature = "keybindings")]
+use crate::editor::behavior::KeybindingParadigm;
 
 pub use action::CanvasKeyAction;
 pub use builtin::{
@@ -35,6 +37,7 @@ pub struct CanvasKeyBindings {
     ro: Vec<Binding>,
     edit: Vec<Binding>,
     hl: Vec<Binding>,
+    pub(crate) paradigm: Option<KeybindingParadigm>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -95,15 +98,25 @@ impl KeySequenceTracker {
 
 impl CanvasKeyBindings {
     pub fn vim_defaults() -> Self {
-        Self::from_preset(&builtin_vim_preset())
+        Self::from_builtin_preset(BuiltinCanvasKeybindingPreset::Vim)
     }
 
     pub fn helix_defaults() -> Self {
-        Self::from_preset(&builtin_helix_preset())
+        Self::from_builtin_preset(BuiltinCanvasKeybindingPreset::Helix)
     }
 
     pub fn emacs_defaults() -> Self {
-        Self::from_preset(&builtin_emacs_preset())
+        Self::from_builtin_preset(BuiltinCanvasKeybindingPreset::Emacs)
+    }
+
+    pub fn from_builtin_preset(preset: BuiltinCanvasKeybindingPreset) -> Self {
+        let mut bindings = Self::from_preset(&preset.preset());
+        bindings.paradigm = Some(match preset {
+            BuiltinCanvasKeybindingPreset::Vim => KeybindingParadigm::Vim,
+            BuiltinCanvasKeybindingPreset::Helix => KeybindingParadigm::Helix,
+            BuiltinCanvasKeybindingPreset::Emacs => KeybindingParadigm::Emacs,
+        });
+        bindings
     }
 
     pub fn from_preset(preset: &CanvasKeybindingPreset) -> Self {

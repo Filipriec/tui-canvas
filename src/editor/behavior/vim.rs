@@ -1,12 +1,13 @@
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub(crate) struct VimBehaviorState {
     count: Option<usize>,
-    register: Option<VimRegister>,
+    yank_register: Option<YankRegister>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) enum VimRegister {
+pub(crate) enum YankRegister {
     Lines(Vec<String>),
+    Text(Vec<String>),
 }
 
 impl VimBehaviorState {
@@ -27,11 +28,15 @@ impl VimBehaviorState {
         self.count = None;
     }
 
-    pub(crate) fn set_line_register(&mut self, lines: Vec<String>) {
-        self.register = Some(VimRegister::Lines(lines));
+    pub(crate) fn set_line_yank_register(&mut self, lines: Vec<String>) {
+        self.yank_register = Some(YankRegister::Lines(lines));
     }
 
-    pub(crate) fn register(&self) -> Option<&VimRegister> {
-        self.register.as_ref()
+    pub(crate) fn set_text_yank_register(&mut self, lines: Vec<String>) {
+        self.yank_register = Some(YankRegister::Text(lines));
+    }
+
+    pub(crate) fn yank_register(&self) -> Option<&YankRegister> {
+        self.yank_register.as_ref()
     }
 }

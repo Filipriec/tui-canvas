@@ -197,10 +197,16 @@ mod tests {
             .iter()
             .any(|binding| binding.mode == AppMode::Nor
                 && binding.action == CanvasAction::Redo));
-        assert!(!default_helix_action_bindings()
-            .iter()
-            .any(|binding| binding.mode == AppMode::Nor
-                && binding.action == CanvasAction::DeleteLine));
+        let delete = [KeyStroke {
+            code: KeyCode::Char('d'),
+            modifiers: KeyModifiers::empty(),
+        }];
+        assert_eq!(
+            CanvasKeyBindings::helix_defaults()
+                .lookup_action(AppMode::Nor, &delete)
+                .0,
+            Some(&CanvasKeyAction::DeleteSelection)
+        );
         assert!(emacs
             .iter()
             .any(|binding| binding.mode == AppMode::Ins

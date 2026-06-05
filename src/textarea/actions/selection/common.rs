@@ -16,7 +16,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
                 }
 
                 if yank {
-                    self.editor.behavior_state.vim_mut().set_line_register(
+                    self.editor.behavior_state.vim_mut().set_line_yank_register(
                         lines[start..=end.min(lines.len() - 1)]
                             .to_vec(),
                     );
@@ -62,7 +62,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
                     self.editor
                         .behavior_state
                         .vim_mut()
-                        .set_line_register(yanked);
+                        .set_text_yank_register(yanked);
                 }
 
                 self.editor
@@ -120,7 +120,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
                 self.editor
                     .behavior_state
                     .vim_mut()
-                    .set_line_register(vec![ch]);
+                    .set_text_yank_register(vec![ch]);
             }
             self.editor
                 .record_checkpoint(crate::editor::features::history::EditKind::Delete);
@@ -141,9 +141,15 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
 
         if line_idx + 1 < self.editor.data_provider().field_count() {
             if yank {
-                self.editor.behavior_state.vim_mut().set_line_register(vec![
-                    self.editor.data_provider().field_value(line_idx + 1).to_string(),
-                ]);
+                let text = self
+                    .editor
+                    .data_provider()
+                    .field_value(line_idx + 1)
+                    .to_string();
+                self.editor
+                    .behavior_state
+                    .vim_mut()
+                    .set_text_yank_register(vec![text]);
             }
             self.editor
                 .record_checkpoint(crate::editor::features::history::EditKind::Delete);

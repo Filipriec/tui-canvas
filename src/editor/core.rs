@@ -108,16 +108,17 @@ impl<D: DataProvider> FormEditor<D> {
     /// Set the keybindings for this editor instance.
     #[cfg(feature = "keybindings")]
     pub fn set_keybindings(&mut self, keybindings: CanvasKeyBindings) {
+        if let Some(paradigm) = keybindings.paradigm {
+            self.behavior_state.set_paradigm(paradigm);
+            self.apply_after_mode_change_for_paradigm();
+        }
         self.keybindings = Some(keybindings);
     }
 
     /// Install a built-in keybinding preset and its editing paradigm.
     #[cfg(feature = "keybindings")]
     pub fn set_keybinding_preset(&mut self, preset: BuiltinCanvasKeybindingPreset) {
-        self.keybindings = Some(CanvasKeyBindings::from_preset(&preset.preset()));
-        self.behavior_state
-            .set_paradigm(keybinding_paradigm_for_preset(preset));
-        self.apply_after_mode_change_for_paradigm();
+        self.set_keybindings(CanvasKeyBindings::from_builtin_preset(preset));
     }
 
     #[cfg(feature = "keybindings")]
@@ -148,11 +149,23 @@ impl<D: DataProvider> FormEditor<D> {
 
     pub(crate) fn set_cursor_raw(&mut self, pos: usize) {
         self.ui_state.set_cursor(pos, pos, true);
+        #[cfg(feature = "keybindings")]
+        if self.keybinding_paradigm() == KeybindingParadigm::Helix
+            && self.ui_state.current_mode == AppMode::Nor
+        {
+            self.collapse_helix_selection_to_cursor();
+        }
     }
 
     pub(crate) fn set_cursor_for_mode(&mut self, pos: usize, max_len: usize) {
         self.ui_state
             .set_cursor(pos, max_len, self.ui_state.current_mode == AppMode::Ins);
+        #[cfg(feature = "keybindings")]
+        if self.keybinding_paradigm() == KeybindingParadigm::Helix
+            && self.ui_state.current_mode == AppMode::Nor
+        {
+            self.collapse_helix_selection_to_cursor();
+        }
     }
 
     pub fn current_field(&self) -> usize {
@@ -200,14 +213,5 @@ impl<D: DataProvider> FormEditor<D> {
 impl<D: DataProvider> Drop for FormEditor<D> {
     fn drop(&mut self) {
         let _ = self.cleanup_cursor();
-    }
-}
-
-#[cfg(feature = "keybindings")]
-fn keybinding_paradigm_for_preset(preset: BuiltinCanvasKeybindingPreset) -> KeybindingParadigm {
-    match preset {
-        BuiltinCanvasKeybindingPreset::Vim => KeybindingParadigm::Vim,
-        BuiltinCanvasKeybindingPreset::Helix => KeybindingParadigm::Helix,
-        BuiltinCanvasKeybindingPreset::Emacs => KeybindingParadigm::Emacs,
     }
 }

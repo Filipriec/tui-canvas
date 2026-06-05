@@ -127,7 +127,15 @@ impl<D: DataProvider> FormEditor<D> {
             | CanvasKeyAction::JoinLineBelow
             | CanvasKeyAction::YankLine
             | CanvasKeyAction::PasteAfter
-            | CanvasKeyAction::PasteBefore => None,
+            | CanvasKeyAction::PasteBefore
+            | CanvasKeyAction::DeleteSelection
+            | CanvasKeyAction::DeleteSelectionNoYank
+            | CanvasKeyAction::ChangeSelection
+            | CanvasKeyAction::ChangeSelectionNoYank
+            | CanvasKeyAction::YankSelection
+            | CanvasKeyAction::CollapseSelection
+            | CanvasKeyAction::ExtendLineBelow
+            | CanvasKeyAction::ExtendToLineBounds => None,
             #[cfg(feature = "suggestions")]
             CanvasKeyAction::OpenSuggestions => Some(CanvasAction::TriggerSuggestions),
             #[cfg(feature = "suggestions")]

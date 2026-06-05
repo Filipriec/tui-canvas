@@ -51,7 +51,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
             self.editor
                 .behavior_state
                 .vim_mut()
-                .set_line_register(vec![String::new()]);
+                .set_line_yank_register(vec![String::new()]);
             return;
         }
 
@@ -59,6 +59,6 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         self.editor
             .behavior_state
             .vim_mut()
-            .set_line_register(lines[current..end].to_vec());
+            .set_line_yank_register(lines[current..end].to_vec());
     }
 }
