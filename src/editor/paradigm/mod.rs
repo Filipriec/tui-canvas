@@ -1,12 +1,19 @@
+#[cfg(feature = "keybindings")]
 mod emacs;
+#[cfg(feature = "keybindings")]
 mod helix;
+#[cfg(feature = "keybindings")]
 mod shared;
 mod vim;
 
+#[cfg(feature = "keybindings")]
 use crate::editor::behavior::KeybindingParadigm;
+#[cfg(feature = "keybindings")]
 use crate::editor::FormEditor;
+#[cfg(feature = "keybindings")]
 use crate::DataProvider;
 
+#[cfg(feature = "keybindings")]
 impl<D: DataProvider> FormEditor<D> {
     pub(crate) fn apply_after_mode_change_for_paradigm(&mut self) {
         match self.behavior_state.paradigm() {

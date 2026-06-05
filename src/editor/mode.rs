@@ -5,6 +5,7 @@ use crate::cursor::CursorManager;
 
 use crate::canvas::modes::AppMode;
 use crate::canvas::state::SelectionState;
+#[cfg(feature = "keybindings")]
 use crate::editor::behavior::KeybindingParadigm;
 use crate::editor::FormEditor;
 use crate::DataProvider;
