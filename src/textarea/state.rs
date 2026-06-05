@@ -30,12 +30,39 @@ fn normalize_indent(width: u16, indent: u16) -> u16 {
 }
 
 #[cfg(feature = "gui")]
+pub(crate) fn continuation_prefix(width: u16, indent: u16) -> String {
+    if width == 0 {
+        return String::new();
+    }
+
+    let max_cols = width.saturating_sub(1) as usize;
+    let spaces = (indent as usize + 1).min(max_cols.saturating_sub(1));
+    let mut prefix = " ".repeat(spaces);
+    if prefix.chars().count() < max_cols {
+        prefix.push('↪');
+    }
+    if prefix.chars().count() < max_cols {
+        prefix.push(' ');
+    }
+    prefix
+}
+
+#[cfg(feature = "gui")]
+pub(crate) fn continuation_prefix_width(width: u16, indent: u16) -> u16 {
+    continuation_prefix(width, indent)
+        .chars()
+        .map(|ch| UnicodeWidthChar::width(ch).unwrap_or(0) as u16)
+        .sum()
+}
+
+#[cfg(feature = "gui")]
 pub(crate) fn count_wrapped_rows_indented(s: &str, width: u16, indent: u16) -> u16 {
     if width == 0 {
         return 1;
     }
     let indent = normalize_indent(width, indent);
-    let cont_cap = width.saturating_sub(indent);
+    let cont_prefix = continuation_prefix_width(width, indent);
+    let cont_cap = width.saturating_sub(cont_prefix);
 
     let mut rows: u16 = 1;
     let mut used: u16 = 0;
@@ -48,7 +75,7 @@ pub(crate) fn count_wrapped_rows_indented(s: &str, width: u16, indent: u16) -> u
         if used > 0 && used.saturating_add(w) >= cap {
             rows = rows.saturating_add(1);
             first = false;
-            used = indent;
+            used = cont_prefix;
         }
         used = used.saturating_add(w);
     }
@@ -67,7 +94,8 @@ fn wrapped_rows_to_cursor_indented(
         return (0, 0);
     }
     let indent = normalize_indent(width, indent);
-    let cont_cap = width.saturating_sub(indent);
+    let cont_prefix = continuation_prefix_width(width, indent);
+    let cont_cap = width.saturating_sub(cont_prefix);
 
     let mut row: u16 = 0;
     let mut used: u16 = 0;
@@ -83,12 +111,77 @@ fn wrapped_rows_to_cursor_indented(
         if used > 0 && used.saturating_add(w) >= cap {
             row = row.saturating_add(1);
             first = false;
-            used = indent;
+            used = cont_prefix;
         }
         used = used.saturating_add(w);
     }
 
     (row, used.min(width.saturating_sub(1)))
+}
+
+#[cfg(feature = "gui")]
+pub(crate) fn wrap_segment_ranges(s: &str, width: u16, indent: u16) -> Vec<(usize, usize)> {
+    if width == 0 {
+        return vec![(0, 0)];
+    }
+
+    let indent = normalize_indent(width, indent);
+    let cont_prefix = continuation_prefix_width(width, indent);
+    let cont_cap = width.saturating_sub(cont_prefix);
+    let mut ranges = Vec::new();
+    let mut used: u16 = 0;
+    let mut first = true;
+    let mut segment_start = 0;
+    let mut char_len = 0;
+
+    for (char_idx, ch) in s.chars().enumerate() {
+        char_len = char_idx + 1;
+        let w = UnicodeWidthChar::width(ch).unwrap_or(0) as u16;
+        let cap = if first { width } else { cont_cap };
+
+        if used > 0 && used.saturating_add(w) >= cap {
+            ranges.push((segment_start, char_idx));
+            first = false;
+            segment_start = char_idx;
+            used = cont_prefix;
+        }
+        used = used.saturating_add(w);
+    }
+
+    ranges.push((segment_start, char_len));
+    ranges
+}
+
+#[cfg(feature = "gui")]
+fn char_index_for_visual_col(
+    s: &str,
+    start: usize,
+    end: usize,
+    prefix_cols: u16,
+    target_col: u16,
+) -> usize {
+    if start >= end {
+        return start;
+    }
+    if target_col <= prefix_cols {
+        return start;
+    }
+
+    let mut col = prefix_cols;
+    for (char_idx, ch) in s
+        .chars()
+        .enumerate()
+        .skip(start)
+        .take(end.saturating_sub(start))
+    {
+        let w = UnicodeWidthChar::width(ch).unwrap_or(0) as u16;
+        if col.saturating_add(w) > target_col {
+            return char_idx;
+        }
+        col = col.saturating_add(w);
+    }
+
+    end
 }
 
 pub type TextAreaEditor<P = TextAreaProvider> = FormEditor<P>;
@@ -215,6 +308,8 @@ pub struct TextAreaState<P: TextAreaDataProvider = TextAreaProvider> {
     #[cfg(feature = "gui")]
     pub(crate) wrap_indent_cols: u16,
     #[cfg(feature = "gui")]
+    pub(crate) viewport_width: u16,
+    #[cfg(feature = "gui")]
     pub(crate) viewport_height: u16,
     #[cfg(feature = "gui")]
     pub(crate) edited_this_frame: bool,
@@ -236,6 +331,8 @@ impl<P: TextAreaDataProvider + Default> Default for TextAreaState<P> {
             line_number_mode: TextAreaLineNumberMode::None,
             #[cfg(feature = "gui")]
             wrap_indent_cols: 0,
+            #[cfg(feature = "gui")]
+            viewport_width: 80,
             #[cfg(feature = "gui")]
             viewport_height: 10,
             #[cfg(feature = "gui")]
@@ -274,6 +371,8 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
             line_number_mode: TextAreaLineNumberMode::None,
             #[cfg(feature = "gui")]
             wrap_indent_cols: 0,
+            #[cfg(feature = "gui")]
+            viewport_width: 80,
             #[cfg(feature = "gui")]
             viewport_height: 10,
             #[cfg(feature = "gui")]
@@ -664,6 +763,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         if inner.height == 0 {
             return;
         }
+        self.viewport_width = inner.width;
         self.viewport_height = inner.height;
 
         match self.overflow_mode {
@@ -745,6 +845,93 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
                 self.h_scroll = 0;
             }
         }
+    }
+
+    #[cfg(feature = "gui")]
+    pub(crate) fn move_visual_line_helix(&mut self, down: bool, count: usize) -> bool {
+        if !matches!(self.overflow_mode, TextOverflowMode::Wrap) || self.viewport_width == 0 {
+            let mut moved = false;
+            for _ in 0..count.max(1) {
+                moved |= if down {
+                    self.move_down()
+                } else {
+                    self.move_up()
+                };
+            }
+            return moved;
+        }
+
+        let mut moved = false;
+        for _ in 0..count.max(1) {
+            moved |= self.move_visual_line_once(down);
+        }
+        moved
+    }
+
+    #[cfg(feature = "gui")]
+    fn move_visual_line_once(&mut self, down: bool) -> bool {
+        let width = self.viewport_width;
+        let indent = self.wrap_indent_cols;
+        let line_idx = self.current_field();
+        let current_line = self.current_text().to_string();
+        let cursor = self.display_cursor_position();
+        let (subrow, target_col) =
+            wrapped_rows_to_cursor_indented(&current_line, width, indent, cursor);
+        let current_ranges = wrap_segment_ranges(&current_line, width, indent);
+
+        let target_line = if down {
+            if (subrow as usize) + 1 < current_ranges.len() {
+                Some(line_idx)
+            } else if line_idx + 1 < self.editor.data_provider().field_count() {
+                Some(line_idx + 1)
+            } else {
+                None
+            }
+        } else if subrow > 0 {
+            Some(line_idx)
+        } else if line_idx > 0 {
+            Some(line_idx - 1)
+        } else {
+            None
+        };
+
+        let Some(target_line) = target_line else {
+            return false;
+        };
+
+        let target_text = self.editor.data_provider().field_value(target_line).to_string();
+        let target_ranges = wrap_segment_ranges(&target_text, width, indent);
+        let target_subrow = if target_line == line_idx {
+            if down {
+                subrow as usize + 1
+            } else {
+                subrow.saturating_sub(1) as usize
+            }
+        } else if down {
+            0
+        } else {
+            target_ranges.len().saturating_sub(1)
+        };
+
+        let (start, end) = target_ranges
+            .get(target_subrow)
+            .copied()
+            .unwrap_or((0, target_text.chars().count()));
+        let prefix_cols = if target_subrow == 0 {
+            0
+        } else {
+            continuation_prefix_width(width, indent)
+        };
+        let target_pos =
+            char_index_for_visual_col(&target_text, start, end, prefix_cols, target_col);
+
+        if target_line != line_idx && self.editor.transition_to_field(target_line).is_err() {
+            return false;
+        }
+        let char_len = self.current_text().chars().count();
+        self.editor.set_cursor_for_mode(target_pos, char_len);
+        self.editor.ui_state.ideal_cursor_column = target_pos;
+        true
     }
 
     #[cfg(feature = "gui")]

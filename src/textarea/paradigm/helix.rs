@@ -17,6 +17,20 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         }
 
         match action {
+            CanvasKeyAction::MoveUp => {
+                self.move_visual_line_helix(false, count);
+                if self.mode() == AppMode::Nor {
+                    self.collapse_helix_selection_to_cursor();
+                }
+                KeyEventOutcome::Consumed(None)
+            }
+            CanvasKeyAction::MoveDown => {
+                self.move_visual_line_helix(true, count);
+                if self.mode() == AppMode::Nor {
+                    self.collapse_helix_selection_to_cursor();
+                }
+                KeyEventOutcome::Consumed(None)
+            }
             CanvasKeyAction::DeleteSelection => {
                 self.delete_selection_helix(true, count);
                 KeyEventOutcome::Consumed(None)

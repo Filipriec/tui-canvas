@@ -19,7 +19,8 @@ use crate::textarea::provider::{TextAreaDataProvider, TextAreaProvider};
 
 #[cfg(feature = "gui")]
 use crate::textarea::state::{
-    count_wrapped_rows_indented, TextAreaState, TextOverflowMode,
+    continuation_prefix, continuation_prefix_width, count_wrapped_rows_indented, TextAreaState,
+    TextOverflowMode,
 };
 
 #[cfg(feature = "gui")]
@@ -244,8 +245,9 @@ fn wrap_segments_with_offsets(s: &str, width: u16, indent: u16) -> Vec<(String, 
     }
 
     let indent = indent.min(width.saturating_sub(1));
-    let cont_cap = width.saturating_sub(indent);
-    let indent_str = " ".repeat(indent as usize);
+    let cont_prefix = continuation_prefix(width, indent);
+    let cont_prefix_width = continuation_prefix_width(width, indent);
+    let cont_cap = width.saturating_sub(cont_prefix_width);
 
     let mut buf = String::new();
     let mut used: u16 = 0;
@@ -262,10 +264,8 @@ fn wrap_segments_with_offsets(s: &str, width: u16, indent: u16) -> Vec<(String, 
             used = 0;
             first = false;
             segment_start = char_idx;
-            if indent > 0 {
-                buf.push_str(&indent_str);
-                used = indent;
-            }
+            buf.push_str(&cont_prefix);
+            used = cont_prefix_width;
         }
 
         buf.push(ch);

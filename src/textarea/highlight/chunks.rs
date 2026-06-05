@@ -3,6 +3,8 @@ use ratatui::style::Style;
 use ratatui::text::{Line, Span};
 use unicode_width::UnicodeWidthChar;
 
+use crate::textarea::state::{continuation_prefix, continuation_prefix_width};
+
 #[derive(Debug, Clone)]
 pub struct StyledChunk {
     pub text: String,
@@ -119,8 +121,9 @@ pub fn wrap_chunks_indented(chunks: &[StyledChunk], width: u16, indent: u16) -> 
         return vec![Line::from("")];
     }
     let indent = indent.min(width.saturating_sub(1));
-    let cont_cap = width.saturating_sub(indent);
-    let indent_str = " ".repeat(indent as usize);
+    let cont_prefix = continuation_prefix(width, indent);
+    let cont_prefix_width = continuation_prefix_width(width, indent);
+    let cont_cap = width.saturating_sub(cont_prefix_width);
 
     let mut lines: Vec<Line> = Vec::new();
     let mut current_spans: Vec<Span> = Vec::new();
@@ -143,12 +146,9 @@ pub fn wrap_chunks_indented(chunks: &[StyledChunk], width: u16, indent: u16) -> 
                 lines.push(Line::from(current_spans));
                 current_spans = Vec::new();
                 first_line = false;
-                used = 0;
+                used = cont_prefix_width;
 
-                if !first_line && indent > 0 {
-                    current_spans.push(Span::raw(indent_str.clone()));
-                    used = indent;
-                }
+                current_spans.push(Span::raw(cont_prefix.clone()));
             }
 
             if !buf.is_empty() && buf_style != chunk.style {
@@ -157,9 +157,9 @@ pub fn wrap_chunks_indented(chunks: &[StyledChunk], width: u16, indent: u16) -> 
             }
             buf_style = chunk.style;
 
-            if used == 0 && !first_line && indent > 0 {
-                current_spans.push(Span::raw(indent_str.clone()));
-                used = indent;
+            if used == 0 && !first_line {
+                current_spans.push(Span::raw(cont_prefix.clone()));
+                used = cont_prefix_width;
             }
 
             buf.push(ch);
