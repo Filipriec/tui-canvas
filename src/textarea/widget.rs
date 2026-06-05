@@ -245,7 +245,6 @@ fn wrap_segments_with_offsets(s: &str, width: u16, indent: u16) -> Vec<(String, 
     }
 
     let indent = indent.min(width.saturating_sub(1));
-    let cont_prefix = continuation_prefix(width, indent);
     let cont_prefix_width = continuation_prefix_width(width, indent);
     let cont_cap = width.saturating_sub(cont_prefix_width);
 
@@ -264,7 +263,6 @@ fn wrap_segments_with_offsets(s: &str, width: u16, indent: u16) -> Vec<(String, 
             used = 0;
             first = false;
             segment_start = char_idx;
-            buf.push_str(&cont_prefix);
             used = cont_prefix_width;
         }
 
@@ -460,7 +458,10 @@ impl<'a, P: TextAreaDataProvider> StatefulWidget for TextArea<'a, P> {
                 let segments = wrap_segments_with_offsets(s, content.width, indent);
                 let skip = if i == start { intra as usize } else { 0 };
                 for (seg_idx, (seg, offset)) in segments.into_iter().enumerate().skip(skip) {
-                    let prefix = state.line_number_prefix(i, seg_idx == 0);
+                    let mut prefix = state.line_number_prefix(i, seg_idx == 0);
+                    if seg_idx > 0 {
+                        prefix.push_str(&continuation_prefix(content.width, indent));
+                    }
                     display_lines.push(styled_segment_line(
                         seg,
                         i,
