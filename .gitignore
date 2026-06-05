@@ -5,3 +5,4 @@ ui_debug.log
 analysis/
 *.md
 !CHANGELOG.md
+!HELIX_SUPPORT.md

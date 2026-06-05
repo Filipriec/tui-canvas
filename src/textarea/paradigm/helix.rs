@@ -63,6 +63,38 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
                 self.paste_before_helix(count);
                 KeyEventOutcome::Consumed(None)
             }
+            CanvasKeyAction::MoveWordNext => {
+                self.select_next_word_helix(count);
+                KeyEventOutcome::Consumed(None)
+            }
+            CanvasKeyAction::MoveWordPrev => {
+                self.select_prev_word_helix(count);
+                KeyEventOutcome::Consumed(None)
+            }
+            CanvasKeyAction::MoveWordEnd => {
+                self.select_word_end_helix(count);
+                KeyEventOutcome::Consumed(None)
+            }
+            CanvasKeyAction::MoveWordEndPrev => {
+                self.select_word_end_prev_helix(count);
+                KeyEventOutcome::Consumed(None)
+            }
+            CanvasKeyAction::MoveBigWordNext => {
+                self.select_next_big_word_helix(count);
+                KeyEventOutcome::Consumed(None)
+            }
+            CanvasKeyAction::MoveBigWordPrev => {
+                self.select_prev_big_word_helix(count);
+                KeyEventOutcome::Consumed(None)
+            }
+            CanvasKeyAction::MoveBigWordEnd => {
+                self.select_big_word_end_helix(count);
+                KeyEventOutcome::Consumed(None)
+            }
+            CanvasKeyAction::MoveBigWordEndPrev => {
+                self.select_big_word_end_prev_helix(count);
+                KeyEventOutcome::Consumed(None)
+            }
             _ => {
                 let outcome = self.execute_canvas_key_action(action, count);
                 if self.mode() == AppMode::Nor {

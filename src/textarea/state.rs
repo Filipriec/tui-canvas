@@ -1663,6 +1663,69 @@ mod tests {
 
     #[cfg(all(feature = "keybindings", feature = "crossterm"))]
     #[test]
+    fn helix_word_motions_replace_primary_selection() {
+        use crate::canvas::state::SelectionState;
+        use crate::keybindings::{BuiltinCanvasKeybindingPreset, KeyEventOutcome};
+        use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+
+        let mut textarea = TextAreaState::<TextAreaProvider>::from_text("one two three");
+        textarea.use_keybinding_preset(BuiltinCanvasKeybindingPreset::Helix);
+
+        let out = textarea.handle_key_event(KeyEvent::new(KeyCode::Char('w'), KeyModifiers::NONE));
+        assert!(matches!(out, KeyEventOutcome::Consumed(None)));
+        assert_eq!(textarea.cursor_position(), 3);
+        assert!(matches!(
+            textarea.selection_state(),
+            SelectionState::Characterwise { anchor: (0, 0) }
+        ));
+
+        let out = textarea.handle_key_event(KeyEvent::new(KeyCode::Char('e'), KeyModifiers::NONE));
+        assert!(matches!(out, KeyEventOutcome::Consumed(None)));
+        assert_eq!(textarea.cursor_position(), 6);
+        assert!(matches!(
+            textarea.selection_state(),
+            SelectionState::Characterwise { anchor: (0, 3) }
+        ));
+
+        let out = textarea.handle_key_event(KeyEvent::new(KeyCode::Char('w'), KeyModifiers::NONE));
+        assert!(matches!(out, KeyEventOutcome::Consumed(None)));
+        assert_eq!(textarea.cursor_position(), 7);
+        assert!(matches!(
+            textarea.selection_state(),
+            SelectionState::Characterwise { anchor: (0, 6) }
+        ));
+
+        textarea.set_cursor_position(8);
+        let out = textarea.handle_key_event(KeyEvent::new(KeyCode::Char('b'), KeyModifiers::NONE));
+        assert!(matches!(out, KeyEventOutcome::Consumed(None)));
+        // `b` from the start of "three" selects "two " backwards, landing the
+        // block cursor on the 't' of "two" (char 4) with the inclusive anchor
+        // on the trailing space (char 7).
+        assert_eq!(textarea.cursor_position(), 4);
+        assert!(matches!(
+            textarea.selection_state(),
+            SelectionState::Characterwise { anchor: (0, 7) }
+        ));
+
+        // Repeated forward word motions must keep advancing (the previous patch
+        // got stuck on the trailing space after the first `w`).
+        let mut textarea = TextAreaState::<TextAreaProvider>::from_text("one two three four");
+        textarea.use_keybinding_preset(BuiltinCanvasKeybindingPreset::Helix);
+        let expected = [(3usize, 0usize), (7, 4), (13, 8), (17, 14)];
+        for (cursor, anchor) in expected {
+            let out =
+                textarea.handle_key_event(KeyEvent::new(KeyCode::Char('w'), KeyModifiers::NONE));
+            assert!(matches!(out, KeyEventOutcome::Consumed(None)));
+            assert_eq!(textarea.cursor_position(), cursor);
+            assert!(matches!(
+                textarea.selection_state(),
+                SelectionState::Characterwise { anchor: (0, a) } if *a == anchor
+            ));
+        }
+    }
+
+    #[cfg(all(feature = "keybindings", feature = "crossterm"))]
+    #[test]
     fn helix_c_enters_insert_after_deleting_selection() {
         use crate::keybindings::{BuiltinCanvasKeybindingPreset, KeyEventOutcome};
         use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
