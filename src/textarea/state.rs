@@ -36,7 +36,7 @@ pub(crate) fn continuation_prefix(width: u16, indent: u16) -> String {
     }
 
     let max_cols = width.saturating_sub(1) as usize;
-    let spaces = (indent as usize + 1).min(max_cols.saturating_sub(1));
+    let spaces = (indent as usize).min(max_cols.saturating_sub(1));
     let mut prefix = " ".repeat(spaces);
     if prefix.chars().count() < max_cols {
         prefix.push('↪');
@@ -62,19 +62,15 @@ pub(crate) fn count_wrapped_rows_indented(s: &str, width: u16, indent: u16) -> u
     }
     let indent = normalize_indent(width, indent);
     let cont_prefix = continuation_prefix_width(width, indent);
-    let cont_cap = width.saturating_sub(cont_prefix);
 
     let mut rows: u16 = 1;
     let mut used: u16 = 0;
-    let mut first = true;
 
     for ch in s.chars() {
         let w = UnicodeWidthChar::width(ch).unwrap_or(0) as u16;
-        let cap = if first { width } else { cont_cap };
 
-        if used > 0 && used.saturating_add(w) >= cap {
+        if used > 0 && used.saturating_add(w) > width {
             rows = rows.saturating_add(1);
-            first = false;
             used = cont_prefix;
         }
         used = used.saturating_add(w);
@@ -95,25 +91,27 @@ fn wrapped_rows_to_cursor_indented(
     }
     let indent = normalize_indent(width, indent);
     let cont_prefix = continuation_prefix_width(width, indent);
-    let cont_cap = width.saturating_sub(cont_prefix);
 
     let mut row: u16 = 0;
     let mut used: u16 = 0;
-    let mut first = true;
 
     for (i, ch) in s.chars().enumerate() {
         if i >= cursor_chars {
             break;
         }
         let w = UnicodeWidthChar::width(ch).unwrap_or(0) as u16;
-        let cap = if first { width } else { cont_cap };
 
-        if used > 0 && used.saturating_add(w) >= cap {
+        if used > 0 && used.saturating_add(w) > width {
             row = row.saturating_add(1);
-            first = false;
             used = cont_prefix;
         }
         used = used.saturating_add(w);
+    }
+
+    let char_count = s.chars().count();
+    if cursor_chars > 0 && cursor_chars <= char_count && used >= width {
+        row = row.saturating_add(1);
+        used = cont_prefix;
     }
 
     (row, used.min(width.saturating_sub(1)))
@@ -127,21 +125,17 @@ pub(crate) fn wrap_segment_ranges(s: &str, width: u16, indent: u16) -> Vec<(usiz
 
     let indent = normalize_indent(width, indent);
     let cont_prefix = continuation_prefix_width(width, indent);
-    let cont_cap = width.saturating_sub(cont_prefix);
     let mut ranges = Vec::new();
     let mut used: u16 = 0;
-    let mut first = true;
     let mut segment_start = 0;
     let mut char_len = 0;
 
     for (char_idx, ch) in s.chars().enumerate() {
         char_len = char_idx + 1;
         let w = UnicodeWidthChar::width(ch).unwrap_or(0) as u16;
-        let cap = if first { width } else { cont_cap };
 
-        if used > 0 && used.saturating_add(w) >= cap {
+        if used > 0 && used.saturating_add(w) > width {
             ranges.push((segment_start, char_idx));
-            first = false;
             segment_start = char_idx;
             used = cont_prefix;
         }

@@ -123,12 +123,10 @@ pub fn wrap_chunks_indented(chunks: &[StyledChunk], width: u16, indent: u16) -> 
     let indent = indent.min(width.saturating_sub(1));
     let cont_prefix = continuation_prefix(width, indent);
     let cont_prefix_width = continuation_prefix_width(width, indent);
-    let cont_cap = width.saturating_sub(cont_prefix_width);
 
     let mut lines: Vec<Line> = Vec::new();
     let mut current_spans: Vec<Span> = Vec::new();
     let mut used: u16 = 0;
-    let mut first_line = true;
 
     for chunk in chunks {
         let mut buf = String::new();
@@ -136,16 +134,14 @@ pub fn wrap_chunks_indented(chunks: &[StyledChunk], width: u16, indent: u16) -> 
 
         for ch in chunk.text.chars() {
             let w = UnicodeWidthChar::width(ch).unwrap_or(0) as u16;
-            let cap = if first_line { width } else { cont_cap };
 
-            if used > 0 && used.saturating_add(w) >= cap {
+            if used > 0 && used.saturating_add(w) > width {
                 if !buf.is_empty() {
                     current_spans.push(Span::styled(buf.clone(), buf_style));
                     buf.clear();
                 }
                 lines.push(Line::from(current_spans));
                 current_spans = Vec::new();
-                first_line = false;
                 used = cont_prefix_width;
 
                 current_spans.push(Span::raw(cont_prefix.clone()));
@@ -156,11 +152,6 @@ pub fn wrap_chunks_indented(chunks: &[StyledChunk], width: u16, indent: u16) -> 
                 buf.clear();
             }
             buf_style = chunk.style;
-
-            if used == 0 && !first_line {
-                current_spans.push(Span::raw(cont_prefix.clone()));
-                used = cont_prefix_width;
-            }
 
             buf.push(ch);
             used = used.saturating_add(w);

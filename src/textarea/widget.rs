@@ -246,22 +246,17 @@ fn wrap_segments_with_offsets(s: &str, width: u16, indent: u16) -> Vec<(String, 
 
     let indent = indent.min(width.saturating_sub(1));
     let cont_prefix_width = continuation_prefix_width(width, indent);
-    let cont_cap = width.saturating_sub(cont_prefix_width);
 
     let mut buf = String::new();
     let mut used: u16 = 0;
-    let mut first = true;
     let mut segment_start = 0;
 
     for (char_idx, ch) in s.chars().enumerate() {
         let w = UnicodeWidthChar::width(ch).unwrap_or(0) as u16;
-        let cap = if first { width } else { cont_cap };
 
-        if used > 0 && used.saturating_add(w) >= cap {
+        if used > 0 && used.saturating_add(w) > width {
             segments.push((buf, segment_start));
             buf = String::new();
-            used = 0;
-            first = false;
             segment_start = char_idx;
             used = cont_prefix_width;
         }
