@@ -57,6 +57,14 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
                 self.collapse_selection_helix();
                 KeyEventOutcome::Consumed(None)
             }
+            CanvasKeyAction::SearchNext => {
+                self.search_next_helix(count);
+                KeyEventOutcome::Consumed(None)
+            }
+            CanvasKeyAction::SearchPrev => {
+                self.search_prev_helix(count);
+                KeyEventOutcome::Consumed(None)
+            }
             CanvasKeyAction::ExtendLineBelow => {
                 for _ in 0..count {
                     self.extend_line_below_helix();

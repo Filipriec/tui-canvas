@@ -135,7 +135,9 @@ impl<D: DataProvider> FormEditor<D> {
             | CanvasKeyAction::YankSelection
             | CanvasKeyAction::CollapseSelection
             | CanvasKeyAction::ExtendLineBelow
-            | CanvasKeyAction::ExtendToLineBounds => None,
+            | CanvasKeyAction::ExtendToLineBounds
+            | CanvasKeyAction::SearchNext
+            | CanvasKeyAction::SearchPrev => None,
             #[cfg(feature = "suggestions")]
             CanvasKeyAction::OpenSuggestions => Some(CanvasAction::TriggerSuggestions),
             #[cfg(feature = "suggestions")]

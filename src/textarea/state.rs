@@ -422,14 +422,21 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
 
     #[cfg(all(feature = "commandline", feature = "keybindings"))]
     pub(crate) fn apply_default_commandline_submit(&mut self, submit: CommandLineSubmit) {
+        let is_helix = self.editor.keybinding_paradigm().is_helix();
         match submit {
             CommandLineSubmit::SearchForward(query) => {
                 self.set_search_query(query);
                 self.find_next();
+                if is_helix {
+                    self.select_active_search_match_helix();
+                }
             }
             CommandLineSubmit::SearchBackward(query) => {
                 self.set_search_query(query);
                 self.find_previous();
+                if is_helix {
+                    self.select_active_search_match_helix();
+                }
             }
             CommandLineSubmit::Command(command) => self.apply_default_commandline_command(&command),
         }
@@ -1946,6 +1953,51 @@ mod tests {
         assert!(matches!(
             textarea.selection_state(),
             SelectionState::Characterwise { anchor: (0, 0) }
+        ));
+    }
+
+    #[cfg(all(feature = "keybindings", feature = "crossterm", feature = "commandline"))]
+    #[test]
+    fn helix_search_selects_match_and_n_advances() {
+        use crate::canvas::state::SelectionState;
+        use crate::keybindings::BuiltinCanvasKeybindingPreset;
+        use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+
+        let mut textarea = TextAreaState::<TextAreaProvider>::from_text("abc foo xyz foo end");
+        textarea.use_keybinding_preset(BuiltinCanvasKeybindingPreset::Helix);
+        textarea.use_default_commandline();
+
+        let key = |t: &mut TextAreaState<TextAreaProvider>, c: char| {
+            let _ = t.handle_key_event(KeyEvent::new(KeyCode::Char(c), KeyModifiers::NONE));
+        };
+
+        // `/foo` then Enter: the first match after the cursor becomes the
+        // primary selection (anchor on 'f', head on the last 'o').
+        key(&mut textarea, '/');
+        for c in "foo".chars() {
+            key(&mut textarea, c);
+        }
+        let _ = textarea.handle_key_event(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
+        assert_eq!(textarea.cursor_position(), 6);
+        assert!(matches!(
+            textarea.selection_state(),
+            SelectionState::Characterwise { anchor: (0, 4) }
+        ));
+
+        // `n` advances to the next match and selects it.
+        key(&mut textarea, 'n');
+        assert_eq!(textarea.cursor_position(), 14);
+        assert!(matches!(
+            textarea.selection_state(),
+            SelectionState::Characterwise { anchor: (0, 12) }
+        ));
+
+        // `n` again wraps back to the first match.
+        key(&mut textarea, 'n');
+        assert_eq!(textarea.cursor_position(), 6);
+        assert!(matches!(
+            textarea.selection_state(),
+            SelectionState::Characterwise { anchor: (0, 4) }
         ));
     }
 

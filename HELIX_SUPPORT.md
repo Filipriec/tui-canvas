@@ -34,7 +34,9 @@ multi-buffer editor infrastructure.
 - Find motions: `f`, `F`, `t`, `T`, `Alt-.`.
 - Page motions: `Ctrl-b`, `Ctrl-f`, `PageUp`, `PageDown`.
 - Goto mode: `g|`, `gs`, `gj`, `gk`.
-- Search: `/`, `?`, `n`, `N`, `*`.
+- Search: `/` and `?` open the command-line search and select the match; `n`
+  and `N` repeat it forward/backward, each making the match the primary
+  selection (so `d`/`c`/`y` operate on it). Still missing: `*`.
 - Insert mode: `Ctrl-j`, `Ctrl-w`, `Alt-d`, `Ctrl-u`, `Ctrl-r`.
 - Replace and case operations: `r`, `R`, `~`, backtick, `Alt-backtick`.
 - Indent/unindent where applicable: `>`, `<`.

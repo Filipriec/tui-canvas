@@ -58,6 +58,8 @@ pub enum CanvasKeyAction {
     CollapseSelection,
     ExtendLineBelow,
     ExtendToLineBounds,
+    SearchNext,
+    SearchPrev,
     Unknown(String),
 }
 
@@ -120,6 +122,8 @@ impl CanvasKeyAction {
             "collapse_selection" => Self::CollapseSelection,
             "extend_line_below" => Self::ExtendLineBelow,
             "extend_to_line_bounds" => Self::ExtendToLineBounds,
+            "search_next" => Self::SearchNext,
+            "search_prev" => Self::SearchPrev,
             other => Self::Unknown(other.to_string()),
         }
     }
@@ -180,6 +184,8 @@ impl CanvasKeyAction {
             Self::ChangeSelectionNoYank => "change_selection_noyank",
             Self::YankSelection => "yank_selection",
             Self::CollapseSelection => "collapse_selection",
+            Self::SearchNext => "search_next",
+            Self::SearchPrev => "search_prev",
             Self::ExtendLineBelow => "extend_line_below",
             Self::ExtendToLineBounds => "extend_to_line_bounds",
             Self::Unknown(other) => other.as_str(),
@@ -240,7 +246,9 @@ impl CanvasKeyAction {
             | Self::YankSelection
             | Self::CollapseSelection
             | Self::ExtendLineBelow
-            | Self::ExtendToLineBounds => return None,
+            | Self::ExtendToLineBounds
+            | Self::SearchNext
+            | Self::SearchPrev => return None,
             Self::EnterDecider | Self::Exit | Self::Unknown(_) => return None,
         })
     }

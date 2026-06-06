@@ -181,6 +181,45 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         );
     }
 
+    /// Repeat the current search forward (`n`) and make the match the primary
+    /// selection, matching Helix where a search result becomes the selection.
+    pub(crate) fn search_next_helix(&mut self, count: usize) {
+        for _ in 0..count.max(1) {
+            if !self.find_next() {
+                break;
+            }
+        }
+        self.select_active_search_match_helix();
+    }
+
+    /// Repeat the current search backward (`N`) and select the match.
+    pub(crate) fn search_prev_helix(&mut self, count: usize) {
+        for _ in 0..count.max(1) {
+            if !self.find_previous() {
+                break;
+            }
+        }
+        self.select_active_search_match_helix();
+    }
+
+    /// Turn the active search match into the Helix primary selection: anchor on
+    /// the first matched char, block cursor (head) on the last matched char.
+    pub(crate) fn select_active_search_match_helix(&mut self) {
+        let Some(m) = self.active_search_match() else {
+            return;
+        };
+        if m.end <= m.start {
+            return;
+        }
+        let _ = self.transition_to_field(m.line);
+        let len = self.current_text().chars().count();
+        let cursor = m.end.saturating_sub(1).min(len.saturating_sub(1));
+        self.editor.ui_state.set_cursor(cursor, len, false);
+        self.editor.ui_state.selection = SelectionState::Characterwise {
+            anchor: (m.line, m.start),
+        };
+    }
+
     pub(crate) fn delete_selection_helix(&mut self, yank: bool, count: usize) {
         for _ in 0..count.max(1) {
             if !self.delete_selection_once(yank) {
