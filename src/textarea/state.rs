@@ -1727,6 +1727,42 @@ mod tests {
 
     #[cfg(all(feature = "keybindings", feature = "crossterm"))]
     #[test]
+    fn helix_w_crosses_line_boundary_cleanly() {
+        use crate::canvas::state::SelectionState;
+        use crate::keybindings::BuiltinCanvasKeybindingPreset;
+        use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+
+        let key = |t: &mut TextAreaState<TextAreaProvider>, c: char| {
+            let _ = t.handle_key_event(KeyEvent::new(KeyCode::Char(c), KeyModifiers::NONE));
+        };
+
+        let mut t = TextAreaState::<TextAreaProvider>::from_text("ab cd\nef gh");
+        t.use_keybinding_preset(BuiltinCanvasKeybindingPreset::Helix);
+
+        // Within line 0: "ab " then "cd".
+        key(&mut t, 'w');
+        assert_eq!((t.current_field(), t.cursor_position()), (0, 2));
+        key(&mut t, 'w');
+        assert_eq!((t.current_field(), t.cursor_position()), (0, 4));
+
+        // `w` at the end of line 0 crosses into line 1 and selects its first
+        // word "ef " entirely on line 1 — no span back into line 0, and the
+        // anchor is not the previous word's last char.
+        key(&mut t, 'w');
+        assert_eq!((t.current_field(), t.cursor_position()), (1, 2));
+        assert!(matches!(
+            t.selection_state(),
+            SelectionState::Characterwise { anchor: (1, 0) }
+        ));
+
+        // Deleting that word removes exactly "ef " from line 1.
+        key(&mut t, 'd');
+        assert_eq!(t.text(), "ab cd\ngh");
+        assert_eq!(t.current_field(), 1);
+    }
+
+    #[cfg(all(feature = "keybindings", feature = "crossterm"))]
+    #[test]
     fn vim_counted_yank_and_paste_repeat_lines() {
         use crate::keybindings::{CanvasKeyBindings, KeyEventOutcome};
         use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};

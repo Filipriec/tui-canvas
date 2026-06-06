@@ -28,76 +28,77 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
     /// previous `±1` patch moved the *real* cursor onto the trailing boundary
     /// char, so a second `w` could not advance). When a step reaches the field
     /// boundary we fall back to the cross-field vim motion.
-    fn select_word_motion_helix(
-        &mut self,
-        count: usize,
-        target: HelixWordTarget,
-        mut motion: impl FnMut(&mut Self),
-    ) {
-        // Select/extend mode (`v`) keeps the anchor pinned and only advances the
-        // head; normal mode replaces the whole selection with the moved-over
-        // range. Both compute the head with the same faithful Helix port so the
-        // two modes stay perfectly consistent.
+    /// Apply a Helix word motion `count` times.
+    ///
+    /// Each step runs a faithful port of Helix's `word_move`/`range_to_target`
+    /// over the whole document flattened with `\n` between fields, then maps the
+    /// result back to a `(field, char)` position. Running over the flattened
+    /// buffer means line breaks are handled exactly like Helix (a `w` at the end
+    /// of a line crosses into the next line's first word), instead of the old
+    /// per-field fallback that re-anchored onto the previous line.
+    ///
+    /// Normal mode replaces the whole selection with the moved-over range;
+    /// select/extend mode (`v`) keeps the anchor pinned and only advances the
+    /// head. Both share the same head computation so the two modes stay
+    /// consistent.
+    fn select_word_motion_helix(&mut self, count: usize, target: HelixWordTarget) {
         let extend = self.mode() != AppMode::Nor;
         for _ in 0..count.max(1) {
-            self.select_word_motion_step_helix(target, extend, &mut motion);
+            self.select_word_motion_step_helix(target, extend);
         }
     }
 
-    fn select_word_motion_step_helix(
-        &mut self,
-        target: HelixWordTarget,
-        extend: bool,
-        motion: &mut impl FnMut(&mut Self),
-    ) {
+    fn select_word_motion_step_helix(&mut self, target: HelixWordTarget, extend: bool) {
+        let field_count = self.editor.data_provider().field_count();
+        if field_count == 0 {
+            return;
+        }
+
+        // Flatten the document into one char buffer with `\n` between fields,
+        // recording where each field starts so positions can be mapped back.
+        let mut chars: Vec<char> = Vec::new();
+        let mut field_starts: Vec<usize> = Vec::with_capacity(field_count);
+        for f in 0..field_count {
+            field_starts.push(chars.len());
+            chars.extend(self.editor.data_provider().field_value(f).chars());
+            if f + 1 < field_count {
+                chars.push('\n');
+            }
+        }
+        let len = chars.len();
+        if len == 0 {
+            return;
+        }
+
         let field = self.current_field();
         let cursor = self.cursor_position();
+        let to_flat = |pos: (usize, usize)| field_starts[pos.0] + pos.1;
 
-        // The pinned anchor of the current selection (may live in another field
-        // when a previous motion crossed a boundary). In normal mode there is
-        // no pin: the motion re-anchors at the start position.
+        let flat_cursor = to_flat((field, cursor));
         let pinned_anchor = match self.selection_state() {
             SelectionState::Characterwise { anchor } => *anchor,
             _ => (field, cursor),
         };
+        let flat_anchor = to_flat(pinned_anchor);
 
-        // Local anchor used only to decide the motion's direction within this
-        // field. If the real anchor is elsewhere, fall back to the cursor.
-        let anchor_char = if pinned_anchor.0 == field {
-            pinned_anchor.1
-        } else {
-            cursor
-        };
-
-        let chars: Vec<char> = self.current_text().chars().collect();
-        let len = chars.len();
-        if len == 0 {
-            // Empty field: nothing to select; defer to the cross-field motion.
-            let from = if extend { pinned_anchor } else { (field, cursor) };
-            motion(self);
-            self.editor.ui_state.selection = SelectionState::Characterwise { anchor: from };
-            return;
-        }
-
-        // Map our inclusive (anchor_char, cursor) selection to Helix's
-        // (anchor, head) gap range. `head` is exclusive: it sits just past the
-        // block-cursor char for a forward selection, and on the block-cursor
-        // char for a backward one.
-        let input = if cursor >= anchor_char {
+        // Map our inclusive (anchor, cursor) selection to Helix's (anchor, head)
+        // gap range. `head` is exclusive: just past the block-cursor char for a
+        // forward selection, on the block-cursor char for a backward one.
+        let input = if flat_cursor >= flat_anchor {
             HelixRange {
-                anchor: anchor_char,
-                head: cursor + 1,
+                anchor: flat_anchor,
+                head: flat_cursor + 1,
             }
         } else {
             HelixRange {
-                anchor: anchor_char + 1,
-                head: cursor,
+                anchor: flat_anchor + 1,
+                head: flat_cursor,
             }
         };
 
         let result = helix_word_move(&chars, input, target);
 
-        // Convert Helix's exclusive-head range back to our inclusive endpoints.
+        // Convert Helix's exclusive-head range back to inclusive endpoints.
         let (motion_anchor, new_cursor) = if result.anchor < result.head {
             (result.anchor, result.head - 1)
         } else if result.head < result.anchor {
@@ -107,78 +108,55 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
             (c, c)
         };
 
-        let made_progress = new_cursor != cursor || (!extend && motion_anchor != anchor_char);
-        if !made_progress {
-            // At the field boundary: cross fields with the vim motion. Pin the
-            // anchor when extending, otherwise re-anchor at the start position.
-            let from = if extend { pinned_anchor } else { (field, cursor) };
-            motion(self);
-            if (self.current_field(), self.cursor_position()) != (field, cursor) {
-                self.editor.ui_state.selection = SelectionState::Characterwise { anchor: from };
-            }
+        // Nothing moved (already at the document edge).
+        if new_cursor == flat_cursor && (extend || motion_anchor == flat_anchor) {
             return;
         }
 
-        self.editor.ui_state.set_cursor(new_cursor, len, false);
-        // Extend: keep the pinned anchor. Replace: adopt the motion's anchor.
+        let (cur_field, cur_char) = flat_to_field(&chars, &field_starts, new_cursor);
+        let _ = self.transition_to_field(cur_field);
+        let field_len = self.current_text().chars().count();
+        self.editor.ui_state.set_cursor(cur_char, field_len, false);
+
+        // Extend keeps the pinned anchor; replace adopts the motion's anchor.
         let anchor = if extend {
             pinned_anchor
         } else {
-            (field, motion_anchor)
+            flat_to_field(&chars, &field_starts, motion_anchor)
         };
         self.editor.ui_state.selection = SelectionState::Characterwise { anchor };
     }
 
     pub(crate) fn select_next_word_helix(&mut self, count: usize) {
-        self.select_word_motion_helix(count, HelixWordTarget::NextWordStart, Self::move_word_next);
+        self.select_word_motion_helix(count, HelixWordTarget::NextWordStart);
     }
 
     pub(crate) fn select_prev_word_helix(&mut self, count: usize) {
-        self.select_word_motion_helix(count, HelixWordTarget::PrevWordStart, Self::move_word_prev);
+        self.select_word_motion_helix(count, HelixWordTarget::PrevWordStart);
     }
 
     pub(crate) fn select_word_end_helix(&mut self, count: usize) {
-        self.select_word_motion_helix(count, HelixWordTarget::NextWordEnd, Self::move_word_end);
+        self.select_word_motion_helix(count, HelixWordTarget::NextWordEnd);
     }
 
     pub(crate) fn select_word_end_prev_helix(&mut self, count: usize) {
-        self.select_word_motion_helix(
-            count,
-            HelixWordTarget::PrevWordEnd,
-            Self::move_word_end_prev,
-        );
+        self.select_word_motion_helix(count, HelixWordTarget::PrevWordEnd);
     }
 
     pub(crate) fn select_next_big_word_helix(&mut self, count: usize) {
-        self.select_word_motion_helix(
-            count,
-            HelixWordTarget::NextLongWordStart,
-            Self::move_big_word_next,
-        );
+        self.select_word_motion_helix(count, HelixWordTarget::NextLongWordStart);
     }
 
     pub(crate) fn select_prev_big_word_helix(&mut self, count: usize) {
-        self.select_word_motion_helix(
-            count,
-            HelixWordTarget::PrevLongWordStart,
-            Self::move_big_word_prev,
-        );
+        self.select_word_motion_helix(count, HelixWordTarget::PrevLongWordStart);
     }
 
     pub(crate) fn select_big_word_end_helix(&mut self, count: usize) {
-        self.select_word_motion_helix(
-            count,
-            HelixWordTarget::NextLongWordEnd,
-            Self::move_big_word_end,
-        );
+        self.select_word_motion_helix(count, HelixWordTarget::NextLongWordEnd);
     }
 
     pub(crate) fn select_big_word_end_prev_helix(&mut self, count: usize) {
-        self.select_word_motion_helix(
-            count,
-            HelixWordTarget::PrevLongWordEnd,
-            Self::move_big_word_end_prev,
-        );
+        self.select_word_motion_helix(count, HelixWordTarget::PrevLongWordEnd);
     }
 
     /// Repeat the current search forward (`n`) and make the match the primary
@@ -309,6 +287,33 @@ struct HelixRange {
     head: usize,
 }
 
+/// Map a flat char index in the document buffer back to a `(field, char)`
+/// position. An index that lands on a `\n` separator is clamped to the last
+/// real char of that line (or 0 for an empty line).
+fn flat_to_field(chars: &[char], field_starts: &[usize], flat: usize) -> (usize, usize) {
+    let field_count = field_starts.len();
+    for f in 0..field_count {
+        let start = field_starts[f];
+        // Field f's chars occupy [start, next_start - 1), with a `\n` at
+        // next_start - 1 (except the last field, which runs to the buffer end).
+        let field_end = if f + 1 < field_count {
+            field_starts[f + 1].saturating_sub(1)
+        } else {
+            chars.len()
+        };
+        if flat < field_end {
+            return (f, flat - start);
+        }
+        if flat == field_end {
+            // On the `\n` separator: clamp to this line's last real char.
+            return (f, (field_end - start).saturating_sub(1));
+        }
+    }
+    let last = field_count - 1;
+    let start = field_starts[last];
+    (last, chars.len().saturating_sub(start).saturating_sub(1))
+}
+
 impl HelixWordTarget {
     fn is_prev(self) -> bool {
         matches!(
@@ -345,13 +350,20 @@ impl HelixWordTarget {
 
 #[derive(PartialEq, Clone, Copy)]
 enum CharClass {
+    Eol,
     Whitespace,
     Word,
     Punctuation,
 }
 
+fn char_is_line_ending(c: char) -> bool {
+    c == '\n' || c == '\r'
+}
+
 fn classify(c: char) -> CharClass {
-    if c.is_whitespace() {
+    if char_is_line_ending(c) {
+        CharClass::Eol
+    } else if c.is_whitespace() {
         CharClass::Whitespace
     } else if c.is_alphanumeric() {
         CharClass::Word
@@ -360,19 +372,39 @@ fn classify(c: char) -> CharClass {
     }
 }
 
+/// Short-word boundary: every character class is distinct.
+fn is_word_boundary(a: char, b: char) -> bool {
+    classify(a) != classify(b)
+}
+
+/// Long-word ("WORD") boundary: word and punctuation are grouped together, so
+/// only transitions to/from whitespace or end-of-line count.
+fn is_long_word_boundary(a: char, b: char) -> bool {
+    match (classify(a), classify(b)) {
+        (CharClass::Word, CharClass::Punctuation) | (CharClass::Punctuation, CharClass::Word) => {
+            false
+        }
+        (x, y) => x != y,
+    }
+}
+
 fn reached_target(target: HelixWordTarget, prev: char, next: char) -> bool {
     let boundary = if target.is_long() {
-        prev.is_whitespace() != next.is_whitespace()
+        is_long_word_boundary(prev, next)
     } else {
-        classify(prev) != classify(next)
+        is_word_boundary(prev, next)
     };
     if !boundary {
         return false;
     }
+    // A word start stops where the next char begins a word or a line ends; a
+    // word end stops where the previous char ends one. `Eol` is its own class,
+    // so it is never treated as plain whitespace here (this is what lets a
+    // motion cross a line break instead of stalling on it).
     if target.stops_at_word_start() {
-        !next.is_whitespace()
+        classify(next) != CharClass::Whitespace
     } else {
-        !prev.is_whitespace()
+        classify(prev) != CharClass::Whitespace
     }
 }
 
@@ -430,8 +462,8 @@ impl<'a> CharCursor<'a> {
     }
 }
 
-/// Port of Helix's `range_to_target`, specialized to a single field (no line
-/// endings). Walks from `origin.head` toward `target`, returning the resulting
+/// Port of Helix's `range_to_target`. Walks from `origin.head` toward `target`
+/// over a buffer that may contain `\n` line separators, returning the resulting
 /// `(anchor, head)` gap range.
 fn range_to_target(chars: &[char], target: HelixWordTarget, origin: HelixRange) -> HelixRange {
     let is_prev = target.is_prev();
@@ -439,6 +471,14 @@ fn range_to_target(chars: &[char], target: HelixWordTarget, origin: HelixRange) 
     if is_prev {
         cursor.reverse();
     }
+
+    let advance = |head: &mut usize| {
+        if is_prev {
+            *head = head.saturating_sub(1);
+        } else {
+            *head += 1;
+        }
+    };
 
     let mut anchor = origin.anchor;
     let mut head = origin.head;
@@ -452,6 +492,22 @@ fn range_to_target(chars: &[char], target: HelixWordTarget, origin: HelixRange) 
         ch
     };
 
+    // Skip over any line endings at the head, advancing past them. When the
+    // head started on a line ending, re-anchor just past it so the resulting
+    // selection lives on the destination line rather than spanning the break.
+    while let Some(ch) = cursor.next() {
+        if char_is_line_ending(ch) {
+            prev_ch = Some(ch);
+            advance(&mut head);
+        } else {
+            cursor.prev();
+            break;
+        }
+    }
+    if prev_ch.map(char_is_line_ending).unwrap_or(false) {
+        anchor = head;
+    }
+
     let head_start = head;
     while let Some(next_ch) = cursor.next() {
         if prev_ch.is_none() || reached_target(target, prev_ch.unwrap(), next_ch) {
@@ -463,11 +519,7 @@ fn range_to_target(chars: &[char], target: HelixWordTarget, origin: HelixRange) 
             }
         }
         prev_ch = Some(next_ch);
-        if is_prev {
-            head = head.saturating_sub(1);
-        } else {
-            head += 1;
-        }
+        advance(&mut head);
     }
 
     HelixRange { anchor, head }
