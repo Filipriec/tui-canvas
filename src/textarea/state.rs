@@ -1913,6 +1913,44 @@ mod tests {
 
     #[cfg(all(feature = "keybindings", feature = "crossterm"))]
     #[test]
+    fn helix_select_mode_word_motions_extend_with_pinned_anchor() {
+        use crate::canvas::state::SelectionState;
+        use crate::keybindings::{BuiltinCanvasKeybindingPreset, KeyEventOutcome};
+        use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+
+        let mut textarea = TextAreaState::<TextAreaProvider>::from_text("one two three four");
+        textarea.use_keybinding_preset(BuiltinCanvasKeybindingPreset::Helix);
+
+        // Enter select/extend mode; the anchor pins at the cursor.
+        let out = textarea.handle_key_event(KeyEvent::new(KeyCode::Char('v'), KeyModifiers::NONE));
+        assert!(matches!(out, KeyEventOutcome::Consumed(None)));
+        assert_eq!(textarea.mode(), crate::canvas::modes::AppMode::Sel);
+
+        // The heads must match normal-mode word motions (3, 7, 12) exactly,
+        // while the anchor stays pinned at (0, 0) and the mode stays Sel.
+        for (k, head) in [('w', 3usize), ('w', 7), ('e', 12)] {
+            let out = textarea.handle_key_event(KeyEvent::new(KeyCode::Char(k), KeyModifiers::NONE));
+            assert!(matches!(out, KeyEventOutcome::Consumed(None)));
+            assert_eq!(textarea.mode(), crate::canvas::modes::AppMode::Sel);
+            assert_eq!(textarea.cursor_position(), head);
+            assert!(matches!(
+                textarea.selection_state(),
+                SelectionState::Characterwise { anchor: (0, 0) }
+            ));
+        }
+
+        // Extending backward moves only the head; the anchor is still pinned.
+        let out = textarea.handle_key_event(KeyEvent::new(KeyCode::Char('b'), KeyModifiers::NONE));
+        assert!(matches!(out, KeyEventOutcome::Consumed(None)));
+        assert_eq!(textarea.cursor_position(), 8);
+        assert!(matches!(
+            textarea.selection_state(),
+            SelectionState::Characterwise { anchor: (0, 0) }
+        ));
+    }
+
+    #[cfg(all(feature = "keybindings", feature = "crossterm"))]
+    #[test]
     fn helix_c_enters_insert_after_deleting_selection() {
         use crate::keybindings::{BuiltinCanvasKeybindingPreset, KeyEventOutcome};
         use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};

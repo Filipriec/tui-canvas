@@ -18,10 +18,12 @@ the full Helix editor keymap/behavior.
 - Normal-mode motions should replace the primary selection with the moved-over
   object/range. Word motions (`w`, `b`, `e`, `W`, `B`, `E`) are implemented
   this way; other motions need the same audit.
-- Select/extend mode should extend selections consistently for all supported
-  motions, including goto motions.
-- `x` and `X` should exactly match Helix line-extension behavior for repeated
-  use and existing character selections.
+- Select/extend mode (`v`) now extends word motions (`w`, `b`, `e`, `W`, `B`,
+  `E`) with a pinned anchor and the same head precision as normal mode. Goto
+  and other motions still need the same audit.
+- `x` and `X` match Helix line-extension behavior: repeated `x` grows the
+  selection downward from a fixed top line, and `X` snaps to line bounds
+  without collapsing an existing selection.
 - Yank/delete/change/paste need more register-aware behavior to match Helix.
 
 ## Missing Supported-Widget Actions

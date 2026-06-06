@@ -34,39 +34,46 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         target: HelixWordTarget,
         mut motion: impl FnMut(&mut Self),
     ) {
-        if self.mode() != AppMode::Nor {
-            for _ in 0..count.max(1) {
-                motion(self);
-            }
-            return;
-        }
-
+        // Select/extend mode (`v`) keeps the anchor pinned and only advances the
+        // head; normal mode replaces the whole selection with the moved-over
+        // range. Both compute the head with the same faithful Helix port so the
+        // two modes stay perfectly consistent.
+        let extend = self.mode() != AppMode::Nor;
         for _ in 0..count.max(1) {
-            self.select_word_motion_step_helix(target, &mut motion);
+            self.select_word_motion_step_helix(target, extend, &mut motion);
         }
     }
 
     fn select_word_motion_step_helix(
         &mut self,
         target: HelixWordTarget,
+        extend: bool,
         motion: &mut impl FnMut(&mut Self),
     ) {
         let field = self.current_field();
         let cursor = self.cursor_position();
 
-        // Recover the current selection's anchor within this field. If the
-        // anchor lives in another field (a previous cross-field motion) we
-        // collapse to the cursor and let the motion re-anchor here.
-        let anchor_char = match self.selection_state() {
-            SelectionState::Characterwise { anchor: (af, ac) } if *af == field => *ac,
-            _ => cursor,
+        // The pinned anchor of the current selection (may live in another field
+        // when a previous motion crossed a boundary). In normal mode there is
+        // no pin: the motion re-anchors at the start position.
+        let pinned_anchor = match self.selection_state() {
+            SelectionState::Characterwise { anchor } => *anchor,
+            _ => (field, cursor),
+        };
+
+        // Local anchor used only to decide the motion's direction within this
+        // field. If the real anchor is elsewhere, fall back to the cursor.
+        let anchor_char = if pinned_anchor.0 == field {
+            pinned_anchor.1
+        } else {
+            cursor
         };
 
         let chars: Vec<char> = self.current_text().chars().collect();
         let len = chars.len();
         if len == 0 {
             // Empty field: nothing to select; defer to the cross-field motion.
-            let from = (field, cursor);
+            let from = if extend { pinned_anchor } else { (field, cursor) };
             motion(self);
             self.editor.ui_state.selection = SelectionState::Characterwise { anchor: from };
             return;
@@ -91,7 +98,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         let result = helix_word_move(&chars, input, target);
 
         // Convert Helix's exclusive-head range back to our inclusive endpoints.
-        let (new_anchor, new_cursor) = if result.anchor < result.head {
+        let (motion_anchor, new_cursor) = if result.anchor < result.head {
             (result.anchor, result.head - 1)
         } else if result.head < result.anchor {
             (result.anchor - 1, result.head)
@@ -100,22 +107,26 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
             (c, c)
         };
 
-        let made_progress = new_cursor != cursor || new_anchor != anchor_char;
+        let made_progress = new_cursor != cursor || (!extend && motion_anchor != anchor_char);
         if !made_progress {
-            // At the field boundary: cross fields with the vim motion, keeping
-            // the original position as the selection anchor.
-            let from = (field, cursor);
+            // At the field boundary: cross fields with the vim motion. Pin the
+            // anchor when extending, otherwise re-anchor at the start position.
+            let from = if extend { pinned_anchor } else { (field, cursor) };
             motion(self);
-            if (self.current_field(), self.cursor_position()) != from {
+            if (self.current_field(), self.cursor_position()) != (field, cursor) {
                 self.editor.ui_state.selection = SelectionState::Characterwise { anchor: from };
             }
             return;
         }
 
         self.editor.ui_state.set_cursor(new_cursor, len, false);
-        self.editor.ui_state.selection = SelectionState::Characterwise {
-            anchor: (field, new_anchor),
+        // Extend: keep the pinned anchor. Replace: adopt the motion's anchor.
+        let anchor = if extend {
+            pinned_anchor
+        } else {
+            (field, motion_anchor)
         };
+        self.editor.ui_state.selection = SelectionState::Characterwise { anchor };
     }
 
     pub(crate) fn select_next_word_helix(&mut self, count: usize) {
