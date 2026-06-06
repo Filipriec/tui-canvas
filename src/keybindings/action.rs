@@ -60,6 +60,13 @@ pub enum CanvasKeyAction {
     ExtendToLineBounds,
     SearchNext,
     SearchPrev,
+    SelectAll,
+    FlipSelections,
+    SwitchCase,
+    SwitchToLowercase,
+    SwitchToUppercase,
+    TrimSelections,
+    GotoFirstNonWhitespace,
     Unknown(String),
 }
 
@@ -124,6 +131,13 @@ impl CanvasKeyAction {
             "extend_to_line_bounds" => Self::ExtendToLineBounds,
             "search_next" => Self::SearchNext,
             "search_prev" => Self::SearchPrev,
+            "select_all" => Self::SelectAll,
+            "flip_selections" => Self::FlipSelections,
+            "switch_case" => Self::SwitchCase,
+            "switch_to_lowercase" => Self::SwitchToLowercase,
+            "switch_to_uppercase" => Self::SwitchToUppercase,
+            "trim_selections" => Self::TrimSelections,
+            "goto_first_nonwhitespace" => Self::GotoFirstNonWhitespace,
             other => Self::Unknown(other.to_string()),
         }
     }
@@ -186,6 +200,13 @@ impl CanvasKeyAction {
             Self::CollapseSelection => "collapse_selection",
             Self::SearchNext => "search_next",
             Self::SearchPrev => "search_prev",
+            Self::SelectAll => "select_all",
+            Self::FlipSelections => "flip_selections",
+            Self::SwitchCase => "switch_case",
+            Self::SwitchToLowercase => "switch_to_lowercase",
+            Self::SwitchToUppercase => "switch_to_uppercase",
+            Self::TrimSelections => "trim_selections",
+            Self::GotoFirstNonWhitespace => "goto_first_nonwhitespace",
             Self::ExtendLineBelow => "extend_line_below",
             Self::ExtendToLineBounds => "extend_to_line_bounds",
             Self::Unknown(other) => other.as_str(),
@@ -248,7 +269,14 @@ impl CanvasKeyAction {
             | Self::ExtendLineBelow
             | Self::ExtendToLineBounds
             | Self::SearchNext
-            | Self::SearchPrev => return None,
+            | Self::SearchPrev
+            | Self::SelectAll
+            | Self::FlipSelections
+            | Self::SwitchCase
+            | Self::SwitchToLowercase
+            | Self::SwitchToUppercase
+            | Self::TrimSelections
+            | Self::GotoFirstNonWhitespace => return None,
             Self::EnterDecider | Self::Exit | Self::Unknown(_) => return None,
         })
     }

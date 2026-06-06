@@ -1,7 +1,16 @@
 use crate::{
     canvas::{modes::AppMode, state::SelectionState},
+    editor::features::history::EditKind,
     textarea::{TextAreaDataProvider, TextAreaState},
 };
+
+/// Case transformation applied to a selection by `~`, `` ` ``, and `` Alt-` ``.
+#[derive(Clone, Copy)]
+pub(crate) enum HelixCase {
+    Toggle,
+    Lower,
+    Upper,
+}
 
 /// Which Helix word motion a selection step performs. These mirror Helix's
 /// `WordMotionTarget` variants and drive the faithful port in [`helix_word`].
@@ -196,6 +205,175 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         self.editor.ui_state.selection = SelectionState::Characterwise {
             anchor: (m.line, m.start),
         };
+    }
+
+    /// `%` — select the whole document.
+    pub(crate) fn select_all_helix(&mut self) {
+        let field_count = self.editor.data_provider().field_count();
+        if field_count == 0 {
+            return;
+        }
+        let last = field_count - 1;
+        let _ = self.transition_to_field(last);
+        let len = self.current_text().chars().count();
+        self.editor
+            .ui_state
+            .set_cursor(len.saturating_sub(1), len, false);
+        self.editor.ui_state.selection = SelectionState::Characterwise { anchor: (0, 0) };
+    }
+
+    /// `Alt-;` — flip the selection so anchor and head swap places.
+    pub(crate) fn flip_selection_helix(&mut self) {
+        match self.selection_state().clone() {
+            SelectionState::Characterwise { anchor } => {
+                let cursor = (self.current_field(), self.cursor_position());
+                if anchor == cursor {
+                    return;
+                }
+                let _ = self.transition_to_field(anchor.0);
+                let len = self.current_text().chars().count();
+                self.editor.ui_state.set_cursor(anchor.1, len, false);
+                self.editor.ui_state.selection = SelectionState::Characterwise { anchor: cursor };
+            }
+            SelectionState::Linewise { anchor_field } => {
+                let current = self.current_field();
+                if anchor_field == current {
+                    return;
+                }
+                let _ = self.transition_to_field(anchor_field);
+                self.editor.ui_state.selection = SelectionState::Linewise {
+                    anchor_field: current,
+                };
+            }
+            SelectionState::None => {}
+        }
+    }
+
+    /// `~` / `` ` `` / `` Alt-` `` — change the case of the selected text in
+    /// place, leaving the selection where it is.
+    pub(crate) fn switch_case_selection_helix(&mut self, case: HelixCase) {
+        let map = |c: char| -> char {
+            match case {
+                HelixCase::Lower => c.to_lowercase().next().unwrap_or(c),
+                HelixCase::Upper => c.to_uppercase().next().unwrap_or(c),
+                HelixCase::Toggle => {
+                    if c.is_uppercase() {
+                        c.to_lowercase().next().unwrap_or(c)
+                    } else if c.is_lowercase() {
+                        c.to_uppercase().next().unwrap_or(c)
+                    } else {
+                        c
+                    }
+                }
+            }
+        };
+
+        let (start, end) = self.selection_endpoints();
+        let mut lines = self.editor.data_provider().capture_content();
+        if start.0 >= lines.len() || end.0 >= lines.len() {
+            return;
+        }
+
+        self.editor.record_checkpoint(EditKind::Other);
+        for field in start.0..=end.0 {
+            let count = lines[field].chars().count();
+            if count == 0 {
+                continue;
+            }
+            let (col_start, col_end) = if start.0 == end.0 {
+                (start.1, end.1)
+            } else if field == start.0 {
+                (start.1, count - 1)
+            } else if field == end.0 {
+                (0, end.1)
+            } else {
+                (0, count - 1)
+            };
+            let new_line: String = lines[field]
+                .chars()
+                .enumerate()
+                .map(|(i, c)| {
+                    if i >= col_start && i <= col_end {
+                        map(c)
+                    } else {
+                        c
+                    }
+                })
+                .collect();
+            lines[field] = new_line;
+        }
+        self.editor.data_provider_mut().restore_content(&lines);
+        #[cfg(feature = "gui")]
+        {
+            self.edited_this_frame = true;
+        }
+    }
+
+    /// `_` — shrink the selection so it excludes leading and trailing
+    /// whitespace. A whitespace-only selection is left unchanged.
+    pub(crate) fn trim_selection_helix(&mut self) {
+        let SelectionState::Characterwise { anchor } = self.selection_state().clone() else {
+            return;
+        };
+        let cursor = (self.current_field(), self.cursor_position());
+        let forward = cursor >= anchor;
+        let (start, end) = (anchor.min(cursor), anchor.max(cursor));
+
+        // Only single-line selections are trimmed; multi-line trimming would
+        // need to pick which line edges to keep.
+        if start.0 != end.0 {
+            return;
+        }
+
+        let line: Vec<char> = self.current_text_for_field(start.0);
+        let mut new_start = start.1;
+        let mut new_end = end.1.min(line.len().saturating_sub(1));
+        while new_start <= new_end && line[new_start].is_whitespace() {
+            new_start += 1;
+        }
+        while new_end > new_start && line[new_end].is_whitespace() {
+            new_end -= 1;
+        }
+        if new_start > new_end || line[new_start].is_whitespace() {
+            return; // all whitespace
+        }
+
+        let _ = self.transition_to_field(start.0);
+        let len = self.current_text().chars().count();
+        let (anchor_pos, cursor_pos) = if forward {
+            ((start.0, new_start), new_end)
+        } else {
+            ((start.0, new_end), new_start)
+        };
+        self.editor.ui_state.set_cursor(cursor_pos, len, false);
+        self.editor.ui_state.selection = SelectionState::Characterwise { anchor: anchor_pos };
+    }
+
+    /// `gs` — move to the first non-whitespace character of the current line,
+    /// replacing the selection (normal) or extending it (select mode).
+    pub(crate) fn goto_first_nonwhitespace_helix(&mut self) {
+        let field = self.current_field();
+        let line: Vec<char> = self.current_text_for_field(field);
+        let target = line
+            .iter()
+            .position(|c| !c.is_whitespace())
+            .unwrap_or(0);
+        let extend = self.mode() != AppMode::Nor;
+        let len = line.len();
+        self.editor.ui_state.set_cursor(target, len, false);
+        if !extend {
+            self.editor.ui_state.selection = SelectionState::Characterwise {
+                anchor: (field, target),
+            };
+        }
+    }
+
+    fn current_text_for_field(&self, field: usize) -> Vec<char> {
+        self.editor
+            .data_provider()
+            .field_value(field)
+            .chars()
+            .collect()
     }
 
     pub(crate) fn delete_selection_helix(&mut self, yank: bool, count: usize) {

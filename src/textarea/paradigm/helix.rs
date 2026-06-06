@@ -2,6 +2,7 @@
 use crate::{
     canvas::modes::AppMode,
     keybindings::{CanvasKeyAction, KeyEventOutcome},
+    textarea::actions::selection::helix::HelixCase,
     textarea::{TextAreaDataProvider, TextAreaState},
 };
 
@@ -63,6 +64,34 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
             }
             CanvasKeyAction::SearchPrev => {
                 self.search_prev_helix(count);
+                KeyEventOutcome::Consumed(None)
+            }
+            CanvasKeyAction::SelectAll => {
+                self.select_all_helix();
+                KeyEventOutcome::Consumed(None)
+            }
+            CanvasKeyAction::FlipSelections => {
+                self.flip_selection_helix();
+                KeyEventOutcome::Consumed(None)
+            }
+            CanvasKeyAction::SwitchCase => {
+                self.switch_case_selection_helix(HelixCase::Toggle);
+                KeyEventOutcome::Consumed(None)
+            }
+            CanvasKeyAction::SwitchToLowercase => {
+                self.switch_case_selection_helix(HelixCase::Lower);
+                KeyEventOutcome::Consumed(None)
+            }
+            CanvasKeyAction::SwitchToUppercase => {
+                self.switch_case_selection_helix(HelixCase::Upper);
+                KeyEventOutcome::Consumed(None)
+            }
+            CanvasKeyAction::TrimSelections => {
+                self.trim_selection_helix();
+                KeyEventOutcome::Consumed(None)
+            }
+            CanvasKeyAction::GotoFirstNonWhitespace => {
+                self.goto_first_nonwhitespace_helix();
                 KeyEventOutcome::Consumed(None)
             }
             CanvasKeyAction::ExtendLineBelow => {

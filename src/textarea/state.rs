@@ -1727,6 +1727,76 @@ mod tests {
 
     #[cfg(all(feature = "keybindings", feature = "crossterm"))]
     #[test]
+    fn helix_selection_and_case_ops() {
+        use crate::canvas::state::SelectionState;
+        use crate::keybindings::BuiltinCanvasKeybindingPreset;
+        use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+
+        let mk = |text: &str| {
+            let mut t = TextAreaState::<TextAreaProvider>::from_text(text);
+            t.use_keybinding_preset(BuiltinCanvasKeybindingPreset::Helix);
+            t
+        };
+        let k = |t: &mut TextAreaState<TextAreaProvider>, c: char, m: KeyModifiers| {
+            let _ = t.handle_key_event(KeyEvent::new(KeyCode::Char(c), m));
+        };
+        let n = KeyModifiers::NONE;
+        let alt = KeyModifiers::ALT;
+
+        // `%` selects the whole document.
+        let mut t = mk("ab\ncd");
+        k(&mut t, '%', n);
+        assert_eq!((t.current_field(), t.cursor_position()), (1, 1));
+        assert!(matches!(
+            t.selection_state(),
+            SelectionState::Characterwise { anchor: (0, 0) }
+        ));
+
+        // Case operations transform the selection in place.
+        let mut t = mk("Hello");
+        k(&mut t, '%', n);
+        k(&mut t, '~', n);
+        assert_eq!(t.text(), "hELLO");
+
+        let mut t = mk("Hello");
+        k(&mut t, '%', n);
+        k(&mut t, '`', n);
+        assert_eq!(t.text(), "hello");
+
+        let mut t = mk("Hello");
+        k(&mut t, '%', n);
+        k(&mut t, '`', alt);
+        assert_eq!(t.text(), "HELLO");
+
+        // `_` trims leading/trailing whitespace from the selection.
+        let mut t = mk("  hi");
+        k(&mut t, '%', n);
+        k(&mut t, '_', n);
+        assert_eq!(t.cursor_position(), 3);
+        assert!(matches!(
+            t.selection_state(),
+            SelectionState::Characterwise { anchor: (0, 2) }
+        ));
+
+        // `gs` jumps to the first non-whitespace char of the line.
+        let mut t = mk("   abc");
+        let _ = t.handle_key_event(KeyEvent::new(KeyCode::Char('g'), n));
+        let _ = t.handle_key_event(KeyEvent::new(KeyCode::Char('s'), n));
+        assert_eq!(t.cursor_position(), 3);
+
+        // `Alt-;` flips anchor and head without changing the covered range.
+        let mut t = mk("one two three");
+        k(&mut t, 'w', n); // selects "one ", anchor (0,0), head 3
+        k(&mut t, ';', alt);
+        assert_eq!(t.cursor_position(), 0);
+        assert!(matches!(
+            t.selection_state(),
+            SelectionState::Characterwise { anchor: (0, 3) }
+        ));
+    }
+
+    #[cfg(all(feature = "keybindings", feature = "crossterm"))]
+    #[test]
     fn helix_w_crosses_line_boundary_cleanly() {
         use crate::canvas::state::SelectionState;
         use crate::keybindings::BuiltinCanvasKeybindingPreset;

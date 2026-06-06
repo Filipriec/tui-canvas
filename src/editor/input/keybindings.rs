@@ -137,7 +137,14 @@ impl<D: DataProvider> FormEditor<D> {
             | CanvasKeyAction::ExtendLineBelow
             | CanvasKeyAction::ExtendToLineBounds
             | CanvasKeyAction::SearchNext
-            | CanvasKeyAction::SearchPrev => None,
+            | CanvasKeyAction::SearchPrev
+            | CanvasKeyAction::SelectAll
+            | CanvasKeyAction::FlipSelections
+            | CanvasKeyAction::SwitchCase
+            | CanvasKeyAction::SwitchToLowercase
+            | CanvasKeyAction::SwitchToUppercase
+            | CanvasKeyAction::TrimSelections
+            | CanvasKeyAction::GotoFirstNonWhitespace => None,
             #[cfg(feature = "suggestions")]
             CanvasKeyAction::OpenSuggestions => Some(CanvasAction::TriggerSuggestions),
             #[cfg(feature = "suggestions")]
