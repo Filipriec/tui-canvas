@@ -1885,6 +1885,8 @@ mod tests {
             // --- delete yanks, then paste ---
             ("one\ntwo", "ddp", "two\none"),      // dd yanks the line
             ("foo bar baz", "dwP", "foo bar baz"),// dw yanks "foo ", P puts it back
+            ("abc", "cc\x1bp", "\nabc"),           // cc yanks before changing
+            ("one\ntwo\nthree", "cj\x1bp", "\none\ntwo\nthree"),
             // --- linewise ---
             ("one\ntwo\nthree", "dd", "two\nthree"),
             ("only", "dd", ""),                   // dd on the sole line
@@ -1898,6 +1900,8 @@ mod tests {
             ("hello world", "dfo", " world"),     // df<o> inclusive
             ("hello world", "dto", "o world"),    // dt<o> stops short
             ("hello world", "dfz", "hello world"),// find miss: no-op
+            ("hello world", "fod;", "hellrld"),   // repeat last find as a motion
+            ("hello world", "fo;d,", "hellorld"), // reverse-repeat as a motion
             // --- cancellation ---
             ("hello", "d\x1b", "hello"),          // Esc cancels operator
             ("hello", "dx", "hello"),             // d + non-motion cancels

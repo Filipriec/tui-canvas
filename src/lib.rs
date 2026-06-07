@@ -51,6 +51,11 @@ pub mod computed;
 #[cfg(feature = "keybindings")]
 pub mod keybindings;
 
+// The clipboard only has a consumer once an editing surface can yank, which
+// lives behind `keybindings`; co-gating keeps a keybindings-less build clean.
+#[cfg(all(feature = "clipboard", feature = "keybindings"))]
+mod clipboard;
+
 #[cfg(feature = "cursor-style")]
 pub use cursor::CursorManager;
 

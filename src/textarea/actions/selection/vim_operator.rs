@@ -91,7 +91,11 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         ) {
             self.editor.behavior_state.vim_mut().clear_pending_operator();
             let start = pending.anchor.0;
-            self.apply_operator_linewise_vim(pending.operator, start, start + total - 1);
+            self.apply_operator_linewise_vim(
+                pending.operator,
+                start,
+                start.saturating_add(total).saturating_sub(1),
+            );
             return KeyEventOutcome::Consumed(None);
         }
 
@@ -111,6 +115,20 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
                 forward,
                 count: total,
             });
+            return KeyEventOutcome::Consumed(None);
+        }
+
+        if matches!(
+            action,
+            CanvasKeyAction::RepeatLastFind | CanvasKeyAction::RepeatLastFindReverse
+        ) {
+            self.editor.behavior_state.vim_mut().clear_pending_operator();
+            if let Some(find) = self.vim_last_find {
+                let reverse = matches!(action, CanvasKeyAction::RepeatLastFindReverse);
+                let forward = if reverse { !find.forward } else { find.forward };
+                self.repeat_last_find_vim(reverse, total);
+                self.finish_operator_charwise_vim(pending.operator, pending.anchor, forward);
+            }
             return KeyEventOutcome::Consumed(None);
         }
 
@@ -278,6 +296,14 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
                 }
             }
             VimOperator::Change => {
+                self.editor.ui_state.selection = SelectionState::Linewise {
+                    anchor_field: start,
+                };
+                let _ = self.transition_to_field(end);
+                self.yank_selection();
+                self.editor.ui_state.selection = SelectionState::None;
+                let _ = self.transition_to_field(start);
+
                 if count <= 1 {
                     self.change_current_line();
                 } else {
