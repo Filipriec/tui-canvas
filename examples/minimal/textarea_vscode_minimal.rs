@@ -5,7 +5,10 @@
 //! `--no-default-features`:
 //!
 //!   cargo run --example textarea_vscode_minimal --no-default-features \
-//!     --features "gui,textarea,keybindings,cursor-style,commandline,textmode-normal"
+//!     --features "gui,textarea,keybindings,cursor-style,commandline,textmode-normal,clipboard"
+//!
+//! `clipboard` is included so Ctrl+C / Ctrl+X mirror to the OS clipboard; it's
+//! a default feature that `--no-default-features` would otherwise drop.
 //!
 //! Try:
 //!   - arrows / Ctrl+Left-Right to move, Ctrl+Backspace to delete a word
