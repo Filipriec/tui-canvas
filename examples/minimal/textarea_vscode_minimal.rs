@@ -7,8 +7,13 @@
 //!   cargo run --example textarea_vscode_minimal --no-default-features \
 //!     --features "gui,textarea,keybindings,cursor-style,commandline,textmode-normal"
 //!
-//! Try: arrows / Ctrl+Left-Right to move, Ctrl+Backspace to delete a word,
-//! Ctrl+Z / Ctrl+Y to undo / redo, Ctrl+Shift+K to delete the line.
+//! Try:
+//!   - arrows / Ctrl+Left-Right to move, Ctrl+Backspace to delete a word
+//!   - Shift+arrows (and Shift+Ctrl+arrows) to select; Ctrl+A selects all
+//!   - Ctrl+C / Ctrl+X / Ctrl+V to copy / cut / paste (whole line with no
+//!     selection); typing or Backspace replaces a selection
+//!   - Ctrl+Z / Ctrl+Y to undo / redo, Ctrl+Shift+K to delete the line
+//!   - Alt+Up/Down to move the line, Shift+Alt+Up/Down to duplicate it
 
 #[cfg(not(feature = "keybindings"))]
 compile_error!(

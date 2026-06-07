@@ -170,7 +170,23 @@ impl<D: DataProvider> FormEditor<D> {
             | CanvasKeyAction::DeleteWordBackward
             | CanvasKeyAction::DeleteToLineStart
             | CanvasKeyAction::DeleteWordForward
-            | CanvasKeyAction::ClearSearch => None,
+            | CanvasKeyAction::ClearSearch
+            | CanvasKeyAction::MoveLineUp
+            | CanvasKeyAction::MoveLineDown
+            | CanvasKeyAction::DuplicateLineUp
+            | CanvasKeyAction::DuplicateLineDown
+            | CanvasKeyAction::CopyLine
+            | CanvasKeyAction::CutLine
+            | CanvasKeyAction::SelectLeft
+            | CanvasKeyAction::SelectRight
+            | CanvasKeyAction::SelectUp
+            | CanvasKeyAction::SelectDown
+            | CanvasKeyAction::SelectWordPrev
+            | CanvasKeyAction::SelectWordNext
+            | CanvasKeyAction::SelectLineStart
+            | CanvasKeyAction::SelectLineEnd
+            | CanvasKeyAction::SelectDocStart
+            | CanvasKeyAction::SelectDocEnd => None,
             #[cfg(feature = "suggestions")]
             CanvasKeyAction::OpenSuggestions => Some(CanvasAction::TriggerSuggestions),
             #[cfg(feature = "suggestions")]

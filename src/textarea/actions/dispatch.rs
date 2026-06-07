@@ -115,6 +115,12 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         let mode = self.editor.ui_state.mode();
 
         if mode == AppMode::Ins && matches!(evt.code, KeyCode::Enter) {
+            // VSCode: typing over a selection (here, a newline) replaces it.
+            if self.editor.keybinding_paradigm() == KeybindingParadigm::Vscode
+                && self.vscode_selection_active()
+            {
+                self.vscode_delete_selection();
+            }
             self.insert_newline();
             return KeyEventOutcome::Consumed(None);
         }
@@ -171,6 +177,12 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
                     let m = evt.modifiers;
                     let is_plain = m.is_empty() || m == KeyModifiers::SHIFT;
                     if is_plain {
+                        // VSCode: typing over a selection replaces it.
+                        if self.editor.keybinding_paradigm() == KeybindingParadigm::Vscode
+                            && self.vscode_selection_active()
+                        {
+                            self.vscode_delete_selection();
+                        }
                         self.enter_edit_mode();
                         #[cfg(feature = "gui")]
                         {
@@ -199,9 +211,8 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
     ) -> KeyEventOutcome {
         match self.editor.keybinding_paradigm() {
             KeybindingParadigm::Helix => self.dispatch_textarea_key_action_helix(action, count),
-            KeybindingParadigm::Emacs | KeybindingParadigm::Vscode => {
-                self.dispatch_textarea_key_action_emacs(action, count)
-            }
+            KeybindingParadigm::Emacs => self.dispatch_textarea_key_action_emacs(action, count),
+            KeybindingParadigm::Vscode => self.dispatch_textarea_key_action_vscode(action, count),
             KeybindingParadigm::Vim => self.dispatch_textarea_key_action_vim(action, count),
         }
     }

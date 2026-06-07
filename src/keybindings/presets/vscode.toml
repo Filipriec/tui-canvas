@@ -7,10 +7,14 @@
 # this preset under a modal `textmode-vim` build).
 #
 # Notes / limitations of the current engine (tracked for later phases):
-#   - Shift+arrow selection, copy/cut of the current line without a selection,
-#     and move/duplicate-line need engine work and are not bound yet.
+#   - Multi-cursor (Ctrl+D, Ctrl+Alt+Up/Down) is not implemented yet.
 #   - IntelliSense accept (Tab/Enter while the popup is open) needs
 #     context-sensitive handling; only trigger + navigate are bound here.
+#
+# Chords like Ctrl+Backspace, Ctrl+Shift+K and Shift+Alt+Arrow only reach the
+# editor when the terminal reports enhanced key modifiers (the Kitty keyboard
+# protocol). The application is responsible for enabling that; see the
+# `textarea_vscode_minimal` example.
 
 [ins]
 mode = "ins"
@@ -41,6 +45,29 @@ join_line_below = ["Ctrl+j"]
 paste_after = ["Ctrl+v"]
 undo = ["Ctrl+z"]
 redo = ["Ctrl+y", "Ctrl+Shift+z"]
+
+# --- Line operations ---
+# Ctrl+C / Ctrl+X with no selection copy / cut the whole current line, matching
+# VSCode. (They become selection-aware once modeless selection lands.)
+copy_line = ["Ctrl+c"]
+cut_line = ["Ctrl+x"]
+move_line_up = ["Alt+Up"]
+move_line_down = ["Alt+Down"]
+duplicate_line_up = ["Shift+Alt+Up"]
+duplicate_line_down = ["Shift+Alt+Down"]
+
+# --- Selection (Shift extends; plain movement collapses) ---
+select_left = ["Shift+Left"]
+select_right = ["Shift+Right"]
+select_up = ["Shift+Up"]
+select_down = ["Shift+Down"]
+select_word_prev = ["Shift+Ctrl+Left"]
+select_word_next = ["Shift+Ctrl+Right"]
+select_line_start = ["Shift+Home"]
+select_line_end = ["Shift+End"]
+select_doc_start = ["Shift+Ctrl+Home"]
+select_doc_end = ["Shift+Ctrl+End"]
+select_all = ["Ctrl+a"]
 
 # --- IntelliSense ---
 open_suggestions = ["Ctrl+space"]

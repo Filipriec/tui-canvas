@@ -8,3 +8,5 @@ mod helix;
 mod paste;
 #[cfg(feature = "keybindings")]
 mod vim;
+#[cfg(feature = "keybindings")]
+mod vscode;

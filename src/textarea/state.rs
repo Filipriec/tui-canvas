@@ -1405,6 +1405,149 @@ mod tests {
 
     #[cfg(all(feature = "keybindings", feature = "crossterm"))]
     #[test]
+    fn vscode_move_and_duplicate_line_ops() {
+        use crate::keybindings::CanvasKeyBindings;
+
+        let mut ta = TextAreaState::<TextAreaProvider>::from_text("a\nb\nc");
+        ta.set_keybindings(CanvasKeyBindings::vscode_defaults());
+        let _ = ta.move_down(); // on "b"
+        assert_eq!(ta.current_field(), 1);
+
+        ta.move_line_up(1);
+        assert_eq!(ta.text(), "b\na\nc");
+        assert_eq!(ta.current_field(), 0);
+
+        ta.move_line_down(1);
+        assert_eq!(ta.text(), "a\nb\nc");
+        assert_eq!(ta.current_field(), 1);
+
+        ta.duplicate_line_down(1);
+        assert_eq!(ta.text(), "a\nb\nb\nc");
+        assert_eq!(ta.current_field(), 2);
+
+        ta.duplicate_line_up(1);
+        assert_eq!(ta.text(), "a\nb\nb\nb\nc");
+        assert_eq!(ta.current_field(), 2);
+    }
+
+    #[cfg(all(feature = "keybindings", feature = "crossterm"))]
+    #[test]
+    fn vscode_copy_and_cut_current_line() {
+        use crate::editor::behavior::YankRegister;
+        use crate::keybindings::CanvasKeyBindings;
+
+        let mut ta = TextAreaState::<TextAreaProvider>::from_text("first\nsecond\nthird");
+        ta.set_keybindings(CanvasKeyBindings::vscode_defaults());
+        let _ = ta.move_down(); // on "second"
+
+        ta.copy_current_line();
+        assert_eq!(
+            ta.editor.behavior_state.yank().register(),
+            Some(&YankRegister::Lines(vec!["second".to_string()]))
+        );
+
+        ta.cut_current_line();
+        assert_eq!(ta.text(), "first\nthird");
+        assert_eq!(
+            ta.editor.behavior_state.yank().register(),
+            Some(&YankRegister::Lines(vec!["second".to_string()]))
+        );
+    }
+
+    #[cfg(all(feature = "keybindings", feature = "crossterm"))]
+    #[test]
+    fn vscode_shift_select_then_type_replaces() {
+        use crate::canvas::state::SelectionState;
+        use crate::keybindings::CanvasKeyBindings;
+        use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+
+        let mut ta = TextAreaState::<TextAreaProvider>::from_text("hello");
+        ta.set_keybindings(CanvasKeyBindings::vscode_defaults());
+        ta.enter_edit_mode();
+        ta.set_cursor_position(0);
+
+        for _ in 0..3 {
+            let _ = ta.handle_key_event(KeyEvent::new(KeyCode::Right, KeyModifiers::SHIFT));
+        }
+        assert!(matches!(
+            ta.selection_state(),
+            SelectionState::Characterwise { anchor: (0, 0) }
+        ));
+        assert_eq!(ta.cursor_position(), 3);
+
+        // Typing over the "hel" selection replaces it.
+        let _ = ta.handle_key_event(KeyEvent::new(KeyCode::Char('X'), KeyModifiers::NONE));
+        assert_eq!(ta.text(), "Xlo");
+        assert!(matches!(ta.selection_state(), SelectionState::None));
+    }
+
+    #[cfg(all(feature = "keybindings", feature = "crossterm"))]
+    #[test]
+    fn vscode_copy_selection_and_collapse() {
+        use crate::canvas::state::SelectionState;
+        use crate::editor::behavior::YankRegister;
+        use crate::keybindings::CanvasKeyBindings;
+        use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+
+        let mut ta = TextAreaState::<TextAreaProvider>::from_text("hello");
+        ta.set_keybindings(CanvasKeyBindings::vscode_defaults());
+        ta.enter_edit_mode();
+        ta.set_cursor_position(0);
+        for _ in 0..3 {
+            let _ = ta.handle_key_event(KeyEvent::new(KeyCode::Right, KeyModifiers::SHIFT));
+        }
+
+        // Ctrl+C copies the selection (exclusive range "hel").
+        let _ = ta.handle_key_event(KeyEvent::new(KeyCode::Char('c'), KeyModifiers::CONTROL));
+        assert_eq!(
+            ta.editor.behavior_state.yank().register(),
+            Some(&YankRegister::Text(vec!["hel".to_string()]))
+        );
+        assert_eq!(ta.text(), "hello");
+
+        // A plain arrow collapses the selection without editing.
+        let _ = ta.handle_key_event(KeyEvent::new(KeyCode::Right, KeyModifiers::NONE));
+        assert!(matches!(ta.selection_state(), SelectionState::None));
+    }
+
+    #[cfg(all(feature = "keybindings", feature = "crossterm"))]
+    #[test]
+    fn vscode_backspace_deletes_selection() {
+        use crate::canvas::state::SelectionState;
+        use crate::keybindings::CanvasKeyBindings;
+        use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+
+        let mut ta = TextAreaState::<TextAreaProvider>::from_text("hello");
+        ta.set_keybindings(CanvasKeyBindings::vscode_defaults());
+        ta.enter_edit_mode();
+        ta.set_cursor_position(0);
+        for _ in 0..3 {
+            let _ = ta.handle_key_event(KeyEvent::new(KeyCode::Right, KeyModifiers::SHIFT));
+        }
+
+        let _ = ta.handle_key_event(KeyEvent::new(KeyCode::Backspace, KeyModifiers::NONE));
+        assert_eq!(ta.text(), "lo");
+        assert!(matches!(ta.selection_state(), SelectionState::None));
+    }
+
+    #[cfg(all(feature = "keybindings", feature = "crossterm"))]
+    #[test]
+    fn vscode_alt_up_moves_line_through_keymap() {
+        use crate::keybindings::CanvasKeyBindings;
+        use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+
+        let mut ta = TextAreaState::<TextAreaProvider>::from_text("a\nb\nc");
+        ta.set_keybindings(CanvasKeyBindings::vscode_defaults());
+        ta.enter_edit_mode(); // modeless: the [ins] bindings are the active ones
+        let _ = ta.move_down(); // on "b"
+
+        let _ = ta.handle_key_event(KeyEvent::new(KeyCode::Up, KeyModifiers::ALT));
+        assert_eq!(ta.text(), "b\na\nc");
+        assert_eq!(ta.current_field(), 0);
+    }
+
+    #[cfg(all(feature = "keybindings", feature = "crossterm"))]
+    #[test]
     fn vim_edit_enter_inserts_newline() {
         use crate::keybindings::{CanvasKeyBindings, KeyEventOutcome};
         use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};

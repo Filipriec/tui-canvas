@@ -77,6 +77,24 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
             CanvasKeyAction::JoinLineBelow => {
                 Some(self.consume_action(|this| this.join_lines_below(count)))
             }
+            CanvasKeyAction::MoveLineUp => {
+                Some(self.consume_action(|this| this.move_line_up(count)))
+            }
+            CanvasKeyAction::MoveLineDown => {
+                Some(self.consume_action(|this| this.move_line_down(count)))
+            }
+            CanvasKeyAction::DuplicateLineUp => {
+                Some(self.consume_action(|this| this.duplicate_line_up(count)))
+            }
+            CanvasKeyAction::DuplicateLineDown => {
+                Some(self.consume_action(|this| this.duplicate_line_down(count)))
+            }
+            CanvasKeyAction::CopyLine => {
+                Some(self.consume_action(|this| this.copy_current_line()))
+            }
+            CanvasKeyAction::CutLine => {
+                Some(self.consume_action(|this| this.cut_current_line()))
+            }
             _ => None,
         }
     }
