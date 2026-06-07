@@ -151,38 +151,101 @@ See `cargo doc --open` for full signatures.
 
 ## Running Examples
 
-The repository includes several examples. Each requires specific feature flags.
-Use the following commands to run them:
+The repository ships 18 runnable examples. Most are organized into
+subdirectories under `examples/` (`textarea/`, `validation/`, `suggestions/`,
+`default/`, `minimal/`); a few live at the examples root. You always invoke
+them by their short name with `cargo run --example <name>`. Each example
+declares its own `required-features` in `Cargo.toml`, so the `--features` flags
+below are what Cargo needs to actually compile and run that target.
+
+The categories below mirror the structure of `examples/`.
+
+### Forms (`FormEditor`)
 
 ```bash
-# Textarea with Vim mode
-cargo run --example textarea_vim --features "gui cursor-style textarea textmode-vim"
+# Centralized keybinding system (multi-key sequences, modal editing).
+cargo run --example canvas_keybindings \
+  --features "gui keybindings cursor-style"
 
-# Textarea with Normal mode
-cargo run --example textarea_normal --features "gui cursor-style textarea textmode-normal"
+# Minimal form wired to the default Vim keybinding preset.
+cargo run --example form_vim \
+  --features "gui keybindings cursor-style"
+```
 
-# Single-line text input
-cargo run --example textinput_normal --features "gui cursor-style textinput textmode-normal"
+### Textarea (multi-line `TextAreaState`)
 
-# Textarea with syntax highlighting
-cargo run --example textarea_syntax --features "gui cursor-style textarea syntect textmode-normal"
+```bash
+# Textarea + automatic cursor management, Vim keybindings.
+cargo run --example textarea_vim \
+  --features "gui cursor-style textarea textmode-vim"
 
-# Validation examples
+# Textarea + automatic cursor management, Normal (non-modal) mode,
+# with the default command-line integration.
+cargo run --example textarea_normal \
+  --features "gui cursor-style textarea textmode-normal commandline"
+
+# Textarea with `syntect` syntax highlighting (Normal mode).
+cargo run --example textarea_syntax \
+  --features "gui cursor-style textarea textmode-normal syntect"
+
+# Minimal textarea using the centralized Vim keybindings + command line.
+cargo run --example textarea_vim_minimal \
+  --features "textarea keybindings cursor-style commandline"
+
+# Minimal textarea using the centralized Helix keybindings + command line.
+cargo run --example textarea_helix_minimal \
+  --features "textarea keybindings cursor-style commandline"
+```
+
+### Text Input (single-line `TextInputState`)
+
+```bash
+# Single-line text input in Normal (non-modal) mode.
+cargo run --example textinput_normal \
+  --features "gui cursor-style textinput textmode-normal"
+
+# Single-line text input with a tiny modal layer (NORMAL/INSERT) showing
+# built-in undo/redo on each insert session.
+cargo run --example undo_redo \
+  --features "gui cursor-style textinput"
+```
+
+### Validation
+
+```bash
 cargo run --example validation_1 --features "gui validation cursor-style"
 cargo run --example validation_2 --features "gui validation cursor-style"
 cargo run --example validation_3 --features "gui validation cursor-style"
 cargo run --example validation_4 --features "gui validation cursor-style"
 cargo run --example validation_5 --features "gui validation cursor-style"
+```
 
-# Suggestions
-cargo run --example suggestions --features "suggestions gui cursor-style"
+- `validation_1` — field validation basics.
+- `validation_2` — advanced pattern filtering edge cases.
+- `validation_3` — display masks (dynamic and template modes, placeholders).
+- `validation_4` — multiple custom formatters (PSC, phone, credit card, date).
+- `validation_5` — external / async validation with caching and debouncing.
+
+### Suggestions
+
+```bash
+cargo run --example suggestions  --features "suggestions gui cursor-style"
 cargo run --example suggestions2 --features "suggestions gui cursor-style"
+```
 
-# Cursor auto movement
-cargo run --example canvas_cursor_auto --features "gui cursor-style"
+- `suggestions`  — non-blocking, instant suggestions dropdown.
+- `suggestions2` — Tab-triggered suggestions dropdown.
 
-# Computed fields
-cargo run --example computed_fields --features "gui computed"
+### Features
+
+```bash
+# Automatic cursor style handling for the form canvas.
+cargo run --example canvas_cursor_auto \
+  --features "gui cursor-style"
+
+# Computed (derived) fields — invoice calculator demo.
+cargo run --example computed_fields \
+  --features "gui computed"
 ```
 
 For terminal paste support with `crossterm`, the smoothest path is to install
