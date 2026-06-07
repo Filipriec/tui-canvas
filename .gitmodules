@@ -1,0 +1,3 @@
+[submodule "tui-canvas-validation-core"]
+	path = tui-canvas-validation-core
+	url = git@gitlab.com:filipriec/tui-canvas-validation-core.git
