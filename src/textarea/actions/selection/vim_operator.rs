@@ -131,6 +131,17 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
                 let start_field = pending.anchor.0;
                 let _ = self.execute_canvas_key_action(&resolved, total);
                 let end_field = self.current_field();
+                // `j`/`k` are relative: if the cursor couldn't move (already at the
+                // top/bottom), the operator aborts — Vim does not touch the line.
+                // `gg`/`G` are absolute, so landing on the same line is a real
+                // single-line range.
+                let relative = matches!(
+                    resolved,
+                    CanvasKeyAction::MoveDown | CanvasKeyAction::MoveUp
+                );
+                if relative && end_field == start_field {
+                    return KeyEventOutcome::Consumed(None);
+                }
                 self.apply_operator_linewise_vim(
                     pending.operator,
                     start_field.min(end_field),
@@ -139,8 +150,35 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
                 KeyEventOutcome::Consumed(None)
             }
             MotionKind::CharExclusive | MotionKind::CharInclusive => {
-                let inclusive = motion_kind(&resolved) == MotionKind::CharInclusive;
-                let _ = self.execute_canvas_key_action(&resolved, total);
+                let mut inclusive = motion_kind(&resolved) == MotionKind::CharInclusive;
+                let forward_word = matches!(
+                    resolved,
+                    CanvasKeyAction::MoveWordNext | CanvasKeyAction::MoveBigWordNext
+                );
+
+                // Run the motion one step at a time so we can tell when it can no
+                // longer advance (e.g. `w` on the final word).
+                let mut stalled = false;
+                for _ in 0..total {
+                    let before = (self.current_field(), self.cursor_position());
+                    let _ = self.execute_canvas_key_action(&resolved, 1);
+                    if (self.current_field(), self.cursor_position()) == before {
+                        stalled = true;
+                        break;
+                    }
+                }
+
+                // `dw`/`dW` that runs out of words still deletes through the end
+                // of the current line in Vim.
+                if forward_word && stalled {
+                    let field = self.current_field();
+                    let len = self.field_len_vim(field);
+                    if len > 0 {
+                        self.editor.ui_state.set_cursor(len - 1, len, false);
+                        inclusive = true;
+                    }
+                }
+
                 self.editor.behavior_state.vim_mut().clear_pending_operator();
                 self.finish_operator_charwise_vim(pending.operator, pending.anchor, inclusive);
                 KeyEventOutcome::Consumed(None)
@@ -216,7 +254,16 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
 
         let _ = self.transition_to_field(start);
         match operator {
-            VimOperator::Delete => self.delete_current_lines(count),
+            VimOperator::Delete => {
+                // Reuse the linewise selection delete so the lines land in the
+                // yank register (Vim's `dd` is also a yank).
+                self.editor.ui_state.selection = SelectionState::Linewise {
+                    anchor_field: start,
+                };
+                let _ = self.transition_to_field(end);
+                self.delete_selection_once(true);
+                self.editor.ui_state.selection = SelectionState::None;
+            }
             VimOperator::Yank => {
                 self.editor.ui_state.selection = SelectionState::Linewise {
                     anchor_field: start,

@@ -1850,6 +1850,82 @@ mod tests {
         assert_eq!(t.cursor_position(), 1);
     }
 
+    /// Data-driven sweep checking that whole key sequences produce the same
+    /// buffer a real Vim would. `\x1b` in a sequence stands for Esc; everything
+    /// else is fed as a literal `Char`. The starting cursor is moved with
+    /// leading motions inside each sequence.
+    #[cfg(all(feature = "keybindings", feature = "crossterm"))]
+    #[test]
+    fn vim_operator_behaviour_matches_vim() {
+        use crate::keybindings::CanvasKeyBindings;
+        use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+
+        let cases: &[(&str, &str, &str)] = &[
+            // --- charwise delete, inclusive vs exclusive ---
+            ("hello world", "dw", "world"),       // exclusive to next word
+            ("hello", "dw", ""),                  // dw on the last word -> EOL
+            ("hello", "dW", ""),                  // dW on the last word -> EOL
+            ("foo bar", "wdw", "foo "),           // dw on last word keeps the space
+            ("foo.bar", "dw", ".bar"),            // w stops at punctuation
+            ("ab\ncd", "dw", "\ncd"),             // exclusive end-of-line rule
+            ("hello world", "lldw", "heworld"),   // dw from mid-word
+            ("hello world", "de", " world"),      // inclusive to word end
+            ("hello", "llde", "he"),              // de from mid-word
+            ("hello world", "d$", ""),            // to end of line
+            ("hello world", "llld0", "lo world"), // d0 deletes before cursor
+            ("hello", "dl", "ello"),              // dl == one char right
+            ("hello", "lldh", "hllo"),            // dh deletes the char to the left
+            ("hello", "dh", "hello"),             // dh at col 0 is a no-op
+            // --- backward word ---
+            ("hello world", "$db", "hello d"),    // db from last col
+            // --- counts ---
+            ("a b c d", "2dw", "c d"),            // 2dw
+            ("a b c d", "d2w", "c d"),            // d2w (count on motion)
+            ("a b", "d3w", ""),                   // count past last word -> EOL
+            // --- delete yanks, then paste ---
+            ("one\ntwo", "ddp", "two\none"),      // dd yanks the line
+            ("foo bar baz", "dwP", "foo bar baz"),// dw yanks "foo ", P puts it back
+            // --- linewise ---
+            ("one\ntwo\nthree", "dd", "two\nthree"),
+            ("only", "dd", ""),                   // dd on the sole line
+            ("one\ntwo\nthree", "dj", "three"),   // dj deletes 2 lines
+            ("one\ntwo", "jdj", "one\ntwo"),      // dj on last line: no-op
+            ("one\ntwo", "dk", "one\ntwo"),       // dk on first line: no-op
+            ("one\ntwo", "jdk", ""),              // dk from last line deletes both
+            ("a\nb\nc\nd", "jdG", "a"),           // dG to end of buffer
+            ("a\nb\nc", "jjdgg", ""),             // dgg to start of buffer
+            // --- find-motion operators ---
+            ("hello world", "dfo", " world"),     // df<o> inclusive
+            ("hello world", "dto", "o world"),    // dt<o> stops short
+            ("hello world", "dfz", "hello world"),// find miss: no-op
+            // --- cancellation ---
+            ("hello", "d\x1b", "hello"),          // Esc cancels operator
+            ("hello", "dx", "hello"),             // d + non-motion cancels
+            // --- non-operator deletes still work ---
+            ("hello", "x", "ello"),
+            ("hello", "llX", "hllo"),
+        ];
+
+        for (start, keys, expected) in cases {
+            let mut t = TextAreaState::<TextAreaProvider>::from_text(*start);
+            t.set_keybindings(CanvasKeyBindings::vim_defaults());
+            for ch in keys.chars() {
+                let code = if ch == '\x1b' {
+                    KeyCode::Esc
+                } else {
+                    KeyCode::Char(ch)
+                };
+                let _ = t.handle_key_event(KeyEvent::new(code, KeyModifiers::NONE));
+            }
+            assert_eq!(
+                t.text(),
+                *expected,
+                "start={start:?} keys={keys:?} -> got {:?}, want {expected:?}",
+                t.text()
+            );
+        }
+    }
+
     #[cfg(all(feature = "keybindings", feature = "crossterm"))]
     #[test]
     fn vim_operator_charwise_motions() {
