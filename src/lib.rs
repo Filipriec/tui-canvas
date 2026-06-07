@@ -64,8 +64,7 @@ pub use data_provider::DataProvider;
 pub use data_provider::{SuggestionItem, SuggestionQuery, SuggestionTrigger};
 #[cfg(feature = "crossterm")]
 pub use editor::input::normal::FormInputEventOutcome;
-#[allow(deprecated)]
-pub use editor::{FormEditor, TextForm};
+pub use editor::TextForm;
 
 pub use canvas::modes::AppMode;
 pub use canvas::state::EditorState;
@@ -108,13 +107,13 @@ pub use keybindings::{
 
 #[cfg(feature = "textarea")]
 pub use textarea::{
-    TextArea, TextAreaDataProvider, TextAreaEditor, TextAreaLineNumberMode, TextAreaProvider,
+    TextArea, TextAreaDataProvider, TextAreaLineNumberMode, TextAreaProvider,
     TextAreaSearchMatch, TextAreaState,
 };
 
 #[cfg(feature = "textinput")]
 pub use textinput::{
-    TextInput, TextInputDataProvider, TextInputEditor, TextInputEventOutcome, TextInputProvider,
+    TextInput, TextInputDataProvider, TextInputEventOutcome, TextInputProvider,
     TextInputState,
 };
 

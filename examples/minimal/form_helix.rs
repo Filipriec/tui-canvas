@@ -255,7 +255,7 @@ fn ui(f: &mut Frame, app: &mut App) {
         .constraints([Constraint::Min(5), Constraint::Length(3)])
         .split(f.area());
 
-    render_canvas_default(f, chunks[0], app.form.editor());
+    render_canvas_default(f, chunks[0], app.form.core());
 
     let status = format!(
         "mode: {:?}  row: {}/{}  -  Helix keys  fixed rows  Ctrl+C quit",

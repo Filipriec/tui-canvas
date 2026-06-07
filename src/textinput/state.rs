@@ -17,8 +17,6 @@ use crate::textinput::provider::{TextInputDataProvider, TextInputProvider};
 #[cfg(feature = "gui")]
 use ratatui::{layout::Rect, widgets::Block};
 
-pub type TextInputEditor<P = TextInputProvider> = TextForm<P>;
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TextInputEventOutcome {
     Ignored,
@@ -30,11 +28,11 @@ pub enum TextInputEventOutcome {
 ///
 /// Wraps a single-field [`TextForm`]. Editing, cursor, and movement methods
 /// from the form are available directly, and the form can be reached explicitly
-/// via [`TextInputState::editor`] / [`TextInputState::editor_mut`].
+/// via [`TextInputState::form`] / [`TextInputState::form_mut`].
 /// With the `validation` and `computed` features enabled, the corresponding
 /// helper methods are re-exposed as inherent methods on this type.
 pub struct TextInputState<P: TextInputDataProvider = TextInputProvider> {
-    pub(crate) form: TextInputEditor<P>,
+    pub(crate) form: TextForm<P>,
     pub(crate) placeholder: Option<String>,
     pub(crate) suggestion_suffix: Option<String>,
     pub(crate) overflow_indicator: char,
@@ -58,7 +56,7 @@ impl<P: TextInputDataProvider + Default> Default for TextInputState<P> {
 }
 
 impl<P: TextInputDataProvider> Deref for TextInputState<P> {
-    type Target = TextInputEditor<P>;
+    type Target = TextForm<P>;
 
     fn deref(&self) -> &Self::Target {
         &self.form
@@ -339,25 +337,12 @@ impl<P: TextInputDataProvider> TextInputState<P> {
 
 impl<P: TextInputDataProvider> TextInputState<P> {
     /// Borrow the underlying [`TextForm`].
-    ///
-    /// `TextInputState` is a thin wrapper around a single-field `TextForm`.
-    /// Use this for form functionality not re-exposed directly on the wrapper.
-    pub fn editor(&self) -> &TextInputEditor<P> {
+    pub fn form(&self) -> &TextForm<P> {
         &self.form
     }
 
     /// Mutably borrow the underlying [`TextForm`].
-    pub fn editor_mut(&mut self) -> &mut TextInputEditor<P> {
-        &mut self.form
-    }
-
-    /// Borrow the underlying [`TextForm`].
-    pub fn form(&self) -> &TextInputEditor<P> {
-        &self.form
-    }
-
-    /// Mutably borrow the underlying [`TextForm`].
-    pub fn form_mut(&mut self) -> &mut TextInputEditor<P> {
+    pub fn form_mut(&mut self) -> &mut TextForm<P> {
         &mut self.form
     }
 

@@ -4,9 +4,24 @@
 
 ### Added
 
-- Added full Helix editing paradigm support when using `BuiltinCanvasKeybindingPreset::Helix` via `FormEditor::set_keybinding_preset` or `TextAreaState::use_keybinding_preset`. Helix mode uses selection-first editing (`d`/`c`/`y`/`p` on the primary selection), `U` for redo, `x`/`X` for line selection extension, and collapses the primary selection after normal-mode movements. Vim, Helix, and Emacs behaviors are implemented in separate paradigm modules (`editor/paradigm/{vim,helix,emacs}`, `textarea/paradigm/{vim,helix,emacs}`) with top-level dispatch only.
+- Added full Helix editing paradigm support when using `BuiltinCanvasKeybindingPreset::Helix` via `TextForm::set_keybinding_preset` or `TextAreaState::use_keybinding_preset`. Helix mode uses selection-first editing (`d`/`c`/`y`/`p` on the primary selection), `U` for redo, `x`/`X` for line selection extension, and collapses the primary selection after normal-mode movements. Vim, Helix, and Emacs behaviors are implemented in separate paradigm modules (`editor/paradigm/{vim,helix,emacs}`, `textarea/paradigm/{vim,helix,emacs}`) with top-level dispatch only.
 - Added full Emacs editing paradigm support when using `BuiltinCanvasKeybindingPreset::Emacs`. Emacs mode uses mark/region editing (`C-SPC` set mark, `C-w` kill region, `M-w` copy region, `C-y` yank, `Esc` deactivate mark) with the same shared `nor`/`sel`/`ins` modes as Vim and Helix.
 - Added opt-in default textarea command-line integration through `TextAreaState::use_default_commandline()`, including built-in `:set number`, `:set relativenumber`, `:set nonumber`, `:noh`, `/`, and `?` behavior with automatic bottom-row reservation and cursor routing.
+
+## v0.7.5
+
+### Changed
+
+- Renamed the fixed-row form product from `FormEditor<D>` to `TextForm<D>` and removed the old compatibility alias. Shared cursor, mode, keybinding, validation, suggestions, and history state now lives in `EditorCore<D>`.
+- `TextAreaState<P>` now owns `EditorCore<P>` directly instead of wrapping the fixed-row form type. Textarea row mutations such as split, join, insert, delete, and multiline paste remain textarea-only behavior.
+- `TextInputState<P>` now owns a single-row `TextForm<P>`.
+
+### Migration Notes
+
+- Replace `FormEditor` imports/usages with `TextForm`.
+- Replace `TextAreaState::editor()` / `editor_mut()` with `TextAreaState::core()` / `core_mut()`.
+- Replace `TextInputState::editor()` / `editor_mut()` with `TextInputState::form()` / `form_mut()`.
+- `TextAreaEditor` and `TextInputEditor` aliases were removed; use `EditorCore<P>` for textarea internals and `TextForm<P>` for text input internals when an explicit type is needed.
 
 ## v0.7.2
 
@@ -72,7 +87,7 @@ The crate root continues to re-export the main widget and rendering types:
 
 ```rust
 use canvas::{
-    CursorManager, FormEditor, TextArea, TextAreaState, TextInput, TextInputState,
+    CursorManager, TextForm, TextArea, TextAreaState, TextInput, TextInputState,
     render_canvas, render_canvas_default, render_canvas_with_options,
 };
 ```

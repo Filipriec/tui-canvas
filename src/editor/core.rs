@@ -52,9 +52,6 @@ pub struct EditorCore<D: DataProvider> {
 
 pub type TextForm<D> = EditorCore<D>;
 
-#[deprecated(note = "use TextForm")]
-pub type FormEditor<D> = TextForm<D>;
-
 impl<D: DataProvider> EditorCore<D> {
     pub(crate) fn char_to_byte_index(s: &str, char_idx: usize) -> usize {
         s.char_indices()

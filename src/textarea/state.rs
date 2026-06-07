@@ -178,8 +178,6 @@ fn char_index_for_visual_col(
     end
 }
 
-pub type TextAreaEditor<P = TextAreaProvider> = EditorCore<P>;
-
 /// Outcome of feeding a single input event to a [`TextAreaState`].
 ///
 /// Unlike the single-line input there is no `Submitted` variant: in a textarea
@@ -286,12 +284,12 @@ pub enum TextAreaLineNumberMode {
 ///
 /// Owns a shared editor core plus textarea-specific state and behavior. Editing,
 /// cursor, and movement methods from the core are available directly, and the
-/// core can be reached explicitly via [`TextAreaState::editor`] /
-/// [`TextAreaState::editor_mut`]. With the `validation` and `computed` features
+/// core can be reached explicitly via [`TextAreaState::core`] /
+/// [`TextAreaState::core_mut`]. With the `validation` and `computed` features
 /// enabled, the corresponding helper methods are re-exposed as inherent methods
 /// on this type.
 pub struct TextAreaState<P: TextAreaDataProvider = TextAreaProvider> {
-    pub(crate) core: TextAreaEditor<P>,
+    pub(crate) core: EditorCore<P>,
     pub(crate) scroll_y: u16,
     pub(crate) placeholder: Option<String>,
     pub(crate) overflow_mode: TextOverflowMode,
@@ -351,7 +349,7 @@ impl<P: TextAreaDataProvider + Default> Default for TextAreaState<P> {
 }
 
 impl<P: TextAreaDataProvider> Deref for TextAreaState<P> {
-    type Target = TextAreaEditor<P>;
+    type Target = EditorCore<P>;
 
     fn deref(&self) -> &Self::Target {
         &self.core
@@ -987,22 +985,13 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
     ///
     /// `TextAreaState` owns an editor core plus textarea behavior. Use this for
     /// core functionality not re-exposed directly on the wrapper.
-    pub fn editor(&self) -> &TextAreaEditor<P> {
-        &self.core
-    }
-
-    /// Mutably borrow the underlying [`EditorCore`].
-    pub fn editor_mut(&mut self) -> &mut TextAreaEditor<P> {
-        &mut self.core
-    }
-
     /// Borrow the underlying [`EditorCore`].
-    pub fn core(&self) -> &TextAreaEditor<P> {
+    pub fn core(&self) -> &EditorCore<P> {
         &self.core
     }
 
     /// Mutably borrow the underlying [`EditorCore`].
-    pub fn core_mut(&mut self) -> &mut TextAreaEditor<P> {
+    pub fn core_mut(&mut self) -> &mut EditorCore<P> {
         &mut self.core
     }
 
