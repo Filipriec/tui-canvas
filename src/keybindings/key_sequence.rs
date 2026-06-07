@@ -103,7 +103,8 @@ fn try_parse_chord(token: &str) -> Result<KeyStroke, ParseKeyError> {
         key = rest;
     }
 
-    let code = parse_key_code(key).ok_or_else(|| ParseKeyError::UnknownKey(original.to_string()))?;
+    let code =
+        parse_key_code(key).ok_or_else(|| ParseKeyError::UnknownKey(original.to_string()))?;
     Ok(normalize_stroke(KeyStroke { code, modifiers }))
 }
 
@@ -158,7 +159,7 @@ fn is_modifier(part: &str) -> bool {
 pub(crate) fn normalize_stroke(mut stroke: KeyStroke) -> KeyStroke {
     let is_shift_tab =
         stroke.code == KeyCode::Tab && stroke.modifiers.contains(KeyModifiers::SHIFT);
-    if is_shift_tab {
+    if is_shift_tab || stroke.code == KeyCode::BackTab {
         stroke.code = KeyCode::BackTab;
         stroke.modifiers.remove(KeyModifiers::SHIFT);
         return stroke;
