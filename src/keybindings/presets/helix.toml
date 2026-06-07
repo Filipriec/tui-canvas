@@ -1,5 +1,6 @@
 [nor]
 mode = "nor"
+clear_search = ["esc"]
 move_left = ["h", "Left"]
 move_right = ["l", "Right"]
 move_up = ["k", "Up"]

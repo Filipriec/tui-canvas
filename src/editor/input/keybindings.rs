@@ -165,7 +165,8 @@ impl<D: DataProvider> FormEditor<D> {
             | CanvasKeyAction::SurroundReplace
             | CanvasKeyAction::DeleteWordBackward
             | CanvasKeyAction::DeleteToLineStart
-            | CanvasKeyAction::DeleteWordForward => None,
+            | CanvasKeyAction::DeleteWordForward
+            | CanvasKeyAction::ClearSearch => None,
             #[cfg(feature = "suggestions")]
             CanvasKeyAction::OpenSuggestions => Some(CanvasAction::TriggerSuggestions),
             #[cfg(feature = "suggestions")]

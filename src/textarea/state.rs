@@ -514,7 +514,23 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
     }
 
     pub fn active_search_match(&self) -> Option<TextAreaSearchMatch> {
-        self.active_search_match
+        // Self-validate: a stored match goes stale as soon as the text is
+        // edited (delete/change/paste shift positions). Only report it while the
+        // text it points at still equals the query, so a deleted match's
+        // highlight disappears instead of landing on whatever shifted into place.
+        let m = self.active_search_match?;
+        let query = self.search_query.as_deref()?;
+        let provider = self.editor.data_provider();
+        if m.line >= provider.line_count() || m.end <= m.start {
+            return None;
+        }
+        let actual: String = provider
+            .field_value(m.line)
+            .chars()
+            .skip(m.start)
+            .take(m.end - m.start)
+            .collect();
+        (actual == query).then_some(m)
     }
 
     pub fn search_matches_in_line(&self, line_idx: usize) -> Vec<TextAreaSearchMatch> {
@@ -1731,6 +1747,75 @@ mod tests {
         assert!(matches!(out, KeyEventOutcome::Consumed(None)));
         assert_eq!(textarea.text(), "one\ntwo\none\ntwo\nthree");
         assert_eq!(textarea.mode(), crate::canvas::modes::AppMode::Nor);
+    }
+
+    #[cfg(all(feature = "keybindings", feature = "crossterm", feature = "commandline"))]
+    #[test]
+    fn helix_active_search_match_invalidated_by_edit() {
+        use crate::keybindings::BuiltinCanvasKeybindingPreset;
+        use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+
+        let n = KeyModifiers::NONE;
+        let mut t = TextAreaState::<TextAreaProvider>::from_text("foo bar foo baz foo");
+        t.use_keybinding_preset(BuiltinCanvasKeybindingPreset::Helix);
+        t.use_default_commandline();
+        let k = |t: &mut TextAreaState<TextAreaProvider>, c: char, m: KeyModifiers| {
+            let _ = t.handle_key_event(KeyEvent::new(KeyCode::Char(c), m));
+        };
+
+        k(&mut t, 'e', n); // select first "foo"
+        k(&mut t, '*', n); // search "foo"
+        k(&mut t, 'n', n); // active match = second "foo"
+        assert!(t.active_search_match().is_some());
+
+        // Deleting the matched word removes its highlight (no stale match
+        // landing on the text that shifts into its place) and leaves the other
+        // matches highlighted at their new positions.
+        k(&mut t, 'd', n);
+        assert_eq!(t.text(), "foo bar  baz foo");
+        assert!(t.active_search_match().is_none());
+        let starts: Vec<usize> = t.search_matches().iter().map(|m| m.start).collect();
+        assert_eq!(starts, vec![0, 13]);
+    }
+
+    #[cfg(all(feature = "keybindings", feature = "crossterm", feature = "commandline"))]
+    #[test]
+    fn helix_star_then_n_and_shift_n_navigate() {
+        use crate::keybindings::BuiltinCanvasKeybindingPreset;
+        use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+
+        let n = KeyModifiers::NONE;
+        let mut t = TextAreaState::<TextAreaProvider>::from_text("foo bar foo baz foo");
+        t.use_keybinding_preset(BuiltinCanvasKeybindingPreset::Helix);
+        t.use_default_commandline();
+        let k = |t: &mut TextAreaState<TextAreaProvider>, c: char, m: KeyModifiers| {
+            let _ = t.handle_key_event(KeyEvent::new(KeyCode::Char(c), m));
+        };
+
+        // Select the first "foo" (chars 0..2) and search for it.
+        k(&mut t, 'e', n);
+        k(&mut t, '*', n);
+        assert_eq!(t.search_query(), Some("foo"));
+
+        // `n` advances to the second match (chars 8..10).
+        k(&mut t, 'n', n);
+        assert_eq!(t.cursor_position(), 10);
+
+        // `N` goes back to the first match — previously this stayed put because
+        // navigation was cursor-relative instead of match-relative.
+        k(&mut t, 'N', KeyModifiers::SHIFT);
+        assert_eq!(t.cursor_position(), 2);
+
+        // `N` again wraps around to the last match (chars 16..18).
+        k(&mut t, 'N', KeyModifiers::SHIFT);
+        assert_eq!(t.cursor_position(), 18);
+
+        // The search (and its highlight) persists for navigation...
+        assert_eq!(t.search_matches().len(), 3);
+        // ...until Esc clears it.
+        let _ = t.handle_key_event(KeyEvent::new(KeyCode::Esc, n));
+        assert_eq!(t.search_query(), None);
+        assert!(t.search_matches().is_empty());
     }
 
     #[cfg(all(feature = "keybindings", feature = "crossterm"))]

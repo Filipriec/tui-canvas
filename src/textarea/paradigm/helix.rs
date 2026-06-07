@@ -189,6 +189,10 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
                 self.delete_word_forward_helix();
                 KeyEventOutcome::Consumed(None)
             }
+            CanvasKeyAction::ClearSearch => {
+                self.clear_search();
+                KeyEventOutcome::Consumed(None)
+            }
             CanvasKeyAction::ExtendLineBelow => {
                 for _ in 0..count {
                     self.extend_line_below_helix();

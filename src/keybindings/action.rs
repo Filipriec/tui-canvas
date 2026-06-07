@@ -88,6 +88,7 @@ pub enum CanvasKeyAction {
     DeleteWordBackward,
     DeleteToLineStart,
     DeleteWordForward,
+    ClearSearch,
     Unknown(String),
 }
 
@@ -180,6 +181,7 @@ impl CanvasKeyAction {
             "delete_word_backward" => Self::DeleteWordBackward,
             "delete_to_line_start" => Self::DeleteToLineStart,
             "delete_word_forward" => Self::DeleteWordForward,
+            "clear_search" => Self::ClearSearch,
             other => Self::Unknown(other.to_string()),
         }
     }
@@ -270,6 +272,7 @@ impl CanvasKeyAction {
             Self::DeleteWordBackward => "delete_word_backward",
             Self::DeleteToLineStart => "delete_to_line_start",
             Self::DeleteWordForward => "delete_word_forward",
+            Self::ClearSearch => "clear_search",
             Self::ExtendLineBelow => "extend_line_below",
             Self::ExtendToLineBounds => "extend_to_line_bounds",
             Self::Unknown(other) => other.as_str(),
@@ -360,7 +363,8 @@ impl CanvasKeyAction {
             | Self::SurroundReplace
             | Self::DeleteWordBackward
             | Self::DeleteToLineStart
-            | Self::DeleteWordForward => return None,
+            | Self::DeleteWordForward
+            | Self::ClearSearch => return None,
             Self::EnterDecider | Self::Exit | Self::Unknown(_) => return None,
         })
     }

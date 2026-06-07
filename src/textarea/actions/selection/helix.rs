@@ -205,24 +205,51 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         self.select_word_motion_helix(count, HelixWordTarget::PrevLongWordEnd);
     }
 
-    /// Repeat the current search forward (`n`) and make the match the primary
-    /// selection, matching Helix where a search result becomes the selection.
+    /// `n` — go to the next search match and select it.
     pub(crate) fn search_next_helix(&mut self, count: usize) {
-        for _ in 0..count.max(1) {
-            if !self.find_next() {
-                break;
-            }
-        }
-        self.select_active_search_match_helix();
+        self.navigate_search_helix(true, count);
     }
 
-    /// Repeat the current search backward (`N`) and select the match.
+    /// `N` — go to the previous search match and select it.
     pub(crate) fn search_prev_helix(&mut self, count: usize) {
-        for _ in 0..count.max(1) {
-            if !self.find_previous() {
-                break;
-            }
+        self.navigate_search_helix(false, count);
+    }
+
+    /// Move to the next/previous search match relative to the *active match*
+    /// (falling back to the cursor), wrapping around, then select it. Using the
+    /// active match as the reference is what makes `N` work: after a match is
+    /// selected the cursor sits at the match's end, so a cursor-relative search
+    /// would keep re-finding the current match.
+    fn navigate_search_helix(&mut self, forward: bool, count: usize) {
+        let matches = self.search_matches();
+        if matches.is_empty() {
+            return;
         }
+        let reference = self
+            .active_search_match()
+            .map(|m| (m.line, m.start))
+            .unwrap_or_else(|| (self.current_field(), self.cursor_position()));
+
+        let mut idx = if forward {
+            matches
+                .iter()
+                .position(|m| (m.line, m.start) > reference)
+                .unwrap_or(0)
+        } else {
+            matches
+                .iter()
+                .rposition(|m| (m.line, m.start) < reference)
+                .unwrap_or(matches.len() - 1)
+        };
+        for _ in 1..count.max(1) {
+            idx = if forward {
+                (idx + 1) % matches.len()
+            } else {
+                (idx + matches.len() - 1) % matches.len()
+            };
+        }
+
+        self.active_search_match = Some(matches[idx]);
         self.select_active_search_match_helix();
     }
 
