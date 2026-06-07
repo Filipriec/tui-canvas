@@ -41,9 +41,15 @@ compile_error!(
 use std::io;
 
 use crossterm::{
-    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyModifiers},
+    event::{
+        self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyModifiers,
+        KeyboardEnhancementFlags, PopKeyboardEnhancementFlags, PushKeyboardEnhancementFlags,
+    },
     execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    terminal::{
+        disable_raw_mode, enable_raw_mode, supports_keyboard_enhancement, EnterAlternateScreen,
+        LeaveAlternateScreen,
+    },
 };
 use ratatui::{
     backend::{Backend, CrosstermBackend},
@@ -84,6 +90,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     enable_raw_mode()?;
     let mut stdout = io::stdout();
     execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
+
+    // Chords like Ctrl+Backspace and Ctrl+Shift+K are indistinguishable from
+    // plain Backspace / Ctrl+K in a legacy terminal. The Kitty keyboard
+    // protocol (supported by Alacritty, Kitty, foot, WezTerm, …) makes the
+    // terminal report the real modifiers so those bindings can fire.
+    let enhanced = supports_keyboard_enhancement().unwrap_or(false);
+    if enhanced {
+        execute!(
+            stdout,
+            PushKeyboardEnhancementFlags(
+                KeyboardEnhancementFlags::DISAMBIGUATE_ESCAPE_CODES
+                    | KeyboardEnhancementFlags::REPORT_ALL_KEYS_AS_ESCAPE_CODES
+            )
+        )?;
+    }
+
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
@@ -95,6 +117,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let res = run_app(&mut terminal, textarea);
 
+    if enhanced {
+        execute!(terminal.backend_mut(), PopKeyboardEnhancementFlags)?;
+    }
     disable_raw_mode()?;
     execute!(
         terminal.backend_mut(),
