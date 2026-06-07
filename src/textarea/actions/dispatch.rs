@@ -35,6 +35,25 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
             }
         }
 
+        // Vim's `f`/`t`/`r` likewise capture the next literal character.
+        if self.editor.keybinding_paradigm() == KeybindingParadigm::Vim {
+            if let Some(pending) = self.vim_pending {
+                if evt.kind != KeyEventKind::Press {
+                    return KeyEventOutcome::Consumed(None);
+                }
+                self.vim_pending = None;
+                if let KeyCode::Char(ch) = evt.code {
+                    if !evt.modifiers.contains(KeyModifiers::CONTROL)
+                        && !evt.modifiers.contains(KeyModifiers::ALT)
+                    {
+                        self.resolve_vim_pending(pending, ch);
+                    }
+                }
+                // Esc or any non-character key simply cancels.
+                return KeyEventOutcome::Consumed(None);
+            }
+        }
+
         #[cfg(feature = "commandline")]
         {
             let should_route_commandline = self

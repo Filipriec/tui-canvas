@@ -160,6 +160,7 @@ impl<D: DataProvider> FormEditor<D> {
             | CanvasKeyAction::TillPrevChar
             | CanvasKeyAction::ReplaceChar
             | CanvasKeyAction::RepeatLastFind
+            | CanvasKeyAction::RepeatLastFindReverse
             | CanvasKeyAction::SurroundAdd
             | CanvasKeyAction::SurroundDelete
             | CanvasKeyAction::SurroundReplace

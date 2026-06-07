@@ -82,6 +82,7 @@ pub enum CanvasKeyAction {
     TillPrevChar,
     ReplaceChar,
     RepeatLastFind,
+    RepeatLastFindReverse,
     SurroundAdd,
     SurroundDelete,
     SurroundReplace,
@@ -175,6 +176,7 @@ impl CanvasKeyAction {
             "till_prev_char" => Self::TillPrevChar,
             "replace_char" => Self::ReplaceChar,
             "repeat_last_find" => Self::RepeatLastFind,
+            "repeat_last_find_reverse" => Self::RepeatLastFindReverse,
             "surround_add" => Self::SurroundAdd,
             "surround_delete" => Self::SurroundDelete,
             "surround_replace" => Self::SurroundReplace,
@@ -266,6 +268,7 @@ impl CanvasKeyAction {
             Self::TillPrevChar => "till_prev_char",
             Self::ReplaceChar => "replace_char",
             Self::RepeatLastFind => "repeat_last_find",
+            Self::RepeatLastFindReverse => "repeat_last_find_reverse",
             Self::SurroundAdd => "surround_add",
             Self::SurroundDelete => "surround_delete",
             Self::SurroundReplace => "surround_replace",
@@ -358,6 +361,7 @@ impl CanvasKeyAction {
             | Self::TillPrevChar
             | Self::ReplaceChar
             | Self::RepeatLastFind
+            | Self::RepeatLastFindReverse
             | Self::SurroundAdd
             | Self::SurroundDelete
             | Self::SurroundReplace

@@ -301,6 +301,10 @@ pub struct TextAreaState<P: TextAreaDataProvider = TextAreaProvider> {
     pub(crate) helix_pending: Option<crate::textarea::actions::selection::helix::HelixPending>,
     /// The last `f`/`t`/`F`/`T` for `Alt-.` to repeat.
     pub(crate) helix_last_find: Option<crate::textarea::actions::selection::helix::HelixFind>,
+    /// A Vim command waiting for the next literal character (`f`, `t`, `r`, …).
+    pub(crate) vim_pending: Option<crate::textarea::actions::selection::vim::VimPending>,
+    /// The last `f`/`t`/`F`/`T` for `;`/`,` to repeat.
+    pub(crate) vim_last_find: Option<crate::textarea::actions::selection::vim::VimFind>,
     #[cfg(feature = "gui")]
     pub(crate) line_number_mode: TextAreaLineNumberMode,
     #[cfg(feature = "gui")]
@@ -327,6 +331,8 @@ impl<P: TextAreaDataProvider + Default> Default for TextAreaState<P> {
             active_search_match: None,
             helix_pending: None,
             helix_last_find: None,
+            vim_pending: None,
+            vim_last_find: None,
             #[cfg(feature = "gui")]
             line_number_mode: TextAreaLineNumberMode::None,
             #[cfg(feature = "gui")]
@@ -369,6 +375,8 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
             active_search_match: None,
             helix_pending: None,
             helix_last_find: None,
+            vim_pending: None,
+            vim_last_find: None,
             #[cfg(feature = "gui")]
             line_number_mode: TextAreaLineNumberMode::None,
             #[cfg(feature = "gui")]
@@ -1747,6 +1755,98 @@ mod tests {
         assert!(matches!(out, KeyEventOutcome::Consumed(None)));
         assert_eq!(textarea.text(), "one\ntwo\none\ntwo\nthree");
         assert_eq!(textarea.mode(), crate::canvas::modes::AppMode::Nor);
+    }
+
+    #[cfg(all(feature = "keybindings", feature = "crossterm"))]
+    #[test]
+    fn vim_visual_d_and_c_act_on_selection() {
+        use crate::canvas::modes::AppMode;
+        use crate::keybindings::CanvasKeyBindings;
+        use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+
+        let n = KeyModifiers::NONE;
+        let press = |t: &mut TextAreaState<TextAreaProvider>, c: char| {
+            let _ = t.handle_key_event(KeyEvent::new(KeyCode::Char(c), n));
+        };
+
+        // Visual `d` deletes the (inclusive) selection and returns to normal.
+        let mut t = TextAreaState::<TextAreaProvider>::from_text("hello");
+        t.set_keybindings(CanvasKeyBindings::vim_defaults());
+        press(&mut t, 'v'); // anchor at 0
+        press(&mut t, 'l'); // head -> 1
+        press(&mut t, 'l'); // head -> 2  (covers "hel")
+        press(&mut t, 'd');
+        assert_eq!(t.text(), "lo");
+        assert_eq!(t.mode(), AppMode::Nor);
+
+        // Visual `c` deletes the selection and drops into insert mode.
+        let mut t = TextAreaState::<TextAreaProvider>::from_text("hello");
+        t.set_keybindings(CanvasKeyBindings::vim_defaults());
+        press(&mut t, 'v');
+        press(&mut t, 'l');
+        press(&mut t, 'l');
+        press(&mut t, 'c');
+        assert_eq!(t.text(), "lo");
+        assert_eq!(t.mode(), AppMode::Ins);
+    }
+
+    #[cfg(all(feature = "keybindings", feature = "crossterm"))]
+    #[test]
+    fn vim_find_char_with_repeat_and_reverse() {
+        use crate::keybindings::CanvasKeyBindings;
+        use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+
+        let n = KeyModifiers::NONE;
+        let press = |t: &mut TextAreaState<TextAreaProvider>, c: char| {
+            let _ = t.handle_key_event(KeyEvent::new(KeyCode::Char(c), n));
+        };
+
+        let mut t = TextAreaState::<TextAreaProvider>::from_text("hello world");
+        t.set_keybindings(CanvasKeyBindings::vim_defaults());
+
+        press(&mut t, 'f');
+        press(&mut t, 'o'); // first 'o' at index 4
+        assert_eq!(t.cursor_position(), 4);
+
+        press(&mut t, ';'); // repeat -> 'o' at index 7
+        assert_eq!(t.cursor_position(), 7);
+
+        press(&mut t, ','); // reverse -> back to index 4
+        assert_eq!(t.cursor_position(), 4);
+
+        // `t` (till) stops one short of the target.
+        let mut t = TextAreaState::<TextAreaProvider>::from_text("hello");
+        t.set_keybindings(CanvasKeyBindings::vim_defaults());
+        press(&mut t, 't');
+        press(&mut t, 'l'); // first 'l' at index 2 -> till lands on index 1
+        assert_eq!(t.cursor_position(), 1);
+    }
+
+    #[cfg(all(feature = "keybindings", feature = "crossterm"))]
+    #[test]
+    fn vim_replace_char_and_toggle_case() {
+        use crate::keybindings::CanvasKeyBindings;
+        use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+
+        let n = KeyModifiers::NONE;
+        let press = |t: &mut TextAreaState<TextAreaProvider>, c: char| {
+            let _ = t.handle_key_event(KeyEvent::new(KeyCode::Char(c), n));
+        };
+
+        // `r` replaces the single character under the cursor.
+        let mut t = TextAreaState::<TextAreaProvider>::from_text("hello");
+        t.set_keybindings(CanvasKeyBindings::vim_defaults());
+        press(&mut t, 'r');
+        press(&mut t, 'x');
+        assert_eq!(t.text(), "xello");
+        assert_eq!(t.cursor_position(), 0);
+
+        // `~` toggles case and advances the cursor.
+        let mut t = TextAreaState::<TextAreaProvider>::from_text("abc");
+        t.set_keybindings(CanvasKeyBindings::vim_defaults());
+        press(&mut t, '~');
+        assert_eq!(t.text(), "Abc");
+        assert_eq!(t.cursor_position(), 1);
     }
 
     #[cfg(all(feature = "keybindings", feature = "crossterm", feature = "commandline"))]

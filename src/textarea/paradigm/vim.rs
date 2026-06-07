@@ -35,6 +35,80 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
                 }
                 KeyEventOutcome::Consumed(None)
             }
+            CanvasKeyAction::DeleteSelection => {
+                self.delete_selection_vim(true, count);
+                KeyEventOutcome::Consumed(None)
+            }
+            CanvasKeyAction::DeleteSelectionNoYank => {
+                self.delete_selection_vim(false, count);
+                KeyEventOutcome::Consumed(None)
+            }
+            CanvasKeyAction::ChangeSelection => {
+                self.change_selection_vim(count);
+                KeyEventOutcome::Consumed(None)
+            }
+            CanvasKeyAction::SwitchCase => {
+                if self.mode() == AppMode::Sel {
+                    self.switch_case_selection_vim();
+                } else {
+                    self.toggle_case_char_vim(count);
+                }
+                KeyEventOutcome::Consumed(None)
+            }
+            CanvasKeyAction::IndentSelection => {
+                self.indent_selection_vim(count);
+                KeyEventOutcome::Consumed(None)
+            }
+            CanvasKeyAction::UnindentSelection => {
+                self.unindent_selection_vim(count);
+                KeyEventOutcome::Consumed(None)
+            }
+            CanvasKeyAction::FindNextChar => {
+                self.set_vim_pending(crate::textarea::actions::selection::vim::VimPending::Find {
+                    till: false,
+                    forward: true,
+                    count,
+                });
+                KeyEventOutcome::Consumed(None)
+            }
+            CanvasKeyAction::FindPrevChar => {
+                self.set_vim_pending(crate::textarea::actions::selection::vim::VimPending::Find {
+                    till: false,
+                    forward: false,
+                    count,
+                });
+                KeyEventOutcome::Consumed(None)
+            }
+            CanvasKeyAction::TillNextChar => {
+                self.set_vim_pending(crate::textarea::actions::selection::vim::VimPending::Find {
+                    till: true,
+                    forward: true,
+                    count,
+                });
+                KeyEventOutcome::Consumed(None)
+            }
+            CanvasKeyAction::TillPrevChar => {
+                self.set_vim_pending(crate::textarea::actions::selection::vim::VimPending::Find {
+                    till: true,
+                    forward: false,
+                    count,
+                });
+                KeyEventOutcome::Consumed(None)
+            }
+            CanvasKeyAction::ReplaceChar => {
+                self.set_vim_pending(
+                    crate::textarea::actions::selection::vim::VimPending::Replace { count },
+                );
+                KeyEventOutcome::Consumed(None)
+            }
+            CanvasKeyAction::RepeatLastFind => {
+                self.repeat_last_find_vim(false, count);
+                KeyEventOutcome::Consumed(None)
+            }
+            CanvasKeyAction::RepeatLastFindReverse => {
+                self.repeat_last_find_vim(true, count);
+                KeyEventOutcome::Consumed(None)
+            }
             _ => self.execute_canvas_key_action(action, count),
         }
     }
