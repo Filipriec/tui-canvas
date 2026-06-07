@@ -32,7 +32,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
     }
 
     fn paste_yank_vim(&mut self, after: bool, count: usize) {
-        let Some(register) = self.editor.behavior_state.yank().register().cloned() else {
+        let Some(register) = self.core.behavior_state.yank().register().cloned() else {
             return;
         };
 
@@ -63,7 +63,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
     }
 
     fn paste_yank_helix(&mut self, after: bool, count: usize) {
-        let Some(register) = self.editor.behavior_state.yank().register().cloned() else {
+        let Some(register) = self.core.behavior_state.yank().register().cloned() else {
             return;
         };
 
@@ -94,7 +94,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
     }
 
     fn paste_yank_emacs(&mut self, after: bool, count: usize) {
-        let Some(register) = self.editor.behavior_state.yank().register().cloned() else {
+        let Some(register) = self.core.behavior_state.yank().register().cloned() else {
             return;
         };
 
@@ -125,10 +125,10 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
             return;
         }
 
-        self.editor
+        self.core
             .record_checkpoint(crate::editor::features::history::EditKind::Other);
 
-        let mut content = self.editor.data_provider().capture_content();
+        let mut content = self.core.data_provider().capture_content();
         let current = self.current_field().min(content.len().saturating_sub(1));
         let insert_at = if after {
             current.saturating_add(1).min(content.len())
@@ -143,7 +143,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         }
 
         content.splice(insert_at..insert_at, insert);
-        self.editor.data_provider_mut().restore_content(&content);
+        self.core.data_provider_mut().restore_content(&content);
         let _ = self.transition_to_field(insert_at.min(content.len().saturating_sub(1)));
         self.move_line_start();
         self.set_mode(AppMode::Nor);
@@ -158,10 +158,10 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
             return;
         }
 
-        self.editor
+        self.core
             .record_checkpoint(crate::editor::features::history::EditKind::Other);
 
-        let mut content = self.editor.data_provider().capture_content();
+        let mut content = self.core.data_provider().capture_content();
         let current = self.current_field().min(content.len().saturating_sub(1));
         let insert_at = if after {
             current.saturating_add(1).min(content.len())
@@ -176,7 +176,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         }
 
         content.splice(insert_at..insert_at, insert);
-        self.editor.data_provider_mut().restore_content(&content);
+        self.core.data_provider_mut().restore_content(&content);
         let _ = self.transition_to_field(insert_at.min(content.len().saturating_sub(1)));
         self.move_line_start();
         self.ui_state.current_mode = AppMode::Nor;
@@ -192,14 +192,14 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
             return;
         }
 
-        self.editor
+        self.core
             .record_checkpoint(crate::editor::features::history::EditKind::Other);
 
         if self.mode() == AppMode::Sel {
             self.exit_highlight_mode_emacs();
         }
 
-        let mut content = self.editor.data_provider().capture_content();
+        let mut content = self.core.data_provider().capture_content();
         let current = self.current_field().min(content.len().saturating_sub(1));
         let insert_at = if after {
             current.saturating_add(1).min(content.len())
@@ -214,7 +214,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         }
 
         content.splice(insert_at..insert_at, insert);
-        self.editor.data_provider_mut().restore_content(&content);
+        self.core.data_provider_mut().restore_content(&content);
         let _ = self.transition_to_field(insert_at.min(content.len().saturating_sub(1)));
         self.move_line_start();
         self.set_mode(AppMode::Nor);
@@ -225,10 +225,10 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
     }
 
     fn insert_text_at(&mut self, field: usize, col: usize, text: &str) -> (usize, usize) {
-        self.editor
+        self.core
             .record_checkpoint(crate::editor::features::history::EditKind::Other);
 
-        let mut content = self.editor.data_provider().capture_content();
+        let mut content = self.core.data_provider().capture_content();
         if content.is_empty() {
             content.push(String::new());
         }
@@ -254,7 +254,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
             (field.saturating_add(parts.len() - 1), last.chars().count())
         };
 
-        self.editor.data_provider_mut().restore_content(&content);
+        self.core.data_provider_mut().restore_content(&content);
         target
     }
 }

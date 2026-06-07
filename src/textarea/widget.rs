@@ -170,7 +170,7 @@ fn styled_segment_line<'a, P: TextAreaDataProvider>(
             state,
             line_idx,
             state
-                .editor
+                .core
                 .data_provider()
                 .field_value(line_idx)
                 .chars()
@@ -372,7 +372,7 @@ fn resolve_start_line_and_intra_indented(
     state: &TextAreaState<impl TextAreaDataProvider>,
     inner: Rect,
 ) -> (usize, u16) {
-    let provider = state.editor.data_provider();
+    let provider = state.core.data_provider();
     let total = provider.line_count();
 
     if total == 0 {
@@ -427,7 +427,7 @@ impl<'a, P: TextAreaDataProvider> StatefulWidget for TextArea<'a, P> {
         let edited_now = state.take_edited_flag();
 
         let wrap_mode = matches!(state.overflow_mode, TextOverflowMode::Wrap);
-        let provider = state.editor.data_provider();
+        let provider = state.core.data_provider();
         let total = provider.line_count();
 
         let (start, intra) = resolve_start_line_and_intra_indented(state, content);

@@ -56,7 +56,7 @@ impl<'a> TextAreaSyntax<'a> {
 }
 
 fn resolve_start_line_and_intra_indented(state: &TextAreaSyntaxState, inner: Rect) -> (usize, u16) {
-    let provider = state.textarea.editor.data_provider();
+    let provider = state.textarea.core.data_provider();
     let total = provider.line_count();
 
     if total == 0 {
@@ -185,7 +185,7 @@ impl<'a> StatefulWidget for TextAreaSyntax<'a> {
         let edited_now = state.textarea.take_edited_flag();
 
         let wrap_mode = matches!(state.textarea.overflow_mode, TextOverflowMode::Wrap);
-        let provider = state.textarea.editor.data_provider();
+        let provider = state.textarea.core.data_provider();
         let total = provider.line_count();
 
         let (start, intra) = resolve_start_line_and_intra_indented(state, content);

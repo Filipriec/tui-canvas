@@ -7,7 +7,7 @@ use std::io;
 
 #[cfg(feature = "cursor-style")]
 use crate::{canvas::modes::AppMode, CursorManager};
-use crate::editor::FormEditor;
+use crate::editor::TextForm;
 #[cfg(feature = "gui")]
 use crate::gui_utils::{
     compute_h_scroll_with_padding, display_cols_up_to, display_width, RIGHT_PAD,
@@ -17,7 +17,7 @@ use crate::textinput::provider::{TextInputDataProvider, TextInputProvider};
 #[cfg(feature = "gui")]
 use ratatui::{layout::Rect, widgets::Block};
 
-pub type TextInputEditor<P = TextInputProvider> = FormEditor<P>;
+pub type TextInputEditor<P = TextInputProvider> = TextForm<P>;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TextInputEventOutcome {
@@ -28,13 +28,13 @@ pub enum TextInputEventOutcome {
 
 /// Single-line text input widget state.
 ///
-/// Wraps a single-field [`FormEditor`]. Editing, cursor, and movement methods
-/// from the engine are available directly, and the engine can be reached
-/// explicitly via [`TextInputState::editor`] / [`TextInputState::editor_mut`].
+/// Wraps a single-field [`TextForm`]. Editing, cursor, and movement methods
+/// from the form are available directly, and the form can be reached explicitly
+/// via [`TextInputState::editor`] / [`TextInputState::editor_mut`].
 /// With the `validation` and `computed` features enabled, the corresponding
 /// helper methods are re-exposed as inherent methods on this type.
 pub struct TextInputState<P: TextInputDataProvider = TextInputProvider> {
-    pub(crate) editor: TextInputEditor<P>,
+    pub(crate) form: TextInputEditor<P>,
     pub(crate) placeholder: Option<String>,
     pub(crate) suggestion_suffix: Option<String>,
     pub(crate) overflow_indicator: char,
@@ -46,7 +46,7 @@ pub struct TextInputState<P: TextInputDataProvider = TextInputProvider> {
 impl<P: TextInputDataProvider + Default> Default for TextInputState<P> {
     fn default() -> Self {
         Self {
-            editor: FormEditor::new(P::default()),
+            form: TextForm::new(P::default()),
             placeholder: None,
             suggestion_suffix: None,
             overflow_indicator: '$',
@@ -61,20 +61,20 @@ impl<P: TextInputDataProvider> Deref for TextInputState<P> {
     type Target = TextInputEditor<P>;
 
     fn deref(&self) -> &Self::Target {
-        &self.editor
+        &self.form
     }
 }
 
 impl<P: TextInputDataProvider> DerefMut for TextInputState<P> {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.editor
+        &mut self.form
     }
 }
 
 impl<P: TextInputDataProvider> TextInputState<P> {
     pub fn with_provider(provider: P) -> Self {
         Self {
-            editor: FormEditor::new(provider),
+            form: TextForm::new(provider),
             placeholder: None,
             suggestion_suffix: None,
             overflow_indicator: '$',
@@ -89,13 +89,13 @@ impl<P: TextInputDataProvider> TextInputState<P> {
     }
 
     pub fn text(&self) -> String {
-        self.editor.data_provider().to_text()
+        self.form.data_provider().to_text()
     }
 
     pub fn set_text<S: Into<String>>(&mut self, text: S) {
-        self.editor.data_provider_mut().set_text(text.into());
-        self.editor.ui_state.current_field = 0;
-        self.editor
+        self.form.data_provider_mut().set_text(text.into());
+        self.form.ui_state.current_field = 0;
+        self.form
             .set_cursor_raw(self.current_text().chars().count());
         self.clear_suggestion_suffix();
         self.h_scroll = 0;
@@ -338,94 +338,104 @@ impl<P: TextInputDataProvider> TextInputState<P> {
 }
 
 impl<P: TextInputDataProvider> TextInputState<P> {
-    /// Borrow the underlying [`FormEditor`] engine.
+    /// Borrow the underlying [`TextForm`].
     ///
-    /// `TextInputState` is a thin wrapper around a single-field `FormEditor`.
-    /// Use this for engine functionality not re-exposed directly on the wrapper.
+    /// `TextInputState` is a thin wrapper around a single-field `TextForm`.
+    /// Use this for form functionality not re-exposed directly on the wrapper.
     pub fn editor(&self) -> &TextInputEditor<P> {
-        &self.editor
+        &self.form
     }
 
-    /// Mutably borrow the underlying [`FormEditor`] engine.
+    /// Mutably borrow the underlying [`TextForm`].
     pub fn editor_mut(&mut self) -> &mut TextInputEditor<P> {
-        &mut self.editor
+        &mut self.form
+    }
+
+    /// Borrow the underlying [`TextForm`].
+    pub fn form(&self) -> &TextInputEditor<P> {
+        &self.form
+    }
+
+    /// Mutably borrow the underlying [`TextForm`].
+    pub fn form_mut(&mut self) -> &mut TextInputEditor<P> {
+        &mut self.form
     }
 
     /// Move to the start of the next word.
     pub fn move_word_next(&mut self) {
-        self.editor.move_word_next();
+        self.form.move_word_next();
     }
 
     /// Move to the start of the previous word.
     pub fn move_word_prev(&mut self) {
-        self.editor.move_word_prev();
+        self.form.move_word_prev();
     }
 
     /// Move to the end of the current/next word.
     pub fn move_word_end(&mut self) {
-        self.editor.move_word_end();
+        self.form.move_word_end();
     }
 
     /// Move to the end of the previous word.
     pub fn move_word_end_prev(&mut self) {
-        self.editor.move_word_end_prev();
+        self.form.move_word_end_prev();
     }
 
     /// Move to the start of the next WORD (whitespace-delimited, vim `W`).
     pub fn move_big_word_next(&mut self) {
-        self.editor.move_big_word_next();
+        self.form.move_big_word_next();
     }
 
     /// Move to the start of the previous WORD (vim `B`).
     pub fn move_big_word_prev(&mut self) {
-        self.editor.move_big_word_prev();
+        self.form.move_big_word_prev();
     }
 
     /// Move to the end of the current/next WORD (vim `E`).
     pub fn move_big_word_end(&mut self) {
-        self.editor.move_big_word_end();
+        self.form.move_big_word_end();
     }
 
     /// Move to the end of the previous WORD (vim `gE`).
     pub fn move_big_word_end_prev(&mut self) {
-        self.editor.move_big_word_end_prev();
+        self.form.move_big_word_end_prev();
     }
 
     /// Enter edit mode with the cursor positioned for append (vim `a`).
     pub fn enter_append_mode(&mut self) {
-        self.editor.enter_append_mode();
+        self.form.enter_append_mode();
     }
 
     /// The current field's display text (mask/formatter-aware when the
     /// `validation` feature is enabled; otherwise the raw text).
     #[cfg(feature = "validation")]
     pub fn current_display_text(&self) -> String {
-        self.editor.current_display_text()
+        self.form.current_display_text()
     }
 
     /// The current field's text (raw; no validation feature for masking).
     #[cfg(not(feature = "validation"))]
     pub fn current_display_text(&self) -> String {
-        self.editor.current_text().to_string()
+        self.form.current_text().to_string()
     }
 
     /// Cursor position in display coordinates (accounts for a display mask).
     pub fn display_cursor_position(&self) -> usize {
-        self.editor.display_cursor_position()
+        self.form.display_cursor_position()
     }
 }
 
-/// Validation helpers, re-exposed from the underlying [`FormEditor`] so they are
+/// Validation helpers, re-exposed from the underlying [`TextForm`] so they are
 /// part of `TextInputState`'s own public API rather than only reachable through
 /// `Deref`.
 #[cfg(feature = "validation")]
 impl<P: TextInputDataProvider> TextInputState<P> {
     pub fn set_validation_enabled(&mut self, enabled: bool) {
-        self.editor.set_validation_enabled(enabled);
+        self.form.set_validation_enabled(enabled);
     }
 
     pub fn is_validation_enabled(&self) -> bool {
-        self.editor.is_validation_enabled()
+        self.form.is_validation_enabled()
     }
 
     pub fn set_field_validation(
@@ -433,65 +443,65 @@ impl<P: TextInputDataProvider> TextInputState<P> {
         field_index: usize,
         config: crate::validation::ValidationConfig,
     ) {
-        self.editor.set_field_validation(field_index, config);
+        self.form.set_field_validation(field_index, config);
     }
 
     pub fn remove_field_validation(&mut self, field_index: usize) {
-        self.editor.remove_field_validation(field_index);
+        self.form.remove_field_validation(field_index);
     }
 
     pub fn validate_current_field(&mut self) -> crate::validation::ValidationResult {
-        self.editor.validate_current_field()
+        self.form.validate_current_field()
     }
 
     pub fn validate_field(
         &mut self,
         field_index: usize,
     ) -> Option<crate::validation::ValidationResult> {
-        self.editor.validate_field(field_index)
+        self.form.validate_field(field_index)
     }
 
     pub fn clear_validation_results(&mut self) {
-        self.editor.clear_validation_results();
+        self.form.clear_validation_results();
     }
 
     pub fn validation_summary(&self) -> crate::validation::ValidationSummary {
-        self.editor.validation_summary()
+        self.form.validation_summary()
     }
 
     pub fn can_switch_fields(&self) -> bool {
-        self.editor.can_switch_fields()
+        self.form.can_switch_fields()
     }
 
     pub fn field_switch_block_reason(&self) -> Option<String> {
-        self.editor.field_switch_block_reason()
+        self.form.field_switch_block_reason()
     }
 
     pub fn last_switch_block(&self) -> Option<&str> {
-        self.editor.last_switch_block()
+        self.form.last_switch_block()
     }
 
     pub fn current_limits_status_text(&self) -> Option<String> {
-        self.editor.current_limits_status_text()
+        self.form.current_limits_status_text()
     }
 
     pub fn current_formatter_warning(&self) -> Option<String> {
-        self.editor.current_formatter_warning()
+        self.form.current_formatter_warning()
     }
 
     pub fn external_validation_of(
         &self,
         field_index: usize,
     ) -> crate::validation::ExternalValidationState {
-        self.editor.external_validation_of(field_index)
+        self.form.external_validation_of(field_index)
     }
 
     pub fn clear_all_external_validation(&mut self) {
-        self.editor.clear_all_external_validation();
+        self.form.clear_all_external_validation();
     }
 
     pub fn clear_external_validation(&mut self, field_index: usize) {
-        self.editor.clear_external_validation(field_index);
+        self.form.clear_external_validation(field_index);
     }
 
     pub fn set_external_validation(
@@ -499,142 +509,142 @@ impl<P: TextInputDataProvider> TextInputState<P> {
         field_index: usize,
         state: crate::validation::ExternalValidationState,
     ) {
-        self.editor.set_external_validation(field_index, state);
+        self.form.set_external_validation(field_index, state);
     }
 
     pub fn set_external_validation_callback<F>(&mut self, callback: F)
     where
         F: FnMut(usize, &str) -> crate::validation::ExternalValidationState + Send + Sync + 'static,
     {
-        self.editor.set_external_validation_callback(callback);
+        self.form.set_external_validation_callback(callback);
     }
 }
 
-/// Computed-field helpers, re-exposed from the underlying [`FormEditor`].
+/// Computed-field helpers, re-exposed from the underlying [`TextForm`].
 #[cfg(feature = "computed")]
 impl<P: TextInputDataProvider> TextInputState<P> {
     pub fn register_computed_provider<C>(&mut self, provider: &C)
     where
         C: crate::computed::ComputedProvider,
     {
-        self.editor.register_computed_provider(provider);
+        self.form.register_computed_provider(provider);
     }
 
     pub fn set_computed_provider<C>(&mut self, provider: C)
     where
         C: crate::computed::ComputedProvider,
     {
-        self.editor.set_computed_provider(provider);
+        self.form.set_computed_provider(provider);
     }
 
     pub fn recompute_fields<C>(&mut self, provider: &mut C, field_indices: &[usize])
     where
         C: crate::computed::ComputedProvider,
     {
-        self.editor.recompute_fields(provider, field_indices);
+        self.form.recompute_fields(provider, field_indices);
     }
 
     pub fn recompute_all_fields<C>(&mut self, provider: &mut C)
     where
         C: crate::computed::ComputedProvider,
     {
-        self.editor.recompute_all_fields(provider);
+        self.form.recompute_all_fields(provider);
     }
 
     pub fn on_field_changed<C>(&mut self, provider: &mut C, changed_field: usize)
     where
         C: crate::computed::ComputedProvider,
     {
-        self.editor.on_field_changed(provider, changed_field);
+        self.form.on_field_changed(provider, changed_field);
     }
 
     pub fn effective_field_value(&self, field_index: usize) -> String {
-        self.editor.effective_field_value(field_index)
+        self.form.effective_field_value(field_index)
     }
 }
 
-/// Undo/redo, re-exposed from the underlying [`FormEditor`].
+/// Undo/redo, re-exposed from the underlying [`TextForm`].
 impl<P: TextInputDataProvider> TextInputState<P> {
     pub fn undo(&mut self) -> bool {
-        self.editor.undo()
+        self.form.undo()
     }
 
     pub fn redo(&mut self) -> bool {
-        self.editor.redo()
+        self.form.redo()
     }
 
     pub fn can_undo(&self) -> bool {
-        self.editor.can_undo()
+        self.form.can_undo()
     }
 
     pub fn can_redo(&self) -> bool {
-        self.editor.can_redo()
+        self.form.can_redo()
     }
 
     pub fn clear_history(&mut self) {
-        self.editor.clear_history();
+        self.form.clear_history();
     }
 
     pub fn set_history_limit(&mut self, limit: usize) {
-        self.editor.set_history_limit(limit);
+        self.form.set_history_limit(limit);
     }
 }
 
-/// Dropdown suggestions, re-exposed from the underlying [`FormEditor`] so that
-/// `TextInput`, `TextArea`, and `FormEditor` all share one suggestions
+/// Dropdown suggestions, re-exposed from the underlying [`TextForm`] so that
+/// `TextInput`, `TextArea`, and `TextForm` all share one suggestions
 /// mechanism. Render the dropdown with
-/// `canvas::suggestions::render::render_suggestions_dropdown(.., self.editor())`.
+/// `canvas::suggestions::render::render_suggestions_dropdown(.., self.form())`.
 ///
 /// This is distinct from the lightweight inline-suffix completion
 /// ([`TextInputState::set_suggestion_suffix`]), which `TextInput` also offers.
 #[cfg(feature = "suggestions")]
 impl<P: TextInputDataProvider> TextInputState<P> {
     pub fn open_suggestions(&mut self, field_index: usize) {
-        self.editor.open_suggestions(field_index);
+        self.form.open_suggestions(field_index);
     }
 
     pub fn trigger_suggestions(&mut self) -> Option<(usize, String)> {
-        self.editor.trigger_suggestions()
+        self.form.trigger_suggestions()
     }
 
     pub fn apply_suggestions(&mut self, items: Vec<crate::SuggestionItem>) {
-        self.editor.apply_suggestions(items);
+        self.form.apply_suggestions(items);
     }
 
     pub fn update_suggestions(&mut self, items: Vec<crate::SuggestionItem>) {
-        self.editor.update_suggestions(items);
+        self.form.update_suggestions(items);
     }
 
     pub fn dismiss_suggestions(&mut self) {
-        self.editor.dismiss_suggestions();
+        self.form.dismiss_suggestions();
     }
 
     pub fn cancel_suggestions(&mut self) {
-        self.editor.cancel_suggestions();
+        self.form.cancel_suggestions();
     }
 
     pub fn suggestions_next(&mut self) {
-        self.editor.suggestions_next();
+        self.form.suggestions_next();
     }
 
     pub fn suggestions_prev(&mut self) {
-        self.editor.suggestions_prev();
+        self.form.suggestions_prev();
     }
 
     pub fn apply_suggestion(&mut self) -> Option<String> {
-        self.editor.apply_suggestion()
+        self.form.apply_suggestion()
     }
 
     pub fn is_suggestions_active(&self) -> bool {
-        self.editor.is_suggestions_active()
+        self.form.is_suggestions_active()
     }
 
     pub fn is_suggestions_loading(&self) -> bool {
-        self.editor.ui_state().is_suggestions_loading()
+        self.form.ui_state().is_suggestions_loading()
     }
 
     pub fn dropdown_suggestions(&self) -> &[crate::SuggestionItem] {
-        self.editor.suggestions()
+        self.form.suggestions()
     }
 }
 

@@ -17,7 +17,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
     pub fn handle_key_event(&mut self, evt: KeyEvent) -> KeyEventOutcome {
         // A Helix command (`f`, `t`, `r`, …) waiting for a literal character
         // captures the next key before anything else routes it.
-        if self.editor.keybinding_paradigm().is_helix() {
+        if self.core.keybinding_paradigm().is_helix() {
             if let Some(pending) = self.helix_pending {
                 if evt.kind != KeyEventKind::Press {
                     return KeyEventOutcome::Consumed(None);
@@ -36,7 +36,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         }
 
         // Vim's `f`/`t`/`r` likewise capture the next literal character.
-        if self.editor.keybinding_paradigm() == KeybindingParadigm::Vim {
+        if self.core.keybinding_paradigm() == KeybindingParadigm::Vim {
             if let Some(pending) = self.vim_pending {
                 if evt.kind != KeyEventKind::Press {
                     return KeyEventOutcome::Consumed(None);
@@ -55,8 +55,8 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
                 // If the pending char was a find motion delimiting an operator
                 // (`dfx`, `dtx`), apply the operator now that the cursor moved;
                 // `f`/`t` are inclusive, `F`/`T` exclusive (inclusive == forward).
-                if let Some(op) = self.editor.behavior_state.vim().pending_operator() {
-                    self.editor.behavior_state.vim_mut().clear_pending_operator();
+                if let Some(op) = self.core.behavior_state.vim().pending_operator() {
+                    self.core.behavior_state.vim_mut().clear_pending_operator();
                     if resolved {
                         if let crate::textarea::actions::selection::vim::VimPending::Find {
                             forward,
@@ -112,11 +112,11 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
             return KeyEventOutcome::NotMatched;
         }
 
-        let mode = self.editor.ui_state.mode();
+        let mode = self.core.ui_state.mode();
 
         if mode == AppMode::Ins && matches!(evt.code, KeyCode::Enter) {
             // VSCode: typing over a selection (here, a newline) replaces it.
-            if self.editor.keybinding_paradigm() == KeybindingParadigm::Vscode
+            if self.core.keybinding_paradigm() == KeybindingParadigm::Vscode
                 && self.vscode_selection_active()
             {
                 self.vscode_delete_selection();
@@ -126,11 +126,11 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         }
 
         if mode != AppMode::Ins
-            && self.editor.keybinding_paradigm() == KeybindingParadigm::Vim
+            && self.core.keybinding_paradigm() == KeybindingParadigm::Vim
         {
             if let KeyCode::Char(ch) = evt.code {
                 if let Some(digit) = ch.to_digit(10) {
-                    let vim = self.editor.behavior_state.vim_mut();
+                    let vim = self.core.behavior_state.vim_mut();
                     if digit > 0 || vim.has_count() {
                         vim.push_count_digit(digit as usize);
                         return KeyEventOutcome::Pending;
@@ -144,17 +144,17 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
             modifiers: evt.modifiers,
         };
 
-        self.editor.seq_tracker.add_key(stroke);
+        self.core.seq_tracker.add_key(stroke);
 
-        let Some(keybindings) = self.editor.keybindings.as_ref() else {
+        let Some(keybindings) = self.core.keybindings.as_ref() else {
             return KeyEventOutcome::NotMatched;
         };
         let (matched, is_prefix) =
-            keybindings.lookup_action(mode, self.editor.seq_tracker.sequence());
+            keybindings.lookup_action(mode, self.core.seq_tracker.sequence());
 
         if let Some(action) = matched.cloned() {
             let count = self.take_vim_count();
-            self.editor.seq_tracker.reset();
+            self.core.seq_tracker.reset();
             return self.dispatch_textarea_key_action(&action, count);
         }
 
@@ -162,10 +162,10 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
             return KeyEventOutcome::Pending;
         }
 
-        self.editor.seq_tracker.reset();
-        self.editor.behavior_state.vim_mut().reset_count();
+        self.core.seq_tracker.reset();
+        self.core.behavior_state.vim_mut().reset_count();
         // An unmatched key (e.g. Esc) cancels a half-typed operator.
-        self.editor.behavior_state.vim_mut().clear_pending_operator();
+        self.core.behavior_state.vim_mut().clear_pending_operator();
 
         if mode == AppMode::Ins {
             match evt.code {
@@ -178,7 +178,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
                     let is_plain = m.is_empty() || m == KeyModifiers::SHIFT;
                     if is_plain {
                         // VSCode: typing over a selection replaces it.
-                        if self.editor.keybinding_paradigm() == KeybindingParadigm::Vscode
+                        if self.core.keybinding_paradigm() == KeybindingParadigm::Vscode
                             && self.vscode_selection_active()
                         {
                             self.vscode_delete_selection();
@@ -201,7 +201,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
     }
 
     fn take_vim_count(&mut self) -> usize {
-        self.editor.behavior_state.vim_mut().take_count_or_one()
+        self.core.behavior_state.vim_mut().take_count_or_one()
     }
 
     fn dispatch_textarea_key_action(
@@ -209,7 +209,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         action: &CanvasKeyAction,
         count: usize,
     ) -> KeyEventOutcome {
-        match self.editor.keybinding_paradigm() {
+        match self.core.keybinding_paradigm() {
             KeybindingParadigm::Helix => self.dispatch_textarea_key_action_helix(action, count),
             KeybindingParadigm::Emacs => self.dispatch_textarea_key_action_emacs(action, count),
             KeybindingParadigm::Vscode => self.dispatch_textarea_key_action_vscode(action, count),

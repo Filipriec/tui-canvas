@@ -3,10 +3,10 @@ use crate::cursor::CursorManager;
 
 use crate::canvas::modes::AppMode;
 use crate::canvas::state::SelectionState;
-use crate::editor::FormEditor;
+use crate::editor::EditorCore;
 use crate::DataProvider;
 
-impl<D: DataProvider> FormEditor<D> {
+impl<D: DataProvider> EditorCore<D> {
     pub(crate) fn ensure_helix_primary_selection(&mut self) {
         if self.ui_state.current_mode != AppMode::Nor {
             return;

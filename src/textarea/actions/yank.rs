@@ -11,9 +11,9 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
                 let current = self.current_field();
                 let start = anchor_field.min(current);
                 let end = anchor_field.max(current);
-                let lines = self.editor.data_provider().capture_content();
+                let lines = self.core.data_provider().capture_content();
                 if start < lines.len() {
-                    self.editor
+                    self.core
                         .behavior_state
                         .yank_mut()
                         .set_line_register(lines[start..=end.min(lines.len() - 1)].to_vec());
@@ -23,7 +23,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
                 let cursor = (self.current_field(), self.cursor_position());
                 let start = anchor.min(cursor);
                 let end = anchor.max(cursor);
-                let lines = self.editor.data_provider().capture_content();
+                let lines = self.core.data_provider().capture_content();
                 if start.0 >= lines.len() || end.0 >= lines.len() {
                     return;
                 }
@@ -53,7 +53,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
                     let last: String = lines[end.0].chars().take(end.1 + 1).collect();
                     yanked.push(last);
                 }
-                self.editor
+                self.core
                     .behavior_state
                     .yank_mut()
                     .set_text_register(yanked);

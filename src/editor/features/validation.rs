@@ -1,9 +1,9 @@
 // src/editor/features/validation.rs
 
-use crate::editor::FormEditor;
+use crate::editor::EditorCore;
 use crate::DataProvider;
 
-impl<D: DataProvider> FormEditor<D> {
+impl<D: DataProvider> EditorCore<D> {
     #[cfg(feature = "validation")]
     pub fn set_validation_enabled(&mut self, enabled: bool) {
         self.ui_state.validation.set_enabled(enabled);

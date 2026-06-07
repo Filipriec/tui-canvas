@@ -2,7 +2,7 @@
 #[cfg(feature = "crossterm")]
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 
-use crate::editor::FormEditor;
+use crate::editor::EditorCore;
 use crate::DataProvider;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -12,7 +12,7 @@ pub enum FormInputEventOutcome {
     Submitted,
 }
 
-impl<D: DataProvider> FormEditor<D> {
+impl<D: DataProvider> EditorCore<D> {
     pub fn paste(&mut self, text: &str) -> FormInputEventOutcome {
         let filtered: String = text
             .chars()
@@ -138,7 +138,7 @@ mod tests {
     use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 
     use super::FormInputEventOutcome;
-    use crate::{DataProvider, FormEditor};
+    use crate::{editor::EditorCore, DataProvider};
 
     #[derive(Default)]
     struct TestProvider {
@@ -171,7 +171,7 @@ mod tests {
 
     #[test]
     fn paste_filters_line_breaks_in_form_fields() {
-        let mut editor = FormEditor::new(TestProvider::default());
+        let mut editor = EditorCore::new(TestProvider::default());
         editor.enter_edit_mode();
 
         let outcome = editor.paste("ab\r\ncd");
@@ -182,7 +182,7 @@ mod tests {
 
     #[test]
     fn enter_submits_on_last_field() {
-        let mut editor = FormEditor::new(TestProvider::default());
+        let mut editor = EditorCore::new(TestProvider::default());
         let _ = editor.next_field();
 
         let outcome = editor.input(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
@@ -193,7 +193,7 @@ mod tests {
 
     #[test]
     fn handle_event_routes_paste() {
-        let mut editor = FormEditor::new(TestProvider::default());
+        let mut editor = EditorCore::new(TestProvider::default());
         editor.enter_edit_mode();
 
         let outcome = editor.handle_event(Event::Paste("hello".to_string()));

@@ -18,5 +18,6 @@ pub mod navigation;
 
 pub mod input;
 
-// Re-export the main type
-pub use core::FormEditor;
+// Re-export the editor core and public fixed-row form surface.
+#[allow(deprecated)]
+pub use core::{EditorCore, FormEditor, TextForm};

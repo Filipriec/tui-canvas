@@ -24,11 +24,11 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
             return;
         }
 
-        self.editor
+        self.core
             .record_checkpoint(crate::editor::features::history::EditKind::Delete);
 
         let kept: String = current.chars().take(cursor).collect();
-        self.editor
+        self.core
             .data_provider_mut()
             .set_field_value(line_idx, kept);
         self.set_cursor_position(cursor);
@@ -50,15 +50,15 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
     }
 
     pub fn delete_current_lines(&mut self, count: usize) {
-        self.editor
+        self.core
             .record_checkpoint(crate::editor::features::history::EditKind::Other);
 
         let current_line = self.current_field();
-        let mut lines = self.editor.data_provider().capture_content();
+        let mut lines = self.core.data_provider().capture_content();
         let count = count.max(1);
 
         if lines.len() <= 1 {
-            self.editor.data_provider_mut().set_text(String::new());
+            self.core.data_provider_mut().set_text(String::new());
             self.set_cursor_position(0);
         } else {
             let remove_idx = current_line.min(lines.len() - 1);
@@ -67,7 +67,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
             if lines.is_empty() {
                 lines.push(String::new());
             }
-            self.editor.data_provider_mut().restore_content(&lines);
+            self.core.data_provider_mut().restore_content(&lines);
             let target = remove_idx.min(lines.len() - 1);
             let _ = self.transition_to_field(target);
             self.move_line_start();
@@ -81,11 +81,11 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
     }
 
     pub fn change_current_line(&mut self) {
-        self.editor
+        self.core
             .record_checkpoint(crate::editor::features::history::EditKind::Other);
 
         let line_idx = self.current_field();
-        self.editor
+        self.core
             .data_provider_mut()
             .set_field_value(line_idx, String::new());
         self.move_line_start();
@@ -102,16 +102,16 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
 
     pub fn join_lines_below(&mut self, count: usize) {
         let line_idx = self.current_field();
-        if line_idx + 1 >= self.editor.data_provider().field_count() {
+        if line_idx + 1 >= self.core.data_provider().field_count() {
             return;
         }
 
-        self.editor
+        self.core
             .record_checkpoint(crate::editor::features::history::EditKind::Other);
 
         let mut last_col = None;
         for _ in 0..count.max(1) {
-            if let Some(new_col) = self.editor.data_provider_mut().join_with_next(line_idx) {
+            if let Some(new_col) = self.core.data_provider_mut().join_with_next(line_idx) {
                 last_col = Some(new_col);
             } else {
                 break;
@@ -132,14 +132,14 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
     /// line's leading whitespace, leaving the cursor on the inserted space.
     pub fn join_lines_below_helix(&mut self, count: usize) {
         let line_idx = self.current_field();
-        if line_idx + 1 >= self.editor.data_provider().field_count() {
+        if line_idx + 1 >= self.core.data_provider().field_count() {
             return;
         }
 
-        self.editor
+        self.core
             .record_checkpoint(crate::editor::features::history::EditKind::Other);
 
-        let mut content = self.editor.data_provider().capture_content();
+        let mut content = self.core.data_provider().capture_content();
         let mut cursor_col = self.cursor_position();
         for _ in 0..count.max(1) {
             if line_idx + 1 >= content.len() {
@@ -155,7 +155,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
             };
             content.remove(line_idx + 1);
         }
-        self.editor.data_provider_mut().restore_content(&content);
+        self.core.data_provider_mut().restore_content(&content);
 
         let _ = self.transition_to_field(line_idx);
         self.set_cursor_position(cursor_col);
@@ -181,7 +181,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
     /// carrying the cursor with it. No-op at the bottom of the buffer.
     pub fn move_line_down(&mut self, count: usize) {
         let cur = self.current_field();
-        let last = self.editor.data_provider().field_count().saturating_sub(1);
+        let last = self.core.data_provider().field_count().saturating_sub(1);
         if cur >= last {
             return;
         }
@@ -196,18 +196,18 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         if cur == target {
             return;
         }
-        self.editor
+        self.core
             .record_checkpoint(crate::editor::features::history::EditKind::Other);
 
         let col = self.cursor_position();
-        let mut lines = self.editor.data_provider().capture_content();
+        let mut lines = self.core.data_provider().capture_content();
         if cur >= lines.len() {
             return;
         }
         let line = lines.remove(cur);
         let target = target.min(lines.len());
         lines.insert(target, line);
-        self.editor.data_provider_mut().restore_content(&lines);
+        self.core.data_provider_mut().restore_content(&lines);
 
         let _ = self.transition_to_field(target);
         self.set_cursor_position(col);
@@ -230,12 +230,12 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
     }
 
     fn duplicate_current_line(&mut self, count: usize, downward: bool) {
-        self.editor
+        self.core
             .record_checkpoint(crate::editor::features::history::EditKind::Other);
 
         let col = self.cursor_position();
         let cur = self.current_field();
-        let mut lines = self.editor.data_provider().capture_content();
+        let mut lines = self.core.data_provider().capture_content();
         if cur >= lines.len() {
             return;
         }
@@ -245,7 +245,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         for _ in 0..copies {
             lines.insert(insert_at.min(lines.len()), line.clone());
         }
-        self.editor.data_provider_mut().restore_content(&lines);
+        self.core.data_provider_mut().restore_content(&lines);
 
         // Downward leaves the cursor on the first new copy; upward keeps it on
         // the topmost copy, which now sits at the original index.
@@ -264,7 +264,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
     #[cfg(feature = "keybindings")]
     pub(crate) fn copy_current_line(&mut self) {
         let line = self.current_text().to_string();
-        self.editor
+        self.core
             .behavior_state
             .yank_mut()
             .set_line_register(vec![line]);

@@ -30,7 +30,7 @@ pub(crate) struct VimFind {
 
 impl<P: TextAreaDataProvider> TextAreaState<P> {
     fn field_chars_vim(&self, field: usize) -> Vec<char> {
-        self.editor
+        self.core
             .data_provider()
             .field_value(field)
             .chars()
@@ -98,15 +98,15 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         let cursor = self.cursor_position();
         let end = (cursor + count.max(1) - 1).min(len - 1);
 
-        self.editor.ui_state.selection = SelectionState::Characterwise {
+        self.core.ui_state.selection = SelectionState::Characterwise {
             anchor: (field, cursor),
         };
-        self.editor.ui_state.set_cursor(end, len, false);
+        self.core.ui_state.set_cursor(end, len, false);
         self.switch_case_selection_helix(HelixCase::Toggle);
 
         let next = (end + 1).min(len.saturating_sub(1));
-        self.editor.ui_state.set_cursor(next, len, false);
-        self.editor.ui_state.selection = SelectionState::None;
+        self.core.ui_state.set_cursor(next, len, false);
+        self.core.ui_state.selection = SelectionState::None;
     }
 
     /// `r<char>`: replace `count` characters under the cursor with `ch`. Fails
@@ -122,15 +122,15 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         }
         let end = cursor + count - 1;
 
-        self.editor.ui_state.selection = SelectionState::Characterwise {
+        self.core.ui_state.selection = SelectionState::Characterwise {
             anchor: (field, cursor),
         };
-        self.editor.ui_state.set_cursor(end, len, false);
+        self.core.ui_state.set_cursor(end, len, false);
         self.replace_selection_with_char_helix(ch);
 
         // Vim leaves the cursor on the last replaced character.
-        self.editor.ui_state.set_cursor(end, len, false);
-        self.editor.ui_state.selection = SelectionState::None;
+        self.core.ui_state.set_cursor(end, len, false);
+        self.core.ui_state.selection = SelectionState::None;
     }
 
     /// `f`/`F`/`t`/`T`: move the cursor to the `count`-th occurrence of `ch` on
@@ -181,11 +181,11 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
                 SelectionState::Characterwise { anchor } => *anchor,
                 _ => (field, cursor),
             };
-            self.editor.ui_state.set_cursor(pos, len, false);
-            self.editor.ui_state.selection = SelectionState::Characterwise { anchor };
+            self.core.ui_state.set_cursor(pos, len, false);
+            self.core.ui_state.selection = SelectionState::Characterwise { anchor };
         } else {
-            self.editor.ui_state.set_cursor(pos, len, false);
-            self.editor.ui_state.selection = SelectionState::None;
+            self.core.ui_state.set_cursor(pos, len, false);
+            self.core.ui_state.selection = SelectionState::None;
         }
     }
 

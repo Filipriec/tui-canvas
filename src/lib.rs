@@ -64,7 +64,8 @@ pub use data_provider::DataProvider;
 pub use data_provider::{SuggestionItem, SuggestionQuery, SuggestionTrigger};
 #[cfg(feature = "crossterm")]
 pub use editor::input::normal::FormInputEventOutcome;
-pub use editor::FormEditor;
+#[allow(deprecated)]
+pub use editor::{FormEditor, TextForm};
 
 pub use canvas::modes::AppMode;
 pub use canvas::state::EditorState;

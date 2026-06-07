@@ -10,19 +10,19 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
                 let current = self.current_field();
                 let start = anchor_field.min(current);
                 let end = anchor_field.max(current);
-                let lines = self.editor.data_provider().capture_content();
+                let lines = self.core.data_provider().capture_content();
                 if start >= lines.len() {
                     return false;
                 }
 
                 if yank {
-                    self.editor.behavior_state.yank_mut().set_line_register(
+                    self.core.behavior_state.yank_mut().set_line_register(
                         lines[start..=end.min(lines.len() - 1)]
                             .to_vec(),
                     );
                 }
 
-                self.editor
+                self.core
                     .record_checkpoint(crate::editor::features::history::EditKind::Delete);
 
                 let mut content = lines;
@@ -34,7 +34,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
                         content.push(String::new());
                     }
                 }
-                self.editor.data_provider_mut().restore_content(&content);
+                self.core.data_provider_mut().restore_content(&content);
                 let target = start.min(content.len().saturating_sub(1));
                 let _ = self.transition_to_field(target);
                 self.move_line_start();
@@ -52,20 +52,20 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
 
                 let start = anchor.min(cursor);
                 let end = anchor.max(cursor);
-                let lines = self.editor.data_provider().capture_content();
+                let lines = self.core.data_provider().capture_content();
                 if start.0 >= lines.len() || end.0 >= lines.len() {
                     return false;
                 }
 
                 if yank {
                     let yanked = self.extract_characterwise_text(&lines, start, end);
-                    self.editor
+                    self.core
                         .behavior_state
                         .yank_mut()
                         .set_text_register(yanked);
                 }
 
-                self.editor
+                self.core
                     .record_checkpoint(crate::editor::features::history::EditKind::Delete);
 
                 let mut content = lines;
@@ -95,7 +95,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
                     }
                 }
 
-                self.editor.data_provider_mut().restore_content(&content);
+                self.core.data_provider_mut().restore_content(&content);
                 let _ = self.transition_to_field(start.0);
                 self.set_cursor_position(start.1);
                 #[cfg(feature = "gui")]
@@ -117,19 +117,19 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         if col < line_len {
             if yank {
                 let ch: String = current.chars().skip(col).take(1).collect();
-                self.editor
+                self.core
                     .behavior_state
                     .yank_mut()
                     .set_text_register(vec![ch]);
             }
-            self.editor
+            self.core
                 .record_checkpoint(crate::editor::features::history::EditKind::Delete);
             let kept: String = current
                 .chars()
                 .enumerate()
                 .filter_map(|(idx, ch)| if idx == col { None } else { Some(ch) })
                 .collect();
-            self.editor
+            self.core
                 .data_provider_mut()
                 .set_field_value(line_idx, kept);
             #[cfg(feature = "gui")]
@@ -139,21 +139,21 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
             return true;
         }
 
-        if line_idx + 1 < self.editor.data_provider().field_count() {
+        if line_idx + 1 < self.core.data_provider().field_count() {
             if yank {
                 let text = self
-                    .editor
+                    .core
                     .data_provider()
                     .field_value(line_idx + 1)
                     .to_string();
-                self.editor
+                self.core
                     .behavior_state
                     .yank_mut()
                     .set_text_register(vec![text]);
             }
-            self.editor
+            self.core
                 .record_checkpoint(crate::editor::features::history::EditKind::Delete);
-            if let Some(new_col) = self.editor.data_provider_mut().join_with_next(line_idx) {
+            if let Some(new_col) = self.core.data_provider_mut().join_with_next(line_idx) {
                 self.set_cursor_position(new_col);
                 #[cfg(feature = "gui")]
                 {

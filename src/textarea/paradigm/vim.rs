@@ -14,7 +14,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
     ) -> KeyEventOutcome {
         // An operator (`d`/`c`/`y`) is waiting for its motion: the next action
         // delimits the range instead of running on its own.
-        if self.editor.behavior_state.vim().has_pending_operator() {
+        if self.core.behavior_state.vim().has_pending_operator() {
             return self.apply_operator_motion_vim(action, count);
         }
 
@@ -148,9 +148,9 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         }
 
         let current = self.current_field();
-        let lines = self.editor.data_provider().capture_content();
+        let lines = self.core.data_provider().capture_content();
         if lines.is_empty() {
-            self.editor
+            self.core
                 .behavior_state
                 .yank_mut()
                 .set_line_register(vec![String::new()]);
@@ -158,7 +158,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         }
 
         let end = current.saturating_add(count.max(1)).min(lines.len());
-        self.editor
+        self.core
             .behavior_state
             .yank_mut()
             .set_line_register(lines[current..end].to_vec());

@@ -33,21 +33,21 @@ use std::io;
 
 use tui_canvas::{
     render_canvas_default, AppMode, CursorManager, DataProvider, DisplayMask,
-    FormEditor, ValidationConfig, ValidationConfigBuilder,
+    TextForm, ValidationConfig, ValidationConfigBuilder,
 };
 
-// FormEditor wrapper for mask demo
-struct MaskDemoFormEditor<D: DataProvider> {
-    editor: FormEditor<D>,
+// TextForm wrapper for mask demo
+struct MaskDemoTextForm<D: DataProvider> {
+    editor: TextForm<D>,
     debug_message: String,
     command_buffer: String,
     validation_enabled: bool,
     show_raw_data: bool,
 }
 
-impl<D: DataProvider> MaskDemoFormEditor<D> {
+impl<D: DataProvider> MaskDemoTextForm<D> {
     fn new(data_provider: D) -> Self {
-        let mut editor = FormEditor::new(data_provider);
+        let mut editor = TextForm::new(data_provider);
         editor.set_validation_enabled(true);
 
         Self {
@@ -443,7 +443,7 @@ impl DataProvider for MaskDemoData {
 fn handle_key_press(
     key: KeyCode,
     modifiers: KeyModifiers,
-    editor: &mut MaskDemoFormEditor<MaskDemoData>,
+    editor: &mut MaskDemoTextForm<MaskDemoData>,
 ) -> anyhow::Result<bool> {
     let mode = editor.mode();
 
@@ -583,7 +583,7 @@ fn handle_key_press(
 
 fn run_app<B: Backend>(
     terminal: &mut Terminal<B>,
-    mut editor: MaskDemoFormEditor<MaskDemoData>,
+    mut editor: MaskDemoTextForm<MaskDemoData>,
 ) -> io::Result<()> {
     loop {
         terminal.draw(|f| ui(f, &editor))?;
@@ -605,7 +605,7 @@ fn run_app<B: Backend>(
     Ok(())
 }
 
-fn ui(f: &mut Frame, editor: &MaskDemoFormEditor<MaskDemoData>) {
+fn ui(f: &mut Frame, editor: &MaskDemoTextForm<MaskDemoData>) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([Constraint::Min(8), Constraint::Length(16)])
@@ -615,11 +615,11 @@ fn ui(f: &mut Frame, editor: &MaskDemoFormEditor<MaskDemoData>) {
     render_mask_status(f, chunks[1], editor);
 }
 
-fn render_enhanced_canvas(f: &mut Frame, area: Rect, editor: &MaskDemoFormEditor<MaskDemoData>) {
+fn render_enhanced_canvas(f: &mut Frame, area: Rect, editor: &MaskDemoTextForm<MaskDemoData>) {
     render_canvas_default(f, area, &editor.editor);
 }
 
-fn render_mask_status(f: &mut Frame, area: Rect, editor: &MaskDemoFormEditor<MaskDemoData>) {
+fn render_mask_status(f: &mut Frame, area: Rect, editor: &MaskDemoTextForm<MaskDemoData>) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
@@ -759,7 +759,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut terminal = Terminal::new(backend)?;
 
     let data = MaskDemoData::new();
-    let mut editor = MaskDemoFormEditor::new(data);
+    let mut editor = MaskDemoTextForm::new(data);
 
     // Initialize with normal mode - library automatically sets block cursor
     editor.set_mode(AppMode::Nor);

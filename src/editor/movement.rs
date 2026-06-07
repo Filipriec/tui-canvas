@@ -5,10 +5,10 @@ use crate::canvas::actions::movement::word::{
     find_last_big_word_start_in_field, find_last_word_start_in_field,
 };
 use crate::canvas::modes::AppMode;
-use crate::editor::FormEditor;
+use crate::editor::EditorCore;
 use crate::DataProvider;
 
-impl<D: DataProvider> FormEditor<D> {
+impl<D: DataProvider> EditorCore<D> {
     /// Move cursor left within current field (mask-aware)
     pub fn move_left(&mut self) -> anyhow::Result<()> {
         self.break_undo_coalescing();
@@ -99,7 +99,7 @@ impl<D: DataProvider> FormEditor<D> {
     }
 }
 
-impl<D: DataProvider> FormEditor<D> {
+impl<D: DataProvider> EditorCore<D> {
     fn move_up_to_previous_field_and_set_last<F>(&mut self, mut position_for_field: F) -> bool
     where
         F: FnMut(&str) -> usize,

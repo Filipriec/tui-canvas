@@ -53,7 +53,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         let Some((start, end)) = self.emacs_region_endpoints(anchor) else {
             return false;
         };
-        let lines = self.editor.data_provider().capture_content();
+        let lines = self.core.data_provider().capture_content();
         if start.0 >= lines.len() || end.0 >= lines.len() {
             return false;
         }
@@ -74,7 +74,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
             yanked
         };
 
-        self.editor
+        self.core
             .behavior_state
             .yank_mut()
             .set_text_register(yanked);
@@ -85,12 +85,12 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         let Some((start, end)) = self.emacs_region_endpoints(anchor) else {
             return false;
         };
-        let lines = self.editor.data_provider().capture_content();
+        let lines = self.core.data_provider().capture_content();
         if start.0 >= lines.len() || end.0 >= lines.len() {
             return false;
         }
 
-        self.editor
+        self.core
             .record_checkpoint(crate::editor::features::history::EditKind::Delete);
 
         let mut content = lines;
@@ -117,7 +117,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
             }
         }
 
-        self.editor.data_provider_mut().restore_content(&content);
+        self.core.data_provider_mut().restore_content(&content);
         let _ = self.transition_to_field(start.0);
         self.set_cursor_position(start.1);
         #[cfg(feature = "gui")]

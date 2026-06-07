@@ -1,8 +1,8 @@
 // src/editor/editing.rs
-use crate::editor::FormEditor;
+use crate::editor::EditorCore;
 use crate::DataProvider;
 
-impl<D: DataProvider> FormEditor<D> {
+impl<D: DataProvider> EditorCore<D> {
     /// Open new line below (vim o)
     pub fn open_line_below(&mut self) -> anyhow::Result<()> {
         let field_count = self.data_provider.field_count();

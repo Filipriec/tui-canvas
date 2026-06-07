@@ -25,18 +25,18 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
     pub(crate) fn vscode_extend<F: FnOnce(&mut Self)>(&mut self, mv: F) {
         if !self.vscode_selection_active() {
             let anchor = (self.current_field(), self.cursor_position());
-            self.editor.ui_state.selection = SelectionState::Characterwise { anchor };
+            self.core.ui_state.selection = SelectionState::Characterwise { anchor };
         }
         mv(self);
     }
 
     pub(crate) fn vscode_clear_selection(&mut self) {
-        self.editor.ui_state.selection = SelectionState::None;
+        self.core.ui_state.selection = SelectionState::None;
     }
 
     /// Select the entire buffer (`Ctrl+A`).
     pub(crate) fn vscode_select_all(&mut self) {
-        self.editor.ui_state.selection = SelectionState::Characterwise { anchor: (0, 0) };
+        self.core.ui_state.selection = SelectionState::Characterwise { anchor: (0, 0) };
         let _ = self.move_last_line();
         self.move_line_end();
     }
@@ -60,7 +60,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         let Some((start, end)) = self.vscode_region_endpoints() else {
             return false;
         };
-        let lines = self.editor.data_provider().capture_content();
+        let lines = self.core.data_provider().capture_content();
         if start.0 >= lines.len() || end.0 >= lines.len() {
             return false;
         }
@@ -81,7 +81,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
             yanked
         };
 
-        self.editor
+        self.core
             .behavior_state
             .yank_mut()
             .set_text_register(yanked);
@@ -95,13 +95,13 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
             self.vscode_clear_selection();
             return false;
         };
-        let mut content = self.editor.data_provider().capture_content();
+        let mut content = self.core.data_provider().capture_content();
         if start.0 >= content.len() || end.0 >= content.len() {
             self.vscode_clear_selection();
             return false;
         }
 
-        self.editor
+        self.core
             .record_checkpoint(crate::editor::features::history::EditKind::Delete);
 
         if start.0 == end.0 {
@@ -118,7 +118,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
             content.drain(start.0 + 1..=end.0);
         }
 
-        self.editor.data_provider_mut().restore_content(&content);
+        self.core.data_provider_mut().restore_content(&content);
         let _ = self.transition_to_field(start.0);
         self.set_cursor_position(start.1);
         self.vscode_clear_selection();

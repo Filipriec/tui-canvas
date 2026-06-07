@@ -4,7 +4,7 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 #[cfg(feature = "keybindings")]
 use crate::canvas::actions::{ActionResult, CanvasAction};
 use crate::canvas::modes::AppMode;
-use crate::editor::FormEditor;
+use crate::editor::EditorCore;
 use crate::DataProvider;
 
 #[cfg(feature = "keybindings")]
@@ -12,7 +12,7 @@ use crate::integration::focus_handoff::{key_outcome_for_vertical_navigation, Bou
 #[cfg(feature = "keybindings")]
 use crate::keybindings::{CanvasKeyAction, KeyEventOutcome, KeyStroke};
 
-impl<D: DataProvider> FormEditor<D> {
+impl<D: DataProvider> EditorCore<D> {
     #[cfg(feature = "keybindings")]
     pub fn handle_key_event(&mut self, evt: KeyEvent) -> KeyEventOutcome {
         let mode = self.ui_state.current_mode;

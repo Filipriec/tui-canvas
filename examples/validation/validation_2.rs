@@ -32,12 +32,12 @@ use std::sync::Arc;
 
 use tui_canvas::{
     render_canvas_default, AppMode, CursorManager, CharacterFilter, DataProvider,
-    FormEditor, PatternFilters, PositionFilter, PositionRange, ValidationConfig,
+    TextForm, PatternFilters, PositionFilter, PositionRange, ValidationConfig,
     ValidationConfigBuilder,
 };
 
-struct AdvancedPatternFormEditor<D: DataProvider> {
-    editor: FormEditor<D>,
+struct AdvancedPatternTextForm<D: DataProvider> {
+    editor: TextForm<D>,
     debug_message: String,
     command_buffer: String,
     validation_enabled: bool,
@@ -45,9 +45,9 @@ struct AdvancedPatternFormEditor<D: DataProvider> {
     block_reason: Option<String>,
 }
 
-impl<D: DataProvider> AdvancedPatternFormEditor<D> {
+impl<D: DataProvider> AdvancedPatternTextForm<D> {
     fn new(data_provider: D) -> Self {
-        let mut editor = FormEditor::new(data_provider);
+        let mut editor = TextForm::new(data_provider);
         editor.set_validation_enabled(true);
 
         Self {
@@ -530,7 +530,7 @@ impl DataProvider for AdvancedPatternData {
 fn handle_key_press(
     key: KeyCode,
     modifiers: KeyModifiers,
-    editor: &mut AdvancedPatternFormEditor<AdvancedPatternData>,
+    editor: &mut AdvancedPatternTextForm<AdvancedPatternData>,
 ) -> anyhow::Result<bool> {
     let mode = editor.mode();
 
@@ -649,7 +649,7 @@ fn handle_key_press(
 
 fn run_app<B: Backend>(
     terminal: &mut Terminal<B>,
-    mut editor: AdvancedPatternFormEditor<AdvancedPatternData>,
+    mut editor: AdvancedPatternTextForm<AdvancedPatternData>,
 ) -> io::Result<()> {
     loop {
         terminal.draw(|f| ui(f, &editor))?;
@@ -671,7 +671,7 @@ fn run_app<B: Backend>(
     Ok(())
 }
 
-fn ui(f: &mut Frame, editor: &AdvancedPatternFormEditor<AdvancedPatternData>) {
+fn ui(f: &mut Frame, editor: &AdvancedPatternTextForm<AdvancedPatternData>) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([Constraint::Min(8), Constraint::Length(15)])
@@ -684,7 +684,7 @@ fn ui(f: &mut Frame, editor: &AdvancedPatternFormEditor<AdvancedPatternData>) {
 fn render_advanced_validation_status(
     f: &mut Frame,
     area: Rect,
-    editor: &AdvancedPatternFormEditor<AdvancedPatternData>,
+    editor: &AdvancedPatternTextForm<AdvancedPatternData>,
 ) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
@@ -818,7 +818,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut terminal = Terminal::new(backend)?;
 
     let data = AdvancedPatternData::new();
-    let mut editor = AdvancedPatternFormEditor::new(data);
+    let mut editor = AdvancedPatternTextForm::new(data);
 
     // Initialize with normal mode - library automatically sets block cursor
     editor.set_mode(AppMode::Nor);

@@ -114,7 +114,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         };
         let mut result = crate::canvas::actions::ActionResult::Success;
         for _ in 0..count {
-            result = self.editor.execute(canvas_action.clone());
+            result = self.core.execute(canvas_action.clone());
         }
         match result {
             crate::canvas::actions::ActionResult::Success => KeyEventOutcome::Consumed(None),

@@ -9,12 +9,12 @@ mod vim;
 #[cfg(feature = "keybindings")]
 use crate::editor::behavior::KeybindingParadigm;
 #[cfg(feature = "keybindings")]
-use crate::editor::FormEditor;
+use crate::editor::EditorCore;
 #[cfg(feature = "keybindings")]
 use crate::DataProvider;
 
 #[cfg(feature = "keybindings")]
-impl<D: DataProvider> FormEditor<D> {
+impl<D: DataProvider> EditorCore<D> {
     pub(crate) fn apply_after_mode_change_for_paradigm(&mut self) {
         match self.behavior_state.paradigm() {
             KeybindingParadigm::Helix => self.apply_after_mode_change_helix(),
