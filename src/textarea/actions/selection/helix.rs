@@ -969,7 +969,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
     pub(crate) fn extend_line_below_helix(&mut self) {
         let current = self.current_field();
         let field_count = self.core.data_provider().field_count();
-        self.ui_state.current_mode = AppMode::Nor;
+        self.core.ui_state.current_mode = AppMode::Nor;
 
         match self.selection_state().clone() {
             SelectionState::Linewise { anchor_field } => {
@@ -980,17 +980,17 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
                 if next != current {
                     let _ = self.transition_to_field(next);
                 }
-                self.ui_state.selection = SelectionState::Linewise { anchor_field };
+                self.core.ui_state.selection = SelectionState::Linewise { anchor_field };
             }
             SelectionState::Characterwise { anchor } => {
                 // Promote to a full-line selection, snapping to line bounds
                 // while preserving the existing top of the selection.
-                self.ui_state.selection = SelectionState::Linewise {
+                self.core.ui_state.selection = SelectionState::Linewise {
                     anchor_field: anchor.0,
                 };
             }
             SelectionState::None => {
-                self.ui_state.selection = SelectionState::Linewise {
+                self.core.ui_state.selection = SelectionState::Linewise {
                     anchor_field: current,
                 };
             }
@@ -999,7 +999,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
 
     pub(crate) fn extend_to_line_bounds_helix(&mut self) {
         let current = self.current_field();
-        self.ui_state.current_mode = AppMode::Nor;
+        self.core.ui_state.current_mode = AppMode::Nor;
 
         // Snap the selection to whole lines without moving to the next line,
         // preserving the existing anchor line so it doesn't collapse.
@@ -1008,7 +1008,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
             SelectionState::Characterwise { anchor } => anchor.0,
             SelectionState::None => current,
         };
-        self.ui_state.selection = SelectionState::Linewise { anchor_field };
+        self.core.ui_state.selection = SelectionState::Linewise { anchor_field };
     }
 }
 

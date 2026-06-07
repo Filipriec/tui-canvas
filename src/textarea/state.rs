@@ -1,9 +1,11 @@
 // src/textarea/state.rs
-use std::ops::{Deref, DerefMut};
-
 #[cfg(feature = "cursor-style")]
 use crate::cursor::CursorManager;
-use crate::editor::EditorCore;
+use crate::{
+    canvas::modes::AppMode,
+    canvas::state::{EditorState, SelectionState},
+    editor::EditorCore,
+};
 #[cfg(feature = "commandline")]
 use crate::{
     commandline::{CommandLineCommand, CommandLineRegistry, CommandLineState},
@@ -12,6 +14,8 @@ use crate::{
 use crate::commandline::CommandLineSubmit;
 #[cfg(all(feature = "commandline", feature = "keybindings"))]
 use crate::keybindings::KeyEventOutcome;
+#[cfg(feature = "keybindings")]
+use crate::keybindings::CanvasKeyBindings;
 #[cfg(feature = "gui")]
 use crate::gui_utils::{compute_h_scroll_with_padding, RIGHT_PAD};
 use crate::textarea::provider::{TextAreaDataProvider, TextAreaProvider};
@@ -345,20 +349,6 @@ impl<P: TextAreaDataProvider + Default> Default for TextAreaState<P> {
             #[cfg(feature = "commandline")]
             commandline: None,
         }
-    }
-}
-
-impl<P: TextAreaDataProvider> Deref for TextAreaState<P> {
-    type Target = EditorCore<P>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.core
-    }
-}
-
-impl<P: TextAreaDataProvider> DerefMut for TextAreaState<P> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.core
     }
 }
 
@@ -995,6 +985,166 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         &mut self.core
     }
 
+    pub fn current_field(&self) -> usize {
+        self.core.current_field()
+    }
+
+    pub fn cursor_position(&self) -> usize {
+        self.core.cursor_position()
+    }
+
+    pub fn current_text(&self) -> &str {
+        self.core.current_text()
+    }
+
+    pub fn mode(&self) -> AppMode {
+        self.core.mode()
+    }
+
+    pub fn ui_state(&self) -> &EditorState {
+        self.core.ui_state()
+    }
+
+    pub fn selection_state(&self) -> &SelectionState {
+        self.core.selection_state()
+    }
+
+    pub(crate) fn selection_endpoints(&self) -> ((usize, usize), (usize, usize)) {
+        self.core.selection_endpoints()
+    }
+
+    pub fn data_provider(&self) -> &P {
+        self.core.data_provider()
+    }
+
+    pub fn data_provider_mut(&mut self) -> &mut P {
+        self.core.data_provider_mut()
+    }
+
+    pub fn move_left(&mut self) -> anyhow::Result<()> {
+        self.core.move_left()
+    }
+
+    pub fn move_right(&mut self) -> anyhow::Result<()> {
+        self.core.move_right()
+    }
+
+    pub fn move_up(&mut self) -> bool {
+        self.core.move_up()
+    }
+
+    pub fn move_down(&mut self) -> bool {
+        self.core.move_down()
+    }
+
+    pub fn move_first_line(&mut self) -> anyhow::Result<()> {
+        self.core.move_first_line()
+    }
+
+    pub fn move_last_line(&mut self) -> anyhow::Result<()> {
+        self.core.move_last_line()
+    }
+
+    pub fn move_line_start(&mut self) {
+        self.core.move_line_start();
+    }
+
+    pub fn move_line_end(&mut self) {
+        self.core.move_line_end();
+    }
+
+    pub fn set_cursor_position(&mut self, position: usize) {
+        self.core.set_cursor_position(position);
+    }
+
+    pub(crate) fn transition_to_field(&mut self, new_field: usize) -> anyhow::Result<()> {
+        self.core.transition_to_field(new_field)
+    }
+
+    pub fn enter_edit_mode(&mut self) {
+        self.core.enter_edit_mode();
+    }
+
+    pub fn exit_edit_mode(&mut self) -> anyhow::Result<()> {
+        self.core.exit_edit_mode()
+    }
+
+    pub fn set_mode(&mut self, mode: AppMode) {
+        self.core.set_mode(mode);
+    }
+
+    pub fn is_highlight_mode(&self) -> bool {
+        self.core.is_highlight_mode()
+    }
+
+    pub fn enter_highlight_mode(&mut self) {
+        self.core.enter_highlight_mode();
+    }
+
+    pub fn enter_highlight_line_mode(&mut self) {
+        self.core.enter_highlight_line_mode();
+    }
+
+    pub fn exit_highlight_mode(&mut self) {
+        self.core.exit_highlight_mode();
+    }
+
+    #[cfg(feature = "keybindings")]
+    pub(crate) fn enter_edit_mode_vim(&mut self) {
+        self.core.enter_edit_mode_vim();
+    }
+
+    #[cfg(feature = "keybindings")]
+    pub(crate) fn set_mode_vim(&mut self, mode: AppMode) {
+        self.core.set_mode_vim(mode);
+    }
+
+    #[cfg(feature = "keybindings")]
+    pub(crate) fn exit_highlight_mode_vim(&mut self) {
+        self.core.exit_highlight_mode_vim();
+    }
+
+    #[cfg(feature = "keybindings")]
+    pub(crate) fn enter_edit_mode_helix(&mut self) {
+        self.core.enter_edit_mode_helix();
+    }
+
+    #[cfg(feature = "keybindings")]
+    pub(crate) fn exit_highlight_mode_helix(&mut self) {
+        self.core.exit_highlight_mode_helix();
+    }
+
+    #[cfg(feature = "keybindings")]
+    pub(crate) fn ensure_helix_primary_selection(&mut self) {
+        self.core.ensure_helix_primary_selection();
+    }
+
+    #[cfg(feature = "keybindings")]
+    pub(crate) fn collapse_helix_selection_to_cursor(&mut self) {
+        self.core.collapse_helix_selection_to_cursor();
+    }
+
+    #[cfg(feature = "keybindings")]
+    pub(crate) fn exit_highlight_mode_emacs(&mut self) {
+        self.core.exit_highlight_mode_emacs();
+    }
+
+    pub fn insert_char(&mut self, ch: char) -> anyhow::Result<()> {
+        self.core.insert_char(ch)
+    }
+
+    pub fn insert_text(&mut self, text: &str) -> anyhow::Result<()> {
+        self.core.insert_text(text)
+    }
+
+    pub fn delete_backward(&mut self) -> anyhow::Result<()> {
+        self.core.delete_backward()
+    }
+
+    pub fn delete_forward(&mut self) -> anyhow::Result<()> {
+        self.core.delete_forward()
+    }
+
     /// Install a built-in keybinding preset and its editing paradigm.
     #[cfg(feature = "keybindings")]
     pub fn use_keybinding_preset(
@@ -1002,6 +1152,12 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         preset: crate::keybindings::BuiltinCanvasKeybindingPreset,
     ) {
         self.core.set_keybinding_preset(preset);
+    }
+
+    /// Set custom keybindings for this textarea instance.
+    #[cfg(feature = "keybindings")]
+    pub fn set_keybindings(&mut self, keybindings: CanvasKeyBindings) {
+        self.core.set_keybindings(keybindings);
     }
 
     /// Move to the start of the next word.
@@ -1086,8 +1242,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
 }
 
 /// Validation helpers, re-exposed from the underlying [`EditorCore`] so they are
-/// part of `TextAreaState`'s own public API rather than only reachable through
-/// `Deref`.
+/// part of `TextAreaState`'s own public API.
 #[cfg(feature = "validation")]
 impl<P: TextAreaDataProvider> TextAreaState<P> {
     pub fn set_validation_enabled(&mut self, enabled: bool) {

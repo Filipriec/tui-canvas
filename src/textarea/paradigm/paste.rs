@@ -83,7 +83,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
                 let (target_field, target_col) = self.insert_text_at(field, col, &text);
                 let _ = self.transition_to_field(target_field);
                 self.set_cursor_position(target_col);
-                self.ui_state.current_mode = AppMode::Nor;
+                self.core.ui_state.current_mode = AppMode::Nor;
                 self.ensure_helix_primary_selection();
                 #[cfg(feature = "gui")]
                 {
@@ -179,7 +179,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         self.core.data_provider_mut().restore_content(&content);
         let _ = self.transition_to_field(insert_at.min(content.len().saturating_sub(1)));
         self.move_line_start();
-        self.ui_state.current_mode = AppMode::Nor;
+        self.core.ui_state.current_mode = AppMode::Nor;
         self.ensure_helix_primary_selection();
         #[cfg(feature = "gui")]
         {

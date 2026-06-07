@@ -87,21 +87,21 @@ Terminal cursor changes automatically!
     // Mode transitions with automatic cursor management
 
     fn enter_insert_mode(&mut self) -> std::io::Result<()> {
-        self.textarea.enter_edit_mode(); // Direct EditorCore method call via Deref!
+        self.textarea.enter_edit_mode();
         CursorManager::update_for_mode(AppMode::Ins)?; // Automatic: cursor becomes bar |
         self.debug_message = "INSERT MODE - Cursor: |".to_string();
         Ok(())
     }
 
     fn enter_append_mode(&mut self) -> std::io::Result<()> {
-        self.textarea.enter_append_mode(); // Direct EditorCore method call!
+        self.textarea.enter_append_mode();
         CursorManager::update_for_mode(AppMode::Ins)?;
         self.debug_message = "INSERT (append) - Cursor: |".to_string();
         Ok(())
     }
 
     fn exit_to_normal_mode(&mut self) -> std::io::Result<()> {
-        self.textarea.exit_edit_mode(); // Direct EditorCore method call!
+        self.textarea.exit_edit_mode();
         CursorManager::update_for_mode(AppMode::Nor)?; // Automatic: cursor becomes steady block
         self.debug_message = "NORMAL MODE - Cursor: █".to_string();
         Ok(())
@@ -130,7 +130,7 @@ Terminal cursor changes automatically!
         self.has_unsaved_changes = true;
     }
 
-    // Movement operations using direct EditorCore methods
+    // Movement operations using textarea methods
 
     fn move_left(&mut self) {
         self.textarea.move_left();

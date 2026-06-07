@@ -1,5 +1,3 @@
-use std::ops::{Deref, DerefMut};
-
 #[cfg(feature = "crossterm")]
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 #[cfg(feature = "cursor-style")]
@@ -7,7 +5,7 @@ use std::io;
 
 #[cfg(feature = "cursor-style")]
 use crate::{canvas::modes::AppMode, CursorManager};
-use crate::editor::TextForm;
+use crate::{canvas::state::EditorState, editor::TextForm};
 #[cfg(feature = "gui")]
 use crate::gui_utils::{
     compute_h_scroll_with_padding, display_cols_up_to, display_width, RIGHT_PAD,
@@ -55,20 +53,6 @@ impl<P: TextInputDataProvider + Default> Default for TextInputState<P> {
     }
 }
 
-impl<P: TextInputDataProvider> Deref for TextInputState<P> {
-    type Target = TextForm<P>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.form
-    }
-}
-
-impl<P: TextInputDataProvider> DerefMut for TextInputState<P> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.form
-    }
-}
-
 impl<P: TextInputDataProvider> TextInputState<P> {
     pub fn with_provider(provider: P) -> Self {
         Self {
@@ -93,8 +77,8 @@ impl<P: TextInputDataProvider> TextInputState<P> {
     pub fn set_text<S: Into<String>>(&mut self, text: S) {
         self.form.data_provider_mut().set_text(text.into());
         self.form.ui_state.current_field = 0;
-        self.form
-            .set_cursor_raw(self.current_text().chars().count());
+        let cursor = self.current_text().chars().count();
+        self.form.set_cursor_raw(cursor);
         self.clear_suggestion_suffix();
         self.h_scroll = 0;
     }
@@ -346,6 +330,82 @@ impl<P: TextInputDataProvider> TextInputState<P> {
         &mut self.form
     }
 
+    pub fn current_field(&self) -> usize {
+        self.form.current_field()
+    }
+
+    pub fn cursor_position(&self) -> usize {
+        self.form.cursor_position()
+    }
+
+    pub fn current_text(&self) -> &str {
+        self.form.current_text()
+    }
+
+    pub fn mode(&self) -> crate::canvas::modes::AppMode {
+        self.form.mode()
+    }
+
+    pub fn ui_state(&self) -> &EditorState {
+        self.form.ui_state()
+    }
+
+    pub fn data_provider(&self) -> &P {
+        self.form.data_provider()
+    }
+
+    pub fn data_provider_mut(&mut self) -> &mut P {
+        self.form.data_provider_mut()
+    }
+
+    pub fn move_left(&mut self) -> anyhow::Result<()> {
+        self.form.move_left()
+    }
+
+    pub fn move_right(&mut self) -> anyhow::Result<()> {
+        self.form.move_right()
+    }
+
+    pub fn move_line_start(&mut self) {
+        self.form.move_line_start();
+    }
+
+    pub fn move_line_end(&mut self) {
+        self.form.move_line_end();
+    }
+
+    pub fn set_cursor_position(&mut self, position: usize) {
+        self.form.set_cursor_position(position);
+    }
+
+    pub fn enter_edit_mode(&mut self) {
+        self.form.enter_edit_mode();
+    }
+
+    pub fn exit_edit_mode(&mut self) -> anyhow::Result<()> {
+        self.form.exit_edit_mode()
+    }
+
+    pub fn insert_char(&mut self, ch: char) -> anyhow::Result<()> {
+        self.form.insert_char(ch)
+    }
+
+    pub fn insert_text(&mut self, text: &str) -> anyhow::Result<()> {
+        self.form.insert_text(text)
+    }
+
+    pub fn set_current_field_value(&mut self, value: String) {
+        self.form.set_current_field_value(value);
+    }
+
+    pub fn delete_backward(&mut self) -> anyhow::Result<()> {
+        self.form.delete_backward()
+    }
+
+    pub fn delete_forward(&mut self) -> anyhow::Result<()> {
+        self.form.delete_forward()
+    }
+
     /// Move to the start of the next word.
     pub fn move_word_next(&mut self) {
         self.form.move_word_next();
@@ -411,8 +471,7 @@ impl<P: TextInputDataProvider> TextInputState<P> {
 }
 
 /// Validation helpers, re-exposed from the underlying [`TextForm`] so they are
-/// part of `TextInputState`'s own public API rather than only reachable through
-/// `Deref`.
+/// part of `TextInputState`'s own public API.
 #[cfg(feature = "validation")]
 impl<P: TextInputDataProvider> TextInputState<P> {
     pub fn set_validation_enabled(&mut self, enabled: bool) {
