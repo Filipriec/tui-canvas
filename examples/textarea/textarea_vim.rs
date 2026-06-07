@@ -37,7 +37,7 @@ use ratatui::{
 use std::io;
 use std::time::Duration;
 
-use canvas::{
+use tui_canvas::{
     render_canvas_default, AppMode, CursorManager, TextArea, TextAreaState,
 };
 

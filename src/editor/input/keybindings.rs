@@ -124,6 +124,9 @@ impl<D: DataProvider> FormEditor<D> {
             | CanvasKeyAction::DeleteToLineEnd
             | CanvasKeyAction::ChangeLine
             | CanvasKeyAction::ChangeToLineEnd
+            | CanvasKeyAction::OperatorDelete
+            | CanvasKeyAction::OperatorChange
+            | CanvasKeyAction::OperatorYank
             | CanvasKeyAction::JoinLineBelow
             | CanvasKeyAction::YankLine
             | CanvasKeyAction::PasteAfter

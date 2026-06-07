@@ -29,7 +29,7 @@ use ratatui::{
     Frame, Terminal,
 };
 
-use canvas::{keybindings::CanvasKeyBindings, render_canvas_default, DataProvider, FormEditor};
+use tui_canvas::{keybindings::CanvasKeyBindings, render_canvas_default, DataProvider, FormEditor};
 
 struct App {
     editor: FormEditor<Form>,

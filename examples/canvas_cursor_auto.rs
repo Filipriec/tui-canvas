@@ -31,7 +31,7 @@ use ratatui::{
 };
 use std::io;
 
-use canvas::{
+use tui_canvas::{
     render_canvas_default,
     AppMode,
     CursorManager, // This import only exists when cursor-style feature is enabled
@@ -96,7 +96,7 @@ impl<D: DataProvider> AutoCursorFormEditor<D> {
 
     fn update_visual_selection(&mut self) {
         if self.editor.is_highlight_mode() {
-            use canvas::canvas::state::SelectionState;
+            use tui_canvas::canvas::state::SelectionState;
             match self.editor.selection_state() {
                 SelectionState::Characterwise { anchor } => {
                     self.debug_message = format!(
@@ -276,7 +276,7 @@ impl<D: DataProvider> AutoCursorFormEditor<D> {
         self.editor.data_provider()
     }
 
-    fn ui_state(&self) -> &canvas::EditorState {
+    fn ui_state(&self) -> &tui_canvas::EditorState {
         self.editor.ui_state()
     }
 
@@ -457,7 +457,7 @@ fn handle_key_press(
 
         // From Visual Mode: Switch between visual modes or exit
         (AppMode::Sel, KeyCode::Char('v'), _) => {
-            use canvas::canvas::state::SelectionState;
+            use tui_canvas::canvas::state::SelectionState;
             match editor.editor.selection_state() {
                 SelectionState::Characterwise { .. } => {
                     // Already in characterwise mode, exit visual mode (vim behavior)
@@ -475,7 +475,7 @@ fn handle_key_press(
         }
 
         (AppMode::Sel, KeyCode::Char('V'), _) => {
-            use canvas::canvas::state::SelectionState;
+            use tui_canvas::canvas::state::SelectionState;
             match editor.editor.selection_state() {
                 SelectionState::Linewise { .. } => {
                     // Already in linewise mode, exit visual mode (vim behavior)
@@ -765,7 +765,7 @@ fn render_status_and_help(
         AppMode::Nor => "NORMAL █ (block cursor)",
         AppMode::Sel => {
             // Use library selection state instead of editor.highlight_state()
-            use canvas::canvas::state::SelectionState;
+            use tui_canvas::canvas::state::SelectionState;
             match editor.editor.selection_state() {
                 SelectionState::Characterwise { .. } => "VISUAL █ (blinking block)",
                 SelectionState::Linewise { .. } => "VISUAL LINE █ (blinking block)",

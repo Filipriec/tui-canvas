@@ -34,6 +34,9 @@ pub enum CanvasKeyAction {
     DeleteToLineEnd,
     ChangeLine,
     ChangeToLineEnd,
+    OperatorDelete,
+    OperatorChange,
+    OperatorYank,
     JoinLineBelow,
     YankLine,
     PasteAfter,
@@ -128,6 +131,9 @@ impl CanvasKeyAction {
             "delete_to_line_end" => Self::DeleteToLineEnd,
             "change_line" => Self::ChangeLine,
             "change_to_line_end" => Self::ChangeToLineEnd,
+            "operator_delete" => Self::OperatorDelete,
+            "operator_change" => Self::OperatorChange,
+            "operator_yank" => Self::OperatorYank,
             "join_line_below" => Self::JoinLineBelow,
             "yank_line" => Self::YankLine,
             "paste_after" => Self::PasteAfter,
@@ -222,6 +228,9 @@ impl CanvasKeyAction {
             Self::DeleteToLineEnd => "delete_to_line_end",
             Self::ChangeLine => "change_line",
             Self::ChangeToLineEnd => "change_to_line_end",
+            Self::OperatorDelete => "operator_delete",
+            Self::OperatorChange => "operator_change",
+            Self::OperatorYank => "operator_yank",
             Self::JoinLineBelow => "join_line_below",
             Self::YankLine => "yank_line",
             Self::PasteAfter => "paste_after",
@@ -325,6 +334,9 @@ impl CanvasKeyAction {
             | Self::DeleteToLineEnd
             | Self::ChangeLine
             | Self::ChangeToLineEnd
+            | Self::OperatorDelete
+            | Self::OperatorChange
+            | Self::OperatorYank
             | Self::JoinLineBelow
             | Self::YankLine
             |             Self::PasteAfter

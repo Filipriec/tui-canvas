@@ -13,7 +13,7 @@ compile_error!(
      Run with: cargo run --example validation_advanced_patterns --features \"validation,gui,cursor-style\""
 );
 
-use canvas::ValidationResult;
+use tui_canvas::ValidationResult;
 use crossterm::{
     event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyModifiers},
     execute,
@@ -30,7 +30,7 @@ use ratatui::{
 use std::io;
 use std::sync::Arc;
 
-use canvas::{
+use tui_canvas::{
     render_canvas_default, AppMode, CursorManager, CharacterFilter, DataProvider,
     FormEditor, PatternFilters, PositionFilter, PositionRange, ValidationConfig,
     ValidationConfigBuilder,
@@ -198,7 +198,7 @@ impl<D: DataProvider> AdvancedPatternFormEditor<D> {
     fn data_provider(&self) -> &D {
         self.editor.data_provider()
     }
-    fn ui_state(&self) -> &canvas::EditorState {
+    fn ui_state(&self) -> &tui_canvas::EditorState {
         self.editor.ui_state()
     }
     fn set_mode(&mut self, mode: AppMode) {

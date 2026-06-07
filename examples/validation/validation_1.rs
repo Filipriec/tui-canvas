@@ -16,7 +16,7 @@ compile_error!(
      Run with: cargo run --example validation_1 --features \"gui,validation,cursor-style\""
 );
 
-use canvas::{
+use tui_canvas::{
     render_canvas_default, AppMode, CursorManager, CharacterLimits, DataProvider,
     FormEditor, ValidationConfig, ValidationConfigBuilder, ValidationResult,
 };
@@ -36,7 +36,7 @@ use ratatui::{
 use std::io;
 
 // Import CountMode from the validation module directly
-use canvas::validation::limits::CountMode;
+use tui_canvas::validation::limits::CountMode;
 
 // FormEditor wrapper for validation demo
 struct ValidationFormEditor<D: DataProvider> {
@@ -339,7 +339,7 @@ impl<D: DataProvider> ValidationFormEditor<D> {
         self.editor.data_provider()
     }
 
-    fn ui_state(&self) -> &canvas::EditorState {
+    fn ui_state(&self) -> &tui_canvas::EditorState {
         self.editor.ui_state()
     }
 

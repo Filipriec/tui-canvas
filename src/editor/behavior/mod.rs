@@ -4,6 +4,8 @@ mod yank;
 
 pub(crate) use paradigm::KeybindingParadigm;
 pub(crate) use vim::VimBehaviorState;
+#[allow(unused_imports)]
+pub(crate) use vim::{VimOperator, VimPendingOperator};
 pub(crate) use yank::{YankBehaviorState, YankRegister};
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -16,6 +18,10 @@ pub(crate) struct EditorBehaviorState {
 impl EditorBehaviorState {
     pub(crate) fn vim_mut(&mut self) -> &mut VimBehaviorState {
         &mut self.vim
+    }
+
+    pub(crate) fn vim(&self) -> &VimBehaviorState {
+        &self.vim
     }
 
     pub(crate) fn yank(&self) -> &YankBehaviorState {

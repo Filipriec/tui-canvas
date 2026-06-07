@@ -25,7 +25,7 @@ use ratatui::{
     Frame, Terminal,
 };
 
-use canvas::{
+use tui_canvas::{
     integration::crossterm_input::{CrosstermInputOptions, CrosstermInputSession},
     CursorManager, TextInput, TextInputEventOutcome, TextInputState,
 };

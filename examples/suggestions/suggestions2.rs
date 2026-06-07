@@ -32,7 +32,7 @@ use ratatui::{
 };
 use std::io;
 
-use canvas::{
+use tui_canvas::{
     render_canvas_default,
     AppMode,
     CursorManager, // This import only exists when cursor-style feature is enabled
@@ -107,7 +107,7 @@ impl<D: DataProvider> AutoCursorFormEditor<D> {
 
     fn update_visual_selection(&mut self) {
         if self.editor.is_highlight_mode() {
-            use canvas::canvas::state::SelectionState;
+            use tui_canvas::canvas::state::SelectionState;
             match self.editor.selection_state() {
                 SelectionState::Characterwise { anchor } => {
                     self.debug_message = format!(
@@ -332,7 +332,7 @@ impl<D: DataProvider> AutoCursorFormEditor<D> {
         self.editor.data_provider()
     }
 
-    fn ui_state(&self) -> &canvas::EditorState {
+    fn ui_state(&self) -> &tui_canvas::EditorState {
         self.editor.ui_state()
     }
 
@@ -863,7 +863,7 @@ fn ui(f: &mut Frame, editor: &AutoCursorFormEditor<ApplicationData>) {
             f,
             chunks[0],
             input_rect,
-            &canvas::canvas::theme::DefaultCanvasTheme,
+            &tui_canvas::canvas::theme::DefaultCanvasTheme,
             &editor.editor,
         );
     }

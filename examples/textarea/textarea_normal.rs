@@ -29,7 +29,7 @@ use ratatui::{
     Frame, Terminal,
 };
 
-use canvas::{
+use tui_canvas::{
     CommandLine, CommandLineCommand, CommandLineEventOutcome, CommandLineRegistry,
     CommandLineState, CommandLineSubmit,
     integration::crossterm_input::{CrosstermInputOptions, CrosstermInputSession},

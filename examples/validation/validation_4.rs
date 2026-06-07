@@ -36,7 +36,7 @@ use ratatui::{
     Frame, Terminal,
 };
 
-use canvas::{
+use tui_canvas::{
     render_canvas_default, AppMode, CursorManager, CustomFormatter, DataProvider,
     FormEditor, FormattingResult, ValidationConfig, ValidationConfigBuilder,
 };
@@ -521,7 +521,7 @@ impl<D: DataProvider> EnhancedDemoEditor<D> {
     fn data_provider_mut(&mut self) -> &mut D {
         self.editor.data_provider_mut()
     }
-    fn ui_state(&self) -> &canvas::EditorState {
+    fn ui_state(&self) -> &tui_canvas::EditorState {
         self.editor.ui_state()
     }
 

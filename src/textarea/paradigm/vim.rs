@@ -12,6 +12,34 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         action: &CanvasKeyAction,
         count: usize,
     ) -> KeyEventOutcome {
+        // An operator (`d`/`c`/`y`) is waiting for its motion: the next action
+        // delimits the range instead of running on its own.
+        if self.editor.behavior_state.vim().has_pending_operator() {
+            return self.apply_operator_motion_vim(action, count);
+        }
+
+        match action {
+            CanvasKeyAction::OperatorDelete => {
+                self.begin_operator_vim(
+                    crate::editor::behavior::VimOperator::Delete,
+                    count,
+                );
+                return KeyEventOutcome::Consumed(None);
+            }
+            CanvasKeyAction::OperatorChange => {
+                self.begin_operator_vim(
+                    crate::editor::behavior::VimOperator::Change,
+                    count,
+                );
+                return KeyEventOutcome::Consumed(None);
+            }
+            CanvasKeyAction::OperatorYank => {
+                self.begin_operator_vim(crate::editor::behavior::VimOperator::Yank, count);
+                return KeyEventOutcome::Consumed(None);
+            }
+            _ => {}
+        }
+
         if let Some(outcome) = self.dispatch_shared_textarea_key_action(action, count) {
             return outcome;
         }

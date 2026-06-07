@@ -1600,9 +1600,10 @@ mod tests {
         textarea.set_keybindings(CanvasKeyBindings::vim_defaults());
         let _ = textarea.move_down();
 
+        // `d` now arms the operator (consumed), and the second `d` completes it.
         assert!(matches!(
             textarea.handle_key_event(KeyEvent::new(KeyCode::Char('d'), KeyModifiers::NONE)),
-            KeyEventOutcome::Pending
+            KeyEventOutcome::Consumed(None)
         ));
         let out = textarea.handle_key_event(KeyEvent::new(KeyCode::Char('d'), KeyModifiers::NONE));
         assert!(matches!(out, KeyEventOutcome::Consumed(None)));
@@ -1612,7 +1613,7 @@ mod tests {
 
         assert!(matches!(
             textarea.handle_key_event(KeyEvent::new(KeyCode::Char('c'), KeyModifiers::NONE)),
-            KeyEventOutcome::Pending
+            KeyEventOutcome::Consumed(None)
         ));
         let out = textarea.handle_key_event(KeyEvent::new(KeyCode::Char('c'), KeyModifiers::NONE));
         assert!(matches!(out, KeyEventOutcome::Consumed(None)));
@@ -1663,7 +1664,7 @@ mod tests {
         ));
         assert!(matches!(
             textarea.handle_key_event(KeyEvent::new(KeyCode::Char('d'), KeyModifiers::NONE)),
-            KeyEventOutcome::Pending
+            KeyEventOutcome::Consumed(None)
         ));
         let out = textarea.handle_key_event(KeyEvent::new(KeyCode::Char('d'), KeyModifiers::NONE));
         assert!(matches!(out, KeyEventOutcome::Consumed(None)));
@@ -1714,7 +1715,7 @@ mod tests {
 
         assert!(matches!(
             textarea.handle_key_event(KeyEvent::new(KeyCode::Char('y'), KeyModifiers::NONE)),
-            KeyEventOutcome::Pending
+            KeyEventOutcome::Consumed(None)
         ));
         let out = textarea.handle_key_event(KeyEvent::new(KeyCode::Char('y'), KeyModifiers::NONE));
         assert!(matches!(out, KeyEventOutcome::Consumed(None)));
@@ -1847,6 +1848,133 @@ mod tests {
         press(&mut t, '~');
         assert_eq!(t.text(), "Abc");
         assert_eq!(t.cursor_position(), 1);
+    }
+
+    #[cfg(all(feature = "keybindings", feature = "crossterm"))]
+    #[test]
+    fn vim_operator_charwise_motions() {
+        use crate::keybindings::CanvasKeyBindings;
+        use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+
+        let n = KeyModifiers::NONE;
+        let press = |t: &mut TextAreaState<TextAreaProvider>, c: char| {
+            let _ = t.handle_key_event(KeyEvent::new(KeyCode::Char(c), n));
+        };
+        let vim = |s: &str| {
+            let mut t = TextAreaState::<TextAreaProvider>::from_text(s);
+            t.set_keybindings(CanvasKeyBindings::vim_defaults());
+            t
+        };
+
+        // `dw` is exclusive: deletes up to the start of the next word.
+        let mut t = vim("hello world");
+        press(&mut t, 'd');
+        press(&mut t, 'w');
+        assert_eq!(t.text(), "world");
+        assert_eq!(t.cursor_position(), 0);
+
+        // `de` is inclusive: deletes through the end of the word.
+        let mut t = vim("hello world");
+        press(&mut t, 'd');
+        press(&mut t, 'e');
+        assert_eq!(t.text(), " world");
+
+        // `d$` deletes to the end of the line.
+        let mut t = vim("hello world");
+        press(&mut t, 'd');
+        press(&mut t, '$');
+        assert_eq!(t.text(), "");
+
+        // `2dw` deletes two words.
+        let mut t = vim("a b c d");
+        press(&mut t, '2');
+        press(&mut t, 'd');
+        press(&mut t, 'w');
+        assert_eq!(t.text(), "c d");
+    }
+
+    #[cfg(all(feature = "keybindings", feature = "crossterm"))]
+    #[test]
+    fn vim_operator_linewise_and_change() {
+        use crate::canvas::modes::AppMode;
+        use crate::keybindings::CanvasKeyBindings;
+        use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+
+        let n = KeyModifiers::NONE;
+        let press = |t: &mut TextAreaState<TextAreaProvider>, c: char| {
+            let _ = t.handle_key_event(KeyEvent::new(KeyCode::Char(c), n));
+        };
+        let vim = |s: &str| {
+            let mut t = TextAreaState::<TextAreaProvider>::from_text(s);
+            t.set_keybindings(CanvasKeyBindings::vim_defaults());
+            t
+        };
+
+        // `dd` deletes the current line.
+        let mut t = vim("one\ntwo\nthree");
+        press(&mut t, 'd');
+        press(&mut t, 'd');
+        assert_eq!(t.text(), "two\nthree");
+
+        // `dj` is linewise: deletes the current and next line.
+        let mut t = vim("one\ntwo\nthree");
+        press(&mut t, 'd');
+        press(&mut t, 'j');
+        assert_eq!(t.text(), "three");
+
+        // `cw` behaves like `ce` and drops into insert mode.
+        let mut t = vim("hello world");
+        press(&mut t, 'c');
+        press(&mut t, 'w');
+        assert_eq!(t.text(), " world");
+        assert_eq!(t.mode(), AppMode::Ins);
+
+        // `cc` clears the line content and enters insert mode.
+        let mut t = vim("abc");
+        press(&mut t, 'c');
+        press(&mut t, 'c');
+        assert_eq!(t.text(), "");
+        assert_eq!(t.mode(), AppMode::Ins);
+    }
+
+    #[cfg(all(feature = "keybindings", feature = "crossterm"))]
+    #[test]
+    fn vim_operator_yank_and_find() {
+        use crate::keybindings::CanvasKeyBindings;
+        use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+
+        let n = KeyModifiers::NONE;
+        let press = |t: &mut TextAreaState<TextAreaProvider>, c: char| {
+            let _ = t.handle_key_event(KeyEvent::new(KeyCode::Char(c), n));
+        };
+        let vim = |s: &str| {
+            let mut t = TextAreaState::<TextAreaProvider>::from_text(s);
+            t.set_keybindings(CanvasKeyBindings::vim_defaults());
+            t
+        };
+
+        // `yw` yanks without modifying; `P` pastes it before the cursor.
+        let mut t = vim("hello world");
+        press(&mut t, 'y');
+        press(&mut t, 'w');
+        assert_eq!(t.text(), "hello world");
+        assert_eq!(t.cursor_position(), 0);
+        press(&mut t, 'P');
+        assert_eq!(t.text(), "hello hello world");
+
+        // `df<char>` is inclusive of the found character.
+        let mut t = vim("hello world");
+        press(&mut t, 'd');
+        press(&mut t, 'f');
+        press(&mut t, 'o');
+        assert_eq!(t.text(), " world");
+
+        // `dt<char>` stops one short of the found character.
+        let mut t = vim("hello world");
+        press(&mut t, 'd');
+        press(&mut t, 't');
+        press(&mut t, 'o');
+        assert_eq!(t.text(), "o world");
     }
 
     #[cfg(all(feature = "keybindings", feature = "crossterm", feature = "commandline"))]
@@ -2270,7 +2398,7 @@ mod tests {
         ));
         assert!(matches!(
             textarea.handle_key_event(KeyEvent::new(KeyCode::Char('y'), KeyModifiers::NONE)),
-            KeyEventOutcome::Pending
+            KeyEventOutcome::Consumed(None)
         ));
         let out = textarea.handle_key_event(KeyEvent::new(KeyCode::Char('y'), KeyModifiers::NONE));
         assert!(matches!(out, KeyEventOutcome::Consumed(None)));

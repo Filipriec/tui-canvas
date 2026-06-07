@@ -42,11 +42,29 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
                     return KeyEventOutcome::Consumed(None);
                 }
                 self.vim_pending = None;
+                let mut resolved = false;
                 if let KeyCode::Char(ch) = evt.code {
                     if !evt.modifiers.contains(KeyModifiers::CONTROL)
                         && !evt.modifiers.contains(KeyModifiers::ALT)
                     {
                         self.resolve_vim_pending(pending, ch);
+                        resolved = true;
+                    }
+                }
+
+                // If the pending char was a find motion delimiting an operator
+                // (`dfx`, `dtx`), apply the operator now that the cursor moved;
+                // `f`/`t` are inclusive, `F`/`T` exclusive (inclusive == forward).
+                if let Some(op) = self.editor.behavior_state.vim().pending_operator() {
+                    self.editor.behavior_state.vim_mut().clear_pending_operator();
+                    if resolved {
+                        if let crate::textarea::actions::selection::vim::VimPending::Find {
+                            forward,
+                            ..
+                        } = pending
+                        {
+                            self.finish_operator_charwise_vim(op.operator, op.anchor, forward);
+                        }
                     }
                 }
                 // Esc or any non-character key simply cancels.
@@ -140,6 +158,8 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
 
         self.editor.seq_tracker.reset();
         self.editor.behavior_state.vim_mut().reset_count();
+        // An unmatched key (e.g. Esc) cancels a half-typed operator.
+        self.editor.behavior_state.vim_mut().clear_pending_operator();
 
         if mode == AppMode::Ins {
             match evt.code {

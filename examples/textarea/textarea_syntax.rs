@@ -29,7 +29,7 @@ use ratatui::{
 };
 use std::io;
 
-use canvas::{
+use tui_canvas::{
     textarea::highlight::{TextAreaSyntax, TextAreaSyntaxState},
     CursorManager,
 };

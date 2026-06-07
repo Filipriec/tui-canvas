@@ -27,7 +27,7 @@ use ratatui::{
 };
 use std::io;
 
-use canvas::{
+use tui_canvas::{
     render_canvas_default, AppMode,
     computed::{ComputedContext, ComputedProvider},
     DataProvider, FormEditor,
@@ -399,7 +399,7 @@ impl<D: DataProvider> ComputedFieldsEditor<D> {
     fn data_provider(&self) -> &D {
         self.editor.data_provider()
     }
-    fn ui_state(&self) -> &canvas::EditorState {
+    fn ui_state(&self) -> &tui_canvas::EditorState {
         self.editor.ui_state()
     }
     fn move_left(&mut self) {
