@@ -297,6 +297,10 @@ pub struct TextAreaState<P: TextAreaDataProvider = TextAreaProvider> {
     pub(crate) h_scroll: u16,
     pub(crate) search_query: Option<String>,
     pub(crate) active_search_match: Option<TextAreaSearchMatch>,
+    /// A Helix command waiting for the next literal character (`f`, `t`, `r`, …).
+    pub(crate) helix_pending: Option<crate::textarea::actions::selection::helix::HelixPending>,
+    /// The last `f`/`t`/`F`/`T` for `Alt-.` to repeat.
+    pub(crate) helix_last_find: Option<crate::textarea::actions::selection::helix::HelixFind>,
     #[cfg(feature = "gui")]
     pub(crate) line_number_mode: TextAreaLineNumberMode,
     #[cfg(feature = "gui")]
@@ -321,6 +325,8 @@ impl<P: TextAreaDataProvider + Default> Default for TextAreaState<P> {
             h_scroll: 0,
             search_query: None,
             active_search_match: None,
+            helix_pending: None,
+            helix_last_find: None,
             #[cfg(feature = "gui")]
             line_number_mode: TextAreaLineNumberMode::None,
             #[cfg(feature = "gui")]
@@ -361,6 +367,8 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
             h_scroll: 0,
             search_query: None,
             active_search_match: None,
+            helix_pending: None,
+            helix_last_find: None,
             #[cfg(feature = "gui")]
             line_number_mode: TextAreaLineNumberMode::None,
             #[cfg(feature = "gui")]
@@ -1723,6 +1731,237 @@ mod tests {
         assert!(matches!(out, KeyEventOutcome::Consumed(None)));
         assert_eq!(textarea.text(), "one\ntwo\none\ntwo\nthree");
         assert_eq!(textarea.mode(), crate::canvas::modes::AppMode::Nor);
+    }
+
+    #[cfg(all(feature = "keybindings", feature = "crossterm"))]
+    #[test]
+    fn helix_wave4_surround_and_insert_deletes() {
+        use crate::keybindings::BuiltinCanvasKeybindingPreset;
+        use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+
+        let mk = |text: &str| {
+            let mut t = TextAreaState::<TextAreaProvider>::from_text(text);
+            t.use_keybinding_preset(BuiltinCanvasKeybindingPreset::Helix);
+            t
+        };
+        let k = |t: &mut TextAreaState<TextAreaProvider>, c: char, m: KeyModifiers| {
+            let _ = t.handle_key_event(KeyEvent::new(KeyCode::Char(c), m));
+        };
+        let n = KeyModifiers::NONE;
+        let ctrl = KeyModifiers::CONTROL;
+        let alt = KeyModifiers::ALT;
+
+        // `ms(` wraps the selection in a pair.
+        let mut t = mk("abc");
+        k(&mut t, '%', n);
+        k(&mut t, 'm', n);
+        k(&mut t, 's', n);
+        k(&mut t, '(', n);
+        assert_eq!(t.text(), "(abc)");
+
+        // `md(` removes the surrounding pair.
+        let mut t = mk("(abc)");
+        t.set_cursor_position(2);
+        k(&mut t, 'm', n);
+        k(&mut t, 'd', n);
+        k(&mut t, '(', n);
+        assert_eq!(t.text(), "abc");
+
+        // `mr({` replaces the surrounding pair (two pending chars).
+        let mut t = mk("(abc)");
+        t.set_cursor_position(2);
+        k(&mut t, 'm', n);
+        k(&mut t, 'r', n);
+        k(&mut t, '(', n);
+        k(&mut t, '{', n);
+        assert_eq!(t.text(), "{abc}");
+
+        // Insert-mode deletes.
+        let mut t = mk("foo bar");
+        k(&mut t, 'A', n); // insert at end of line
+        k(&mut t, 'w', ctrl);
+        assert_eq!(t.text(), "foo ");
+
+        let mut t = mk("foo bar");
+        k(&mut t, 'A', n);
+        k(&mut t, 'u', ctrl);
+        assert_eq!(t.text(), "");
+
+        let mut t = mk("foo bar");
+        k(&mut t, 'i', n); // insert at start of line
+        k(&mut t, 'd', alt);
+        assert_eq!(t.text(), "bar");
+    }
+
+    #[cfg(all(feature = "keybindings", feature = "crossterm"))]
+    #[test]
+    fn helix_wave3_find_till_replace() {
+        use crate::canvas::state::SelectionState;
+        use crate::keybindings::BuiltinCanvasKeybindingPreset;
+        use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+
+        let mk = |text: &str| {
+            let mut t = TextAreaState::<TextAreaProvider>::from_text(text);
+            t.use_keybinding_preset(BuiltinCanvasKeybindingPreset::Helix);
+            t
+        };
+        let k = |t: &mut TextAreaState<TextAreaProvider>, c: char, m: KeyModifiers| {
+            let _ = t.handle_key_event(KeyEvent::new(KeyCode::Char(c), m));
+        };
+        let n = KeyModifiers::NONE;
+        let alt = KeyModifiers::ALT;
+
+        // `f<char>` selects up to and including the next match.
+        let mut t = mk("one two three");
+        k(&mut t, 'f', n);
+        k(&mut t, 'o', n);
+        assert_eq!(t.cursor_position(), 6);
+        assert!(matches!(
+            t.selection_state(),
+            SelectionState::Characterwise { anchor: (0, 0) }
+        ));
+
+        // `t<char>` stops one short of the match.
+        let mut t = mk("one two three");
+        k(&mut t, 't', n);
+        k(&mut t, 'o', n);
+        assert_eq!(t.cursor_position(), 5);
+
+        // `F<char>` searches backward.
+        let mut t = mk("one two three");
+        t.set_cursor_position(6);
+        k(&mut t, 'F', n);
+        k(&mut t, 'o', n);
+        assert_eq!(t.cursor_position(), 0);
+
+        // `Alt-.` repeats the last find.
+        let mut t = mk("oxoxox");
+        k(&mut t, 'f', n);
+        k(&mut t, 'x', n);
+        assert_eq!(t.cursor_position(), 1);
+        k(&mut t, '.', alt);
+        assert_eq!(t.cursor_position(), 3);
+
+        // `r<char>` replaces every selected char; single-char and word.
+        let mut t = mk("abcd");
+        k(&mut t, 'w', n);
+        k(&mut t, 'r', n);
+        k(&mut t, 'x', n);
+        assert_eq!(t.text(), "xxxx");
+
+        let mut t = mk("abcd");
+        k(&mut t, 'r', n);
+        k(&mut t, 'Z', n);
+        assert_eq!(t.text(), "Zbcd");
+
+        // Esc cancels a pending command without editing.
+        let mut t = mk("abcd");
+        k(&mut t, 'r', n);
+        let _ = t.handle_key_event(KeyEvent::new(KeyCode::Esc, n));
+        assert_eq!(t.text(), "abcd");
+    }
+
+    #[cfg(all(feature = "keybindings", feature = "crossterm"))]
+    #[test]
+    fn helix_wave2_indent_and_number_ops() {
+        use crate::canvas::state::SelectionState;
+        use crate::keybindings::BuiltinCanvasKeybindingPreset;
+        use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+
+        let mk = |text: &str| {
+            let mut t = TextAreaState::<TextAreaProvider>::from_text(text);
+            t.use_keybinding_preset(BuiltinCanvasKeybindingPreset::Helix);
+            t
+        };
+        let k = |t: &mut TextAreaState<TextAreaProvider>, c: char, m: KeyModifiers| {
+            let _ = t.handle_key_event(KeyEvent::new(KeyCode::Char(c), m));
+        };
+        let n = KeyModifiers::NONE;
+        let ctrl = KeyModifiers::CONTROL;
+
+        // `>` indents every selected line; `<` unindents back.
+        let mut t = mk("ab\ncd");
+        k(&mut t, '%', n);
+        k(&mut t, '>', n);
+        assert_eq!(t.text(), "    ab\n    cd");
+        k(&mut t, '<', n);
+        assert_eq!(t.text(), "ab\ncd");
+
+        // `Ctrl-a` increments the number, selecting it.
+        let mut t = mk("x 5 y");
+        k(&mut t, 'a', ctrl);
+        assert_eq!(t.text(), "x 6 y");
+        assert_eq!(t.cursor_position(), 2);
+        assert!(matches!(
+            t.selection_state(),
+            SelectionState::Characterwise { anchor: (0, 2) }
+        ));
+
+        // `Ctrl-x` decrements; negative numbers are handled.
+        let mut t = mk("x 5 y");
+        k(&mut t, 'x', ctrl);
+        assert_eq!(t.text(), "x 4 y");
+
+        let mut t = mk("v -3 w");
+        k(&mut t, 'a', ctrl);
+        assert_eq!(t.text(), "v -2 w");
+    }
+
+    #[cfg(all(feature = "keybindings", feature = "crossterm", feature = "commandline"))]
+    #[test]
+    fn helix_wave1_movement_and_selection_ops() {
+        use crate::canvas::state::SelectionState;
+        use crate::keybindings::BuiltinCanvasKeybindingPreset;
+        use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+
+        let mk = |text: &str| {
+            let mut t = TextAreaState::<TextAreaProvider>::from_text(text);
+            t.use_keybinding_preset(BuiltinCanvasKeybindingPreset::Helix);
+            t
+        };
+        let k = |t: &mut TextAreaState<TextAreaProvider>, c: char, m: KeyModifiers| {
+            let _ = t.handle_key_event(KeyEvent::new(KeyCode::Char(c), m));
+        };
+        let n = KeyModifiers::NONE;
+        let alt = KeyModifiers::ALT;
+
+        // `mm` jumps between matching brackets.
+        let mut t = mk("a(bc)d");
+        t.set_cursor_position(1);
+        k(&mut t, 'm', n);
+        k(&mut t, 'm', n);
+        assert_eq!(t.cursor_position(), 4);
+        k(&mut t, 'm', n);
+        k(&mut t, 'm', n);
+        assert_eq!(t.cursor_position(), 1);
+
+        // `*` sets the search pattern from the selection.
+        let mut t = mk("bc x bc");
+        k(&mut t, 'w', n);
+        k(&mut t, '*', n);
+        assert_eq!(t.search_query(), Some("bc "));
+
+        // `Alt-:` makes a backward selection face forward.
+        let mut t = mk("one two");
+        t.set_cursor_position(4);
+        k(&mut t, 'b', n);
+        assert_eq!(t.cursor_position(), 0);
+        k(&mut t, ':', alt);
+        assert_eq!(t.cursor_position(), 3);
+        assert!(matches!(
+            t.selection_state(),
+            SelectionState::Characterwise { anchor: (0, 0) }
+        ));
+
+        // `J` joins the next line with a single space.
+        let mut t = mk("ab\ncd");
+        k(&mut t, 'J', n);
+        assert_eq!(t.text(), "ab cd");
+
+        // `G` jumps to the last line.
+        let mut t = mk("l0\nl1\nl2");
+        k(&mut t, 'G', n);
+        assert_eq!(t.current_field(), 2);
     }
 
     #[cfg(all(feature = "keybindings", feature = "crossterm"))]

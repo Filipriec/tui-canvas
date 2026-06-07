@@ -2,7 +2,7 @@
 use crate::{
     canvas::modes::AppMode,
     keybindings::{CanvasKeyAction, KeyEventOutcome},
-    textarea::actions::selection::helix::HelixCase,
+    textarea::actions::selection::helix::{HelixCase, HelixPending},
     textarea::{TextAreaDataProvider, TextAreaState},
 };
 
@@ -13,6 +13,13 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         action: &CanvasKeyAction,
         count: usize,
     ) -> KeyEventOutcome {
+        // Helix `J` joins with a space; intercept before the shared (no-space)
+        // join handler runs.
+        if matches!(action, CanvasKeyAction::JoinLineBelow) {
+            self.join_lines_below_helix(count);
+            return KeyEventOutcome::Consumed(None);
+        }
+
         if let Some(outcome) = self.dispatch_shared_textarea_key_action(action, count) {
             return outcome;
         }
@@ -92,6 +99,94 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
             }
             CanvasKeyAction::GotoFirstNonWhitespace => {
                 self.goto_first_nonwhitespace_helix();
+                KeyEventOutcome::Consumed(None)
+            }
+            CanvasKeyAction::SearchSelection => {
+                self.search_selection_helix();
+                KeyEventOutcome::Consumed(None)
+            }
+            CanvasKeyAction::EnsureSelectionForward => {
+                self.ensure_selection_forward_helix();
+                KeyEventOutcome::Consumed(None)
+            }
+            CanvasKeyAction::MatchBrackets => {
+                self.match_brackets_helix();
+                KeyEventOutcome::Consumed(None)
+            }
+            CanvasKeyAction::IndentSelection => {
+                self.indent_selection_helix(count);
+                KeyEventOutcome::Consumed(None)
+            }
+            CanvasKeyAction::UnindentSelection => {
+                self.unindent_selection_helix(count);
+                KeyEventOutcome::Consumed(None)
+            }
+            CanvasKeyAction::IncrementNumber => {
+                self.change_number_helix(1, count);
+                KeyEventOutcome::Consumed(None)
+            }
+            CanvasKeyAction::DecrementNumber => {
+                self.change_number_helix(-1, count);
+                KeyEventOutcome::Consumed(None)
+            }
+            CanvasKeyAction::FindNextChar => {
+                self.set_helix_pending(HelixPending::Find {
+                    till: false,
+                    forward: true,
+                });
+                KeyEventOutcome::Consumed(None)
+            }
+            CanvasKeyAction::FindPrevChar => {
+                self.set_helix_pending(HelixPending::Find {
+                    till: false,
+                    forward: false,
+                });
+                KeyEventOutcome::Consumed(None)
+            }
+            CanvasKeyAction::TillNextChar => {
+                self.set_helix_pending(HelixPending::Find {
+                    till: true,
+                    forward: true,
+                });
+                KeyEventOutcome::Consumed(None)
+            }
+            CanvasKeyAction::TillPrevChar => {
+                self.set_helix_pending(HelixPending::Find {
+                    till: true,
+                    forward: false,
+                });
+                KeyEventOutcome::Consumed(None)
+            }
+            CanvasKeyAction::ReplaceChar => {
+                self.set_helix_pending(HelixPending::Replace);
+                KeyEventOutcome::Consumed(None)
+            }
+            CanvasKeyAction::RepeatLastFind => {
+                self.repeat_last_find_helix();
+                KeyEventOutcome::Consumed(None)
+            }
+            CanvasKeyAction::SurroundAdd => {
+                self.set_helix_pending(HelixPending::SurroundAdd);
+                KeyEventOutcome::Consumed(None)
+            }
+            CanvasKeyAction::SurroundDelete => {
+                self.set_helix_pending(HelixPending::SurroundDelete);
+                KeyEventOutcome::Consumed(None)
+            }
+            CanvasKeyAction::SurroundReplace => {
+                self.set_helix_pending(HelixPending::SurroundReplaceFrom);
+                KeyEventOutcome::Consumed(None)
+            }
+            CanvasKeyAction::DeleteWordBackward => {
+                self.delete_word_backward_helix();
+                KeyEventOutcome::Consumed(None)
+            }
+            CanvasKeyAction::DeleteToLineStart => {
+                self.delete_to_line_start_helix();
+                KeyEventOutcome::Consumed(None)
+            }
+            CanvasKeyAction::DeleteWordForward => {
+                self.delete_word_forward_helix();
                 KeyEventOutcome::Consumed(None)
             }
             CanvasKeyAction::ExtendLineBelow => {

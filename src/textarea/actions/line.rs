@@ -128,6 +128,44 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         }
     }
 
+    /// Helix `J`: join the next line with a single space, dropping the next
+    /// line's leading whitespace, leaving the cursor on the inserted space.
+    pub fn join_lines_below_helix(&mut self, count: usize) {
+        let line_idx = self.current_field();
+        if line_idx + 1 >= self.editor.data_provider().field_count() {
+            return;
+        }
+
+        self.editor
+            .record_checkpoint(crate::editor::features::history::EditKind::Other);
+
+        let mut content = self.editor.data_provider().capture_content();
+        let mut cursor_col = self.cursor_position();
+        for _ in 0..count.max(1) {
+            if line_idx + 1 >= content.len() {
+                break;
+            }
+            let cur = content[line_idx].trim_end().to_string();
+            let next = content[line_idx + 1].trim_start().to_string();
+            cursor_col = cur.chars().count();
+            content[line_idx] = if cur.is_empty() || next.is_empty() {
+                format!("{cur}{next}")
+            } else {
+                format!("{cur} {next}")
+            };
+            content.remove(line_idx + 1);
+        }
+        self.editor.data_provider_mut().restore_content(&content);
+
+        let _ = self.transition_to_field(line_idx);
+        self.set_cursor_position(cursor_col);
+        self.set_mode(AppMode::Nor);
+        #[cfg(feature = "gui")]
+        {
+            self.edited_this_frame = true;
+        }
+    }
+
     fn half_page_lines(&self) -> usize {
         #[cfg(feature = "gui")]
         {
@@ -150,6 +188,35 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
 
     pub fn move_half_page_down(&mut self, count: usize) {
         let steps = self.half_page_lines().saturating_mul(count.max(1));
+        for _ in 0..steps {
+            if !self.move_down() {
+                break;
+            }
+        }
+    }
+
+    fn page_lines(&self) -> usize {
+        #[cfg(feature = "gui")]
+        {
+            return (self.viewport_height as usize).max(1);
+        }
+        #[cfg(not(feature = "gui"))]
+        {
+            10
+        }
+    }
+
+    pub fn move_page_up(&mut self, count: usize) {
+        let steps = self.page_lines().saturating_mul(count.max(1));
+        for _ in 0..steps {
+            if !self.move_up() {
+                break;
+            }
+        }
+    }
+
+    pub fn move_page_down(&mut self, count: usize) {
+        let steps = self.page_lines().saturating_mul(count.max(1));
         for _ in 0..steps {
             if !self.move_down() {
                 break;

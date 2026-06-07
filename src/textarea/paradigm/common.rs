@@ -50,6 +50,12 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
             CanvasKeyAction::MoveHalfPageDown => {
                 Some(self.consume_action(|this| this.move_half_page_down(count)))
             }
+            CanvasKeyAction::MovePageUp => {
+                Some(self.consume_action(|this| this.move_page_up(count)))
+            }
+            CanvasKeyAction::MovePageDown => {
+                Some(self.consume_action(|this| this.move_page_down(count)))
+            }
             CanvasKeyAction::EnterEditModeLineStart => {
                 Some(self.consume_action(|this| this.enter_line_start_insert_mode()))
             }

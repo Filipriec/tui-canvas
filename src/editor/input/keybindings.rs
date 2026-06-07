@@ -144,7 +144,28 @@ impl<D: DataProvider> FormEditor<D> {
             | CanvasKeyAction::SwitchToLowercase
             | CanvasKeyAction::SwitchToUppercase
             | CanvasKeyAction::TrimSelections
-            | CanvasKeyAction::GotoFirstNonWhitespace => None,
+            | CanvasKeyAction::GotoFirstNonWhitespace
+            | CanvasKeyAction::MovePageUp
+            | CanvasKeyAction::MovePageDown
+            | CanvasKeyAction::SearchSelection
+            | CanvasKeyAction::EnsureSelectionForward
+            | CanvasKeyAction::MatchBrackets
+            | CanvasKeyAction::IndentSelection
+            | CanvasKeyAction::UnindentSelection
+            | CanvasKeyAction::IncrementNumber
+            | CanvasKeyAction::DecrementNumber
+            | CanvasKeyAction::FindNextChar
+            | CanvasKeyAction::FindPrevChar
+            | CanvasKeyAction::TillNextChar
+            | CanvasKeyAction::TillPrevChar
+            | CanvasKeyAction::ReplaceChar
+            | CanvasKeyAction::RepeatLastFind
+            | CanvasKeyAction::SurroundAdd
+            | CanvasKeyAction::SurroundDelete
+            | CanvasKeyAction::SurroundReplace
+            | CanvasKeyAction::DeleteWordBackward
+            | CanvasKeyAction::DeleteToLineStart
+            | CanvasKeyAction::DeleteWordForward => None,
             #[cfg(feature = "suggestions")]
             CanvasKeyAction::OpenSuggestions => Some(CanvasAction::TriggerSuggestions),
             #[cfg(feature = "suggestions")]

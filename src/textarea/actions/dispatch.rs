@@ -15,6 +15,26 @@ use crate::{
 #[cfg(feature = "keybindings")]
 impl<P: TextAreaDataProvider> TextAreaState<P> {
     pub fn handle_key_event(&mut self, evt: KeyEvent) -> KeyEventOutcome {
+        // A Helix command (`f`, `t`, `r`, …) waiting for a literal character
+        // captures the next key before anything else routes it.
+        if self.editor.keybinding_paradigm().is_helix() {
+            if let Some(pending) = self.helix_pending {
+                if evt.kind != KeyEventKind::Press {
+                    return KeyEventOutcome::Consumed(None);
+                }
+                self.helix_pending = None;
+                if let KeyCode::Char(ch) = evt.code {
+                    if !evt.modifiers.contains(KeyModifiers::CONTROL)
+                        && !evt.modifiers.contains(KeyModifiers::ALT)
+                    {
+                        self.resolve_helix_pending(pending, ch);
+                    }
+                }
+                // Esc or any non-character key simply cancels.
+                return KeyEventOutcome::Consumed(None);
+            }
+        }
+
         #[cfg(feature = "commandline")]
         {
             let should_route_commandline = self

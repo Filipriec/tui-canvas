@@ -67,6 +67,27 @@ pub enum CanvasKeyAction {
     SwitchToUppercase,
     TrimSelections,
     GotoFirstNonWhitespace,
+    MovePageUp,
+    MovePageDown,
+    SearchSelection,
+    EnsureSelectionForward,
+    MatchBrackets,
+    IndentSelection,
+    UnindentSelection,
+    IncrementNumber,
+    DecrementNumber,
+    FindNextChar,
+    FindPrevChar,
+    TillNextChar,
+    TillPrevChar,
+    ReplaceChar,
+    RepeatLastFind,
+    SurroundAdd,
+    SurroundDelete,
+    SurroundReplace,
+    DeleteWordBackward,
+    DeleteToLineStart,
+    DeleteWordForward,
     Unknown(String),
 }
 
@@ -138,6 +159,27 @@ impl CanvasKeyAction {
             "switch_to_uppercase" => Self::SwitchToUppercase,
             "trim_selections" => Self::TrimSelections,
             "goto_first_nonwhitespace" => Self::GotoFirstNonWhitespace,
+            "move_page_up" => Self::MovePageUp,
+            "move_page_down" => Self::MovePageDown,
+            "search_selection" => Self::SearchSelection,
+            "ensure_selection_forward" => Self::EnsureSelectionForward,
+            "match_brackets" => Self::MatchBrackets,
+            "indent_selection" => Self::IndentSelection,
+            "unindent_selection" => Self::UnindentSelection,
+            "increment_number" => Self::IncrementNumber,
+            "decrement_number" => Self::DecrementNumber,
+            "find_next_char" => Self::FindNextChar,
+            "find_prev_char" => Self::FindPrevChar,
+            "till_next_char" => Self::TillNextChar,
+            "till_prev_char" => Self::TillPrevChar,
+            "replace_char" => Self::ReplaceChar,
+            "repeat_last_find" => Self::RepeatLastFind,
+            "surround_add" => Self::SurroundAdd,
+            "surround_delete" => Self::SurroundDelete,
+            "surround_replace" => Self::SurroundReplace,
+            "delete_word_backward" => Self::DeleteWordBackward,
+            "delete_to_line_start" => Self::DeleteToLineStart,
+            "delete_word_forward" => Self::DeleteWordForward,
             other => Self::Unknown(other.to_string()),
         }
     }
@@ -207,6 +249,27 @@ impl CanvasKeyAction {
             Self::SwitchToUppercase => "switch_to_uppercase",
             Self::TrimSelections => "trim_selections",
             Self::GotoFirstNonWhitespace => "goto_first_nonwhitespace",
+            Self::MovePageUp => "move_page_up",
+            Self::MovePageDown => "move_page_down",
+            Self::SearchSelection => "search_selection",
+            Self::EnsureSelectionForward => "ensure_selection_forward",
+            Self::MatchBrackets => "match_brackets",
+            Self::IndentSelection => "indent_selection",
+            Self::UnindentSelection => "unindent_selection",
+            Self::IncrementNumber => "increment_number",
+            Self::DecrementNumber => "decrement_number",
+            Self::FindNextChar => "find_next_char",
+            Self::FindPrevChar => "find_prev_char",
+            Self::TillNextChar => "till_next_char",
+            Self::TillPrevChar => "till_prev_char",
+            Self::ReplaceChar => "replace_char",
+            Self::RepeatLastFind => "repeat_last_find",
+            Self::SurroundAdd => "surround_add",
+            Self::SurroundDelete => "surround_delete",
+            Self::SurroundReplace => "surround_replace",
+            Self::DeleteWordBackward => "delete_word_backward",
+            Self::DeleteToLineStart => "delete_to_line_start",
+            Self::DeleteWordForward => "delete_word_forward",
             Self::ExtendLineBelow => "extend_line_below",
             Self::ExtendToLineBounds => "extend_to_line_bounds",
             Self::Unknown(other) => other.as_str(),
@@ -276,7 +339,28 @@ impl CanvasKeyAction {
             | Self::SwitchToLowercase
             | Self::SwitchToUppercase
             | Self::TrimSelections
-            | Self::GotoFirstNonWhitespace => return None,
+            | Self::GotoFirstNonWhitespace
+            | Self::MovePageUp
+            | Self::MovePageDown
+            | Self::SearchSelection
+            | Self::EnsureSelectionForward
+            | Self::MatchBrackets
+            | Self::IndentSelection
+            | Self::UnindentSelection
+            | Self::IncrementNumber
+            | Self::DecrementNumber
+            | Self::FindNextChar
+            | Self::FindPrevChar
+            | Self::TillNextChar
+            | Self::TillPrevChar
+            | Self::ReplaceChar
+            | Self::RepeatLastFind
+            | Self::SurroundAdd
+            | Self::SurroundDelete
+            | Self::SurroundReplace
+            | Self::DeleteWordBackward
+            | Self::DeleteToLineStart
+            | Self::DeleteWordForward => return None,
             Self::EnterDecider | Self::Exit | Self::Unknown(_) => return None,
         })
     }
