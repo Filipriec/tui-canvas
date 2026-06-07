@@ -55,7 +55,9 @@ impl<D: DataProvider> FormEditor<D> {
             {
                 match self.keybinding_paradigm() {
                     KeybindingParadigm::Helix => self.set_mode_helix(mode),
-                    KeybindingParadigm::Emacs => self.set_mode_emacs(mode),
+                    KeybindingParadigm::Emacs | KeybindingParadigm::Vscode => {
+                        self.set_mode_emacs(mode)
+                    }
                     KeybindingParadigm::Vim => self.set_mode_vim(mode),
                 }
             }
@@ -165,7 +167,9 @@ impl<D: DataProvider> FormEditor<D> {
             #[cfg(feature = "keybindings")]
             match self.keybinding_paradigm() {
                 KeybindingParadigm::Helix => self.enter_edit_mode_helix(),
-                KeybindingParadigm::Emacs => self.enter_edit_mode_emacs(),
+                KeybindingParadigm::Emacs | KeybindingParadigm::Vscode => {
+                    self.enter_edit_mode_emacs()
+                }
                 KeybindingParadigm::Vim => self.enter_edit_mode_vim(),
             }
             #[cfg(not(feature = "keybindings"))]
@@ -188,7 +192,9 @@ impl<D: DataProvider> FormEditor<D> {
             #[cfg(feature = "keybindings")]
             match self.keybinding_paradigm() {
                 KeybindingParadigm::Helix => self.enter_highlight_mode_helix(),
-                KeybindingParadigm::Emacs => self.enter_highlight_mode_emacs(),
+                KeybindingParadigm::Emacs | KeybindingParadigm::Vscode => {
+                    self.enter_highlight_mode_emacs()
+                }
                 KeybindingParadigm::Vim => self.enter_highlight_mode_vim(),
             }
             #[cfg(not(feature = "keybindings"))]
@@ -205,7 +211,9 @@ impl<D: DataProvider> FormEditor<D> {
             #[cfg(feature = "keybindings")]
             match self.keybinding_paradigm() {
                 KeybindingParadigm::Helix => self.enter_highlight_line_mode_helix(),
-                KeybindingParadigm::Emacs => self.enter_highlight_line_mode_emacs(),
+                KeybindingParadigm::Emacs | KeybindingParadigm::Vscode => {
+                    self.enter_highlight_line_mode_emacs()
+                }
                 KeybindingParadigm::Vim => self.enter_highlight_line_mode_vim(),
             }
             #[cfg(not(feature = "keybindings"))]
@@ -222,7 +230,9 @@ impl<D: DataProvider> FormEditor<D> {
             #[cfg(feature = "keybindings")]
             match self.keybinding_paradigm() {
                 KeybindingParadigm::Helix => self.exit_highlight_mode_helix(),
-                KeybindingParadigm::Emacs => self.exit_highlight_mode_emacs(),
+                KeybindingParadigm::Emacs | KeybindingParadigm::Vscode => {
+                    self.exit_highlight_mode_emacs()
+                }
                 KeybindingParadigm::Vim => self.exit_highlight_mode_vim(),
             }
             #[cfg(not(feature = "keybindings"))]

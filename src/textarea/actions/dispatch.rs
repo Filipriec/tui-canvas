@@ -199,7 +199,9 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
     ) -> KeyEventOutcome {
         match self.editor.keybinding_paradigm() {
             KeybindingParadigm::Helix => self.dispatch_textarea_key_action_helix(action, count),
-            KeybindingParadigm::Emacs => self.dispatch_textarea_key_action_emacs(action, count),
+            KeybindingParadigm::Emacs | KeybindingParadigm::Vscode => {
+                self.dispatch_textarea_key_action_emacs(action, count)
+            }
             KeybindingParadigm::Vim => self.dispatch_textarea_key_action_vim(action, count),
         }
     }

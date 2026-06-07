@@ -153,3 +153,8 @@ path = "examples/minimal/textarea_vim_minimal.rs"
 name = "textarea_helix_minimal"
 required-features = ["textarea", "keybindings", "cursor-style", "commandline"]
 path = "examples/minimal/textarea_helix_minimal.rs"
+
+[[example]]
+name = "textarea_vscode_minimal"
+required-features = ["textarea", "keybindings", "cursor-style", "commandline", "textmode-normal"]
+path = "examples/minimal/textarea_vscode_minimal.rs"

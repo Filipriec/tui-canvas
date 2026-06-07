@@ -270,7 +270,9 @@ impl<D: DataProvider> FormEditor<D> {
             use crate::editor::behavior::KeybindingParadigm;
             match self.keybinding_paradigm() {
                 KeybindingParadigm::Helix => self.enter_append_mode_helix(),
-                KeybindingParadigm::Emacs => self.enter_append_mode_emacs(),
+                KeybindingParadigm::Emacs | KeybindingParadigm::Vscode => {
+                    self.enter_append_mode_emacs()
+                }
                 KeybindingParadigm::Vim => self.enter_append_mode_vim(),
             }
             return;

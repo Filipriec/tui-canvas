@@ -13,10 +13,11 @@ use crate::editor::behavior::KeybindingParadigm;
 
 pub use action::CanvasKeyAction;
 pub use builtin::{
-    builtin_emacs_preset, builtin_helix_preset, builtin_vim_preset,
+    builtin_emacs_preset, builtin_helix_preset, builtin_vim_preset, builtin_vscode_preset,
     default_builtin_action_bindings, default_emacs_action_bindings,
-    default_helix_action_bindings, default_vim_action_bindings, emacs_preset_toml,
-    helix_preset_toml, vim_preset_toml, BuiltinCanvasKeybindingPreset,
+    default_helix_action_bindings, default_vim_action_bindings, default_vscode_action_bindings,
+    emacs_preset_toml, helix_preset_toml, vim_preset_toml, vscode_preset_toml,
+    BuiltinCanvasKeybindingPreset,
 };
 pub use key_sequence::{
     parse_binding, try_parse_binding, try_parse_key, KeyStroke, ParseKeyError,
@@ -109,12 +110,17 @@ impl CanvasKeyBindings {
         Self::from_builtin_preset(BuiltinCanvasKeybindingPreset::Emacs)
     }
 
+    pub fn vscode_defaults() -> Self {
+        Self::from_builtin_preset(BuiltinCanvasKeybindingPreset::Vscode)
+    }
+
     pub fn from_builtin_preset(preset: BuiltinCanvasKeybindingPreset) -> Self {
         let mut bindings = Self::from_preset(&preset.preset());
         bindings.paradigm = Some(match preset {
             BuiltinCanvasKeybindingPreset::Vim => KeybindingParadigm::Vim,
             BuiltinCanvasKeybindingPreset::Helix => KeybindingParadigm::Helix,
             BuiltinCanvasKeybindingPreset::Emacs => KeybindingParadigm::Emacs,
+            BuiltinCanvasKeybindingPreset::Vscode => KeybindingParadigm::Vscode,
         });
         bindings
     }

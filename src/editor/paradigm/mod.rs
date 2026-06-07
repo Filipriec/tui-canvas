@@ -18,7 +18,9 @@ impl<D: DataProvider> FormEditor<D> {
     pub(crate) fn apply_after_mode_change_for_paradigm(&mut self) {
         match self.behavior_state.paradigm() {
             KeybindingParadigm::Helix => self.apply_after_mode_change_helix(),
-            KeybindingParadigm::Emacs => self.apply_after_mode_change_emacs(),
+            KeybindingParadigm::Emacs | KeybindingParadigm::Vscode => {
+                self.apply_after_mode_change_emacs()
+            }
             KeybindingParadigm::Vim => self.apply_after_mode_change_vim(),
         }
     }

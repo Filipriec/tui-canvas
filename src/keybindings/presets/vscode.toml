@@ -1,0 +1,86 @@
+# VSCode-style keybindings.
+#
+# VSCode is a *modeless* editor: build the crate with the `textmode-normal`
+# feature so the editor stays in edit/insert mode, and the `[ins]` section below
+# is the one that's actually consulted. `[nor]` and `[sel]` are provided for
+# parity with the other built-in presets (and for the unusual case of running
+# this preset under a modal `textmode-vim` build).
+#
+# Notes / limitations of the current engine (tracked for later phases):
+#   - Shift+arrow selection, copy/cut of the current line without a selection,
+#     and move/duplicate-line need engine work and are not bound yet.
+#   - IntelliSense accept (Tab/Enter while the popup is open) needs
+#     context-sensitive handling; only trigger + navigate are bound here.
+
+[ins]
+mode = "ins"
+
+# --- Caret movement ---
+move_left = ["Left"]
+move_right = ["Right"]
+move_up = ["Up"]
+move_down = ["Down"]
+move_word_prev = ["Ctrl+Left"]
+move_word_next = ["Ctrl+Right"]
+move_line_start = ["Home"]
+move_line_end = ["End"]
+move_first_line = ["Ctrl+Home"]
+move_last_line = ["Ctrl+End"]
+move_page_up = ["PageUp"]
+move_page_down = ["PageDown"]
+
+# --- Deletion ---
+delete_char_backward = ["Backspace"]
+delete_char_forward = ["Delete"]
+delete_word_backward = ["Ctrl+Backspace"]
+delete_word_forward = ["Ctrl+Delete"]
+delete_line = ["Ctrl+Shift+k"]
+
+# --- Editing ---
+join_line_below = ["Ctrl+j"]
+paste_after = ["Ctrl+v"]
+undo = ["Ctrl+z"]
+redo = ["Ctrl+y", "Ctrl+Shift+z"]
+
+# --- IntelliSense ---
+open_suggestions = ["Ctrl+space"]
+suggestion_down = ["Ctrl+n"]
+suggestion_up = ["Ctrl+p"]
+
+[nor]
+mode = "nor"
+move_left = ["Left", "h"]
+move_right = ["Right", "l"]
+move_up = ["Up", "k"]
+move_down = ["Down", "j"]
+move_word_prev = ["Ctrl+Left"]
+move_word_next = ["Ctrl+Right"]
+move_line_start = ["Home"]
+move_line_end = ["End"]
+move_first_line = ["Ctrl+Home"]
+move_last_line = ["Ctrl+End"]
+move_page_up = ["PageUp"]
+move_page_down = ["PageDown"]
+enter_edit_mode_before = ["i"]
+enter_edit_mode_after = ["a"]
+enter_highlight_mode = ["Ctrl+space"]
+paste_after = ["Ctrl+v"]
+undo = ["Ctrl+z"]
+redo = ["Ctrl+y", "Ctrl+Shift+z"]
+
+[sel]
+mode = "sel"
+exit_highlight_mode = ["esc"]
+move_left = ["Left"]
+move_right = ["Right"]
+move_up = ["Up"]
+move_down = ["Down"]
+move_word_prev = ["Ctrl+Left"]
+move_word_next = ["Ctrl+Right"]
+move_line_start = ["Home"]
+move_line_end = ["End"]
+yank_selection = ["Ctrl+c"]
+delete_selection = ["Ctrl+x"]
+paste_after = ["Ctrl+v"]
+undo = ["Ctrl+z"]
+redo = ["Ctrl+y", "Ctrl+Shift+z"]

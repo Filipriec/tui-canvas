@@ -6,6 +6,7 @@ pub enum BuiltinCanvasKeybindingPreset {
     Vim,
     Helix,
     Emacs,
+    Vscode,
 }
 
 impl BuiltinCanvasKeybindingPreset {
@@ -14,6 +15,7 @@ impl BuiltinCanvasKeybindingPreset {
             Self::Vim => "vim",
             Self::Helix => "helix",
             Self::Emacs => "emacs",
+            Self::Vscode => "vscode",
         }
     }
 
@@ -22,6 +24,7 @@ impl BuiltinCanvasKeybindingPreset {
             Self::Vim => include_str!("presets/vim.toml"),
             Self::Helix => include_str!("presets/helix.toml"),
             Self::Emacs => include_str!("presets/emacs.toml"),
+            Self::Vscode => include_str!("presets/vscode.toml"),
         }
     }
 
@@ -42,6 +45,10 @@ pub fn emacs_preset_toml() -> &'static str {
     BuiltinCanvasKeybindingPreset::Emacs.toml()
 }
 
+pub fn vscode_preset_toml() -> &'static str {
+    BuiltinCanvasKeybindingPreset::Vscode.toml()
+}
+
 pub fn builtin_vim_preset() -> CanvasKeybindingPreset {
     BuiltinCanvasKeybindingPreset::Vim.preset()
 }
@@ -52,6 +59,10 @@ pub fn builtin_helix_preset() -> CanvasKeybindingPreset {
 
 pub fn builtin_emacs_preset() -> CanvasKeybindingPreset {
     BuiltinCanvasKeybindingPreset::Emacs.preset()
+}
+
+pub fn builtin_vscode_preset() -> CanvasKeybindingPreset {
+    BuiltinCanvasKeybindingPreset::Vscode.preset()
 }
 
 pub fn default_builtin_action_bindings(
@@ -70,6 +81,10 @@ pub fn default_helix_action_bindings() -> Vec<CanvasActionKeyBinding> {
 
 pub fn default_emacs_action_bindings() -> Vec<CanvasActionKeyBinding> {
     default_builtin_action_bindings(BuiltinCanvasKeybindingPreset::Emacs)
+}
+
+pub fn default_vscode_action_bindings() -> Vec<CanvasActionKeyBinding> {
+    default_builtin_action_bindings(BuiltinCanvasKeybindingPreset::Vscode)
 }
 
 fn action_bindings_from_preset(preset: CanvasKeybindingPreset) -> Vec<CanvasActionKeyBinding> {
@@ -112,10 +127,52 @@ mod tests {
             BuiltinCanvasKeybindingPreset::Vim,
             BuiltinCanvasKeybindingPreset::Helix,
             BuiltinCanvasKeybindingPreset::Emacs,
+            BuiltinCanvasKeybindingPreset::Vscode,
         ] {
             let parsed = CanvasKeybindingPreset::from_toml(preset.toml()).unwrap();
             assert_eq!(parsed.sections().len(), 3);
         }
+    }
+
+    #[test]
+    fn vscode_defaults_map_modeless_edit_bindings() {
+        let keybindings = CanvasKeyBindings::vscode_defaults();
+
+        // Undo/redo on the VSCode chords, in the always-active insert mode.
+        let undo = [KeyStroke {
+            code: KeyCode::Char('z'),
+            modifiers: KeyModifiers::CONTROL,
+        }];
+        let redo = [KeyStroke {
+            code: KeyCode::Char('y'),
+            modifiers: KeyModifiers::CONTROL,
+        }];
+        assert_eq!(
+            keybindings.lookup_action(AppMode::Ins, &undo).0,
+            Some(&CanvasKeyAction::Undo)
+        );
+        assert_eq!(
+            keybindings.lookup_action(AppMode::Ins, &redo).0,
+            Some(&CanvasKeyAction::Redo)
+        );
+
+        // Word-wise delete (Ctrl+Backspace) and word motion (Ctrl+Right).
+        let del_word = [KeyStroke {
+            code: KeyCode::Backspace,
+            modifiers: KeyModifiers::CONTROL,
+        }];
+        let word_next = [KeyStroke {
+            code: KeyCode::Right,
+            modifiers: KeyModifiers::CONTROL,
+        }];
+        assert_eq!(
+            keybindings.lookup_action(AppMode::Ins, &del_word).0,
+            Some(&CanvasKeyAction::DeleteWordBackward)
+        );
+        assert_eq!(
+            keybindings.lookup_action(AppMode::Ins, &word_next).0,
+            Some(&CanvasKeyAction::MoveWordNext)
+        );
     }
 
     #[test]

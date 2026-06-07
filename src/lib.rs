@@ -100,7 +100,8 @@ pub use suggestions::render::render_suggestions_dropdown;
 #[cfg(feature = "keybindings")]
 pub use keybindings::{
     default_builtin_action_bindings, default_emacs_action_bindings, default_helix_action_bindings,
-    default_vim_action_bindings, preset, BuiltinCanvasKeybindingPreset, CanvasActionBinding,
+    default_vim_action_bindings, default_vscode_action_bindings, preset,
+    BuiltinCanvasKeybindingPreset, CanvasActionBinding,
     CanvasActionKeyBinding, CanvasKeyBindings, KeyEventOutcome,
 };
 
