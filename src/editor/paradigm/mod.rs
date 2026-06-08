@@ -3,6 +3,8 @@ mod emacs;
 #[cfg(feature = "keybindings")]
 mod helix;
 #[cfg(feature = "keybindings")]
+pub(crate) mod helix_word;
+#[cfg(feature = "keybindings")]
 mod shared;
 mod vim;
 

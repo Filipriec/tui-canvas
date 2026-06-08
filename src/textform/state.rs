@@ -20,8 +20,11 @@ use ratatui::{layout::Rect, widgets::Block};
 
 #[cfg(feature = "keybindings")]
 use crate::{
-    editor::behavior::{VimOperator, VimPendingOperator},
-    editor::product::{handle_product_key_event, KeybindingProduct},
+    editor::{
+        behavior::{KeybindingParadigm, VimOperator, VimPendingOperator},
+        paradigm::helix_word::HelixWordTarget,
+        product::{handle_product_key_event, KeybindingProduct},
+    },
     integration::focus_handoff::{key_outcome_for_vertical_navigation, BoundaryExit},
     keybindings::{CanvasKeyAction, CanvasKeyBindings, KeyEventOutcome},
 };
@@ -304,24 +307,6 @@ impl<D: DataProvider> TextFormState<D> {
     }
 
     #[cfg(feature = "keybindings")]
-    fn selected_field_range(&self) -> (usize, usize) {
-        match self.core.selection_state() {
-            SelectionState::Linewise { anchor_field } => {
-                let current = self.core.current_field();
-                ((*anchor_field).min(current), (*anchor_field).max(current))
-            }
-            SelectionState::Characterwise { anchor } => {
-                let current = self.core.current_field();
-                (anchor.0.min(current), anchor.0.max(current))
-            }
-            SelectionState::None => {
-                let current = self.core.current_field();
-                (current, current)
-            }
-        }
-    }
-
-    #[cfg(feature = "keybindings")]
     fn extend_line_below_helix(&mut self, count: usize) {
         if self.fixed_field_count == 0 {
             return;
@@ -362,23 +347,285 @@ impl<D: DataProvider> TextFormState<D> {
     }
 
     #[cfg(feature = "keybindings")]
-    fn clear_selected_fields_helix(&mut self, enter_edit_mode: bool) {
-        let (start, end) = self.selected_field_range();
-        self.clear_field_range(start, end);
-        let _ = self.core.transition_to_field(start);
-        self.core.ui_state.current_mode = if enter_edit_mode {
-            AppMode::Ins
-        } else {
-            AppMode::Nor
-        };
-        self.core.ui_state.selection = SelectionState::None;
-        if enter_edit_mode {
-            self.core.enter_edit_mode();
-        } else {
-            self.core.ui_state.selection = SelectionState::Characterwise {
-                anchor: (self.core.current_field(), self.core.cursor_position()),
-            };
+    fn field_char_len(&self, field_index: usize) -> usize {
+        self.core
+            .data_provider()
+            .field_value(field_index)
+            .chars()
+            .count()
+    }
+
+    #[cfg(feature = "keybindings")]
+    fn extract_characterwise_text(
+        &self,
+        start: (usize, usize),
+        end: (usize, usize),
+    ) -> Vec<String> {
+        if start.0 == end.0 {
+            let text: String = self
+                .core
+                .data_provider()
+                .field_value(start.0)
+                .chars()
+                .skip(start.1)
+                .take(end.1.saturating_sub(start.1) + 1)
+                .collect();
+            return vec![text];
         }
+
+        let mut yanked = Vec::new();
+        let first: String = self
+            .core
+            .data_provider()
+            .field_value(start.0)
+            .chars()
+            .skip(start.1)
+            .collect();
+        yanked.push(first);
+        for field_index in start.0 + 1..end.0 {
+            yanked.push(
+                self.core
+                    .data_provider()
+                    .field_value(field_index)
+                    .to_string(),
+            );
+        }
+        let last: String = self
+            .core
+            .data_provider()
+            .field_value(end.0)
+            .chars()
+            .take(end.1 + 1)
+            .collect();
+        yanked.push(last);
+        yanked
+    }
+
+    #[cfg(feature = "keybindings")]
+    fn yank_selection_helix(&mut self) {
+        match self.core.selection_state().clone() {
+            SelectionState::Linewise { anchor_field } => {
+                let current = self.core.current_field();
+                let start = anchor_field.min(current);
+                let end = anchor_field.max(current).min(self.fixed_field_count.saturating_sub(1));
+                if start > end || self.fixed_field_count == 0 {
+                    return;
+                }
+
+                let lines: Vec<String> = (start..=end)
+                    .map(|field_index| {
+                        self.core
+                            .data_provider()
+                            .field_value(field_index)
+                            .to_string()
+                    })
+                    .collect();
+                self.core
+                    .behavior_state
+                    .yank_mut()
+                    .set_line_register(lines);
+            }
+            SelectionState::Characterwise { anchor } => {
+                let cursor = (self.core.current_field(), self.core.cursor_position());
+                let start = anchor.min(cursor);
+                let end = anchor.max(cursor);
+                if start.0 >= self.fixed_field_count || end.0 >= self.fixed_field_count {
+                    return;
+                }
+
+                let yanked = self.extract_characterwise_text(start, end);
+                if yanked.iter().all(|text| text.is_empty()) {
+                    return;
+                }
+                self.core
+                    .behavior_state
+                    .yank_mut()
+                    .set_text_register(yanked);
+            }
+            SelectionState::None => {}
+        }
+    }
+
+    #[cfg(feature = "keybindings")]
+    fn ensure_helix_primary_selection(&mut self) {
+        self.core.ui_state.current_mode = AppMode::Nor;
+        self.core.ui_state.selection = SelectionState::Characterwise {
+            anchor: (self.core.current_field(), self.core.cursor_position()),
+        };
+    }
+
+    #[cfg(feature = "keybindings")]
+    fn delete_primary_character_helix(&mut self, yank: bool) -> bool {
+        let field_index = self.core.current_field();
+        if field_index >= self.fixed_field_count {
+            return false;
+        }
+
+        let cursor = self.core.cursor_position();
+        let current = self.core.data_provider().field_value(field_index).to_string();
+        let line_len = current.chars().count();
+        if cursor >= line_len {
+            return false;
+        }
+
+        if yank {
+            let ch: String = current.chars().skip(cursor).take(1).collect();
+            self.core
+                .behavior_state
+                .yank_mut()
+                .set_text_register(vec![ch]);
+        }
+        self.core
+            .record_checkpoint(crate::editor::features::history::EditKind::Delete);
+        let kept: String = current
+            .chars()
+            .enumerate()
+            .filter_map(|(idx, ch)| if idx == cursor { None } else { Some(ch) })
+            .collect();
+        self.core
+            .data_provider_mut()
+            .set_field_value(field_index, kept);
+        let len = self.field_char_len(field_index);
+        self.core.ui_state.set_cursor(cursor.min(len), len, false);
+        true
+    }
+
+    #[cfg(feature = "keybindings")]
+    fn delete_characterwise_selection_helix(
+        &mut self,
+        anchor: (usize, usize),
+        yank: bool,
+    ) -> bool {
+        let cursor = (self.core.current_field(), self.core.cursor_position());
+        if anchor == cursor {
+            return self.delete_primary_character_helix(yank);
+        }
+
+        let start = anchor.min(cursor);
+        let end = anchor.max(cursor);
+        if start.0 >= self.fixed_field_count || end.0 >= self.fixed_field_count {
+            return false;
+        }
+
+        if yank {
+            let yanked = self.extract_characterwise_text(start, end);
+            self.core
+                .behavior_state
+                .yank_mut()
+                .set_text_register(yanked);
+        }
+
+        self.core
+            .record_checkpoint(crate::editor::features::history::EditKind::Delete);
+
+        if start.0 == end.0 {
+            let line = self.core.data_provider().field_value(start.0).to_string();
+            let new_line: String = line
+                .chars()
+                .enumerate()
+                .filter_map(|(idx, ch)| {
+                    if idx < start.1 || idx > end.1 {
+                        Some(ch)
+                    } else {
+                        None
+                    }
+                })
+                .collect();
+            self.core
+                .data_provider_mut()
+                .set_field_value(start.0, new_line);
+        } else {
+            let first: String = self
+                .core
+                .data_provider()
+                .field_value(start.0)
+                .chars()
+                .take(start.1)
+                .collect();
+            self.core
+                .data_provider_mut()
+                .set_field_value(start.0, first);
+
+            for field_index in start.0 + 1..end.0 {
+                self.core
+                    .data_provider_mut()
+                    .set_field_value(field_index, String::new());
+            }
+
+            let last: String = self
+                .core
+                .data_provider()
+                .field_value(end.0)
+                .chars()
+                .skip(end.1 + 1)
+                .collect();
+            self.core.data_provider_mut().set_field_value(end.0, last);
+        }
+
+        let _ = self.core.transition_to_field(start.0);
+        let len = self.field_char_len(start.0);
+        self.core.ui_state.set_cursor(start.1.min(len), len, false);
+        true
+    }
+
+    #[cfg(feature = "keybindings")]
+    fn delete_selection_once_helix(&mut self, yank: bool) -> bool {
+        match self.core.selection_state().clone() {
+            SelectionState::Linewise { anchor_field } => {
+                let current = self.core.current_field();
+                let start = anchor_field.min(current);
+                let end = anchor_field.max(current).min(self.fixed_field_count.saturating_sub(1));
+                if self.fixed_field_count == 0 || start > end {
+                    return false;
+                }
+
+                if yank {
+                    let lines: Vec<String> = (start..=end)
+                        .map(|field_index| {
+                            self.core
+                                .data_provider()
+                                .field_value(field_index)
+                                .to_string()
+                        })
+                        .collect();
+                    self.core
+                        .behavior_state
+                        .yank_mut()
+                        .set_line_register(lines);
+                }
+
+                self.clear_field_range(start, end);
+                let _ = self.core.transition_to_field(start);
+                self.core.move_line_start();
+                true
+            }
+            SelectionState::Characterwise { anchor } => {
+                self.delete_characterwise_selection_helix(anchor, yank)
+            }
+            SelectionState::None => self.delete_primary_character_helix(yank),
+        }
+    }
+
+    #[cfg(feature = "keybindings")]
+    fn delete_selection_helix(&mut self, yank: bool, count: usize) {
+        for _ in 0..count.max(1) {
+            if !self.delete_selection_once_helix(yank) {
+                break;
+            }
+        }
+        if self.core.mode() == AppMode::Nor {
+            self.ensure_helix_primary_selection();
+        }
+    }
+
+    #[cfg(feature = "keybindings")]
+    fn change_selection_helix(&mut self, yank: bool, count: usize) {
+        for _ in 0..count.max(1) {
+            if !self.delete_selection_once_helix(yank) {
+                break;
+            }
+        }
+        self.core.enter_edit_mode();
     }
 
     pub fn change_current_field(&mut self) {
@@ -624,6 +871,52 @@ impl<D: DataProvider> KeybindingProduct for TextFormState<D> {
             return self.apply_operator_motion_vim(action, count);
         }
 
+        if self.core.keybinding_paradigm() == KeybindingParadigm::Helix {
+            match action {
+                CanvasKeyAction::MoveWordNext => {
+                    self.core
+                        .select_word_motion_helix(count, HelixWordTarget::NextWordStart);
+                    return KeyEventOutcome::Consumed(None);
+                }
+                CanvasKeyAction::MoveWordPrev => {
+                    self.core
+                        .select_word_motion_helix(count, HelixWordTarget::PrevWordStart);
+                    return KeyEventOutcome::Consumed(None);
+                }
+                CanvasKeyAction::MoveWordEnd => {
+                    self.core
+                        .select_word_motion_helix(count, HelixWordTarget::NextWordEnd);
+                    return KeyEventOutcome::Consumed(None);
+                }
+                CanvasKeyAction::MoveWordEndPrev => {
+                    self.core
+                        .select_word_motion_helix(count, HelixWordTarget::PrevWordEnd);
+                    return KeyEventOutcome::Consumed(None);
+                }
+                CanvasKeyAction::MoveBigWordNext => {
+                    self.core
+                        .select_word_motion_helix(count, HelixWordTarget::NextLongWordStart);
+                    return KeyEventOutcome::Consumed(None);
+                }
+                CanvasKeyAction::MoveBigWordPrev => {
+                    self.core
+                        .select_word_motion_helix(count, HelixWordTarget::PrevLongWordStart);
+                    return KeyEventOutcome::Consumed(None);
+                }
+                CanvasKeyAction::MoveBigWordEnd => {
+                    self.core
+                        .select_word_motion_helix(count, HelixWordTarget::NextLongWordEnd);
+                    return KeyEventOutcome::Consumed(None);
+                }
+                CanvasKeyAction::MoveBigWordEndPrev => {
+                    self.core
+                        .select_word_motion_helix(count, HelixWordTarget::PrevLongWordEnd);
+                    return KeyEventOutcome::Consumed(None);
+                }
+                _ => {}
+            }
+        }
+
         match action {
             CanvasKeyAction::OperatorDelete => {
                 self.begin_operator_vim(VimOperator::Delete, count);
@@ -695,11 +988,23 @@ impl<D: DataProvider> KeybindingProduct for TextFormState<D> {
                 KeyEventOutcome::Consumed(None)
             }
             CanvasKeyAction::DeleteSelection | CanvasKeyAction::DeleteSelectionNoYank => {
-                self.clear_selected_fields_helix(false);
+                self.delete_selection_helix(
+                    matches!(action, CanvasKeyAction::DeleteSelection),
+                    count,
+                );
                 KeyEventOutcome::Consumed(None)
             }
             CanvasKeyAction::ChangeSelection | CanvasKeyAction::ChangeSelectionNoYank => {
-                self.clear_selected_fields_helix(true);
+                self.change_selection_helix(
+                    matches!(action, CanvasKeyAction::ChangeSelection),
+                    count,
+                );
+                KeyEventOutcome::Consumed(None)
+            }
+            CanvasKeyAction::YankSelection => {
+                for _ in 0..count {
+                    self.yank_selection_helix();
+                }
                 KeyEventOutcome::Consumed(None)
             }
             CanvasKeyAction::JoinLineBelow
@@ -919,6 +1224,72 @@ mod tests {
         assert_eq!(form.fixed_field_count(), 3);
         assert_eq!(form.data_provider().capture_content(), vec!["", "", "row3"]);
         assert_eq!(form.current_field(), 0);
+    }
+
+    #[cfg(all(feature = "keybindings", feature = "crossterm"))]
+    #[test]
+    fn helix_word_motion_sets_characterwise_selection_for_highlight() {
+        use crate::canvas::state::SelectionState;
+        use crate::keybindings::{BuiltinCanvasKeybindingPreset, KeyEventOutcome};
+
+        let mut form = TextFormState::new(TestProvider {
+            fields: ["one two three".to_string(), "row2".to_string()],
+        });
+        form.use_keybinding_preset(BuiltinCanvasKeybindingPreset::Helix);
+
+        let outcome = form.handle_key_event(KeyEvent::new(KeyCode::Char('w'), KeyModifiers::NONE));
+
+        assert!(matches!(outcome, KeyEventOutcome::Consumed(None)));
+        assert_eq!(form.cursor_position(), 3);
+        assert!(matches!(
+            form.selection_state(),
+            SelectionState::Characterwise { anchor: (0, 0) }
+        ));
+        assert_eq!(form.data_provider().field_value(1), "row2");
+    }
+
+    #[cfg(all(feature = "keybindings", feature = "crossterm"))]
+    #[test]
+    fn helix_word_then_delete_removes_selection_without_clearing_field() {
+        use crate::keybindings::{BuiltinCanvasKeybindingPreset, KeyEventOutcome};
+
+        let mut form = TextFormState::new(TestProvider {
+            fields: ["one two three".to_string(), "row2".to_string()],
+        });
+        form.use_keybinding_preset(BuiltinCanvasKeybindingPreset::Helix);
+
+        let _ = form.handle_key_event(KeyEvent::new(KeyCode::Char('w'), KeyModifiers::NONE));
+        let outcome = form.handle_key_event(KeyEvent::new(KeyCode::Char('d'), KeyModifiers::NONE));
+
+        assert!(matches!(outcome, KeyEventOutcome::Consumed(None)));
+        assert_eq!(form.fixed_field_count(), 2);
+        assert_eq!(form.data_provider().field_value(0), "two three");
+        assert_eq!(form.data_provider().field_value(1), "row2");
+        assert_eq!(form.current_field(), 0);
+        assert_eq!(form.cursor_position(), 0);
+    }
+
+    #[cfg(all(feature = "keybindings", feature = "crossterm"))]
+    #[test]
+    fn helix_cross_field_character_delete_does_not_merge_fixed_fields() {
+        use crate::canvas::state::SelectionState;
+        use crate::keybindings::BuiltinCanvasKeybindingPreset;
+
+        let mut form = TextFormState::new(TestProvider {
+            fields: ["abc".to_string(), "def".to_string()],
+        });
+        form.use_keybinding_preset(BuiltinCanvasKeybindingPreset::Helix);
+        let _ = form.transition_to_field(1);
+        form.set_cursor_position(1);
+        form.core.ui_state.selection = SelectionState::Characterwise { anchor: (0, 1) };
+
+        let _ = form.handle_key_event(KeyEvent::new(KeyCode::Char('d'), KeyModifiers::NONE));
+
+        assert_eq!(form.fixed_field_count(), 2);
+        assert_eq!(form.data_provider().field_value(0), "a");
+        assert_eq!(form.data_provider().field_value(1), "f");
+        assert_eq!(form.current_field(), 0);
+        assert_eq!(form.cursor_position(), 0);
     }
 
     #[test]
