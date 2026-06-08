@@ -158,4 +158,65 @@ impl<D: DataProvider> EditorCore<D> {
             self.exit_highlight_mode_helix();
         }
     }
+
+    /// Helix `x`: snap the selection to whole lines, growing one line downward
+    /// on repeat. Stays in normal mode with a linewise selection (Helix has no
+    /// separate visual mode for this) — shared so forms and areas behave alike.
+    pub(crate) fn extend_line_below_helix(&mut self) {
+        let current = self.current_field();
+        let field_count = self.data_provider().field_count();
+        self.ui_state.current_mode = AppMode::Nor;
+
+        match self.selection_state().clone() {
+            SelectionState::Linewise { anchor_field } => {
+                let next = (current + 1).min(field_count.saturating_sub(1));
+                if next != current {
+                    let _ = self.transition_to_field(next);
+                }
+                self.ui_state.selection = SelectionState::Linewise { anchor_field };
+            }
+            SelectionState::Characterwise { anchor } => {
+                self.ui_state.selection = SelectionState::Linewise {
+                    anchor_field: anchor.0,
+                };
+            }
+            SelectionState::None => {
+                self.ui_state.selection = SelectionState::Linewise {
+                    anchor_field: current,
+                };
+            }
+        }
+    }
+
+    /// Helix `X`: snap the selection to whole lines without moving to the next
+    /// line, preserving the anchor line.
+    pub(crate) fn extend_to_line_bounds_helix(&mut self) {
+        let current = self.current_field();
+        self.ui_state.current_mode = AppMode::Nor;
+
+        let anchor_field = match self.selection_state() {
+            SelectionState::Linewise { anchor_field } => *anchor_field,
+            SelectionState::Characterwise { anchor } => anchor.0,
+            SelectionState::None => current,
+        };
+        self.ui_state.selection = SelectionState::Linewise { anchor_field };
+    }
+
+    /// Helix `;`: collapse the selection to a single-character cursor selection,
+    /// keeping the current mode.
+    pub(crate) fn collapse_selection_helix(&mut self) {
+        self.collapse_helix_selection_to_cursor();
+    }
+
+    /// Return to normal mode after a Helix selection edit (`d`). If the edit ran
+    /// from highlight mode (`v`), leave it; then re-establish the primary cursor
+    /// selection. Shared so the text area and the text form behave identically.
+    pub(crate) fn finish_helix_selection_edit(&mut self) {
+        if self.ui_state.current_mode == AppMode::Sel {
+            self.exit_highlight_mode_helix();
+        }
+        if self.ui_state.current_mode == AppMode::Nor {
+            self.ensure_helix_primary_selection();
+        }
+    }
 }

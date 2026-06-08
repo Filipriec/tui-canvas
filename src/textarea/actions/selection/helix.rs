@@ -822,9 +822,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
                 break;
             }
         }
-        if self.mode() == AppMode::Nor {
-            self.ensure_helix_primary_selection();
-        }
+        self.core.finish_helix_selection_edit();
     }
 
     pub(crate) fn change_selection_helix(&mut self, yank: bool, count: usize) {
@@ -845,52 +843,15 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
     }
 
     pub(crate) fn collapse_selection_helix(&mut self) {
-        self.collapse_helix_selection_to_cursor();
+        self.core.collapse_selection_helix();
     }
 
     pub(crate) fn extend_line_below_helix(&mut self) {
-        let current = self.current_field();
-        let field_count = self.core.data_provider().field_count();
-        self.core.ui_state.current_mode = AppMode::Nor;
-
-        match self.selection_state().clone() {
-            SelectionState::Linewise { anchor_field } => {
-                // Already line-wise: grow the selection downward by one line,
-                // keeping the anchored (top) line fixed. Repeated `x` keeps
-                // extending instead of resetting onto the current line.
-                let next = (current + 1).min(field_count.saturating_sub(1));
-                if next != current {
-                    let _ = self.transition_to_field(next);
-                }
-                self.core.ui_state.selection = SelectionState::Linewise { anchor_field };
-            }
-            SelectionState::Characterwise { anchor } => {
-                // Promote to a full-line selection, snapping to line bounds
-                // while preserving the existing top of the selection.
-                self.core.ui_state.selection = SelectionState::Linewise {
-                    anchor_field: anchor.0,
-                };
-            }
-            SelectionState::None => {
-                self.core.ui_state.selection = SelectionState::Linewise {
-                    anchor_field: current,
-                };
-            }
-        }
+        self.core.extend_line_below_helix();
     }
 
     pub(crate) fn extend_to_line_bounds_helix(&mut self) {
-        let current = self.current_field();
-        self.core.ui_state.current_mode = AppMode::Nor;
-
-        // Snap the selection to whole lines without moving to the next line,
-        // preserving the existing anchor line so it doesn't collapse.
-        let anchor_field = match self.selection_state() {
-            SelectionState::Linewise { anchor_field } => *anchor_field,
-            SelectionState::Characterwise { anchor } => anchor.0,
-            SelectionState::None => current,
-        };
-        self.core.ui_state.selection = SelectionState::Linewise { anchor_field };
+        self.core.extend_to_line_bounds_helix();
     }
 }
 

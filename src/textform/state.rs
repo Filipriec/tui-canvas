@@ -7,8 +7,6 @@ use std::ops::{Deref, DerefMut};
 
 use crate::canvas::actions::{ActionResult, CanvasAction};
 #[cfg(feature = "keybindings")]
-use crate::canvas::modes::AppMode;
-#[cfg(feature = "keybindings")]
 use crate::canvas::state::SelectionState;
 #[cfg(feature = "gui")]
 use crate::gui_utils::{display_cols_up_to, display_width};
@@ -481,56 +479,6 @@ impl<D: DataProvider> TextFormState<D> {
     }
 
     #[cfg(feature = "keybindings")]
-    fn extend_line_below_helix(&mut self, count: usize) {
-        if self.fixed_field_count == 0 {
-            return;
-        }
-
-        match self.core.selection_state().clone() {
-            SelectionState::Linewise { .. } => {}
-            SelectionState::Characterwise { anchor } => {
-                self.core.ui_state.current_mode = AppMode::Sel;
-                self.core.ui_state.selection = SelectionState::Linewise {
-                    anchor_field: anchor.0,
-                };
-                return;
-            }
-            SelectionState::None => {
-                let current = self.core.current_field();
-                self.core.ui_state.current_mode = AppMode::Sel;
-                self.core.ui_state.selection = SelectionState::Linewise {
-                    anchor_field: current,
-                };
-                return;
-            }
-        }
-
-        let target = self
-            .core
-            .current_field()
-            .saturating_add(count.max(1))
-            .min(self.fixed_field_count - 1);
-        let _ = self.core.transition_to_field(target);
-    }
-
-    #[cfg(feature = "keybindings")]
-    fn extend_to_line_bounds_helix(&mut self) {
-        let current = self.core.current_field();
-        self.core.ui_state.current_mode = AppMode::Sel;
-        self.core.ui_state.selection = SelectionState::Linewise {
-            anchor_field: current,
-        };
-    }
-
-    #[cfg(feature = "keybindings")]
-    fn collapse_selection_helix(&mut self) {
-        self.core.ui_state.current_mode = AppMode::Nor;
-        self.core.ui_state.selection = SelectionState::Characterwise {
-            anchor: (self.core.current_field(), self.core.cursor_position()),
-        };
-    }
-
-    #[cfg(feature = "keybindings")]
     fn field_char_len(&self, field_index: usize) -> usize {
         self.core
             .data_provider()
@@ -540,23 +488,13 @@ impl<D: DataProvider> TextFormState<D> {
     }
 
     #[cfg(feature = "keybindings")]
-    fn ensure_helix_primary_selection(&mut self) {
-        self.core.ui_state.current_mode = AppMode::Nor;
-        self.core.ui_state.selection = SelectionState::Characterwise {
-            anchor: (self.core.current_field(), self.core.cursor_position()),
-        };
-    }
-
-    #[cfg(feature = "keybindings")]
     fn delete_selection_helix(&mut self, yank: bool, count: usize) {
         for _ in 0..count.max(1) {
             if !self.core.delete_selection_once_fixed(yank) {
                 break;
             }
         }
-        if self.core.mode() == AppMode::Nor {
-            self.ensure_helix_primary_selection();
-        }
+        self.core.finish_helix_selection_edit();
     }
 
     #[cfg(feature = "keybindings")]
@@ -604,7 +542,7 @@ impl<D: DataProvider> TextFormState<D> {
         match register {
             YankRegister::Lines(lines) => {
                 self.core.paste_lines_fixed(after, count, lines);
-                self.ensure_helix_primary_selection();
+                self.core.ensure_helix_primary_selection();
             }
             YankRegister::Text(lines) => {
                 let text = crate::editor::rows::repeated_text(&lines, count);
@@ -619,7 +557,7 @@ impl<D: DataProvider> TextFormState<D> {
                     self.core.insert_text_fixed(field, col, &text);
                 let _ = self.core.transition_to_field(target_field);
                 self.core.set_cursor_position(target_col);
-                self.ensure_helix_primary_selection();
+                self.core.ensure_helix_primary_selection();
             }
         }
     }
@@ -1006,15 +944,19 @@ impl<D: DataProvider> KeybindingProduct for TextFormState<D> {
                 KeyEventOutcome::Consumed(None)
             }
             CanvasKeyAction::ExtendLineBelow => {
-                self.extend_line_below_helix(count);
+                for _ in 0..count {
+                    self.core.extend_line_below_helix();
+                }
                 KeyEventOutcome::Consumed(None)
             }
             CanvasKeyAction::ExtendToLineBounds => {
-                self.extend_to_line_bounds_helix();
+                for _ in 0..count {
+                    self.core.extend_to_line_bounds_helix();
+                }
                 KeyEventOutcome::Consumed(None)
             }
             CanvasKeyAction::CollapseSelection => {
-                self.collapse_selection_helix();
+                self.core.collapse_selection_helix();
                 KeyEventOutcome::Consumed(None)
             }
             CanvasKeyAction::DeleteSelection | CanvasKeyAction::DeleteSelectionNoYank => {
@@ -1639,7 +1581,7 @@ mod tests {
 
     #[cfg(all(feature = "keybindings", feature = "crossterm"))]
     #[test]
-    fn helix_yank_exits_select_mode_like_textarea() {
+    fn helix_extend_line_stays_in_normal_mode_like_textarea() {
         use crate::canvas::modes::AppMode;
         use crate::keybindings::BuiltinCanvasKeybindingPreset;
 
@@ -1648,9 +1590,45 @@ mod tests {
         });
         form.use_keybinding_preset(BuiltinCanvasKeybindingPreset::Helix);
 
-        // `x` extends to a linewise selection (select mode); `y` yanks and must
-        // collapse the selection back to normal mode, matching the text area.
+        // Helix `x` selects the whole line but stays in normal mode (there is no
+        // separate visual mode for it) — exactly like the text area.
         let _ = form.handle_key_event(KeyEvent::new(KeyCode::Char('x'), KeyModifiers::NONE));
+        assert_eq!(form.mode(), AppMode::Nor);
+    }
+
+    #[cfg(all(feature = "keybindings", feature = "crossterm"))]
+    #[test]
+    fn helix_delete_after_extend_returns_to_normal_mode() {
+        use crate::canvas::modes::AppMode;
+        use crate::keybindings::BuiltinCanvasKeybindingPreset;
+
+        let mut form = TextFormState::new(TestProvider {
+            fields: ["row1".to_string(), "row2".to_string()],
+        });
+        form.use_keybinding_preset(BuiltinCanvasKeybindingPreset::Helix);
+
+        // `x` then `d`: the slot clears and we end in normal mode (no stuck SEL).
+        let _ = form.handle_key_event(KeyEvent::new(KeyCode::Char('x'), KeyModifiers::NONE));
+        let _ = form.handle_key_event(KeyEvent::new(KeyCode::Char('d'), KeyModifiers::NONE));
+        assert_eq!(form.mode(), AppMode::Nor);
+        assert_eq!(form.data_provider().field_value(0), "");
+        assert_eq!(form.data_provider().field_value(1), "row2");
+    }
+
+    #[cfg(all(feature = "keybindings", feature = "crossterm"))]
+    #[test]
+    fn helix_highlight_yank_returns_to_normal_mode() {
+        use crate::canvas::modes::AppMode;
+        use crate::keybindings::BuiltinCanvasKeybindingPreset;
+
+        let mut form = TextFormState::new(TestProvider {
+            fields: ["row1".to_string(), "row2".to_string()],
+        });
+        form.use_keybinding_preset(BuiltinCanvasKeybindingPreset::Helix);
+
+        // `v` enters the genuine highlight (select) mode; `y` yanks and must
+        // leave it, matching the text area.
+        let _ = form.handle_key_event(KeyEvent::new(KeyCode::Char('v'), KeyModifiers::NONE));
         assert_eq!(form.mode(), AppMode::Sel);
 
         let _ = form.handle_key_event(KeyEvent::new(KeyCode::Char('y'), KeyModifiers::NONE));
