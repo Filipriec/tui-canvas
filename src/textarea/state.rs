@@ -2821,8 +2821,7 @@ mod tests {
 
     #[cfg(all(feature = "keybindings", feature = "crossterm"))]
     #[test]
-    fn helix_esc_collapses_selection_in_normal_mode() {
-        use crate::canvas::modes::AppMode;
+    fn helix_esc_does_not_collapse_selection_in_normal_mode() {
         use crate::canvas::state::SelectionState;
         use crate::keybindings::BuiltinCanvasKeybindingPreset;
         use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
@@ -2837,12 +2836,12 @@ mod tests {
             SelectionState::Linewise { .. }
         ));
 
-        // Esc must collapse it back to a single cursor.
+        // Esc must NOT collapse the selection — in Helix it persists in normal
+        // mode and is collapsed explicitly with `;`.
         let _ = textarea.handle_key_event(KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE));
-        assert_eq!(textarea.mode(), AppMode::Nor);
         assert!(matches!(
             textarea.selection_state(),
-            SelectionState::Characterwise { .. } | SelectionState::None
+            SelectionState::Linewise { .. }
         ));
     }
 
