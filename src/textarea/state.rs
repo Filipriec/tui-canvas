@@ -1115,8 +1115,8 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
     }
 
     #[cfg(feature = "keybindings")]
-    pub(crate) fn collapse_helix_selection_to_cursor(&mut self) {
-        self.core.collapse_helix_selection_to_cursor();
+    pub(crate) fn collapse_selection_to_cursor(&mut self) {
+        self.core.collapse_selection_to_cursor();
     }
 
     #[cfg(feature = "keybindings")]

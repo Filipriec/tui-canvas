@@ -18,7 +18,10 @@ impl<D: DataProvider> EditorCore<D> {
         self.ui_state.selection = SelectionState::Characterwise { anchor };
     }
 
-    pub(crate) fn collapse_helix_selection_to_cursor(&mut self) {
+    /// Collapse the selection to a single-character cursor selection, keeping the
+    /// current mode. A paradigm-agnostic primitive (used by Helix `;`, `Esc`, and
+    /// cursor movement) — not Helix-specific behavior.
+    pub(crate) fn collapse_selection_to_cursor(&mut self) {
         let anchor = (self.ui_state.current_field, self.ui_state.cursor_pos);
         self.ui_state.selection = SelectionState::Characterwise { anchor };
     }
@@ -203,12 +206,6 @@ impl<D: DataProvider> EditorCore<D> {
             SelectionState::None => current,
         };
         self.ui_state.selection = SelectionState::Linewise { anchor_field };
-    }
-
-    /// Helix `;`: collapse the selection to a single-character cursor selection,
-    /// keeping the current mode.
-    pub(crate) fn collapse_selection_helix(&mut self) {
-        self.collapse_helix_selection_to_cursor();
     }
 
     /// Return to normal mode after a Helix selection edit (`d`). If the edit ran

@@ -153,7 +153,7 @@ impl<D: DataProvider> EditorCore<D> {
         if self.keybinding_paradigm() == KeybindingParadigm::Helix
             && self.ui_state.current_mode == AppMode::Nor
         {
-            self.collapse_helix_selection_to_cursor();
+            self.collapse_selection_to_cursor();
         }
     }
 
@@ -164,7 +164,7 @@ impl<D: DataProvider> EditorCore<D> {
         if self.keybinding_paradigm() == KeybindingParadigm::Helix
             && self.ui_state.current_mode == AppMode::Nor
         {
-            self.collapse_helix_selection_to_cursor();
+            self.collapse_selection_to_cursor();
         }
     }
 

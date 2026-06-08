@@ -956,14 +956,14 @@ impl<D: DataProvider> KeybindingProduct for TextFormState<D> {
                 KeyEventOutcome::Consumed(None)
             }
             CanvasKeyAction::CollapseSelection => {
-                self.core.collapse_selection_helix();
+                self.core.collapse_selection_to_cursor();
                 KeyEventOutcome::Consumed(None)
             }
             CanvasKeyAction::ClearSearch => {
                 // Helix `Esc` in normal mode collapses the selection (left by
                 // `x`/`v`-then-`Esc`) back to a single cursor. A form has no
                 // search state, so collapsing is all that's needed.
-                self.core.collapse_selection_helix();
+                self.core.collapse_selection_to_cursor();
                 KeyEventOutcome::Consumed(None)
             }
             CanvasKeyAction::DeleteSelection | CanvasKeyAction::DeleteSelectionNoYank => {

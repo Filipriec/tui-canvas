@@ -842,10 +842,6 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         self.core.yank_primary_selection_helix();
     }
 
-    pub(crate) fn collapse_selection_helix(&mut self) {
-        self.core.collapse_selection_helix();
-    }
-
     pub(crate) fn extend_line_below_helix(&mut self) {
         self.core.extend_line_below_helix();
     }
