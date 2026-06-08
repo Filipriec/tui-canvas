@@ -21,7 +21,7 @@ use ratatui::{layout::Rect, widgets::Block};
 #[cfg(feature = "keybindings")]
 use crate::{
     editor::{
-        behavior::{KeybindingParadigm, VimOperator, VimPendingOperator},
+        behavior::{KeybindingParadigm, VimOperator, VimPendingOperator, YankRegister},
         paradigm::helix_word::HelixWordTarget,
         product::{handle_product_key_event, KeybindingProduct},
     },
@@ -312,13 +312,23 @@ impl<D: DataProvider> TextFormState<D> {
             return;
         }
 
-        if !matches!(self.core.selection_state(), SelectionState::Linewise { .. }) {
-            let current = self.core.current_field();
-            self.core.ui_state.current_mode = AppMode::Sel;
-            self.core.ui_state.selection = SelectionState::Linewise {
-                anchor_field: current,
-            };
-            return;
+        match self.core.selection_state().clone() {
+            SelectionState::Linewise { .. } => {}
+            SelectionState::Characterwise { anchor } => {
+                self.core.ui_state.current_mode = AppMode::Sel;
+                self.core.ui_state.selection = SelectionState::Linewise {
+                    anchor_field: anchor.0,
+                };
+                return;
+            }
+            SelectionState::None => {
+                let current = self.core.current_field();
+                self.core.ui_state.current_mode = AppMode::Sel;
+                self.core.ui_state.selection = SelectionState::Linewise {
+                    anchor_field: current,
+                };
+                return;
+            }
         }
 
         let target = self
@@ -626,6 +636,147 @@ impl<D: DataProvider> TextFormState<D> {
             }
         }
         self.core.enter_edit_mode();
+    }
+
+    #[cfg(feature = "keybindings")]
+    fn character_paste_position_helix(&self, after: bool) -> (usize, usize) {
+        match self.core.selection_state() {
+            SelectionState::Characterwise { anchor } => {
+                let cursor = (self.core.current_field(), self.core.cursor_position());
+                let start = (*anchor).min(cursor);
+                let end = (*anchor).max(cursor);
+                if after {
+                    (end.0, end.1.saturating_add(1))
+                } else {
+                    start
+                }
+            }
+            _ => {
+                let field = self.core.current_field();
+                let len = self.field_char_len(field);
+                let cursor = self.core.cursor_position().min(len);
+                if after {
+                    (field, cursor.saturating_add(1).min(len))
+                } else {
+                    (field, cursor)
+                }
+            }
+        }
+    }
+
+    #[cfg(feature = "keybindings")]
+    fn repeated_register_text_lines(lines: &[String], count: usize) -> Vec<String> {
+        let repeat = count.max(1);
+        let mut repeated = Vec::with_capacity(lines.len().saturating_mul(repeat));
+        for _ in 0..repeat {
+            repeated.extend(lines.iter().cloned());
+        }
+        repeated
+    }
+
+    #[cfg(feature = "keybindings")]
+    fn paste_text_register_helix(&mut self, after: bool, count: usize, lines: Vec<String>) {
+        let lines = Self::repeated_register_text_lines(&lines, count);
+        if lines.is_empty() || self.fixed_field_count == 0 {
+            return;
+        }
+
+        let (field, col) = self.character_paste_position_helix(after);
+        if field >= self.fixed_field_count {
+            return;
+        }
+
+        self.core
+            .record_checkpoint(crate::editor::features::history::EditKind::Other);
+
+        let col = col.min(self.field_char_len(field));
+        let current = self.core.data_provider().field_value(field).to_string();
+        let prefix: String = current.chars().take(col).collect();
+        let suffix: String = current.chars().skip(col).collect();
+
+        if lines.len() == 1 {
+            let inserted = &lines[0];
+            self.core
+                .data_provider_mut()
+                .set_field_value(field, format!("{prefix}{inserted}{suffix}"));
+            let cursor = col.saturating_add(inserted.chars().count());
+            let len = self.field_char_len(field);
+            let _ = self.core.transition_to_field(field);
+            self.core.ui_state.set_cursor(cursor.min(len), len, false);
+        } else {
+            self.core
+                .data_provider_mut()
+                .set_field_value(field, format!("{prefix}{}{suffix}", lines[0]));
+
+            let mut target_field = field;
+            let mut target_col = col.saturating_add(lines[0].chars().count());
+            for (offset, text) in lines.iter().enumerate().skip(1) {
+                let next_field = field.saturating_add(offset);
+                if next_field >= self.fixed_field_count {
+                    break;
+                }
+                self.core
+                    .data_provider_mut()
+                    .set_field_value(next_field, text.clone());
+                target_field = next_field;
+                target_col = text.chars().count();
+            }
+
+            let len = self.field_char_len(target_field);
+            let _ = self.core.transition_to_field(target_field);
+            self.core
+                .ui_state
+                .set_cursor(target_col.min(len), len, false);
+        }
+
+        self.ensure_helix_primary_selection();
+    }
+
+    #[cfg(feature = "keybindings")]
+    fn paste_line_register_helix(&mut self, after: bool, count: usize, lines: Vec<String>) {
+        let lines = Self::repeated_register_text_lines(&lines, count);
+        if lines.is_empty() || self.fixed_field_count == 0 {
+            return;
+        }
+
+        let current = self.core.current_field();
+        let start = if after {
+            current.saturating_add(1)
+        } else {
+            current
+        };
+        if start >= self.fixed_field_count {
+            return;
+        }
+
+        self.core
+            .record_checkpoint(crate::editor::features::history::EditKind::Other);
+
+        let mut target = start;
+        for (offset, line) in lines.into_iter().enumerate() {
+            let field = start.saturating_add(offset);
+            if field >= self.fixed_field_count {
+                break;
+            }
+            self.core.data_provider_mut().set_field_value(field, line);
+            target = field;
+        }
+
+        let _ = self.core.transition_to_field(target);
+        self.core.move_line_start();
+        self.ensure_helix_primary_selection();
+    }
+
+    #[cfg(feature = "keybindings")]
+    fn paste_register_helix(&mut self, after: bool, count: usize) {
+        let Some(register) = self.core.behavior_state.yank().register().cloned() else {
+            return;
+        };
+
+        match register {
+            YankRegister::Lines(lines) => self.paste_line_register_helix(after, count, lines),
+            YankRegister::Text(lines) => self.paste_text_register_helix(after, count, lines),
+        }
     }
 
     pub fn change_current_field(&mut self) {
@@ -1012,9 +1163,15 @@ impl<D: DataProvider> KeybindingProduct for TextFormState<D> {
             | CanvasKeyAction::MoveLineDown
             | CanvasKeyAction::DuplicateLineUp
             | CanvasKeyAction::DuplicateLineDown
-            | CanvasKeyAction::CutLine
-            | CanvasKeyAction::PasteAfter
-            | CanvasKeyAction::PasteBefore => KeyEventOutcome::Consumed(None),
+            | CanvasKeyAction::CutLine => KeyEventOutcome::Consumed(None),
+            CanvasKeyAction::PasteAfter => {
+                self.paste_register_helix(true, count);
+                KeyEventOutcome::Consumed(None)
+            }
+            CanvasKeyAction::PasteBefore => {
+                self.paste_register_helix(false, count);
+                KeyEventOutcome::Consumed(None)
+            }
             _ => self.execute_canvas_key_action(action, count),
         }
     }
@@ -1290,6 +1447,48 @@ mod tests {
         assert_eq!(form.data_provider().field_value(1), "f");
         assert_eq!(form.current_field(), 0);
         assert_eq!(form.cursor_position(), 0);
+    }
+
+    #[cfg(all(feature = "keybindings", feature = "crossterm"))]
+    #[test]
+    fn helix_characterwise_yank_then_paste_inserts_inside_field() {
+        use crate::keybindings::{BuiltinCanvasKeybindingPreset, KeyEventOutcome};
+
+        let mut form = TextFormState::new(TestProvider {
+            fields: ["one two".to_string(), "row2".to_string()],
+        });
+        form.use_keybinding_preset(BuiltinCanvasKeybindingPreset::Helix);
+
+        let _ = form.handle_key_event(KeyEvent::new(KeyCode::Char('w'), KeyModifiers::NONE));
+        let _ = form.handle_key_event(KeyEvent::new(KeyCode::Char('y'), KeyModifiers::NONE));
+        let outcome = form.handle_key_event(KeyEvent::new(KeyCode::Char('p'), KeyModifiers::NONE));
+
+        assert!(matches!(outcome, KeyEventOutcome::Consumed(None)));
+        assert_eq!(form.fixed_field_count(), 2);
+        assert_eq!(form.data_provider().field_value(0), "one one two");
+        assert_eq!(form.data_provider().field_value(1), "row2");
+    }
+
+    #[cfg(all(feature = "keybindings", feature = "crossterm"))]
+    #[test]
+    fn helix_linewise_yank_then_paste_writes_fixed_slots_without_shifting() {
+        use crate::keybindings::BuiltinCanvasKeybindingPreset;
+
+        let mut form = TextFormState::new(VecProvider {
+            fields: vec![
+                "row1".to_string(),
+                "row2".to_string(),
+                "row3".to_string(),
+            ],
+        });
+        form.use_keybinding_preset(BuiltinCanvasKeybindingPreset::Helix);
+
+        let _ = form.handle_key_event(KeyEvent::new(KeyCode::Char('x'), KeyModifiers::NONE));
+        let _ = form.handle_key_event(KeyEvent::new(KeyCode::Char('y'), KeyModifiers::NONE));
+        let _ = form.handle_key_event(KeyEvent::new(KeyCode::Char('p'), KeyModifiers::NONE));
+
+        assert_eq!(form.fixed_field_count(), 3);
+        assert_eq!(form.data_provider().capture_content(), vec!["row1", "row1", "row3"]);
     }
 
     #[test]

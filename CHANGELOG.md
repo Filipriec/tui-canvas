@@ -20,6 +20,7 @@
 - Moved key-event sequence/count/fallback dispatch to a product-policy layer so `TextAreaState` and `TextFormState` share routing without sharing Enter/Tab/row-mutation semantics.
 - Moved Helix word-selection motion onto `EditorCore`, so `TextFormState` gets Helix `w`/`b`/`e` selection highlighting without inheriting textarea row-mutation behavior.
 - `TextFormState` now distinguishes Helix characterwise selections from linewise field selections: characterwise `d`/`c` edits text inside fixed fields, while linewise `x d` clears fixed slots without shifting or merging fields.
+- Helix paste now works in `TextFormState`: characterwise registers insert into field text, while linewise registers write into fixed slots without inserting, removing, or shifting rows.
 
 ### Migration Notes
 
