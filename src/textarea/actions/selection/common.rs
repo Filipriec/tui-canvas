@@ -6,7 +6,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
     /// uses the provider's `Dynamic` policy. This wrapper only forwards the call
     /// and tracks the GUI redraw flag.
     pub(crate) fn delete_selection_once(&mut self, yank: bool) -> bool {
-        let changed = self.core.delete_selection_once_core(yank);
+        let changed = self.core.delete_selection_once_dynamic(yank);
         #[cfg(feature = "gui")]
         if changed {
             self.edited_this_frame = true;

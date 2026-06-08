@@ -2,7 +2,7 @@
 use crate::{
     canvas::modes::AppMode,
     editor::behavior::YankRegister,
-    editor::paste::repeated_text,
+    editor::rows::repeated_text,
     textarea::{TextAreaDataProvider, TextAreaState},
 };
 
@@ -125,7 +125,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         if lines.is_empty() {
             return;
         }
-        self.core.paste_register_lines_core(after, count, lines);
+        self.core.paste_lines_dynamic(after, count, lines);
         self.set_mode(AppMode::Nor);
         #[cfg(feature = "gui")]
         {
@@ -137,7 +137,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         if lines.is_empty() {
             return;
         }
-        self.core.paste_register_lines_core(after, count, lines);
+        self.core.paste_lines_dynamic(after, count, lines);
         self.core.ui_state.current_mode = AppMode::Nor;
         self.ensure_helix_primary_selection();
         #[cfg(feature = "gui")]
@@ -153,7 +153,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         if self.mode() == AppMode::Sel {
             self.exit_highlight_mode_emacs();
         }
-        self.core.paste_register_lines_core(after, count, lines);
+        self.core.paste_lines_dynamic(after, count, lines);
         self.set_mode(AppMode::Nor);
         #[cfg(feature = "gui")]
         {
@@ -162,6 +162,6 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
     }
 
     fn insert_text_at(&mut self, field: usize, col: usize, text: &str) -> (usize, usize) {
-        self.core.insert_register_text_core(field, col, text)
+        self.core.insert_text_dynamic(field, col, text)
     }
 }

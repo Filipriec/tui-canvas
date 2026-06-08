@@ -18,7 +18,7 @@ pub mod navigation;
 #[cfg(feature = "keybindings")]
 pub(crate) mod product;
 #[cfg(feature = "keybindings")]
-pub(crate) mod paste;
+pub(crate) mod rows;
 #[cfg(feature = "keybindings")]
 pub(crate) mod selection;
 

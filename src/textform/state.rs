@@ -12,7 +12,7 @@ use crate::canvas::modes::AppMode;
 use crate::canvas::state::SelectionState;
 #[cfg(feature = "gui")]
 use crate::gui_utils::{display_cols_up_to, display_width};
-use crate::{editor::EditorCore, DataProvider, RowPolicy};
+use crate::{editor::EditorCore, DataProvider};
 #[cfg(feature = "cursor-style")]
 use crate::CursorManager;
 #[cfg(feature = "gui")]
@@ -179,14 +179,11 @@ impl<D: DataProvider + Default> Default for TextFormState<D> {
 impl<D: DataProvider> TextFormState<D> {
     pub fn new(data_provider: D) -> Self {
         let fixed_field_count = data_provider.field_count();
-        let mut core = EditorCore::new(data_provider);
-        // A form is a text buffer pinned to a fixed number of rows: structural
-        // edits clear slots in place instead of removing rows. This makes the
-        // shared editing engine in `EditorCore` behave correctly for any
-        // provider, without requiring callers to override `row_policy()`.
-        core.set_row_policy_override(RowPolicy::Fixed);
         Self {
-            core,
+            // A form is a fixed-row buffer: its dispatch calls the `fixed`
+            // row operations (clear/overwrite slots) rather than the `dynamic`
+            // ones a text area uses.
+            core: EditorCore::new(data_provider),
             fixed_field_count,
         }
     }
@@ -553,7 +550,7 @@ impl<D: DataProvider> TextFormState<D> {
     #[cfg(feature = "keybindings")]
     fn delete_selection_helix(&mut self, yank: bool, count: usize) {
         for _ in 0..count.max(1) {
-            if !self.core.delete_selection_once_core(yank) {
+            if !self.core.delete_selection_once_fixed(yank) {
                 break;
             }
         }
@@ -565,7 +562,7 @@ impl<D: DataProvider> TextFormState<D> {
     #[cfg(feature = "keybindings")]
     fn change_selection_helix(&mut self, yank: bool, count: usize) {
         for _ in 0..count.max(1) {
-            if !self.core.delete_selection_once_core(yank) {
+            if !self.core.delete_selection_once_fixed(yank) {
                 break;
             }
         }
@@ -606,11 +603,11 @@ impl<D: DataProvider> TextFormState<D> {
 
         match register {
             YankRegister::Lines(lines) => {
-                self.core.paste_register_lines_core(after, count, lines);
+                self.core.paste_lines_fixed(after, count, lines);
                 self.ensure_helix_primary_selection();
             }
             YankRegister::Text(lines) => {
-                let text = crate::editor::paste::repeated_text(&lines, count);
+                let text = crate::editor::rows::repeated_text(&lines, count);
                 if text.is_empty() || self.fixed_field_count == 0 {
                     return;
                 }
@@ -619,7 +616,7 @@ impl<D: DataProvider> TextFormState<D> {
                     return;
                 }
                 let (target_field, target_col) =
-                    self.core.insert_register_text_core(field, col, &text);
+                    self.core.insert_text_fixed(field, col, &text);
                 let _ = self.core.transition_to_field(target_field);
                 self.core.set_cursor_position(target_col);
                 self.ensure_helix_primary_selection();

@@ -1,24 +1,6 @@
 // src/data_provider.rs
 //! Simplified user interface - only business data, no UI state
 
-/// Whether the set of rows/fields can grow and shrink during editing.
-///
-/// This is the single decision that distinguishes a free-form text area from a
-/// fixed-row form. The shared editing engine in [`crate::editor::EditorCore`]
-/// reads it to choose how structural edits behave:
-///
-/// - [`RowPolicy::Dynamic`] — deleting a selection removes rows and merges
-///   neighbours (classic text-area behavior).
-/// - [`RowPolicy::Fixed`] — the row count never changes; structural edits clear
-///   the affected slots in place instead of shifting later rows upward.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum RowPolicy {
-    /// Rows may be added or removed (text area).
-    Dynamic,
-    /// Row count is pinned; edits operate in place (text form).
-    Fixed,
-}
-
 /// Defines when suggestions should be shown for a field
 #[cfg(feature = "suggestions")]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -68,14 +50,6 @@ pub trait DataProvider {
 
     /// Set field value (library calls this when text changes)
     fn set_field_value(&mut self, index: usize, value: String);
-
-    /// Whether rows can be added/removed during editing. Defaults to
-    /// [`RowPolicy::Dynamic`] (text-area behavior). Fixed-row forms override
-    /// this to [`RowPolicy::Fixed`] so structural edits never change the row
-    /// count.
-    fn row_policy(&self) -> RowPolicy {
-        RowPolicy::Dynamic
-    }
 
     /// Capture the full editable content as a flat list of field values, for
     /// undo/redo history. The default collects every field value in order.
