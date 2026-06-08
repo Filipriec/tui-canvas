@@ -37,14 +37,14 @@ use tui_canvas::{
     AppMode,
     CursorManager, // This import only exists when cursor-style feature is enabled
     suggestions::render::render_suggestions_dropdown,
-    DataProvider, TextForm, SuggestionItem,
+    DataProvider, TextFormState, SuggestionItem,
 };
 
 use anyhow::Result;
 
-// TextForm wrapper for suggestions demo
+// TextFormState wrapper for suggestions demo
 struct AutoCursorTextForm<D: DataProvider> {
-    editor: TextForm<D>,
+    editor: TextFormState<D>,
     has_unsaved_changes: bool,
     debug_message: String,
     command_buffer: String, // For multi-key vim commands like "gg"
@@ -53,7 +53,7 @@ struct AutoCursorTextForm<D: DataProvider> {
 impl<D: DataProvider> AutoCursorTextForm<D> {
     fn new(data_provider: D) -> Self {
         Self {
-            editor: TextForm::new(data_provider),
+            editor: TextFormState::new(data_provider),
             has_unsaved_changes: false,
             debug_message:
                 "🚀 Production-Ready Suggestions Demo - Copy this architecture for your app!"
@@ -62,11 +62,11 @@ impl<D: DataProvider> AutoCursorTextForm<D> {
         }
     }
 
-    fn inner(&self) -> &TextForm<D> {
+    fn inner(&self) -> &TextFormState<D> {
         &self.editor
     }
 
-    fn inner_mut(&mut self) -> &mut TextForm<D> {
+    fn inner_mut(&mut self) -> &mut TextFormState<D> {
         &mut self.editor
     }
 

@@ -27,6 +27,8 @@ pub mod form;
 #[cfg(feature = "textarea")]
 pub mod textarea;
 
+pub mod textform;
+
 #[cfg(feature = "textinput")]
 pub mod textinput;
 
@@ -62,9 +64,7 @@ pub use cursor::CursorManager;
 pub use data_provider::DataProvider;
 #[cfg(feature = "suggestions")]
 pub use data_provider::{SuggestionItem, SuggestionQuery, SuggestionTrigger};
-#[cfg(feature = "crossterm")]
-pub use editor::input::normal::FormInputEventOutcome;
-pub use editor::TextForm;
+pub use textform::{TextFormEventOutcome, TextFormState};
 
 pub use canvas::modes::AppMode;
 pub use canvas::state::EditorState;

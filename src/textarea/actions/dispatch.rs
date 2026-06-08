@@ -7,7 +7,10 @@ use crate::commandline::CommandLineEventOutcome;
 #[cfg(feature = "keybindings")]
 use crate::{
     canvas::modes::AppMode,
-    editor::behavior::KeybindingParadigm,
+    editor::{
+        behavior::KeybindingParadigm,
+        product::{handle_product_key_event, KeybindingProduct},
+    },
     keybindings::{CanvasKeyAction, KeyEventOutcome},
     textarea::{TextAreaDataProvider, TextAreaState},
 };
@@ -104,104 +107,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
             }
         }
 
-        self.handle_key_event_inner(evt)
-    }
-
-    fn handle_key_event_inner(&mut self, evt: KeyEvent) -> KeyEventOutcome {
-        if evt.kind != KeyEventKind::Press {
-            return KeyEventOutcome::NotMatched;
-        }
-
-        let mode = self.core.ui_state.mode();
-
-        if mode == AppMode::Ins && matches!(evt.code, KeyCode::Enter) {
-            // VSCode: typing over a selection (here, a newline) replaces it.
-            if self.core.keybinding_paradigm() == KeybindingParadigm::Vscode
-                && self.vscode_selection_active()
-            {
-                self.vscode_delete_selection();
-            }
-            self.insert_newline();
-            return KeyEventOutcome::Consumed(None);
-        }
-
-        if mode != AppMode::Ins
-            && self.core.keybinding_paradigm() == KeybindingParadigm::Vim
-        {
-            if let KeyCode::Char(ch) = evt.code {
-                if let Some(digit) = ch.to_digit(10) {
-                    let vim = self.core.behavior_state.vim_mut();
-                    if digit > 0 || vim.has_count() {
-                        vim.push_count_digit(digit as usize);
-                        return KeyEventOutcome::Pending;
-                    }
-                }
-            }
-        }
-
-        let stroke = crate::keybindings::KeyStroke {
-            code: evt.code,
-            modifiers: evt.modifiers,
-        };
-
-        self.core.seq_tracker.add_key(stroke);
-
-        let Some(keybindings) = self.core.keybindings.as_ref() else {
-            return KeyEventOutcome::NotMatched;
-        };
-        let (matched, is_prefix) =
-            keybindings.lookup_action(mode, self.core.seq_tracker.sequence());
-
-        if let Some(action) = matched.cloned() {
-            let count = self.take_vim_count();
-            self.core.seq_tracker.reset();
-            return self.dispatch_textarea_key_action(&action, count);
-        }
-
-        if is_prefix {
-            return KeyEventOutcome::Pending;
-        }
-
-        self.core.seq_tracker.reset();
-        self.core.behavior_state.vim_mut().reset_count();
-        // An unmatched key (e.g. Esc) cancels a half-typed operator.
-        self.core.behavior_state.vim_mut().clear_pending_operator();
-
-        if mode == AppMode::Ins {
-            match evt.code {
-                KeyCode::Tab => {
-                    self.insert_tab_spaces();
-                    return KeyEventOutcome::Consumed(None);
-                }
-                KeyCode::Char(c) => {
-                    let m = evt.modifiers;
-                    let is_plain = m.is_empty() || m == KeyModifiers::SHIFT;
-                    if is_plain {
-                        // VSCode: typing over a selection replaces it.
-                        if self.core.keybinding_paradigm() == KeybindingParadigm::Vscode
-                            && self.vscode_selection_active()
-                        {
-                            self.vscode_delete_selection();
-                        }
-                        self.enter_edit_mode();
-                        #[cfg(feature = "gui")]
-                        {
-                            self.edited_this_frame = true;
-                        }
-                        if self.insert_char(c).is_ok() {
-                            return KeyEventOutcome::Consumed(None);
-                        }
-                    }
-                }
-                _ => {}
-            }
-        }
-
-        KeyEventOutcome::NotMatched
-    }
-
-    fn take_vim_count(&mut self) -> usize {
-        self.core.behavior_state.vim_mut().take_count_or_one()
+        handle_product_key_event(self, evt)
     }
 
     fn dispatch_textarea_key_action(
@@ -215,5 +121,59 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
             KeybindingParadigm::Vscode => self.dispatch_textarea_key_action_vscode(action, count),
             KeybindingParadigm::Vim => self.dispatch_textarea_key_action_vim(action, count),
         }
+    }
+}
+
+#[cfg(feature = "keybindings")]
+impl<P: TextAreaDataProvider> KeybindingProduct for TextAreaState<P> {
+    type Provider = P;
+
+    fn core(&self) -> &crate::editor::EditorCore<Self::Provider> {
+        &self.core
+    }
+
+    fn core_mut(&mut self) -> &mut crate::editor::EditorCore<Self::Provider> {
+        &mut self.core
+    }
+
+    fn handle_insert_enter(&mut self) -> KeyEventOutcome {
+        if self.core.keybinding_paradigm() == KeybindingParadigm::Vscode
+            && self.vscode_selection_active()
+        {
+            self.vscode_delete_selection();
+        }
+        self.insert_newline();
+        KeyEventOutcome::Consumed(None)
+    }
+
+    fn handle_insert_tab(&mut self) -> KeyEventOutcome {
+        self.insert_tab_spaces();
+        KeyEventOutcome::Consumed(None)
+    }
+
+    fn handle_plain_insert_char(&mut self, ch: char) -> KeyEventOutcome {
+        if self.core.keybinding_paradigm() == KeybindingParadigm::Vscode
+            && self.vscode_selection_active()
+        {
+            self.vscode_delete_selection();
+        }
+        self.enter_edit_mode();
+        #[cfg(feature = "gui")]
+        {
+            self.edited_this_frame = true;
+        }
+        if self.insert_char(ch).is_ok() {
+            KeyEventOutcome::Consumed(None)
+        } else {
+            KeyEventOutcome::NotMatched
+        }
+    }
+
+    fn dispatch_product_key_action(
+        &mut self,
+        action: &CanvasKeyAction,
+        count: usize,
+    ) -> KeyEventOutcome {
+        self.dispatch_textarea_key_action(action, count)
     }
 }

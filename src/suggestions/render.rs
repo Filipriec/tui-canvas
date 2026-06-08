@@ -12,19 +12,19 @@ use ratatui::{
 #[cfg(feature = "gui")]
 use crate::canvas::theme::CanvasTheme;
 use crate::data_provider::{DataProvider, SuggestionItem};
-use crate::editor::TextForm;
+use crate::textform::TextFormState;
 
 #[cfg(feature = "gui")]
 use unicode_width::UnicodeWidthStr;
 
-/// Render suggestions dropdown for TextForm - call this AFTER rendering canvas
+/// Render suggestions dropdown for TextFormState - call this AFTER rendering canvas
 #[cfg(feature = "gui")]
 pub fn render_suggestions_dropdown<T: CanvasTheme, D: DataProvider>(
     f: &mut Frame,
     frame_area: Rect,
     input_rect: Rect,
     theme: &T,
-    editor: &TextForm<D>,
+    editor: &TextFormState<D>,
 ) {
     let ui_state = editor.ui_state();
 

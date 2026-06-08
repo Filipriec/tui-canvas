@@ -35,12 +35,12 @@ use tui_canvas::{
     render_canvas_default,
     AppMode,
     CursorManager, // This import only exists when cursor-style feature is enabled
-    DataProvider, TextForm,
+    DataProvider, TextFormState,
 };
 
-// TextForm wrapper for automatic cursor demo
+// TextFormState wrapper for automatic cursor demo
 struct AutoCursorTextForm<D: DataProvider> {
-    editor: TextForm<D>,
+    editor: TextFormState<D>,
     has_unsaved_changes: bool,
     debug_message: String,
     command_buffer: String, // For multi-key vim commands like "gg"
@@ -49,7 +49,7 @@ struct AutoCursorTextForm<D: DataProvider> {
 impl<D: DataProvider> AutoCursorTextForm<D> {
     fn new(data_provider: D) -> Self {
         Self {
-            editor: TextForm::new(data_provider),
+            editor: TextFormState::new(data_provider),
             has_unsaved_changes: false,
             debug_message: "🎯 Automatic Cursor Demo - cursor-style feature enabled!".to_string(),
             command_buffer: String::new(),

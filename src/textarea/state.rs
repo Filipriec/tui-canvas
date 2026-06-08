@@ -1406,7 +1406,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
 }
 
 /// Dropdown suggestions, re-exposed from the underlying [`EditorCore`] so that
-/// `TextInput`, `TextArea`, and `TextForm` all share one suggestions
+/// `TextInput`, `TextArea`, and `TextFormState` all share one suggestions
 /// mechanism. Render the dropdown with
 /// `canvas::suggestions::render::render_suggestions_dropdown(.., self.core())`.
 #[cfg(feature = "suggestions")]

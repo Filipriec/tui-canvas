@@ -32,12 +32,12 @@ use std::sync::Arc;
 
 use tui_canvas::{
     render_canvas_default, AppMode, CursorManager, CharacterFilter, DataProvider,
-    TextForm, PatternFilters, PositionFilter, PositionRange, ValidationConfig,
+    TextFormState, PatternFilters, PositionFilter, PositionRange, ValidationConfig,
     ValidationConfigBuilder,
 };
 
 struct AdvancedPatternTextForm<D: DataProvider> {
-    editor: TextForm<D>,
+    editor: TextFormState<D>,
     debug_message: String,
     command_buffer: String,
     validation_enabled: bool,
@@ -47,7 +47,7 @@ struct AdvancedPatternTextForm<D: DataProvider> {
 
 impl<D: DataProvider> AdvancedPatternTextForm<D> {
     fn new(data_provider: D) -> Self {
-        let mut editor = TextForm::new(data_provider);
+        let mut editor = TextFormState::new(data_provider);
         editor.set_validation_enabled(true);
 
         Self {

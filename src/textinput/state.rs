@@ -5,7 +5,7 @@ use std::io;
 
 #[cfg(feature = "cursor-style")]
 use crate::{canvas::modes::AppMode, CursorManager};
-use crate::{canvas::state::EditorState, editor::TextForm};
+use crate::{canvas::state::EditorState, textform::TextFormState};
 #[cfg(feature = "gui")]
 use crate::gui_utils::{
     compute_h_scroll_with_padding, display_cols_up_to, display_width, RIGHT_PAD,
@@ -24,13 +24,13 @@ pub enum TextInputEventOutcome {
 
 /// Single-line text input widget state.
 ///
-/// Wraps a single-field [`TextForm`]. Editing, cursor, and movement methods
+/// Wraps a single-field [`TextFormState`]. Editing, cursor, and movement methods
 /// from the form are available directly, and the form can be reached explicitly
 /// via [`TextInputState::form`] / [`TextInputState::form_mut`].
 /// With the `validation` and `computed` features enabled, the corresponding
 /// helper methods are re-exposed as inherent methods on this type.
 pub struct TextInputState<P: TextInputDataProvider = TextInputProvider> {
-    pub(crate) form: TextForm<P>,
+    pub(crate) form: TextFormState<P>,
     pub(crate) placeholder: Option<String>,
     pub(crate) suggestion_suffix: Option<String>,
     pub(crate) overflow_indicator: char,
@@ -42,7 +42,7 @@ pub struct TextInputState<P: TextInputDataProvider = TextInputProvider> {
 impl<P: TextInputDataProvider + Default> Default for TextInputState<P> {
     fn default() -> Self {
         Self {
-            form: TextForm::new(P::default()),
+            form: TextFormState::new(P::default()),
             placeholder: None,
             suggestion_suffix: None,
             overflow_indicator: '$',
@@ -56,7 +56,7 @@ impl<P: TextInputDataProvider + Default> Default for TextInputState<P> {
 impl<P: TextInputDataProvider> TextInputState<P> {
     pub fn with_provider(provider: P) -> Self {
         Self {
-            form: TextForm::new(provider),
+            form: TextFormState::new(provider),
             placeholder: None,
             suggestion_suffix: None,
             overflow_indicator: '$',
@@ -320,13 +320,13 @@ impl<P: TextInputDataProvider> TextInputState<P> {
 }
 
 impl<P: TextInputDataProvider> TextInputState<P> {
-    /// Borrow the underlying [`TextForm`].
-    pub fn form(&self) -> &TextForm<P> {
+    /// Borrow the underlying [`TextFormState`].
+    pub fn form(&self) -> &TextFormState<P> {
         &self.form
     }
 
-    /// Mutably borrow the underlying [`TextForm`].
-    pub fn form_mut(&mut self) -> &mut TextForm<P> {
+    /// Mutably borrow the underlying [`TextFormState`].
+    pub fn form_mut(&mut self) -> &mut TextFormState<P> {
         &mut self.form
     }
 
@@ -470,7 +470,7 @@ impl<P: TextInputDataProvider> TextInputState<P> {
     }
 }
 
-/// Validation helpers, re-exposed from the underlying [`TextForm`] so they are
+/// Validation helpers, re-exposed from the underlying [`TextFormState`] so they are
 /// part of `TextInputState`'s own public API.
 #[cfg(feature = "validation")]
 impl<P: TextInputDataProvider> TextInputState<P> {
@@ -564,7 +564,7 @@ impl<P: TextInputDataProvider> TextInputState<P> {
     }
 }
 
-/// Computed-field helpers, re-exposed from the underlying [`TextForm`].
+/// Computed-field helpers, re-exposed from the underlying [`TextFormState`].
 #[cfg(feature = "computed")]
 impl<P: TextInputDataProvider> TextInputState<P> {
     pub fn register_computed_provider<C>(&mut self, provider: &C)
@@ -607,7 +607,7 @@ impl<P: TextInputDataProvider> TextInputState<P> {
     }
 }
 
-/// Undo/redo, re-exposed from the underlying [`TextForm`].
+/// Undo/redo, re-exposed from the underlying [`TextFormState`].
 impl<P: TextInputDataProvider> TextInputState<P> {
     pub fn undo(&mut self) -> bool {
         self.form.undo()
@@ -634,8 +634,8 @@ impl<P: TextInputDataProvider> TextInputState<P> {
     }
 }
 
-/// Dropdown suggestions, re-exposed from the underlying [`TextForm`] so that
-/// `TextInput`, `TextArea`, and `TextForm` all share one suggestions
+/// Dropdown suggestions, re-exposed from the underlying [`TextFormState`] so that
+/// `TextInput`, `TextArea`, and `TextFormState` all share one suggestions
 /// mechanism. Render the dropdown with
 /// `canvas::suggestions::render::render_suggestions_dropdown(.., self.form())`.
 ///

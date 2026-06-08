@@ -1,6 +1,6 @@
 //! Minimal form example using the default vim keybindings.
 //!
-//! Demonstrates the smallest viable setup: a `TextForm` backed by a
+//! Demonstrates the smallest viable setup: a `TextFormState` backed by a
 //! `DataProvider`, with `CanvasKeyBindings::vim_defaults()` wiring up all
 //! modal navigation, editing, and field traversal through the centralized
 //! keybinding system.
@@ -29,10 +29,10 @@ use ratatui::{
     Frame, Terminal,
 };
 
-use tui_canvas::{keybindings::CanvasKeyBindings, render_canvas_default, DataProvider, TextForm};
+use tui_canvas::{keybindings::CanvasKeyBindings, render_canvas_default, DataProvider, TextFormState};
 
 struct App {
-    editor: TextForm<Form>,
+    editor: TextFormState<Form>,
 }
 
 struct Form {
@@ -109,7 +109,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut terminal = Terminal::new(backend)?;
 
     let mut app = App {
-        editor: TextForm::new(Form::new()),
+        editor: TextFormState::new(Form::new()),
     };
     // One call wires up all vim-style modal behavior: hjkl movement,
     // w/b/e word jumps, i/a/o edit modes, gg/G field jumps, v/V visual,

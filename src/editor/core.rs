@@ -16,8 +16,6 @@ use derivative::Derivative;
 #[cfg(feature = "keybindings")]
 use crate::keybindings::{CanvasKeyBindings, KeySequenceTracker};
 
-use std::ops::{Deref, DerefMut};
-
 #[derive(Derivative)]
 #[derivative(Debug, Default)]
 pub struct EditorCore<D: DataProvider> {
@@ -50,41 +48,6 @@ pub struct EditorCore<D: DataProvider> {
     pub(crate) history_last_kind: Option<crate::editor::features::history::EditKind>,
     #[derivative(Default(value = "true"))]
     pub(crate) history_enabled: bool,
-}
-
-#[derive(Debug, Default)]
-pub struct TextForm<D: DataProvider> {
-    pub(crate) core: EditorCore<D>,
-}
-
-impl<D: DataProvider> TextForm<D> {
-    pub fn new(data_provider: D) -> Self {
-        Self {
-            core: EditorCore::new(data_provider),
-        }
-    }
-
-    pub fn core(&self) -> &EditorCore<D> {
-        &self.core
-    }
-
-    pub fn core_mut(&mut self) -> &mut EditorCore<D> {
-        &mut self.core
-    }
-}
-
-impl<D: DataProvider> Deref for TextForm<D> {
-    type Target = EditorCore<D>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.core
-    }
-}
-
-impl<D: DataProvider> DerefMut for TextForm<D> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.core
-    }
 }
 
 impl<D: DataProvider> EditorCore<D> {

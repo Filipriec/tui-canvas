@@ -33,12 +33,12 @@ use tui_canvas::{
     render_canvas_default,
     AppMode,
     keybindings::{CanvasKeyBindings, KeyEventOutcome},
-    DataProvider, TextForm,
+    DataProvider, TextFormState,
 };
 
 /// Demo application using centralized keybinding system
 struct KeybindingDemoApp {
-    editor: TextForm<DemoData>,
+    editor: TextFormState<DemoData>,
     message: String,
     quit: bool,
 }
@@ -46,7 +46,7 @@ struct KeybindingDemoApp {
 impl KeybindingDemoApp {
     fn new() -> Self {
         let data = DemoData::new();
-        let mut editor = TextForm::new(data);
+        let mut editor = TextFormState::new(data);
 
         editor.set_keybindings(CanvasKeyBindings::vim_defaults());
 
@@ -123,7 +123,7 @@ impl KeybindingDemoApp {
         self.quit
     }
 
-    fn editor(&self) -> &TextForm<DemoData> {
+    fn editor(&self) -> &TextFormState<DemoData> {
         &self.editor
     }
 

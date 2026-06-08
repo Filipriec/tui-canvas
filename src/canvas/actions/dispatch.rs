@@ -1,5 +1,5 @@
 // src/canvas/actions/dispatch.rs
-//! Provides the typed dispatcher that maps CanvasAction → TextForm method calls.
+//! Provides the typed dispatcher that maps CanvasAction → TextFormState method calls.
 
 use super::types::{ActionResult, CanvasAction};
 use crate::editor::EditorCore;

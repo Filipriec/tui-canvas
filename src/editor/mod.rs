@@ -15,8 +15,7 @@ pub mod features;
 pub mod mode;
 pub mod movement;
 pub mod navigation;
+#[cfg(feature = "keybindings")]
+pub(crate) mod product;
 
-pub mod input;
-
-// Re-export the editor core and public fixed-row form surface.
-pub use core::{EditorCore, TextForm};
+pub use core::EditorCore;

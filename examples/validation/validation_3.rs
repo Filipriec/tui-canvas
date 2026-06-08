@@ -33,12 +33,12 @@ use std::io;
 
 use tui_canvas::{
     render_canvas_default, AppMode, CursorManager, DataProvider, DisplayMask,
-    TextForm, ValidationConfig, ValidationConfigBuilder,
+    TextFormState, ValidationConfig, ValidationConfigBuilder,
 };
 
-// TextForm wrapper for mask demo
+// TextFormState wrapper for mask demo
 struct MaskDemoTextForm<D: DataProvider> {
-    editor: TextForm<D>,
+    editor: TextFormState<D>,
     debug_message: String,
     command_buffer: String,
     validation_enabled: bool,
@@ -47,7 +47,7 @@ struct MaskDemoTextForm<D: DataProvider> {
 
 impl<D: DataProvider> MaskDemoTextForm<D> {
     fn new(data_provider: D) -> Self {
-        let mut editor = TextForm::new(data_provider);
+        let mut editor = TextFormState::new(data_provider);
         editor.set_validation_enabled(true);
 
         Self {

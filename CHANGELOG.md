@@ -4,7 +4,7 @@
 
 ### Added
 
-- Added full Helix editing paradigm support when using `BuiltinCanvasKeybindingPreset::Helix` via `TextForm::set_keybinding_preset` or `TextAreaState::use_keybinding_preset`. Helix mode uses selection-first editing (`d`/`c`/`y`/`p` on the primary selection), `U` for redo, `x`/`X` for line selection extension, and collapses the primary selection after normal-mode movements. Vim, Helix, and Emacs behaviors are implemented in separate paradigm modules (`editor/paradigm/{vim,helix,emacs}`, `textarea/paradigm/{vim,helix,emacs}`) with top-level dispatch only.
+- Added full Helix editing paradigm support when using `BuiltinCanvasKeybindingPreset::Helix` via `TextFormState::use_keybinding_preset` or `TextAreaState::use_keybinding_preset`. Helix mode uses selection-first editing (`d`/`c`/`y`/`p` on the primary selection), `U` for redo, `x`/`X` for line selection extension, and collapses the primary selection after normal-mode movements. Vim, Helix, and Emacs behaviors are implemented in separate paradigm modules (`editor/paradigm/{vim,helix,emacs}`, `textarea/paradigm/{vim,helix,emacs}`) with top-level dispatch only.
 - Added full Emacs editing paradigm support when using `BuiltinCanvasKeybindingPreset::Emacs`. Emacs mode uses mark/region editing (`C-SPC` set mark, `C-w` kill region, `M-w` copy region, `C-y` yank, `Esc` deactivate mark) with the same shared `nor`/`sel`/`ins` modes as Vim and Helix.
 - Added opt-in default textarea command-line integration through `TextAreaState::use_default_commandline()`, including built-in `:set number`, `:set relativenumber`, `:set nonumber`, `:noh`, `/`, and `?` behavior with automatic bottom-row reservation and cursor routing.
 
@@ -12,16 +12,18 @@
 
 ### Changed
 
-- Renamed the fixed-row form product from `FormEditor<D>` to `TextForm<D>` and removed the old compatibility alias. Shared cursor, mode, keybinding, validation, suggestions, and history state now lives in `EditorCore<D>`.
-- `TextAreaState<P>` now owns `EditorCore<P>` directly instead of wrapping the fixed-row form type. Textarea row mutations such as split, join, insert, delete, and multiline paste remain textarea-only behavior.
-- `TextInputState<P>` now owns a single-row `TextForm<P>`.
+- Split the old form/editor layering into `EditorCore<D>` plus sibling product states. `EditorCore` owns shared cursor, mode, selection, keybinding, validation, suggestions, and history state; product states own editing policy.
+- Added `TextFormState<D>` as the fixed-row product. Its fixed-row policy keeps row count stable: Enter/Tab traverse fields, line deletion clears the current field, and row insert/remove behavior is not part of the form product.
+- `TextAreaState<P>` now owns `EditorCore<P>` directly. Textarea-only behavior such as split, join, insert/delete rows, and multiline paste remains textarea policy.
+- `TextInputState<P>` now owns a single-row `TextFormState<P>`.
+- Moved key-event sequence/count/fallback dispatch to a product-policy layer so `TextAreaState` and `TextFormState` share routing without sharing Enter/Tab/row-mutation semantics.
 
 ### Migration Notes
 
-- Replace `FormEditor` imports/usages with `TextForm`.
+- Replace `FormEditor`/old fixed-row state imports with `TextFormState`.
 - Replace `TextAreaState::editor()` / `editor_mut()` with `TextAreaState::core()` / `core_mut()`.
 - Replace `TextInputState::editor()` / `editor_mut()` with `TextInputState::form()` / `form_mut()`.
-- `TextAreaEditor` and `TextInputEditor` aliases were removed; use `EditorCore<P>` for textarea internals and `TextForm<P>` for text input internals when an explicit type is needed.
+- `TextAreaEditor`, `TextInputEditor`, `FormInputEventOutcome`, and the engine-level `TextForm` alias were removed. Use `EditorCore<P>` only for internals, `TextFormState<P>` for fixed-row forms, and `TextFormEventOutcome` for fixed-row form input events.
 
 ## v0.7.2
 
@@ -87,7 +89,7 @@ The crate root continues to re-export the main widget and rendering types:
 
 ```rust
 use canvas::{
-    CursorManager, TextForm, TextArea, TextAreaState, TextInput, TextInputState,
+    CursorManager, TextFormState, TextArea, TextAreaState, TextInput, TextInputState,
     render_canvas, render_canvas_default, render_canvas_with_options,
 };
 ```

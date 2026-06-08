@@ -18,7 +18,7 @@ compile_error!(
 
 use tui_canvas::{
     render_canvas_default, AppMode, CursorManager, CharacterLimits, DataProvider,
-    TextForm, ValidationConfig, ValidationConfigBuilder, ValidationResult,
+    TextFormState, ValidationConfig, ValidationConfigBuilder, ValidationResult,
 };
 use crossterm::{
     event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyModifiers},
@@ -38,9 +38,9 @@ use std::io;
 // Import CountMode from the validation module directly
 use tui_canvas::validation::limits::CountMode;
 
-// TextForm wrapper for validation demo
+// TextFormState wrapper for validation demo
 struct ValidationTextForm<D: DataProvider> {
-    editor: TextForm<D>,
+    editor: TextFormState<D>,
     has_unsaved_changes: bool,
     debug_message: String,
     command_buffer: String,
@@ -51,7 +51,7 @@ struct ValidationTextForm<D: DataProvider> {
 
 impl<D: DataProvider> ValidationTextForm<D> {
     fn new(data_provider: D) -> Self {
-        let mut editor = TextForm::new(data_provider);
+        let mut editor = TextFormState::new(data_provider);
         // Enable validation by default
         editor.set_validation_enabled(true);
         Self {

@@ -38,7 +38,7 @@ use ratatui::{
 
 use tui_canvas::{
     render_canvas_default, AppMode, CursorManager, CustomFormatter, DataProvider,
-    TextForm, FormattingResult, ValidationConfig, ValidationConfigBuilder,
+    TextFormState, FormattingResult, ValidationConfig, ValidationConfigBuilder,
 };
 
 /// PSC (Postal Code) Formatter: "01001" -> "010 01"
@@ -266,7 +266,7 @@ impl DataProvider for MultiFormatterDemoData {
 
 // Demo editor with status tracking
 struct EnhancedDemoEditor<D: DataProvider> {
-    editor: TextForm<D>,
+    editor: TextFormState<D>,
     debug_message: String,
     validation_enabled: bool,
     show_raw_data: bool,
@@ -276,7 +276,7 @@ struct EnhancedDemoEditor<D: DataProvider> {
 
 impl<D: DataProvider> EnhancedDemoEditor<D> {
     fn new(data_provider: D) -> Self {
-        let mut editor = TextForm::new(data_provider);
+        let mut editor = TextFormState::new(data_provider);
         editor.set_validation_enabled(true);
 
         Self {
