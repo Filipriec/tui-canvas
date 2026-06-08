@@ -21,6 +21,7 @@
 - Moved Helix word-selection motion onto `EditorCore`, so `TextFormState` gets Helix `w`/`b`/`e` selection highlighting without inheriting textarea row-mutation behavior.
 - `TextFormState` now distinguishes Helix characterwise selections from linewise field selections: characterwise `d`/`c` edits text inside fixed fields, while linewise `x d` clears fixed slots without shifting or merging fields.
 - Helix paste now works in `TextFormState`: characterwise registers insert into field text, while linewise registers write into fixed slots without inserting, removing, or shifting rows.
+- `TextFormState` keybinding dispatch now uses an explicit fixed-row action policy. Shared cursor/text actions still route through `EditorCore`, while structural line actions are handled, no-op'd, or rejected without falling through to textarea-style row mutation.
 
 ### Migration Notes
 

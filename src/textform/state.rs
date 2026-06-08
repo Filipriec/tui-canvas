@@ -29,6 +29,134 @@ use crate::{
     keybindings::{CanvasKeyAction, CanvasKeyBindings, KeyEventOutcome},
 };
 
+#[cfg(feature = "keybindings")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum TextFormActionPolicy {
+    SharedCore,
+    ProductHandled,
+    StructuralNoOp,
+    Unsupported,
+}
+
+#[cfg(feature = "keybindings")]
+fn textform_action_policy(action: &CanvasKeyAction) -> TextFormActionPolicy {
+    use CanvasKeyAction::*;
+
+    match action {
+        MoveLeft
+        | MoveRight
+        | MoveUp
+        | MoveDown
+        | MoveLineStart
+        | MoveLineEnd
+        | MoveHalfPageUp
+        | MoveHalfPageDown
+        | MoveFirstLine
+        | MoveLastLine
+        | MoveWordNext
+        | MoveWordPrev
+        | MoveWordEnd
+        | MoveWordEndPrev
+        | MoveBigWordNext
+        | MoveBigWordPrev
+        | MoveBigWordEnd
+        | MoveBigWordEndPrev
+        | DeleteCharBackward
+        | DeleteCharForward
+        | Undo
+        | Redo
+        | OpenSuggestions
+        | ApplySuggestion
+        | SuggestionDown
+        | SuggestionUp
+        | EnterEditModeBefore
+        | EnterEditModeAfter
+        | ExitEditMode
+        | EnterHighlightMode
+        | EnterHighlightModeLinewise
+        | ExitHighlightMode => TextFormActionPolicy::SharedCore,
+
+        NextField
+        | PrevField
+        | OpenLineBelow
+        | OpenLineAbove
+        | EnterEditModeLineStart
+        | EnterEditModeLineEnd
+        | DeleteLine
+        | DeleteToLineEnd
+        | ChangeLine
+        | ChangeToLineEnd
+        | OperatorDelete
+        | OperatorChange
+        | OperatorYank
+        | YankLine
+        | CopyLine
+        | CutLine
+        | PasteAfter
+        | PasteBefore
+        | DeleteSelection
+        | DeleteSelectionNoYank
+        | ChangeSelection
+        | ChangeSelectionNoYank
+        | YankSelection
+        | CollapseSelection
+        | ExtendLineBelow
+        | ExtendToLineBounds => TextFormActionPolicy::ProductHandled,
+
+        JoinLineBelow
+        | MoveLineUp
+        | MoveLineDown
+        | DuplicateLineUp
+        | DuplicateLineDown => TextFormActionPolicy::StructuralNoOp,
+
+        EnterDecider
+        | Exit
+        | SearchNext
+        | SearchPrev
+        | SelectAll
+        | FlipSelections
+        | SwitchCase
+        | SwitchToLowercase
+        | SwitchToUppercase
+        | TrimSelections
+        | GotoFirstNonWhitespace
+        | MovePageUp
+        | MovePageDown
+        | SearchSelection
+        | EnsureSelectionForward
+        | MatchBrackets
+        | IndentSelection
+        | UnindentSelection
+        | IncrementNumber
+        | DecrementNumber
+        | FindNextChar
+        | FindPrevChar
+        | TillNextChar
+        | TillPrevChar
+        | ReplaceChar
+        | RepeatLastFind
+        | RepeatLastFindReverse
+        | SurroundAdd
+        | SurroundDelete
+        | SurroundReplace
+        | DeleteWordBackward
+        | DeleteToLineStart
+        | DeleteWordForward
+        | ClearSearch
+        | SelectLeft
+        | SelectRight
+        | SelectUp
+        | SelectDown
+        | SelectWordPrev
+        | SelectWordNext
+        | SelectLineStart
+        | SelectLineEnd
+        | SelectDocStart
+        | SelectDocEnd
+        | Unknown(_) => TextFormActionPolicy::Unsupported,
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TextFormEventOutcome {
     Ignored,
@@ -288,6 +416,49 @@ impl<D: DataProvider> TextFormState<D> {
                 .min(this.fixed_field_count - 1);
             this.clear_field_range(start, end);
         })
+    }
+
+    #[cfg(feature = "keybindings")]
+    fn selected_fixed_field_values(&self, start: usize, end: usize) -> Vec<String> {
+        if self.fixed_field_count == 0 || start > end {
+            return Vec::new();
+        }
+
+        let end = end.min(self.fixed_field_count - 1);
+        (start..=end)
+            .map(|field_index| {
+                self.core
+                    .data_provider()
+                    .field_value(field_index)
+                    .to_string()
+            })
+            .collect()
+    }
+
+    #[cfg(feature = "keybindings")]
+    fn yank_current_and_following_fields(&mut self, count: usize) {
+        if self.fixed_field_count == 0 {
+            return;
+        }
+
+        let start = self.core.current_field();
+        let end = start
+            .saturating_add(count.max(1))
+            .saturating_sub(1)
+            .min(self.fixed_field_count - 1);
+        let lines = self.selected_fixed_field_values(start, end);
+        if !lines.is_empty() {
+            self.core
+                .behavior_state
+                .yank_mut()
+                .set_line_register(lines);
+        }
+    }
+
+    #[cfg(feature = "keybindings")]
+    fn cut_current_and_following_fields(&mut self, count: usize) {
+        self.yank_current_and_following_fields(count);
+        self.clear_current_and_following_fields(count);
     }
 
     fn clear_field_range(&mut self, start: usize, end: usize) {
@@ -704,9 +875,11 @@ impl<D: DataProvider> TextFormState<D> {
             let _ = self.core.transition_to_field(field);
             self.core.ui_state.set_cursor(cursor.min(len), len, false);
         } else {
+            let available = self.fixed_field_count.saturating_sub(field);
+            let last_offset = lines.len().min(available).saturating_sub(1);
             self.core
                 .data_provider_mut()
-                .set_field_value(field, format!("{prefix}{}{suffix}", lines[0]));
+                .set_field_value(field, format!("{prefix}{}", lines[0]));
 
             let mut target_field = field;
             let mut target_col = col.saturating_add(lines[0].chars().count());
@@ -715,11 +888,22 @@ impl<D: DataProvider> TextFormState<D> {
                 if next_field >= self.fixed_field_count {
                     break;
                 }
+                let value = if offset == last_offset {
+                    format!("{text}{suffix}")
+                } else {
+                    text.clone()
+                };
                 self.core
                     .data_provider_mut()
-                    .set_field_value(next_field, text.clone());
+                    .set_field_value(next_field, value);
                 target_field = next_field;
                 target_col = text.chars().count();
+            }
+
+            if last_offset == 0 {
+                self.core
+                    .data_provider_mut()
+                    .set_field_value(field, format!("{prefix}{}{suffix}", lines[0]));
             }
 
             let len = self.field_char_len(target_field);
@@ -920,7 +1104,15 @@ impl<D: DataProvider> TextFormState<D> {
                     self.clear_field_range(start, end);
                     self.core.enter_edit_mode();
                 }
-                VimOperator::Yank => {}
+                VimOperator::Yank => {
+                    let lines = self.selected_fixed_field_values(start, end);
+                    if !lines.is_empty() {
+                        self.core
+                            .behavior_state
+                            .yank_mut()
+                            .set_line_register(lines);
+                    }
+                }
             }
             return KeyEventOutcome::Consumed(None);
         }
@@ -948,7 +1140,15 @@ impl<D: DataProvider> TextFormState<D> {
                     self.clear_field_range(start, end);
                     self.core.enter_edit_mode();
                 }
-                VimOperator::Yank => {}
+                VimOperator::Yank => {
+                    let lines = self.selected_fixed_field_values(start, end);
+                    if !lines.is_empty() {
+                        self.core
+                            .behavior_state
+                            .yank_mut()
+                            .set_line_register(lines);
+                    }
+                }
             }
             return KeyEventOutcome::Consumed(None);
         }
@@ -963,7 +1163,15 @@ impl<D: DataProvider> TextFormState<D> {
                 self.core.enter_edit_mode();
                 KeyEventOutcome::Consumed(None)
             }
-            VimOperator::Yank => KeyEventOutcome::Consumed(None),
+            VimOperator::Yank => {
+                let field = self.core.current_field();
+                let line = self.core.data_provider().field_value(field).to_string();
+                self.core
+                    .behavior_state
+                    .yank_mut()
+                    .set_text_register(vec![line]);
+                KeyEventOutcome::Consumed(None)
+            }
         }
     }
 }
@@ -1018,6 +1226,8 @@ impl<D: DataProvider> KeybindingProduct for TextFormState<D> {
         action: &CanvasKeyAction,
         count: usize,
     ) -> KeyEventOutcome {
+        let policy = textform_action_policy(action);
+
         if self.core.behavior_state.vim().has_pending_operator() {
             return self.apply_operator_motion_vim(action, count);
         }
@@ -1126,6 +1336,14 @@ impl<D: DataProvider> KeybindingProduct for TextFormState<D> {
                 self.core.enter_edit_mode();
                 KeyEventOutcome::Consumed(None)
             }
+            CanvasKeyAction::YankLine | CanvasKeyAction::CopyLine => {
+                self.yank_current_and_following_fields(count);
+                KeyEventOutcome::Consumed(None)
+            }
+            CanvasKeyAction::CutLine => {
+                self.cut_current_and_following_fields(count);
+                KeyEventOutcome::Consumed(None)
+            }
             CanvasKeyAction::ExtendLineBelow => {
                 self.extend_line_below_helix(count);
                 KeyEventOutcome::Consumed(None)
@@ -1162,8 +1380,7 @@ impl<D: DataProvider> KeybindingProduct for TextFormState<D> {
             | CanvasKeyAction::MoveLineUp
             | CanvasKeyAction::MoveLineDown
             | CanvasKeyAction::DuplicateLineUp
-            | CanvasKeyAction::DuplicateLineDown
-            | CanvasKeyAction::CutLine => KeyEventOutcome::Consumed(None),
+            | CanvasKeyAction::DuplicateLineDown => KeyEventOutcome::Consumed(None),
             CanvasKeyAction::PasteAfter => {
                 self.paste_register_helix(true, count);
                 KeyEventOutcome::Consumed(None)
@@ -1172,7 +1389,15 @@ impl<D: DataProvider> KeybindingProduct for TextFormState<D> {
                 self.paste_register_helix(false, count);
                 KeyEventOutcome::Consumed(None)
             }
-            _ => self.execute_canvas_key_action(action, count),
+            _ => match policy {
+                TextFormActionPolicy::SharedCore => self.execute_canvas_key_action(action, count),
+                TextFormActionPolicy::StructuralNoOp => KeyEventOutcome::Consumed(None),
+                TextFormActionPolicy::Unsupported => KeyEventOutcome::NotMatched,
+                TextFormActionPolicy::ProductHandled => KeyEventOutcome::Consumed(Some(format!(
+                    "Unhandled textform action: {}",
+                    action.as_str()
+                ))),
+            },
         }
     }
 }
@@ -1245,6 +1470,163 @@ mod tests {
         }
     }
 
+    #[cfg(feature = "keybindings")]
+    #[derive(Clone)]
+    struct FixedPolicyProvider {
+        names: [&'static str; 3],
+        fields: [String; 3],
+    }
+
+    #[cfg(feature = "keybindings")]
+    impl FixedPolicyProvider {
+        fn new() -> Self {
+            Self {
+                names: ["first", "second", "third"],
+                fields: ["alpha beta".into(), "gamma delta".into(), "epsilon".into()],
+            }
+        }
+
+        fn names(&self) -> Vec<String> {
+            self.names.iter().map(|name| (*name).to_string()).collect()
+        }
+    }
+
+    #[cfg(feature = "keybindings")]
+    impl DataProvider for FixedPolicyProvider {
+        fn field_count(&self) -> usize {
+            self.fields.len()
+        }
+
+        fn field_name(&self, index: usize) -> &str {
+            self.names.get(index).copied().unwrap_or("")
+        }
+
+        fn field_value(&self, index: usize) -> &str {
+            self.fields.get(index).map(String::as_str).unwrap_or("")
+        }
+
+        fn set_field_value(&mut self, index: usize, value: String) {
+            if let Some(field) = self.fields.get_mut(index) {
+                *field = value;
+            }
+        }
+    }
+
+    #[cfg(feature = "keybindings")]
+    fn all_known_key_actions() -> Vec<crate::keybindings::CanvasKeyAction> {
+        use crate::keybindings::CanvasKeyAction::*;
+
+        vec![
+            MoveLeft,
+            MoveRight,
+            MoveUp,
+            MoveDown,
+            NextField,
+            PrevField,
+            MoveLineStart,
+            MoveLineEnd,
+            MoveHalfPageUp,
+            MoveHalfPageDown,
+            MoveFirstLine,
+            MoveLastLine,
+            MoveWordNext,
+            MoveWordPrev,
+            MoveWordEnd,
+            MoveWordEndPrev,
+            MoveBigWordNext,
+            MoveBigWordPrev,
+            MoveBigWordEnd,
+            MoveBigWordEndPrev,
+            DeleteCharBackward,
+            DeleteCharForward,
+            Undo,
+            Redo,
+            OpenLineBelow,
+            OpenLineAbove,
+            EnterEditModeLineStart,
+            EnterEditModeLineEnd,
+            DeleteLine,
+            DeleteToLineEnd,
+            ChangeLine,
+            ChangeToLineEnd,
+            OperatorDelete,
+            OperatorChange,
+            OperatorYank,
+            JoinLineBelow,
+            YankLine,
+            PasteAfter,
+            PasteBefore,
+            OpenSuggestions,
+            ApplySuggestion,
+            EnterDecider,
+            SuggestionDown,
+            SuggestionUp,
+            EnterEditModeBefore,
+            EnterEditModeAfter,
+            Exit,
+            ExitEditMode,
+            EnterHighlightMode,
+            EnterHighlightModeLinewise,
+            ExitHighlightMode,
+            DeleteSelection,
+            DeleteSelectionNoYank,
+            ChangeSelection,
+            ChangeSelectionNoYank,
+            YankSelection,
+            CollapseSelection,
+            ExtendLineBelow,
+            ExtendToLineBounds,
+            SearchNext,
+            SearchPrev,
+            SelectAll,
+            FlipSelections,
+            SwitchCase,
+            SwitchToLowercase,
+            SwitchToUppercase,
+            TrimSelections,
+            GotoFirstNonWhitespace,
+            MovePageUp,
+            MovePageDown,
+            SearchSelection,
+            EnsureSelectionForward,
+            MatchBrackets,
+            IndentSelection,
+            UnindentSelection,
+            IncrementNumber,
+            DecrementNumber,
+            FindNextChar,
+            FindPrevChar,
+            TillNextChar,
+            TillPrevChar,
+            ReplaceChar,
+            RepeatLastFind,
+            RepeatLastFindReverse,
+            SurroundAdd,
+            SurroundDelete,
+            SurroundReplace,
+            DeleteWordBackward,
+            DeleteToLineStart,
+            DeleteWordForward,
+            ClearSearch,
+            MoveLineUp,
+            MoveLineDown,
+            DuplicateLineUp,
+            DuplicateLineDown,
+            CopyLine,
+            CutLine,
+            SelectLeft,
+            SelectRight,
+            SelectUp,
+            SelectDown,
+            SelectWordPrev,
+            SelectWordNext,
+            SelectLineStart,
+            SelectLineEnd,
+            SelectDocStart,
+            SelectDocEnd,
+        ]
+    }
+
     #[cfg(feature = "crossterm")]
     #[test]
     fn enter_moves_between_fields_then_submits() {
@@ -1257,6 +1639,87 @@ mod tests {
         let second = form.input(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
         assert_eq!(second, TextFormEventOutcome::Submitted);
         assert_eq!(form.current_field(), 1);
+    }
+
+    #[cfg(feature = "keybindings")]
+    #[test]
+    fn every_known_key_action_preserves_textform_fixed_slots() {
+        use crate::editor::product::KeybindingProduct;
+        use crate::keybindings::{BuiltinCanvasKeybindingPreset, KeyEventOutcome};
+
+        for action in all_known_key_actions() {
+            let provider = FixedPolicyProvider::new();
+            let expected_names = provider.names();
+            let mut form = TextFormState::new(provider);
+            form.use_keybinding_preset(BuiltinCanvasKeybindingPreset::Helix);
+            form.core
+                .behavior_state
+                .yank_mut()
+                .set_text_register(vec!["paste".to_string()]);
+
+            let outcome = form.dispatch_product_key_action(&action, 1);
+            assert!(
+                !matches!(
+                    outcome,
+                    KeyEventOutcome::Consumed(Some(ref msg))
+                        if msg.starts_with("Unhandled textform action:")
+                ),
+                "action is classified as product-handled but not implemented: {}",
+                action.as_str()
+            );
+
+            assert_eq!(
+                form.data_provider().field_count(),
+                3,
+                "action changed field count: {}",
+                action.as_str()
+            );
+            assert_eq!(
+                form.fixed_field_count(),
+                3,
+                "action changed fixed count: {}",
+                action.as_str()
+            );
+            let names: Vec<String> = (0..form.data_provider().field_count())
+                .map(|index| form.data_provider().field_name(index).to_string())
+                .collect();
+            assert_eq!(
+                names,
+                expected_names,
+                "action changed field identity/order: {}",
+                action.as_str()
+            );
+        }
+    }
+
+    #[cfg(feature = "keybindings")]
+    #[test]
+    fn structural_noop_actions_leave_fixed_field_values_unchanged() {
+        use crate::editor::product::KeybindingProduct;
+        use crate::keybindings::CanvasKeyAction;
+
+        let actions = [
+            CanvasKeyAction::JoinLineBelow,
+            CanvasKeyAction::MoveLineUp,
+            CanvasKeyAction::MoveLineDown,
+            CanvasKeyAction::DuplicateLineUp,
+            CanvasKeyAction::DuplicateLineDown,
+        ];
+
+        for action in actions {
+            let provider = FixedPolicyProvider::new();
+            let expected = provider.capture_content();
+            let mut form = TextFormState::new(provider);
+
+            let _ = form.dispatch_product_key_action(&action, 1);
+
+            assert_eq!(
+                form.data_provider().capture_content(),
+                expected,
+                "structural no-op changed fixed field values: {}",
+                action.as_str()
+            );
+        }
     }
 
     #[test]
@@ -1305,6 +1768,28 @@ mod tests {
         assert_eq!(form.data_provider().field_value(0), "");
         assert_eq!(form.data_provider().field_value(1), "row2");
         assert_eq!(form.current_field(), 0);
+    }
+
+    #[cfg(feature = "keybindings")]
+    #[test]
+    fn cut_line_clears_fixed_slot_without_shifting_later_fields() {
+        use crate::editor::product::KeybindingProduct;
+        use crate::keybindings::CanvasKeyAction;
+
+        let mut form = TextFormState::new(VecProvider {
+            fields: vec![
+                "row1".to_string(),
+                "row2".to_string(),
+                "row3".to_string(),
+            ],
+        });
+        let _ = form.transition_to_field(1);
+
+        let _ = form.dispatch_product_key_action(&CanvasKeyAction::CutLine, 1);
+
+        assert_eq!(form.fixed_field_count(), 3);
+        assert_eq!(form.data_provider().capture_content(), vec!["row1", "", "row3"]);
+        assert_eq!(form.current_field(), 1);
     }
 
     #[cfg(all(feature = "keybindings", feature = "crossterm"))]
@@ -1489,6 +1974,31 @@ mod tests {
 
         assert_eq!(form.fixed_field_count(), 3);
         assert_eq!(form.data_provider().capture_content(), vec!["row1", "row1", "row3"]);
+    }
+
+    #[cfg(feature = "keybindings")]
+    #[test]
+    fn multiline_text_register_paste_preserves_suffix_in_fixed_slot() {
+        use crate::editor::product::KeybindingProduct;
+        use crate::keybindings::CanvasKeyAction;
+
+        let mut form = TextFormState::new(VecProvider {
+            fields: vec![
+                "aaZZ".to_string(),
+                "row2".to_string(),
+                "row3".to_string(),
+            ],
+        });
+        form.set_cursor_position(2);
+        form.core
+            .behavior_state
+            .yank_mut()
+            .set_text_register(vec!["X".to_string(), "Y".to_string()]);
+
+        let _ = form.dispatch_product_key_action(&CanvasKeyAction::PasteBefore, 1);
+
+        assert_eq!(form.fixed_field_count(), 3);
+        assert_eq!(form.data_provider().capture_content(), vec!["aaX", "YZZ", "row3"]);
     }
 
     #[test]
