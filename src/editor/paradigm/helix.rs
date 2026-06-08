@@ -56,8 +56,11 @@ impl<D: DataProvider> EditorCore<D> {
         let _ = self.transition_to_field(end.0);
         let line_len = self.current_text().chars().count();
         let append_pos = (end.1 + 1).min(line_len);
-        self.set_cursor_position(append_pos);
+        // Switch to insert mode *before* positioning the cursor: in normal mode
+        // `set_cursor_position` clamps to `len - 1`, which would snap the append
+        // position back onto the last character instead of past it.
         self.ui_state.current_mode = AppMode::Ins;
+        self.set_cursor_position(append_pos);
         self.ui_state.selection = SelectionState::None;
         #[cfg(feature = "cursor-style")]
         {

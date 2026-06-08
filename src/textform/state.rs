@@ -1635,6 +1635,28 @@ mod tests {
         assert_eq!(form.mode(), AppMode::Nor);
     }
 
+    #[cfg(all(feature = "keybindings", feature = "crossterm"))]
+    #[test]
+    fn helix_append_on_last_character_inserts_after_it() {
+        use crate::canvas::modes::AppMode;
+        use crate::keybindings::BuiltinCanvasKeybindingPreset;
+
+        let mut form = TextFormState::new(TestProvider {
+            fields: ["abc".to_string(), "row2".to_string()],
+        });
+        form.use_keybinding_preset(BuiltinCanvasKeybindingPreset::Helix);
+
+        // Selection on the last character of the field; `a` must position the
+        // cursor *after* it, not clamp back onto it.
+        form.move_line_end();
+        let _ = form.handle_key_event(KeyEvent::new(KeyCode::Char('a'), KeyModifiers::NONE));
+        assert_eq!(form.mode(), AppMode::Ins);
+        assert_eq!(form.cursor_position(), 3);
+
+        let _ = form.handle_key_event(KeyEvent::new(KeyCode::Char('X'), KeyModifiers::NONE));
+        assert_eq!(form.current_text(), "abcX");
+    }
+
     #[cfg(feature = "keybindings")]
     #[test]
     fn multiline_text_register_paste_preserves_suffix_in_fixed_slot() {

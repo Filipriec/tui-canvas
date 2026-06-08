@@ -2821,6 +2821,27 @@ mod tests {
 
     #[cfg(all(feature = "keybindings", feature = "crossterm"))]
     #[test]
+    fn helix_append_on_last_character_inserts_after_it() {
+        use crate::keybindings::BuiltinCanvasKeybindingPreset;
+        use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+
+        let mut textarea = TextAreaState::<TextAreaProvider>::from_text("abc");
+        textarea.use_keybinding_preset(BuiltinCanvasKeybindingPreset::Helix);
+
+        // Put the primary selection on the last character.
+        textarea.move_line_end();
+
+        // `a` should enter insert mode positioned *after* the last char.
+        let _ = textarea.handle_key_event(KeyEvent::new(KeyCode::Char('a'), KeyModifiers::NONE));
+        assert_eq!(textarea.mode(), crate::canvas::modes::AppMode::Ins);
+        assert_eq!(textarea.cursor_position(), 3);
+
+        let _ = textarea.handle_key_event(KeyEvent::new(KeyCode::Char('X'), KeyModifiers::NONE));
+        assert_eq!(textarea.text(), "abcX");
+    }
+
+    #[cfg(all(feature = "keybindings", feature = "crossterm"))]
+    #[test]
     fn helix_y_and_p_yank_and_paste_selection() {
         use crate::keybindings::{BuiltinCanvasKeybindingPreset, KeyEventOutcome};
         use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
