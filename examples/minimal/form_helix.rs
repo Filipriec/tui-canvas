@@ -26,11 +26,7 @@ compile_error!(
 
 use std::io;
 
-use crossterm::{
-    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyModifiers},
-    execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
-};
+use crossterm::event::{Event, KeyCode, KeyModifiers};
 use ratatui::{
     backend::{Backend, CrosstermBackend},
     layout::{Constraint, Direction, Layout},
@@ -40,7 +36,9 @@ use ratatui::{
 };
 
 use tui_canvas::{
-    keybindings::BuiltinCanvasKeybindingPreset, render_canvas_default, DataProvider, TextFormState,
+    integration::crossterm_input::{CrosstermInputOptions, CrosstermInputSession},
+    keybindings::BuiltinCanvasKeybindingPreset,
+    render_canvas_default, DataProvider, TextFormState,
 };
 
 const ROW_NAMES: [&str; 3] = ["Name", "Email", "Message"];
@@ -111,12 +109,16 @@ impl DataProvider for FixedRowsProvider {
     }
 }
 
-fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> io::Result<()> {
+fn run_app<B: Backend>(
+    terminal: &mut Terminal<B>,
+    session: &CrosstermInputSession,
+    mut app: App,
+) -> io::Result<()> {
     loop {
         app.form.update_cursor_style()?;
         terminal.draw(|f| ui(f, &mut app))?;
 
-        match event::read()? {
+        match session.read_event()? {
             Event::Key(key)
                 if key.modifiers.contains(KeyModifiers::CONTROL)
                     && key.code == KeyCode::Char('c') =>
@@ -126,10 +128,12 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> io::Result<(
             Event::Key(key) => {
                 let _ = app.form.handle_key_event(key);
             }
-            Event::Paste(text) => {
-                let _ = app.form.paste(&text);
+            // Bracketed paste (enabled by the session) and any other non-key
+            // events are routed through the high-level `handle_event`, which
+            // inserts the pasted text in one shot rather than key-by-key.
+            other => {
+                let _ = app.form.handle_event(other);
             }
-            _ => {}
         }
     }
 }
@@ -157,24 +161,18 @@ fn ui(f: &mut Frame, app: &mut App) {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    enable_raw_mode()?;
-    let mut stdout = io::stdout();
-    execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
-    let backend = CrosstermBackend::new(stdout);
+    let mut session =
+        CrosstermInputSession::install_with_options(CrosstermInputOptions::tui_defaults())?;
+    let backend = CrosstermBackend::new(io::stdout());
     let mut terminal = Terminal::new(backend)?;
 
     let mut form = TextFormState::<FixedRowsProvider>::default();
     form.use_keybinding_preset(BuiltinCanvasKeybindingPreset::Helix);
     form.update_cursor_style()?;
 
-    let res = run_app(&mut terminal, App { form });
+    let res = run_app(&mut terminal, &session, App { form });
 
-    disable_raw_mode()?;
-    execute!(
-        terminal.backend_mut(),
-        LeaveAlternateScreen,
-        DisableMouseCapture
-    )?;
+    let _ = session.uninstall();
     terminal.show_cursor()?;
 
     if let Err(err) = res {

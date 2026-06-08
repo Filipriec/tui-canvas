@@ -15,6 +15,8 @@
 //!   - Shift+arrows (and Shift+Ctrl+arrows) to select; Ctrl+A selects all
 //!   - Ctrl+C / Ctrl+X / Ctrl+V to copy / cut / paste (whole line with no
 //!     selection); typing or Backspace replaces a selection
+//!   - paste from the terminal (Ctrl+Shift+V / middle click) inserts the text
+//!     in one shot via bracketed paste
 //!   - Ctrl+Z / Ctrl+Y to undo / redo, Ctrl+Shift+K to delete the line
 //!   - Alt+Up/Down to move the line, Shift+Alt+Up/Down to duplicate it
 
@@ -50,14 +52,11 @@ use std::io;
 
 use crossterm::{
     event::{
-        self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyModifiers,
-        KeyboardEnhancementFlags, PopKeyboardEnhancementFlags, PushKeyboardEnhancementFlags,
+        Event, KeyCode, KeyModifiers, KeyboardEnhancementFlags, PopKeyboardEnhancementFlags,
+        PushKeyboardEnhancementFlags,
     },
     execute,
-    terminal::{
-        disable_raw_mode, enable_raw_mode, supports_keyboard_enhancement, EnterAlternateScreen,
-        LeaveAlternateScreen,
-    },
+    terminal::supports_keyboard_enhancement,
 };
 use ratatui::{
     backend::{Backend, CrosstermBackend},
@@ -65,22 +64,37 @@ use ratatui::{
     Frame, Terminal,
 };
 
-use tui_canvas::{keybindings::BuiltinCanvasKeybindingPreset, TextArea, TextAreaState};
+use tui_canvas::{
+    integration::crossterm_input::{CrosstermInputOptions, CrosstermInputSession},
+    keybindings::BuiltinCanvasKeybindingPreset,
+    TextArea, TextAreaState,
+};
 
-fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut textarea: TextAreaState) -> io::Result<()> {
+fn run_app<B: Backend>(
+    terminal: &mut Terminal<B>,
+    session: &CrosstermInputSession,
+    mut textarea: TextAreaState,
+) -> io::Result<()> {
     loop {
         textarea.update_cursor_style()?;
         terminal.draw(|f| ui(f, &mut textarea))?;
 
-        let Event::Key(key) = event::read()? else {
-            continue;
-        };
-        // Ctrl+Q quits (Ctrl+C is the VSCode copy chord and is left to the editor).
-        if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('q') {
-            return Ok(());
+        match session.read_event()? {
+            Event::Key(key) => {
+                // Ctrl+Q quits (Ctrl+C is the VSCode copy chord and is left to
+                // the editor).
+                if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('q') {
+                    return Ok(());
+                }
+                let _ = textarea.handle_key_event(key);
+            }
+            // Bracketed paste (enabled by the session) and any other non-key
+            // events are routed through the high-level `handle_event`, which
+            // inserts the pasted text in one shot rather than key-by-key.
+            other => {
+                let _ = textarea.handle_event(other);
+            }
         }
-
-        let _ = textarea.handle_key_event(key);
     }
 }
 
@@ -95,9 +109,10 @@ fn ui(f: &mut Frame, textarea: &mut TextAreaState) {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    enable_raw_mode()?;
-    let mut stdout = io::stdout();
-    execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
+    // The session owns raw mode, the alternate screen, mouse capture, and
+    // bracketed paste (so terminal pastes arrive as a single `Event::Paste`).
+    let mut session =
+        CrosstermInputSession::install_with_options(CrosstermInputOptions::tui_defaults())?;
 
     // Chords like Ctrl+Backspace and Ctrl+Shift+K are indistinguishable from
     // plain Backspace / Ctrl+K in a legacy terminal. The Kitty keyboard
@@ -106,7 +121,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let enhanced = supports_keyboard_enhancement().unwrap_or(false);
     if enhanced {
         execute!(
-            stdout,
+            io::stdout(),
             PushKeyboardEnhancementFlags(
                 KeyboardEnhancementFlags::DISAMBIGUATE_ESCAPE_CODES
                     | KeyboardEnhancementFlags::REPORT_ALL_KEYS_AS_ESCAPE_CODES
@@ -114,7 +129,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         )?;
     }
 
-    let backend = CrosstermBackend::new(stdout);
+    let backend = CrosstermBackend::new(io::stdout());
     let mut terminal = Terminal::new(backend)?;
 
     let mut textarea = TextAreaState::from_text("A simple VSCode-style textarea.\nType here.");
@@ -123,17 +138,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     textarea.use_default_commandline();
     textarea.update_cursor_style()?;
 
-    let res = run_app(&mut terminal, textarea);
+    let res = run_app(&mut terminal, &session, textarea);
 
     if enhanced {
-        execute!(terminal.backend_mut(), PopKeyboardEnhancementFlags)?;
+        execute!(io::stdout(), PopKeyboardEnhancementFlags)?;
     }
-    disable_raw_mode()?;
-    execute!(
-        terminal.backend_mut(),
-        LeaveAlternateScreen,
-        DisableMouseCapture
-    )?;
+    let _ = session.uninstall();
     terminal.show_cursor()?;
 
     if let Err(err) = res {

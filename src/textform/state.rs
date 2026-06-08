@@ -974,8 +974,18 @@ impl<D: DataProvider> KeybindingProduct for TextFormState<D> {
                 KeyEventOutcome::Consumed(None)
             }
             CanvasKeyAction::YankSelection => {
-                for _ in 0..count {
-                    self.core.yank_primary_selection_helix();
+                if self.core.keybinding_paradigm() == KeybindingParadigm::Vim {
+                    // Vim visual `y`: yank the selection, then drop back to
+                    // normal mode (leaving no selection behind).
+                    for _ in 0..count {
+                        self.core.yank_selection_core();
+                    }
+                    self.core.exit_highlight_mode_vim();
+                } else {
+                    // Helix keeps the primary selection alive after yank.
+                    for _ in 0..count {
+                        self.core.yank_primary_selection_helix();
+                    }
                 }
                 KeyEventOutcome::Consumed(None)
             }
@@ -1487,6 +1497,32 @@ mod tests {
         assert_eq!(form.fixed_field_count(), 3);
         assert_eq!(form.data_provider().capture_content(), vec!["", "", "row3"]);
         assert_eq!(form.current_field(), 0);
+    }
+
+    #[cfg(all(feature = "keybindings", feature = "crossterm"))]
+    #[test]
+    fn vim_visual_yank_copies_selection_and_exits_to_normal() {
+        use super::YankRegister;
+        use crate::canvas::modes::AppMode;
+
+        let mut form = TextFormState::new(VecProvider {
+            fields: vec!["hello world".to_string(), "second".to_string()],
+        });
+        form.set_keybindings(crate::keybindings::CanvasKeyBindings::vim_defaults());
+
+        // Enter visual mode and extend the selection over "hel".
+        let _ = form.handle_key_event(KeyEvent::new(KeyCode::Char('v'), KeyModifiers::NONE));
+        let _ = form.handle_key_event(KeyEvent::new(KeyCode::Char('l'), KeyModifiers::NONE));
+        let _ = form.handle_key_event(KeyEvent::new(KeyCode::Char('l'), KeyModifiers::NONE));
+        let _ = form.handle_key_event(KeyEvent::new(KeyCode::Char('y'), KeyModifiers::NONE));
+
+        // The selection (not the whole field) lands in the register...
+        assert_eq!(
+            form.core.behavior_state.yank().register().cloned(),
+            Some(YankRegister::Text(vec!["hel".to_string()]))
+        );
+        // ...and visual mode is left behind.
+        assert_eq!(form.mode(), AppMode::Nor);
     }
 
     #[cfg(all(feature = "keybindings", feature = "crossterm"))]
