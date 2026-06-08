@@ -18,6 +18,8 @@ pub mod navigation;
 #[cfg(feature = "keybindings")]
 pub(crate) mod product;
 #[cfg(feature = "keybindings")]
+pub(crate) mod paste;
+#[cfg(feature = "keybindings")]
 pub(crate) mod selection;
 
 pub use core::EditorCore;

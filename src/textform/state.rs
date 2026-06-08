@@ -645,130 +645,31 @@ impl<D: DataProvider> TextFormState<D> {
     }
 
     #[cfg(feature = "keybindings")]
-    fn repeated_register_text_lines(lines: &[String], count: usize) -> Vec<String> {
-        let repeat = count.max(1);
-        let mut repeated = Vec::with_capacity(lines.len().saturating_mul(repeat));
-        for _ in 0..repeat {
-            repeated.extend(lines.iter().cloned());
-        }
-        repeated
-    }
-
-    #[cfg(feature = "keybindings")]
-    fn paste_text_register_helix(&mut self, after: bool, count: usize, lines: Vec<String>) {
-        let lines = Self::repeated_register_text_lines(&lines, count);
-        if lines.is_empty() || self.fixed_field_count == 0 {
-            return;
-        }
-
-        let (field, col) = self.character_paste_position_helix(after);
-        if field >= self.fixed_field_count {
-            return;
-        }
-
-        self.core
-            .record_checkpoint(crate::editor::features::history::EditKind::Other);
-
-        let col = col.min(self.field_char_len(field));
-        let current = self.core.data_provider().field_value(field).to_string();
-        let prefix: String = current.chars().take(col).collect();
-        let suffix: String = current.chars().skip(col).collect();
-
-        if lines.len() == 1 {
-            let inserted = &lines[0];
-            self.core
-                .data_provider_mut()
-                .set_field_value(field, format!("{prefix}{inserted}{suffix}"));
-            let cursor = col.saturating_add(inserted.chars().count());
-            let len = self.field_char_len(field);
-            let _ = self.core.transition_to_field(field);
-            self.core.ui_state.set_cursor(cursor.min(len), len, false);
-        } else {
-            let available = self.fixed_field_count.saturating_sub(field);
-            let last_offset = lines.len().min(available).saturating_sub(1);
-            self.core
-                .data_provider_mut()
-                .set_field_value(field, format!("{prefix}{}", lines[0]));
-
-            let mut target_field = field;
-            let mut target_col = col.saturating_add(lines[0].chars().count());
-            for (offset, text) in lines.iter().enumerate().skip(1) {
-                let next_field = field.saturating_add(offset);
-                if next_field >= self.fixed_field_count {
-                    break;
-                }
-                let value = if offset == last_offset {
-                    format!("{text}{suffix}")
-                } else {
-                    text.clone()
-                };
-                self.core
-                    .data_provider_mut()
-                    .set_field_value(next_field, value);
-                target_field = next_field;
-                target_col = text.chars().count();
-            }
-
-            if last_offset == 0 {
-                self.core
-                    .data_provider_mut()
-                    .set_field_value(field, format!("{prefix}{}{suffix}", lines[0]));
-            }
-
-            let len = self.field_char_len(target_field);
-            let _ = self.core.transition_to_field(target_field);
-            self.core
-                .ui_state
-                .set_cursor(target_col.min(len), len, false);
-        }
-
-        self.ensure_helix_primary_selection();
-    }
-
-    #[cfg(feature = "keybindings")]
-    fn paste_line_register_helix(&mut self, after: bool, count: usize, lines: Vec<String>) {
-        let lines = Self::repeated_register_text_lines(&lines, count);
-        if lines.is_empty() || self.fixed_field_count == 0 {
-            return;
-        }
-
-        let current = self.core.current_field();
-        let start = if after {
-            current.saturating_add(1)
-        } else {
-            current
-        };
-        if start >= self.fixed_field_count {
-            return;
-        }
-
-        self.core
-            .record_checkpoint(crate::editor::features::history::EditKind::Other);
-
-        let mut target = start;
-        for (offset, line) in lines.into_iter().enumerate() {
-            let field = start.saturating_add(offset);
-            if field >= self.fixed_field_count {
-                break;
-            }
-            self.core.data_provider_mut().set_field_value(field, line);
-            target = field;
-        }
-
-        let _ = self.core.transition_to_field(target);
-        self.core.move_line_start();
-        self.ensure_helix_primary_selection();
-    }
-
-    #[cfg(feature = "keybindings")]
     fn paste_register_helix(&mut self, after: bool, count: usize) {
         let Some(register) = self.core.behavior_state.yank().register().cloned() else {
             return;
         };
 
         match register {
-            YankRegister::Lines(lines) => self.paste_line_register_helix(after, count, lines),
-            YankRegister::Text(lines) => self.paste_text_register_helix(after, count, lines),
+            YankRegister::Lines(lines) => {
+                self.core.paste_register_lines_core(after, count, lines);
+                self.ensure_helix_primary_selection();
+            }
+            YankRegister::Text(lines) => {
+                let text = crate::editor::paste::repeated_text(&lines, count);
+                if text.is_empty() || self.fixed_field_count == 0 {
+                    return;
+                }
+                let (field, col) = self.character_paste_position_helix(after);
+                if field >= self.fixed_field_count {
+                    return;
+                }
+                let (target_field, target_col) =
+                    self.core.insert_register_text_core(field, col, &text);
+                let _ = self.core.transition_to_field(target_field);
+                self.core.set_cursor_position(target_col);
+                self.ensure_helix_primary_selection();
+            }
         }
     }
 
