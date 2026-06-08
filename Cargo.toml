@@ -146,7 +146,7 @@ path = "examples/minimal/form_vim.rs"
 
 [[example]]
 name = "form_helix"
-required-features = ["textarea", "keybindings", "cursor-style", "commandline"]
+required-features = ["gui", "keybindings", "cursor-style"]
 path = "examples/minimal/form_helix.rs"
 
 [[example]]

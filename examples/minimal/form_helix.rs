@@ -1,34 +1,27 @@
 //! Minimal fixed-row form example using the default Helix keybindings.
 //!
-//! This uses the textarea editing engine, but the provider keeps a fixed set of
-//! rows. Newline/open-line actions shift content inside those rows instead of
-//! growing the form.
+//! This uses `TextFormState`, so each row is a fixed slot. Deleting a row clears
+//! that slot instead of shifting later rows upward.
 //!
 //! Run with:
-//!   cargo run --example form_helix --features "textarea,keybindings,cursor-style,commandline"
+//!   cargo run --example form_helix --features "gui,keybindings,cursor-style"
 
 #[cfg(not(feature = "keybindings"))]
 compile_error!(
     "This example requires the 'keybindings' feature. \
-     Run with: cargo run --example form_helix --features \"textarea,keybindings,cursor-style,commandline\""
+     Run with: cargo run --example form_helix --features \"gui,keybindings,cursor-style\""
 );
 
-#[cfg(not(feature = "textarea"))]
+#[cfg(not(feature = "gui"))]
 compile_error!(
-    "This example requires the 'textarea' feature. \
-     Run with: cargo run --example form_helix --features \"textarea,keybindings,cursor-style,commandline\""
+    "This example requires the 'gui' feature. \
+     Run with: cargo run --example form_helix --features \"gui,keybindings,cursor-style\""
 );
 
 #[cfg(not(feature = "cursor-style"))]
 compile_error!(
     "This example requires the 'cursor-style' feature. \
-     Run with: cargo run --example form_helix --features \"textarea,keybindings,cursor-style,commandline\""
-);
-
-#[cfg(not(feature = "commandline"))]
-compile_error!(
-    "This example requires the 'commandline' feature. \
-     Run with: cargo run --example form_helix --features \"textarea,keybindings,cursor-style,commandline\""
+     Run with: cargo run --example form_helix --features \"gui,keybindings,cursor-style\""
 );
 
 use std::io;
@@ -42,19 +35,18 @@ use ratatui::{
     backend::{Backend, CrosstermBackend},
     layout::{Constraint, Direction, Layout},
     text::{Line, Span},
-    widgets::{Block, Borders, Paragraph, StatefulWidget},
+    widgets::{Block, Borders, Paragraph},
     Frame, Terminal,
 };
 
 use tui_canvas::{
-    keybindings::BuiltinCanvasKeybindingPreset, render_canvas_default, CommandLine, DataProvider,
-    TextAreaDataProvider, TextAreaState,
+    keybindings::BuiltinCanvasKeybindingPreset, render_canvas_default, DataProvider, TextFormState,
 };
 
 const ROW_NAMES: [&str; 3] = ["Name", "Email", "Message"];
 
 struct App {
-    form: TextAreaState<FixedRowsProvider>,
+    form: TextFormState<FixedRowsProvider>,
 }
 
 #[derive(Debug, Clone)]
@@ -75,19 +67,6 @@ impl Default for FixedRowsProvider {
 }
 
 impl FixedRowsProvider {
-    fn row_len_chars(&self, index: usize) -> usize {
-        self.rows[index].1.chars().count()
-    }
-
-    fn split_at_char(value: &str, at_char: usize) -> (String, String) {
-        let at_byte = value
-            .char_indices()
-            .nth(at_char)
-            .map(|(byte_idx, _)| byte_idx)
-            .unwrap_or_else(|| value.len());
-        (value[..at_byte].to_string(), value[at_byte..].to_string())
-    }
-
     fn assign_lines(&mut self, lines: impl IntoIterator<Item = String>) {
         for row in &mut self.rows {
             row.1.clear();
@@ -132,100 +111,6 @@ impl DataProvider for FixedRowsProvider {
     }
 }
 
-impl TextAreaDataProvider for FixedRowsProvider {
-    fn from_text(text: String) -> Self {
-        let mut provider = Self::default();
-        provider.set_text(text);
-        provider
-    }
-
-    fn to_text(&self) -> String {
-        self.rows
-            .iter()
-            .map(|(_, value)| value.as_str())
-            .collect::<Vec<_>>()
-            .join("\n")
-    }
-
-    fn set_text(&mut self, text: String) {
-        self.assign_lines(text.lines().map(str::to_string));
-    }
-
-    fn line_count(&self) -> usize {
-        self.rows.len()
-    }
-
-    fn split_line_at(&mut self, line_idx: usize, at_char: usize) -> usize {
-        if line_idx + 1 >= self.rows.len() {
-            return line_idx;
-        }
-
-        let (head, tail) = Self::split_at_char(&self.rows[line_idx].1, at_char);
-        for index in ((line_idx + 2)..self.rows.len()).rev() {
-            self.rows[index].1 = self.rows[index - 1].1.clone();
-        }
-        self.rows[line_idx].1 = head;
-        self.rows[line_idx + 1].1 = tail;
-        line_idx + 1
-    }
-
-    fn join_with_next(&mut self, line_idx: usize) -> Option<usize> {
-        if line_idx + 1 >= self.rows.len() {
-            return None;
-        }
-
-        let new_col = self.row_len_chars(line_idx);
-        let next = self.rows[line_idx + 1].1.clone();
-        self.rows[line_idx].1.push_str(&next);
-        for index in (line_idx + 1)..self.rows.len() - 1 {
-            self.rows[index].1 = self.rows[index + 1].1.clone();
-        }
-        if let Some((_, last)) = self.rows.last_mut() {
-            last.clear();
-        }
-        Some(new_col)
-    }
-
-    fn join_with_prev(&mut self, line_idx: usize) -> Option<(usize, usize)> {
-        if line_idx == 0 || line_idx >= self.rows.len() {
-            return None;
-        }
-
-        let prev_idx = line_idx - 1;
-        let new_col = self.row_len_chars(prev_idx);
-        let current = self.rows[line_idx].1.clone();
-        self.rows[prev_idx].1.push_str(&current);
-        for index in line_idx..self.rows.len() - 1 {
-            self.rows[index].1 = self.rows[index + 1].1.clone();
-        }
-        if let Some((_, last)) = self.rows.last_mut() {
-            last.clear();
-        }
-        Some((prev_idx, new_col))
-    }
-
-    fn insert_blank_line_after(&mut self, line_idx: usize) -> usize {
-        if line_idx + 1 >= self.rows.len() {
-            return line_idx;
-        }
-
-        for index in ((line_idx + 2)..self.rows.len()).rev() {
-            self.rows[index].1 = self.rows[index - 1].1.clone();
-        }
-        self.rows[line_idx + 1].1.clear();
-        line_idx + 1
-    }
-
-    fn insert_blank_line_before(&mut self, line_idx: usize) -> usize {
-        let line_idx = line_idx.min(self.rows.len().saturating_sub(1));
-        for index in ((line_idx + 1)..self.rows.len()).rev() {
-            self.rows[index].1 = self.rows[index - 1].1.clone();
-        }
-        self.rows[line_idx].1.clear();
-        line_idx
-    }
-}
-
 fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> io::Result<()> {
     loop {
         app.form.update_cursor_style()?;
@@ -267,20 +152,8 @@ fn ui(f: &mut Frame, app: &mut App) {
         .block(Block::default().borders(Borders::ALL).title("form_helix"));
     f.render_widget(bar, chunks[1]);
 
-    let commandline_active = app
-        .form
-        .commandline()
-        .map(|commandline| commandline.state().is_active())
-        .unwrap_or(false);
-    if let Some(commandline) = app.form.commandline_mut() {
-        CommandLine::default()
-            .bottom()
-            .render(f.area(), f.buffer_mut(), commandline.state_mut());
-    }
-    if commandline_active {
-        let (x, y) = app.form.cursor_with_commandline(f.area(), None);
-        f.set_cursor_position((x, y));
-    }
+    let (x, y) = app.form.cursor(chunks[0], None);
+    f.set_cursor_position((x, y));
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -290,9 +163,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
-    let mut form = TextAreaState::<FixedRowsProvider>::default();
+    let mut form = TextFormState::<FixedRowsProvider>::default();
     form.use_keybinding_preset(BuiltinCanvasKeybindingPreset::Helix);
-    form.use_default_commandline();
     form.update_cursor_style()?;
 
     let res = run_app(&mut terminal, App { form });

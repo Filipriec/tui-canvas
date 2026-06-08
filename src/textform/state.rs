@@ -1,10 +1,22 @@
 #[cfg(feature = "crossterm")]
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
+#[cfg(feature = "cursor-style")]
+use std::io;
 
 use std::ops::{Deref, DerefMut};
 
 use crate::canvas::actions::{ActionResult, CanvasAction};
+#[cfg(feature = "keybindings")]
+use crate::canvas::modes::AppMode;
+#[cfg(feature = "keybindings")]
+use crate::canvas::state::SelectionState;
+#[cfg(feature = "gui")]
+use crate::gui_utils::{display_cols_up_to, display_width};
 use crate::{editor::EditorCore, DataProvider};
+#[cfg(feature = "cursor-style")]
+use crate::CursorManager;
+#[cfg(feature = "gui")]
+use ratatui::{layout::Rect, widgets::Block};
 
 #[cfg(feature = "keybindings")]
 use crate::{
@@ -202,6 +214,39 @@ impl<D: DataProvider> TextFormState<D> {
         self.with_fixed_rows(|this| handle_product_key_event(this, evt))
     }
 
+    #[cfg(feature = "cursor-style")]
+    pub fn update_cursor_style(&self) -> io::Result<()> {
+        CursorManager::update_for_mode(self.core.mode())
+    }
+
+    #[cfg(not(feature = "cursor-style"))]
+    pub fn update_cursor_style(&self) -> std::io::Result<()> {
+        Ok(())
+    }
+
+    #[cfg(feature = "gui")]
+    pub fn cursor(&self, area: Rect, block: Option<&Block<'_>>) -> (u16, u16) {
+        let inner = if let Some(block) = block {
+            block.inner(area)
+        } else {
+            area
+        };
+        let provider = self.core.data_provider();
+        let label_width = (0..provider.field_count())
+            .map(|index| display_width(provider.field_name(index)))
+            .max()
+            .unwrap_or(0)
+            .saturating_add(1);
+        let row = self.core.current_field() as u16;
+        let current_text = self.core.current_text();
+        let cursor_cols = display_cols_up_to(current_text, self.core.display_cursor_position());
+
+        (
+            inner.x.saturating_add(label_width).saturating_add(cursor_cols),
+            inner.y.saturating_add(row),
+        )
+    }
+
     #[cfg(feature = "keybindings")]
     pub fn use_keybinding_preset(
         &mut self,
@@ -255,6 +300,84 @@ impl<D: DataProvider> TextFormState<D> {
 
         for field_index in start..=end {
             self.core.set_field_value(field_index, String::new());
+        }
+    }
+
+    #[cfg(feature = "keybindings")]
+    fn selected_field_range(&self) -> (usize, usize) {
+        match self.core.selection_state() {
+            SelectionState::Linewise { anchor_field } => {
+                let current = self.core.current_field();
+                ((*anchor_field).min(current), (*anchor_field).max(current))
+            }
+            SelectionState::Characterwise { anchor } => {
+                let current = self.core.current_field();
+                (anchor.0.min(current), anchor.0.max(current))
+            }
+            SelectionState::None => {
+                let current = self.core.current_field();
+                (current, current)
+            }
+        }
+    }
+
+    #[cfg(feature = "keybindings")]
+    fn extend_line_below_helix(&mut self, count: usize) {
+        if self.fixed_field_count == 0 {
+            return;
+        }
+
+        if !matches!(self.core.selection_state(), SelectionState::Linewise { .. }) {
+            let current = self.core.current_field();
+            self.core.ui_state.current_mode = AppMode::Sel;
+            self.core.ui_state.selection = SelectionState::Linewise {
+                anchor_field: current,
+            };
+            return;
+        }
+
+        let target = self
+            .core
+            .current_field()
+            .saturating_add(count.max(1))
+            .min(self.fixed_field_count - 1);
+        let _ = self.core.transition_to_field(target);
+    }
+
+    #[cfg(feature = "keybindings")]
+    fn extend_to_line_bounds_helix(&mut self) {
+        let current = self.core.current_field();
+        self.core.ui_state.current_mode = AppMode::Sel;
+        self.core.ui_state.selection = SelectionState::Linewise {
+            anchor_field: current,
+        };
+    }
+
+    #[cfg(feature = "keybindings")]
+    fn collapse_selection_helix(&mut self) {
+        self.core.ui_state.current_mode = AppMode::Nor;
+        self.core.ui_state.selection = SelectionState::Characterwise {
+            anchor: (self.core.current_field(), self.core.cursor_position()),
+        };
+    }
+
+    #[cfg(feature = "keybindings")]
+    fn clear_selected_fields_helix(&mut self, enter_edit_mode: bool) {
+        let (start, end) = self.selected_field_range();
+        self.clear_field_range(start, end);
+        let _ = self.core.transition_to_field(start);
+        self.core.ui_state.current_mode = if enter_edit_mode {
+            AppMode::Ins
+        } else {
+            AppMode::Nor
+        };
+        self.core.ui_state.selection = SelectionState::None;
+        if enter_edit_mode {
+            self.core.enter_edit_mode();
+        } else {
+            self.core.ui_state.selection = SelectionState::Characterwise {
+                anchor: (self.core.current_field(), self.core.cursor_position()),
+            };
         }
     }
 
@@ -559,6 +682,26 @@ impl<D: DataProvider> KeybindingProduct for TextFormState<D> {
                 self.core.enter_edit_mode();
                 KeyEventOutcome::Consumed(None)
             }
+            CanvasKeyAction::ExtendLineBelow => {
+                self.extend_line_below_helix(count);
+                KeyEventOutcome::Consumed(None)
+            }
+            CanvasKeyAction::ExtendToLineBounds => {
+                self.extend_to_line_bounds_helix();
+                KeyEventOutcome::Consumed(None)
+            }
+            CanvasKeyAction::CollapseSelection => {
+                self.collapse_selection_helix();
+                KeyEventOutcome::Consumed(None)
+            }
+            CanvasKeyAction::DeleteSelection | CanvasKeyAction::DeleteSelectionNoYank => {
+                self.clear_selected_fields_helix(false);
+                KeyEventOutcome::Consumed(None)
+            }
+            CanvasKeyAction::ChangeSelection | CanvasKeyAction::ChangeSelectionNoYank => {
+                self.clear_selected_fields_helix(true);
+                KeyEventOutcome::Consumed(None)
+            }
             CanvasKeyAction::JoinLineBelow
             | CanvasKeyAction::MoveLineUp
             | CanvasKeyAction::MoveLineDown
@@ -736,6 +879,45 @@ mod tests {
         assert_eq!(form.fixed_field_count(), 2);
         assert_eq!(form.data_provider().field_value(0), "row1");
         assert_eq!(form.data_provider().field_value(1), "row2");
+        assert_eq!(form.current_field(), 0);
+    }
+
+    #[cfg(all(feature = "keybindings", feature = "crossterm"))]
+    #[test]
+    fn helix_x_then_d_clears_selected_fixed_slot_without_shifting_following_fields() {
+        let mut form = TextFormState::new(TestProvider {
+            fields: ["row1".to_string(), "row2".to_string()],
+        });
+        form.use_keybinding_preset(crate::keybindings::BuiltinCanvasKeybindingPreset::Helix);
+
+        let _ = form.handle_key_event(KeyEvent::new(KeyCode::Char('x'), KeyModifiers::NONE));
+        let _ = form.handle_key_event(KeyEvent::new(KeyCode::Char('d'), KeyModifiers::NONE));
+
+        assert_eq!(form.fixed_field_count(), 2);
+        assert_eq!(form.data_provider().field_count(), 2);
+        assert_eq!(form.data_provider().field_value(0), "");
+        assert_eq!(form.data_provider().field_value(1), "row2");
+        assert_eq!(form.current_field(), 0);
+    }
+
+    #[cfg(all(feature = "keybindings", feature = "crossterm"))]
+    #[test]
+    fn helix_extended_line_delete_clears_fixed_slots_without_shifting_later_fields() {
+        let mut form = TextFormState::new(VecProvider {
+            fields: vec![
+                "row1".to_string(),
+                "row2".to_string(),
+                "row3".to_string(),
+            ],
+        });
+        form.use_keybinding_preset(crate::keybindings::BuiltinCanvasKeybindingPreset::Helix);
+
+        let _ = form.handle_key_event(KeyEvent::new(KeyCode::Char('x'), KeyModifiers::NONE));
+        let _ = form.handle_key_event(KeyEvent::new(KeyCode::Char('x'), KeyModifiers::NONE));
+        let _ = form.handle_key_event(KeyEvent::new(KeyCode::Char('d'), KeyModifiers::NONE));
+
+        assert_eq!(form.fixed_field_count(), 3);
+        assert_eq!(form.data_provider().capture_content(), vec!["", "", "row3"]);
         assert_eq!(form.current_field(), 0);
     }
 
