@@ -98,6 +98,7 @@ fn textform_action_policy(action: &CanvasKeyAction) -> TextFormActionPolicy {
         | ChangeSelectionNoYank
         | YankSelection
         | CollapseSelection
+        | ClearSearch
         | ExtendLineBelow
         | ExtendToLineBounds => TextFormActionPolicy::ProductHandled,
 
@@ -140,7 +141,6 @@ fn textform_action_policy(action: &CanvasKeyAction) -> TextFormActionPolicy {
         | DeleteWordBackward
         | DeleteToLineStart
         | DeleteWordForward
-        | ClearSearch
         | SelectLeft
         | SelectRight
         | SelectUp
@@ -959,6 +959,13 @@ impl<D: DataProvider> KeybindingProduct for TextFormState<D> {
                 self.core.collapse_selection_helix();
                 KeyEventOutcome::Consumed(None)
             }
+            CanvasKeyAction::ClearSearch => {
+                // Helix `Esc` in normal mode collapses the selection (left by
+                // `x`/`v`-then-`Esc`) back to a single cursor. A form has no
+                // search state, so collapsing is all that's needed.
+                self.core.collapse_selection_helix();
+                KeyEventOutcome::Consumed(None)
+            }
             CanvasKeyAction::DeleteSelection | CanvasKeyAction::DeleteSelectionNoYank => {
                 self.delete_selection_helix(
                     matches!(action, CanvasKeyAction::DeleteSelection),
@@ -1353,6 +1360,50 @@ mod tests {
         assert_eq!(form.current_field(), 1);
         assert_eq!(form.data_provider().field_value(0), "abc");
         assert_eq!(form.current_text(), "def");
+    }
+
+    #[cfg(all(feature = "keybindings", feature = "crossterm"))]
+    #[test]
+    fn vim_esc_exits_select_mode() {
+        use crate::canvas::modes::AppMode;
+
+        let mut form = TextFormState::new(TestProvider {
+            fields: ["row1".to_string(), "row2".to_string()],
+        });
+        form.set_keybindings(crate::keybindings::CanvasKeyBindings::vim_defaults());
+
+        let _ = form.handle_key_event(KeyEvent::new(KeyCode::Char('v'), KeyModifiers::NONE));
+        assert_eq!(form.mode(), AppMode::Sel);
+
+        let _ = form.handle_key_event(KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE));
+        assert_eq!(form.mode(), AppMode::Nor);
+    }
+
+    #[cfg(all(feature = "keybindings", feature = "crossterm"))]
+    #[test]
+    fn helix_esc_exits_and_collapses_selection() {
+        use crate::canvas::modes::AppMode;
+        use crate::keybindings::BuiltinCanvasKeybindingPreset;
+
+        let mut form = TextFormState::new(TestProvider {
+            fields: ["row1".to_string(), "row2".to_string()],
+        });
+        form.use_keybinding_preset(BuiltinCanvasKeybindingPreset::Helix);
+
+        let _ = form.handle_key_event(KeyEvent::new(KeyCode::Char('v'), KeyModifiers::NONE));
+        assert_eq!(form.mode(), AppMode::Sel, "v should enter select");
+        let _ = form.handle_key_event(KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE));
+        assert_eq!(form.mode(), AppMode::Nor, "esc from v-select");
+
+        // The helix-specific case: `x` leaves a linewise selection but stays in
+        // Normal mode. Esc should collapse that selection like real Helix.
+        let _ = form.handle_key_event(KeyEvent::new(KeyCode::Char('x'), KeyModifiers::NONE));
+        let _ = form.handle_key_event(KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE));
+        assert!(
+            matches!(form.selection_state(), crate::canvas::state::SelectionState::Characterwise { .. } | crate::canvas::state::SelectionState::None),
+            "esc in Nor should collapse the x-selection, got {:?}",
+            form.selection_state()
+        );
     }
 
     #[cfg(all(feature = "keybindings", feature = "crossterm"))]

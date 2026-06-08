@@ -190,7 +190,12 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
                 KeyEventOutcome::Consumed(None)
             }
             CanvasKeyAction::ClearSearch => {
+                // Helix `Esc` in normal mode: drop any search highlight *and*
+                // collapse the selection back to a single cursor. Without the
+                // collapse, a selection left by `x`/`v`-then-`Esc` would stay
+                // highlighted with no way to clear it.
                 self.clear_search();
+                self.collapse_selection_helix();
                 KeyEventOutcome::Consumed(None)
             }
             CanvasKeyAction::ExtendLineBelow => {

@@ -2821,6 +2821,33 @@ mod tests {
 
     #[cfg(all(feature = "keybindings", feature = "crossterm"))]
     #[test]
+    fn helix_esc_collapses_selection_in_normal_mode() {
+        use crate::canvas::modes::AppMode;
+        use crate::canvas::state::SelectionState;
+        use crate::keybindings::BuiltinCanvasKeybindingPreset;
+        use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+
+        let mut textarea = TextAreaState::<TextAreaProvider>::from_text("one\ntwo");
+        textarea.use_keybinding_preset(BuiltinCanvasKeybindingPreset::Helix);
+
+        // `x` leaves a linewise selection but stays in Normal mode.
+        let _ = textarea.handle_key_event(KeyEvent::new(KeyCode::Char('x'), KeyModifiers::NONE));
+        assert!(matches!(
+            textarea.selection_state(),
+            SelectionState::Linewise { .. }
+        ));
+
+        // Esc must collapse it back to a single cursor.
+        let _ = textarea.handle_key_event(KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE));
+        assert_eq!(textarea.mode(), AppMode::Nor);
+        assert!(matches!(
+            textarea.selection_state(),
+            SelectionState::Characterwise { .. } | SelectionState::None
+        ));
+    }
+
+    #[cfg(all(feature = "keybindings", feature = "crossterm"))]
+    #[test]
     fn helix_append_on_last_character_inserts_after_it() {
         use crate::keybindings::BuiltinCanvasKeybindingPreset;
         use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
