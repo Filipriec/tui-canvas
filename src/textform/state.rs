@@ -543,52 +543,6 @@ impl<D: DataProvider> TextFormState<D> {
     }
 
     #[cfg(feature = "keybindings")]
-    fn yank_selection_helix(&mut self) {
-        match self.core.selection_state().clone() {
-            SelectionState::Linewise { anchor_field } => {
-                let current = self.core.current_field();
-                let start = anchor_field.min(current);
-                let end = anchor_field.max(current).min(self.fixed_field_count.saturating_sub(1));
-                if start > end || self.fixed_field_count == 0 {
-                    return;
-                }
-
-                let lines: Vec<String> = (start..=end)
-                    .map(|field_index| {
-                        self.core
-                            .data_provider()
-                            .field_value(field_index)
-                            .to_string()
-                    })
-                    .collect();
-                self.core
-                    .behavior_state
-                    .yank_mut()
-                    .set_line_register(lines);
-            }
-            SelectionState::Characterwise { anchor } => {
-                let cursor = (self.core.current_field(), self.core.cursor_position());
-                let start = anchor.min(cursor);
-                let end = anchor.max(cursor);
-                if start.0 >= self.fixed_field_count || end.0 >= self.fixed_field_count {
-                    return;
-                }
-
-                let lines = self.core.data_provider().capture_content();
-                let yanked = EditorCore::<D>::extract_characterwise_text_core(&lines, start, end);
-                if yanked.iter().all(|text| text.is_empty()) {
-                    return;
-                }
-                self.core
-                    .behavior_state
-                    .yank_mut()
-                    .set_text_register(yanked);
-            }
-            SelectionState::None => {}
-        }
-    }
-
-    #[cfg(feature = "keybindings")]
     fn ensure_helix_primary_selection(&mut self) {
         self.core.ui_state.current_mode = AppMode::Nor;
         self.core.ui_state.selection = SelectionState::Characterwise {
@@ -1082,7 +1036,7 @@ impl<D: DataProvider> KeybindingProduct for TextFormState<D> {
             }
             CanvasKeyAction::YankSelection => {
                 for _ in 0..count {
-                    self.yank_selection_helix();
+                    self.core.yank_primary_selection_helix();
                 }
                 KeyEventOutcome::Consumed(None)
             }
@@ -1684,6 +1638,26 @@ mod tests {
 
         assert_eq!(form.fixed_field_count(), 3);
         assert_eq!(form.data_provider().capture_content(), vec!["row1", "row1", "row3"]);
+    }
+
+    #[cfg(all(feature = "keybindings", feature = "crossterm"))]
+    #[test]
+    fn helix_yank_exits_select_mode_like_textarea() {
+        use crate::canvas::modes::AppMode;
+        use crate::keybindings::BuiltinCanvasKeybindingPreset;
+
+        let mut form = TextFormState::new(TestProvider {
+            fields: ["row1".to_string(), "row2".to_string()],
+        });
+        form.use_keybinding_preset(BuiltinCanvasKeybindingPreset::Helix);
+
+        // `x` extends to a linewise selection (select mode); `y` yanks and must
+        // collapse the selection back to normal mode, matching the text area.
+        let _ = form.handle_key_event(KeyEvent::new(KeyCode::Char('x'), KeyModifiers::NONE));
+        assert_eq!(form.mode(), AppMode::Sel);
+
+        let _ = form.handle_key_event(KeyEvent::new(KeyCode::Char('y'), KeyModifiers::NONE));
+        assert_eq!(form.mode(), AppMode::Nor);
     }
 
     #[cfg(feature = "keybindings")]

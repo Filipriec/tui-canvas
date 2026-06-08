@@ -841,10 +841,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
     }
 
     pub(crate) fn yank_primary_selection_helix(&mut self) {
-        self.yank_selection();
-        if self.mode() == AppMode::Sel {
-            self.exit_highlight_mode_helix();
-        }
+        self.core.yank_primary_selection_helix();
     }
 
     pub(crate) fn collapse_selection_helix(&mut self) {

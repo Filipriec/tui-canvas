@@ -1110,11 +1110,6 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
     }
 
     #[cfg(feature = "keybindings")]
-    pub(crate) fn exit_highlight_mode_helix(&mut self) {
-        self.core.exit_highlight_mode_helix();
-    }
-
-    #[cfg(feature = "keybindings")]
     pub(crate) fn ensure_helix_primary_selection(&mut self) {
         self.core.ensure_helix_primary_selection();
     }

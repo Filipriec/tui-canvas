@@ -149,4 +149,13 @@ impl<D: DataProvider> EditorCore<D> {
             self.apply_after_mode_change_helix();
         }
     }
+
+    /// Yank the primary selection, then leave select mode (Helix `y`). Shared by
+    /// the text area and the text form so both collapse the selection on yank.
+    pub(crate) fn yank_primary_selection_helix(&mut self) {
+        self.yank_selection_core();
+        if self.ui_state.current_mode == AppMode::Sel {
+            self.exit_highlight_mode_helix();
+        }
+    }
 }

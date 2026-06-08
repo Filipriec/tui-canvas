@@ -193,6 +193,39 @@ impl<D: DataProvider> EditorCore<D> {
         false
     }
 
+    /// Copy the active selection into the yank register without modifying the
+    /// buffer. Provider-agnostic: works the same for fixed and dynamic rows.
+    pub(crate) fn yank_selection_core(&mut self) {
+        match self.selection_state().clone() {
+            SelectionState::Linewise { anchor_field } => {
+                let current = self.current_field();
+                let start = anchor_field.min(current);
+                let end = anchor_field.max(current);
+                let lines = self.data_provider().capture_content();
+                if start < lines.len() {
+                    self.behavior_state
+                        .yank_mut()
+                        .set_line_register(lines[start..=end.min(lines.len() - 1)].to_vec());
+                }
+            }
+            SelectionState::Characterwise { anchor } => {
+                let cursor = (self.current_field(), self.cursor_position());
+                let start = anchor.min(cursor);
+                let end = anchor.max(cursor);
+                let lines = self.data_provider().capture_content();
+                if start.0 >= lines.len() || end.0 >= lines.len() {
+                    return;
+                }
+                let yanked = Self::extract_characterwise_text_core(&lines, start, end);
+                if yanked.iter().all(|text| text.is_empty()) {
+                    return;
+                }
+                self.behavior_state.yank_mut().set_text_register(yanked);
+            }
+            SelectionState::None => {}
+        }
+    }
+
     /// Remove the inclusive `[from, to]` character range from `line`.
     fn remove_char_range(line: &str, from: usize, to: usize) -> String {
         line.chars()
