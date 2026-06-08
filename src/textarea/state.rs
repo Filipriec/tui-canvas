@@ -2847,6 +2847,39 @@ mod tests {
 
     #[cfg(all(feature = "keybindings", feature = "crossterm"))]
     #[test]
+    fn helix_v_up_delete_collapses_selection() {
+        use crate::canvas::modes::AppMode;
+        use crate::canvas::state::SelectionState;
+        use crate::keybindings::BuiltinCanvasKeybindingPreset;
+        use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+
+        let mut textarea = TextAreaState::<TextAreaProvider>::from_text("one\ntwo\nthree");
+        textarea.use_keybinding_preset(BuiltinCanvasKeybindingPreset::Helix);
+
+        // Move onto the middle line, enter select, extend UP, delete.
+        let _ = textarea.handle_key_event(KeyEvent::new(KeyCode::Char('j'), KeyModifiers::NONE));
+        let _ = textarea.handle_key_event(KeyEvent::new(KeyCode::Char('v'), KeyModifiers::NONE));
+        let _ = textarea.handle_key_event(KeyEvent::new(KeyCode::Char('k'), KeyModifiers::NONE));
+        let _ = textarea.handle_key_event(KeyEvent::new(KeyCode::Char('d'), KeyModifiers::NONE));
+
+        assert_eq!(textarea.mode(), AppMode::Nor);
+        // After the delete the selection must be collapsed to the cursor, not a
+        // stale multi-character range left over from the upward extend.
+        match textarea.selection_state() {
+            SelectionState::None => {}
+            SelectionState::Characterwise { anchor } => {
+                assert_eq!(
+                    *anchor,
+                    (textarea.current_field(), textarea.cursor_position()),
+                    "selection anchor should sit on the cursor"
+                );
+            }
+            other => panic!("expected collapsed selection, got {other:?}"),
+        }
+    }
+
+    #[cfg(all(feature = "keybindings", feature = "crossterm"))]
+    #[test]
     fn helix_esc_does_not_collapse_selection_in_normal_mode() {
         use crate::canvas::state::SelectionState;
         use crate::keybindings::BuiltinCanvasKeybindingPreset;

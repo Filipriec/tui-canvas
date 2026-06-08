@@ -43,6 +43,11 @@ impl<D: DataProvider> EditorCore<D> {
                 let target = start.min(content.len().saturating_sub(1));
                 let _ = self.transition_to_field(target);
                 self.move_line_start();
+                // The deleted content is gone, so the old anchor is stale (it
+                // can sit below the new cursor on an upward selection). Clear the
+                // selection; the caller re-establishes a collapsed one at the
+                // cursor.
+                self.ui_state.selection = SelectionState::None;
                 true
             }
             SelectionState::Characterwise { anchor } => {
@@ -75,6 +80,7 @@ impl<D: DataProvider> EditorCore<D> {
                 self.data_provider_mut().restore_content(&content);
                 let _ = self.transition_to_field(start.0);
                 self.set_cursor_position(start.1);
+                self.ui_state.selection = SelectionState::None;
                 true
             }
             SelectionState::None => self.delete_primary_character_dynamic(yank),

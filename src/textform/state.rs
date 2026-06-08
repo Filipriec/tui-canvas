@@ -1374,6 +1374,33 @@ mod tests {
 
     #[cfg(all(feature = "keybindings", feature = "crossterm"))]
     #[test]
+    fn helix_v_up_delete_collapses_selection() {
+        use crate::canvas::state::SelectionState;
+        use crate::keybindings::BuiltinCanvasKeybindingPreset;
+
+        let mut form = TextFormState::new(TestProvider {
+            fields: ["row1".to_string(), "row2".to_string()],
+        });
+        form.use_keybinding_preset(BuiltinCanvasKeybindingPreset::Helix);
+
+        // Onto the second field, enter select, extend UP, delete.
+        let _ = form.handle_key_event(KeyEvent::new(KeyCode::Char('j'), KeyModifiers::NONE));
+        let _ = form.handle_key_event(KeyEvent::new(KeyCode::Char('v'), KeyModifiers::NONE));
+        let _ = form.handle_key_event(KeyEvent::new(KeyCode::Char('k'), KeyModifiers::NONE));
+        let _ = form.handle_key_event(KeyEvent::new(KeyCode::Char('d'), KeyModifiers::NONE));
+
+        // No stale multi-field selection should remain after the delete.
+        match form.selection_state() {
+            SelectionState::None => {}
+            SelectionState::Characterwise { anchor } => {
+                assert_eq!(*anchor, (form.current_field(), form.cursor_position()));
+            }
+            other => panic!("expected collapsed selection, got {other:?}"),
+        }
+    }
+
+    #[cfg(all(feature = "keybindings", feature = "crossterm"))]
+    #[test]
     fn helix_esc_exits_select_but_keeps_selection_in_normal_mode() {
         use crate::canvas::modes::AppMode;
         use crate::canvas::state::SelectionState;

@@ -35,6 +35,9 @@ impl<D: DataProvider> EditorCore<D> {
                 }
                 let _ = self.transition_to_field(start);
                 self.move_line_start();
+                // Drop the now-stale anchor; the caller re-establishes a
+                // collapsed selection at the cursor.
+                self.ui_state.selection = SelectionState::None;
                 true
             }
             SelectionState::Characterwise { anchor } => {
@@ -87,6 +90,7 @@ impl<D: DataProvider> EditorCore<D> {
 
                 let _ = self.transition_to_field(start.0);
                 self.set_cursor_position(start.1);
+                self.ui_state.selection = SelectionState::None;
                 true
             }
             SelectionState::None => self.delete_primary_character_fixed(yank),
