@@ -53,6 +53,20 @@ impl<P: TextInputDataProvider + Default> Default for TextInputState<P> {
     }
 }
 
+impl<P: TextInputDataProvider> std::ops::Deref for TextInputState<P> {
+    type Target = TextFormState<P>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.form
+    }
+}
+
+impl<P: TextInputDataProvider> std::ops::DerefMut for TextInputState<P> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.form
+    }
+}
+
 impl<P: TextInputDataProvider> TextInputState<P> {
     pub fn with_provider(provider: P) -> Self {
         Self {
@@ -645,6 +659,10 @@ impl<P: TextInputDataProvider> TextInputState<P> {
 impl<P: TextInputDataProvider> TextInputState<P> {
     pub fn open_suggestions(&mut self, field_index: usize) {
         self.form.open_suggestions(field_index);
+    }
+
+    pub fn check_suggestion_trigger(&mut self) {
+        self.form.check_suggestion_trigger();
     }
 
     pub fn trigger_suggestions(&mut self) -> Option<(usize, String)> {

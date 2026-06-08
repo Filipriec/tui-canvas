@@ -352,6 +352,20 @@ impl<P: TextAreaDataProvider + Default> Default for TextAreaState<P> {
     }
 }
 
+impl<P: TextAreaDataProvider> std::ops::Deref for TextAreaState<P> {
+    type Target = EditorCore<P>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.core
+    }
+}
+
+impl<P: TextAreaDataProvider> std::ops::DerefMut for TextAreaState<P> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.core
+    }
+}
+
 impl<P: TextAreaDataProvider> TextAreaState<P> {
     pub fn with_provider(provider: P) -> Self {
         Self {
@@ -985,6 +999,14 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         &mut self.core
     }
 
+    pub fn editor(&self) -> &EditorCore<P> {
+        &self.core
+    }
+
+    pub fn editor_mut(&mut self) -> &mut EditorCore<P> {
+        &mut self.core
+    }
+
     pub fn current_field(&self) -> usize {
         self.core.current_field()
     }
@@ -1408,6 +1430,10 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
 impl<P: TextAreaDataProvider> TextAreaState<P> {
     pub fn open_suggestions(&mut self, field_index: usize) {
         self.core.open_suggestions(field_index);
+    }
+
+    pub fn check_suggestion_trigger(&mut self) {
+        self.core.check_suggestion_trigger();
     }
 
     pub fn trigger_suggestions(&mut self) -> Option<(usize, String)> {
