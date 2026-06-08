@@ -12,7 +12,7 @@ use crate::canvas::modes::AppMode;
 use crate::canvas::state::SelectionState;
 #[cfg(feature = "gui")]
 use crate::gui_utils::{display_cols_up_to, display_width};
-use crate::{editor::EditorCore, DataProvider};
+use crate::{editor::EditorCore, DataProvider, RowPolicy};
 #[cfg(feature = "cursor-style")]
 use crate::CursorManager;
 #[cfg(feature = "gui")]
@@ -179,8 +179,14 @@ impl<D: DataProvider + Default> Default for TextFormState<D> {
 impl<D: DataProvider> TextFormState<D> {
     pub fn new(data_provider: D) -> Self {
         let fixed_field_count = data_provider.field_count();
+        let mut core = EditorCore::new(data_provider);
+        // A form is a text buffer pinned to a fixed number of rows: structural
+        // edits clear slots in place instead of removing rows. This makes the
+        // shared editing engine in `EditorCore` behave correctly for any
+        // provider, without requiring callers to override `row_policy()`.
+        core.set_row_policy_override(RowPolicy::Fixed);
         Self {
-            core: EditorCore::new(data_provider),
+            core,
             fixed_field_count,
         }
     }
@@ -537,52 +543,6 @@ impl<D: DataProvider> TextFormState<D> {
     }
 
     #[cfg(feature = "keybindings")]
-    fn extract_characterwise_text(
-        &self,
-        start: (usize, usize),
-        end: (usize, usize),
-    ) -> Vec<String> {
-        if start.0 == end.0 {
-            let text: String = self
-                .core
-                .data_provider()
-                .field_value(start.0)
-                .chars()
-                .skip(start.1)
-                .take(end.1.saturating_sub(start.1) + 1)
-                .collect();
-            return vec![text];
-        }
-
-        let mut yanked = Vec::new();
-        let first: String = self
-            .core
-            .data_provider()
-            .field_value(start.0)
-            .chars()
-            .skip(start.1)
-            .collect();
-        yanked.push(first);
-        for field_index in start.0 + 1..end.0 {
-            yanked.push(
-                self.core
-                    .data_provider()
-                    .field_value(field_index)
-                    .to_string(),
-            );
-        }
-        let last: String = self
-            .core
-            .data_provider()
-            .field_value(end.0)
-            .chars()
-            .take(end.1 + 1)
-            .collect();
-        yanked.push(last);
-        yanked
-    }
-
-    #[cfg(feature = "keybindings")]
     fn yank_selection_helix(&mut self) {
         match self.core.selection_state().clone() {
             SelectionState::Linewise { anchor_field } => {
@@ -614,7 +574,8 @@ impl<D: DataProvider> TextFormState<D> {
                     return;
                 }
 
-                let yanked = self.extract_characterwise_text(start, end);
+                let lines = self.core.data_provider().capture_content();
+                let yanked = EditorCore::<D>::extract_characterwise_text_core(&lines, start, end);
                 if yanked.iter().all(|text| text.is_empty()) {
                     return;
                 }
@@ -636,161 +597,9 @@ impl<D: DataProvider> TextFormState<D> {
     }
 
     #[cfg(feature = "keybindings")]
-    fn delete_primary_character_helix(&mut self, yank: bool) -> bool {
-        let field_index = self.core.current_field();
-        if field_index >= self.fixed_field_count {
-            return false;
-        }
-
-        let cursor = self.core.cursor_position();
-        let current = self.core.data_provider().field_value(field_index).to_string();
-        let line_len = current.chars().count();
-        if cursor >= line_len {
-            return false;
-        }
-
-        if yank {
-            let ch: String = current.chars().skip(cursor).take(1).collect();
-            self.core
-                .behavior_state
-                .yank_mut()
-                .set_text_register(vec![ch]);
-        }
-        self.core
-            .record_checkpoint(crate::editor::features::history::EditKind::Delete);
-        let kept: String = current
-            .chars()
-            .enumerate()
-            .filter_map(|(idx, ch)| if idx == cursor { None } else { Some(ch) })
-            .collect();
-        self.core
-            .data_provider_mut()
-            .set_field_value(field_index, kept);
-        let len = self.field_char_len(field_index);
-        self.core.ui_state.set_cursor(cursor.min(len), len, false);
-        true
-    }
-
-    #[cfg(feature = "keybindings")]
-    fn delete_characterwise_selection_helix(
-        &mut self,
-        anchor: (usize, usize),
-        yank: bool,
-    ) -> bool {
-        let cursor = (self.core.current_field(), self.core.cursor_position());
-        if anchor == cursor {
-            return self.delete_primary_character_helix(yank);
-        }
-
-        let start = anchor.min(cursor);
-        let end = anchor.max(cursor);
-        if start.0 >= self.fixed_field_count || end.0 >= self.fixed_field_count {
-            return false;
-        }
-
-        if yank {
-            let yanked = self.extract_characterwise_text(start, end);
-            self.core
-                .behavior_state
-                .yank_mut()
-                .set_text_register(yanked);
-        }
-
-        self.core
-            .record_checkpoint(crate::editor::features::history::EditKind::Delete);
-
-        if start.0 == end.0 {
-            let line = self.core.data_provider().field_value(start.0).to_string();
-            let new_line: String = line
-                .chars()
-                .enumerate()
-                .filter_map(|(idx, ch)| {
-                    if idx < start.1 || idx > end.1 {
-                        Some(ch)
-                    } else {
-                        None
-                    }
-                })
-                .collect();
-            self.core
-                .data_provider_mut()
-                .set_field_value(start.0, new_line);
-        } else {
-            let first: String = self
-                .core
-                .data_provider()
-                .field_value(start.0)
-                .chars()
-                .take(start.1)
-                .collect();
-            self.core
-                .data_provider_mut()
-                .set_field_value(start.0, first);
-
-            for field_index in start.0 + 1..end.0 {
-                self.core
-                    .data_provider_mut()
-                    .set_field_value(field_index, String::new());
-            }
-
-            let last: String = self
-                .core
-                .data_provider()
-                .field_value(end.0)
-                .chars()
-                .skip(end.1 + 1)
-                .collect();
-            self.core.data_provider_mut().set_field_value(end.0, last);
-        }
-
-        let _ = self.core.transition_to_field(start.0);
-        let len = self.field_char_len(start.0);
-        self.core.ui_state.set_cursor(start.1.min(len), len, false);
-        true
-    }
-
-    #[cfg(feature = "keybindings")]
-    fn delete_selection_once_helix(&mut self, yank: bool) -> bool {
-        match self.core.selection_state().clone() {
-            SelectionState::Linewise { anchor_field } => {
-                let current = self.core.current_field();
-                let start = anchor_field.min(current);
-                let end = anchor_field.max(current).min(self.fixed_field_count.saturating_sub(1));
-                if self.fixed_field_count == 0 || start > end {
-                    return false;
-                }
-
-                if yank {
-                    let lines: Vec<String> = (start..=end)
-                        .map(|field_index| {
-                            self.core
-                                .data_provider()
-                                .field_value(field_index)
-                                .to_string()
-                        })
-                        .collect();
-                    self.core
-                        .behavior_state
-                        .yank_mut()
-                        .set_line_register(lines);
-                }
-
-                self.clear_field_range(start, end);
-                let _ = self.core.transition_to_field(start);
-                self.core.move_line_start();
-                true
-            }
-            SelectionState::Characterwise { anchor } => {
-                self.delete_characterwise_selection_helix(anchor, yank)
-            }
-            SelectionState::None => self.delete_primary_character_helix(yank),
-        }
-    }
-
-    #[cfg(feature = "keybindings")]
     fn delete_selection_helix(&mut self, yank: bool, count: usize) {
         for _ in 0..count.max(1) {
-            if !self.delete_selection_once_helix(yank) {
+            if !self.core.delete_selection_once_core(yank) {
                 break;
             }
         }
@@ -802,7 +611,7 @@ impl<D: DataProvider> TextFormState<D> {
     #[cfg(feature = "keybindings")]
     fn change_selection_helix(&mut self, yank: bool, count: usize) {
         for _ in 0..count.max(1) {
-            if !self.delete_selection_once_helix(yank) {
+            if !self.core.delete_selection_once_core(yank) {
                 break;
             }
         }

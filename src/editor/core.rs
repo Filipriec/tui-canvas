@@ -41,6 +41,11 @@ pub struct EditorCore<D: DataProvider> {
     #[cfg(feature = "keybindings")]
     pub(crate) behavior_state: EditorBehaviorState,
 
+    /// Overrides the provider's [`crate::RowPolicy`] when set. Text forms set
+    /// this to `Fixed` so any provider behaves as a fixed-row buffer; text areas
+    /// leave it `None` and use the provider's policy (`Dynamic`).
+    pub(crate) row_policy_override: Option<crate::RowPolicy>,
+
     pub(crate) undo_stack: Vec<crate::editor::features::history::EditSnapshot>,
     pub(crate) redo_stack: Vec<crate::editor::features::history::EditSnapshot>,
     #[derivative(Default(value = "crate::editor::features::history::DEFAULT_HISTORY_LIMIT"))]
@@ -77,6 +82,7 @@ impl<D: DataProvider> EditorCore<D> {
             seq_tracker: KeySequenceTracker::new(400),
             #[cfg(feature = "keybindings")]
             behavior_state: EditorBehaviorState::default(),
+            row_policy_override: None,
             undo_stack: Vec::new(),
             redo_stack: Vec::new(),
             history_limit: crate::editor::features::history::DEFAULT_HISTORY_LIMIT,
@@ -136,6 +142,20 @@ impl<D: DataProvider> EditorCore<D> {
     #[cfg(feature = "keybindings")]
     pub fn set_key_sequence_timeout_ms(&mut self, timeout_ms: u64) {
         self.seq_tracker = KeySequenceTracker::new(timeout_ms);
+    }
+
+    /// The effective row policy: the form override if present, otherwise the
+    /// provider's declared policy.
+    pub(crate) fn row_policy(&self) -> crate::RowPolicy {
+        self.row_policy_override
+            .unwrap_or_else(|| self.data_provider.row_policy())
+    }
+
+    /// Pin the buffer to a fixed-row policy regardless of the provider. Used by
+    /// text forms so structural edits clear slots in place instead of removing
+    /// rows.
+    pub(crate) fn set_row_policy_override(&mut self, policy: crate::RowPolicy) {
+        self.row_policy_override = Some(policy);
     }
 
     pub fn current_text(&self) -> &str {

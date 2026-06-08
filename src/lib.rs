@@ -61,7 +61,7 @@ mod clipboard;
 #[cfg(feature = "cursor-style")]
 pub use cursor::CursorManager;
 
-pub use data_provider::DataProvider;
+pub use data_provider::{DataProvider, RowPolicy};
 #[cfg(feature = "suggestions")]
 pub use data_provider::{SuggestionItem, SuggestionQuery, SuggestionTrigger};
 pub use textform::{TextFormEventOutcome, TextFormState};
