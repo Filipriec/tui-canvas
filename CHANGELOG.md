@@ -14,6 +14,7 @@
 
 - Split the old form/editor layering into `EditorCore<D>` plus sibling product states. `EditorCore` owns shared cursor, mode, selection, keybinding, validation, suggestions, and history state; product states own editing policy.
 - Added `TextFormState<D>` as the fixed-row product. Its fixed-row policy keeps row count stable: Enter/Tab traverse fields, line deletion clears the current field, and row insert/remove behavior is not part of the form product.
+- `TextFormState<D>` now stores and enforces its initial fixed field count across product input, keybinding dispatch, paste, execute, undo, and redo paths. Vim line operations such as `dd` and counted `2dd` clear fixed slots without shifting later fields upward; structural textarea operations such as join, line move, line duplicate, cut line, and linewise paste are inert for textform.
 - `TextAreaState<P>` now owns `EditorCore<P>` directly. Textarea-only behavior such as split, join, insert/delete rows, and multiline paste remains textarea policy.
 - `TextInputState<P>` now owns a single-row `TextFormState<P>`.
 - Moved key-event sequence/count/fallback dispatch to a product-policy layer so `TextAreaState` and `TextFormState` share routing without sharing Enter/Tab/row-mutation semantics.
