@@ -17,7 +17,6 @@ pub struct CanvasKeybindingProfile {
 }
 
 struct OverrideSection {
-    name: String,
     mode: AppMode,
     bindings: Vec<(CanvasKeyAction, Vec<String>)>,
 }
@@ -208,7 +207,6 @@ fn parse_override_toml(source: &str) -> Result<Vec<OverrideSection>, CanvasKeybi
         }
 
         sections.push(OverrideSection {
-            name: section_name.clone(),
             mode,
             bindings,
         });

@@ -536,7 +536,7 @@ redo = ["z r"]
             .remap_action(
                 AppMode::Nor,
                 CanvasKeyAction::Undo,
-                vec!["Shift+u".to_string(), "z u".to_string()],
+                vec!["Shift+z".to_string(), "z u".to_string()],
             )
             .unwrap();
         profile
@@ -545,7 +545,7 @@ redo = ["z r"]
 
         let overrides = profile.overrides_toml();
         assert!(overrides.contains("[nor]"));
-        assert!(overrides.contains("undo = [\"U\", \"z u\"]"));
+        assert!(overrides.contains("undo = [\"Z\", \"z u\"]"));
         assert!(overrides.contains("redo = []"));
         assert!(!overrides.contains("move_down"));
 
