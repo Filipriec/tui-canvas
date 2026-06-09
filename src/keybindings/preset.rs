@@ -338,11 +338,11 @@ impl CanvasKeybindingPreset {
                             continue;
                         }
                     };
-                    let previous = seen.insert(
+                    let exact_previous = seen.insert(
                         (mode_key.clone(), sequence.clone()),
                         (section.name.clone(), binding.action.clone(), key.clone()),
                     );
-                    if let Some((first_section, first_action, first_key)) = previous {
+                    if let Some((first_section, first_action, first_key)) = exact_previous {
                         if first_action != binding.action {
                             issues.push(CanvasKeybindingPresetIssue::DuplicateBinding {
                                 section: section.name.clone(),
