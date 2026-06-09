@@ -1,6 +1,6 @@
 //! Minimal form example using the default vim keybindings.
 //!
-//! Demonstrates the smallest viable setup: a `FormEditor` backed by a
+//! Demonstrates the smallest viable setup: a `TextFormState` backed by a
 //! `DataProvider`, with `CanvasKeyBindings::vim_defaults()` wiring up all
 //! modal navigation, editing, and field traversal through the centralized
 //! keybinding system.
@@ -16,11 +16,7 @@ compile_error!(
 
 use std::io;
 
-use crossterm::{
-    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyModifiers},
-    execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
-};
+use crossterm::event::{Event, KeyCode, KeyModifiers};
 use ratatui::{
     backend::{Backend, CrosstermBackend},
     layout::{Constraint, Direction, Layout},
@@ -29,10 +25,14 @@ use ratatui::{
     Frame, Terminal,
 };
 
-use tui_canvas::{keybindings::CanvasKeyBindings, render_canvas_default, DataProvider, FormEditor};
+use tui_canvas::{
+    integration::crossterm_input::{CrosstermInputOptions, CrosstermInputSession},
+    keybindings::CanvasKeyBindings,
+    render_canvas_default, DataProvider, TextFormState,
+};
 
 struct App {
-    editor: FormEditor<Form>,
+    editor: TextFormState<Form>,
 }
 
 struct Form {
@@ -66,19 +66,30 @@ impl DataProvider for Form {
     }
 }
 
-fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> io::Result<()> {
+fn run_app<B: Backend>(
+    terminal: &mut Terminal<B>,
+    session: &CrosstermInputSession,
+    mut app: App,
+) -> io::Result<()> {
     loop {
         terminal.draw(|f| ui(f, &app))?;
 
-        let Event::Key(key) = event::read()? else {
-            continue;
-        };
-        // Ctrl+C always quits, regardless of the canvas mode.
-        if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('c') {
-            return Ok(());
+        match session.read_event()? {
+            Event::Key(key) => {
+                // Ctrl+C always quits, regardless of the canvas mode.
+                if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('c') {
+                    return Ok(());
+                }
+                // Everything else goes through the keybinding system.
+                let _ = app.editor.handle_key_event(key);
+            }
+            // Bracketed paste (enabled by the session) and any other non-key
+            // events are routed through the high-level `handle_event`, which
+            // inserts the pasted text in one shot rather than key-by-key.
+            other => {
+                let _ = app.editor.handle_event(other);
+            }
         }
-        // Everything else goes through the keybinding system.
-        let _ = app.editor.handle_key_event(key);
     }
 }
 
@@ -102,14 +113,13 @@ fn ui(f: &mut Frame, app: &App) {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    enable_raw_mode()?;
-    let mut stdout = io::stdout();
-    execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
-    let backend = CrosstermBackend::new(stdout);
+    let mut session =
+        CrosstermInputSession::install_with_options(CrosstermInputOptions::tui_defaults())?;
+    let backend = CrosstermBackend::new(io::stdout());
     let mut terminal = Terminal::new(backend)?;
 
     let mut app = App {
-        editor: FormEditor::new(Form::new()),
+        editor: TextFormState::new(Form::new()),
     };
     // One call wires up all vim-style modal behavior: hjkl movement,
     // w/b/e word jumps, i/a/o edit modes, gg/G field jumps, v/V visual,
@@ -118,14 +128,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     app.editor
         .set_keybindings(CanvasKeyBindings::vim_defaults());
 
-    let res = run_app(&mut terminal, app);
+    let res = run_app(&mut terminal, &session, app);
 
-    disable_raw_mode()?;
-    execute!(
-        terminal.backend_mut(),
-        LeaveAlternateScreen,
-        DisableMouseCapture
-    )?;
+    let _ = session.uninstall();
     terminal.show_cursor()?;
 
     if let Err(err) = res {

@@ -93,6 +93,24 @@ pub enum CanvasKeyAction {
     DeleteToLineStart,
     DeleteWordForward,
     ClearSearch,
+    // VSCode-style line operations (paradigm-agnostic; see textarea line ops).
+    MoveLineUp,
+    MoveLineDown,
+    DuplicateLineUp,
+    DuplicateLineDown,
+    CopyLine,
+    CutLine,
+    // VSCode-style Shift+movement selection extension (modeless).
+    SelectLeft,
+    SelectRight,
+    SelectUp,
+    SelectDown,
+    SelectWordPrev,
+    SelectWordNext,
+    SelectLineStart,
+    SelectLineEnd,
+    SelectDocStart,
+    SelectDocEnd,
     Unknown(String),
 }
 
@@ -190,6 +208,22 @@ impl CanvasKeyAction {
             "delete_to_line_start" => Self::DeleteToLineStart,
             "delete_word_forward" => Self::DeleteWordForward,
             "clear_search" => Self::ClearSearch,
+            "move_line_up" => Self::MoveLineUp,
+            "move_line_down" => Self::MoveLineDown,
+            "duplicate_line_up" => Self::DuplicateLineUp,
+            "duplicate_line_down" => Self::DuplicateLineDown,
+            "copy_line" => Self::CopyLine,
+            "cut_line" => Self::CutLine,
+            "select_left" => Self::SelectLeft,
+            "select_right" => Self::SelectRight,
+            "select_up" => Self::SelectUp,
+            "select_down" => Self::SelectDown,
+            "select_word_prev" => Self::SelectWordPrev,
+            "select_word_next" => Self::SelectWordNext,
+            "select_line_start" => Self::SelectLineStart,
+            "select_line_end" => Self::SelectLineEnd,
+            "select_doc_start" => Self::SelectDocStart,
+            "select_doc_end" => Self::SelectDocEnd,
             other => Self::Unknown(other.to_string()),
         }
     }
@@ -285,6 +319,22 @@ impl CanvasKeyAction {
             Self::DeleteToLineStart => "delete_to_line_start",
             Self::DeleteWordForward => "delete_word_forward",
             Self::ClearSearch => "clear_search",
+            Self::MoveLineUp => "move_line_up",
+            Self::MoveLineDown => "move_line_down",
+            Self::DuplicateLineUp => "duplicate_line_up",
+            Self::DuplicateLineDown => "duplicate_line_down",
+            Self::CopyLine => "copy_line",
+            Self::CutLine => "cut_line",
+            Self::SelectLeft => "select_left",
+            Self::SelectRight => "select_right",
+            Self::SelectUp => "select_up",
+            Self::SelectDown => "select_down",
+            Self::SelectWordPrev => "select_word_prev",
+            Self::SelectWordNext => "select_word_next",
+            Self::SelectLineStart => "select_line_start",
+            Self::SelectLineEnd => "select_line_end",
+            Self::SelectDocStart => "select_doc_start",
+            Self::SelectDocEnd => "select_doc_end",
             Self::ExtendLineBelow => "extend_line_below",
             Self::ExtendToLineBounds => "extend_to_line_bounds",
             Self::Unknown(other) => other.as_str(),
@@ -380,7 +430,23 @@ impl CanvasKeyAction {
             | Self::DeleteWordBackward
             | Self::DeleteToLineStart
             | Self::DeleteWordForward
-            | Self::ClearSearch => return None,
+            | Self::ClearSearch
+            | Self::MoveLineUp
+            | Self::MoveLineDown
+            | Self::DuplicateLineUp
+            | Self::DuplicateLineDown
+            | Self::CopyLine
+            | Self::CutLine
+            | Self::SelectLeft
+            | Self::SelectRight
+            | Self::SelectUp
+            | Self::SelectDown
+            | Self::SelectWordPrev
+            | Self::SelectWordNext
+            | Self::SelectLineStart
+            | Self::SelectLineEnd
+            | Self::SelectDocStart
+            | Self::SelectDocEnd => return None,
             Self::EnterDecider | Self::Exit | Self::Unknown(_) => return None,
         })
     }

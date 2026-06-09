@@ -1,8 +1,8 @@
 use crate::canvas::state::SelectionState;
-use crate::editor::FormEditor;
+use crate::editor::EditorCore;
 use crate::DataProvider;
 
-impl<D: DataProvider> FormEditor<D> {
+impl<D: DataProvider> EditorCore<D> {
     pub(crate) fn selection_endpoints(&self) -> ((usize, usize), (usize, usize)) {
         let cursor = (self.ui_state.current_field, self.ui_state.cursor_pos);
         match self.ui_state.selection {

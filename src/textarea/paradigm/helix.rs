@@ -28,14 +28,14 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
             CanvasKeyAction::MoveUp => {
                 self.move_visual_line_helix(false, count);
                 if self.mode() == AppMode::Nor {
-                    self.collapse_helix_selection_to_cursor();
+                    self.collapse_selection_to_cursor();
                 }
                 KeyEventOutcome::Consumed(None)
             }
             CanvasKeyAction::MoveDown => {
                 self.move_visual_line_helix(true, count);
                 if self.mode() == AppMode::Nor {
-                    self.collapse_helix_selection_to_cursor();
+                    self.collapse_selection_to_cursor();
                 }
                 KeyEventOutcome::Consumed(None)
             }
@@ -62,7 +62,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
                 KeyEventOutcome::Consumed(None)
             }
             CanvasKeyAction::CollapseSelection => {
-                self.collapse_selection_helix();
+                self.collapse_selection_to_cursor();
                 KeyEventOutcome::Consumed(None)
             }
             CanvasKeyAction::SearchNext => {
@@ -190,6 +190,9 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
                 KeyEventOutcome::Consumed(None)
             }
             CanvasKeyAction::ClearSearch => {
+                // Helix `Esc` in normal mode only drops the search highlight. It
+                // does NOT collapse the selection — in Helix the selection
+                // persists in normal mode and is collapsed explicitly with `;`.
                 self.clear_search();
                 KeyEventOutcome::Consumed(None)
             }
@@ -250,7 +253,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
                 if self.mode() == AppMode::Nor {
                     if let Some(canvas_action) = action.to_canvas_action() {
                         if canvas_action.is_movement_action() {
-                            self.collapse_helix_selection_to_cursor();
+                            self.collapse_selection_to_cursor();
                         }
                     }
                 }

@@ -1,9 +1,11 @@
 // src/textarea/state.rs
-use std::ops::{Deref, DerefMut};
-
 #[cfg(feature = "cursor-style")]
 use crate::cursor::CursorManager;
-use crate::editor::FormEditor;
+use crate::{
+    canvas::modes::AppMode,
+    canvas::state::{EditorState, SelectionState},
+    editor::EditorCore,
+};
 #[cfg(feature = "commandline")]
 use crate::{
     commandline::{CommandLineCommand, CommandLineRegistry, CommandLineState},
@@ -12,6 +14,8 @@ use crate::{
 use crate::commandline::CommandLineSubmit;
 #[cfg(all(feature = "commandline", feature = "keybindings"))]
 use crate::keybindings::KeyEventOutcome;
+#[cfg(feature = "keybindings")]
+use crate::keybindings::CanvasKeyBindings;
 #[cfg(feature = "gui")]
 use crate::gui_utils::{compute_h_scroll_with_padding, RIGHT_PAD};
 use crate::textarea::provider::{TextAreaDataProvider, TextAreaProvider};
@@ -178,8 +182,6 @@ fn char_index_for_visual_col(
     end
 }
 
-pub type TextAreaEditor<P = TextAreaProvider> = FormEditor<P>;
-
 /// Outcome of feeding a single input event to a [`TextAreaState`].
 ///
 /// Unlike the single-line input there is no `Submitted` variant: in a textarea
@@ -284,13 +286,14 @@ pub enum TextAreaLineNumberMode {
 
 /// Multi-line textarea widget state.
 ///
-/// Wraps a [`FormEditor`]. Editing, cursor, and movement methods from the engine
-/// are available directly, and the engine can be reached explicitly via
-/// [`TextAreaState::editor`] / [`TextAreaState::editor_mut`]. With the
-/// `validation` and `computed` features enabled, the corresponding helper
-/// methods are re-exposed as inherent methods on this type.
+/// Owns a shared editor core plus textarea-specific state and behavior. Editing,
+/// cursor, and movement methods from the core are available directly, and the
+/// core can be reached explicitly via [`TextAreaState::core`] /
+/// [`TextAreaState::core_mut`]. With the `validation` and `computed` features
+/// enabled, the corresponding helper methods are re-exposed as inherent methods
+/// on this type.
 pub struct TextAreaState<P: TextAreaDataProvider = TextAreaProvider> {
-    pub(crate) editor: TextAreaEditor<P>,
+    pub(crate) core: EditorCore<P>,
     pub(crate) scroll_y: u16,
     pub(crate) placeholder: Option<String>,
     pub(crate) overflow_mode: TextOverflowMode,
@@ -322,7 +325,7 @@ pub struct TextAreaState<P: TextAreaDataProvider = TextAreaProvider> {
 impl<P: TextAreaDataProvider + Default> Default for TextAreaState<P> {
     fn default() -> Self {
         Self {
-            editor: FormEditor::new(P::default()),
+            core: EditorCore::new(P::default()),
             scroll_y: 0,
             placeholder: None,
             overflow_mode: TextOverflowMode::Indicator { ch: '$' },
@@ -349,24 +352,24 @@ impl<P: TextAreaDataProvider + Default> Default for TextAreaState<P> {
     }
 }
 
-impl<P: TextAreaDataProvider> Deref for TextAreaState<P> {
-    type Target = TextAreaEditor<P>;
+impl<P: TextAreaDataProvider> std::ops::Deref for TextAreaState<P> {
+    type Target = EditorCore<P>;
 
     fn deref(&self) -> &Self::Target {
-        &self.editor
+        &self.core
     }
 }
 
-impl<P: TextAreaDataProvider> DerefMut for TextAreaState<P> {
+impl<P: TextAreaDataProvider> std::ops::DerefMut for TextAreaState<P> {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.editor
+        &mut self.core
     }
 }
 
 impl<P: TextAreaDataProvider> TextAreaState<P> {
     pub fn with_provider(provider: P) -> Self {
         Self {
-            editor: FormEditor::new(provider),
+            core: EditorCore::new(provider),
             scroll_y: 0,
             placeholder: None,
             overflow_mode: TextOverflowMode::Indicator { ch: '$' },
@@ -438,7 +441,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
 
     #[cfg(all(feature = "commandline", feature = "keybindings"))]
     pub(crate) fn apply_default_commandline_submit(&mut self, submit: CommandLineSubmit) {
-        let is_helix = self.editor.keybinding_paradigm().is_helix();
+        let is_helix = self.core.keybinding_paradigm().is_helix();
         match submit {
             CommandLineSubmit::SearchForward(query) => {
                 self.set_search_query(query);
@@ -480,13 +483,13 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
     }
 
     pub fn text(&self) -> String {
-        self.editor.data_provider().to_text()
+        self.core.data_provider().to_text()
     }
 
     pub fn set_text<S: Into<String>>(&mut self, text: S) {
-        self.editor.data_provider_mut().set_text(text.into());
-        self.editor.ui_state.current_field = 0;
-        self.editor.set_cursor_raw(0);
+        self.core.data_provider_mut().set_text(text.into());
+        self.core.ui_state.current_field = 0;
+        self.core.set_cursor_raw(0);
         self.active_search_match = None;
     }
 
@@ -528,7 +531,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         // highlight disappears instead of landing on whatever shifted into place.
         let m = self.active_search_match?;
         let query = self.search_query.as_deref()?;
-        let provider = self.editor.data_provider();
+        let provider = self.core.data_provider();
         if m.line >= provider.line_count() || m.end <= m.start {
             return None;
         }
@@ -545,11 +548,11 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         let Some(query) = self.search_query.as_deref() else {
             return Vec::new();
         };
-        if query.is_empty() || line_idx >= self.editor.data_provider().line_count() {
+        if query.is_empty() || line_idx >= self.core.data_provider().line_count() {
             return Vec::new();
         }
 
-        let line = self.editor.data_provider().field_value(line_idx);
+        let line = self.core.data_provider().field_value(line_idx);
         line.match_indices(query)
             .map(|(byte_start, matched)| {
                 let start = line[..byte_start].chars().count();
@@ -565,7 +568,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
 
     pub fn search_matches(&self) -> Vec<TextAreaSearchMatch> {
         let mut matches = Vec::new();
-        let total = self.editor.data_provider().line_count();
+        let total = self.core.data_provider().line_count();
         for line_idx in 0..total {
             matches.extend(self.search_matches_in_line(line_idx));
         }
@@ -606,10 +609,10 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
     }
 
     fn move_to_search_match(&mut self, target: TextAreaSearchMatch) -> bool {
-        let moved = self.editor.transition_to_field(target.line).is_ok();
-        self.editor.set_cursor_for_mode(
+        let moved = self.core.transition_to_field(target.line).is_ok();
+        self.core.set_cursor_for_mode(
             target.start,
-            self.editor.current_text().chars().count(),
+            self.core.current_text().chars().count(),
         );
         self.active_search_match = Some(target);
         moved
@@ -654,7 +657,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
             return 0;
         }
 
-        let line_count = self.editor.data_provider().line_count().max(1);
+        let line_count = self.core.data_provider().line_count().max(1);
         let digits = line_count.ilog10() as u16 + 1;
         digits.saturating_add(1)
     }
@@ -695,7 +698,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
 
     #[cfg(feature = "gui")]
     fn visual_rows_before_line_and_intra_indented(&self, width: u16, line_idx: usize) -> u16 {
-        let provider = self.editor.data_provider();
+        let provider = self.core.data_provider();
         let mut acc: u16 = 0;
         let indent = self.wrap_indent_cols;
 
@@ -896,14 +899,14 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
 
         let mut moved = false;
         let target_col = self
-            .editor
+            .core
             .ui_state
             .ideal_cursor_column
             .min(u16::MAX as usize) as u16;
         for _ in 0..count.max(1) {
             moved |= self.move_visual_line_once(down, target_col);
         }
-        self.editor.ui_state.ideal_cursor_column = target_col as usize;
+        self.core.ui_state.ideal_cursor_column = target_col as usize;
         moved
     }
 
@@ -921,7 +924,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         let target_line = if down {
             if (subrow as usize) + 1 < current_ranges.len() {
                 Some(line_idx)
-            } else if line_idx + 1 < self.editor.data_provider().field_count() {
+            } else if line_idx + 1 < self.core.data_provider().field_count() {
                 Some(line_idx + 1)
             } else {
                 None
@@ -938,7 +941,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
             return false;
         };
 
-        let target_text = self.editor.data_provider().field_value(target_line).to_string();
+        let target_text = self.core.data_provider().field_value(target_line).to_string();
         let target_ranges = wrap_segment_ranges(&target_text, width, indent);
         let target_subrow = if target_line == line_idx {
             if down {
@@ -964,12 +967,12 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         let target_pos =
             char_index_for_visual_col(&target_text, start, end, prefix_cols, target_col);
 
-        if target_line != line_idx && self.editor.transition_to_field(target_line).is_err() {
+        if target_line != line_idx && self.core.transition_to_field(target_line).is_err() {
             return false;
         }
         let char_len = self.current_text().chars().count();
-        self.editor.set_cursor_for_mode(target_pos, char_len);
-        self.editor.ui_state.ideal_cursor_column = target_col as usize;
+        self.core.set_cursor_for_mode(target_pos, char_len);
+        self.core.ui_state.ideal_cursor_column = target_col as usize;
         true
     }
 
@@ -982,17 +985,181 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
 }
 
 impl<P: TextAreaDataProvider> TextAreaState<P> {
-    /// Borrow the underlying [`FormEditor`] engine.
+    /// Borrow the underlying [`EditorCore`].
     ///
-    /// `TextAreaState` is a thin wrapper around a `FormEditor`. Use this for
-    /// engine functionality not re-exposed directly on the wrapper.
-    pub fn editor(&self) -> &TextAreaEditor<P> {
-        &self.editor
+    /// `TextAreaState` owns an editor core plus textarea behavior. Use this for
+    /// core functionality not re-exposed directly on the wrapper.
+    /// Borrow the underlying [`EditorCore`].
+    pub fn core(&self) -> &EditorCore<P> {
+        &self.core
     }
 
-    /// Mutably borrow the underlying [`FormEditor`] engine.
-    pub fn editor_mut(&mut self) -> &mut TextAreaEditor<P> {
-        &mut self.editor
+    /// Mutably borrow the underlying [`EditorCore`].
+    pub fn core_mut(&mut self) -> &mut EditorCore<P> {
+        &mut self.core
+    }
+
+    pub fn editor(&self) -> &EditorCore<P> {
+        &self.core
+    }
+
+    pub fn editor_mut(&mut self) -> &mut EditorCore<P> {
+        &mut self.core
+    }
+
+    pub fn current_field(&self) -> usize {
+        self.core.current_field()
+    }
+
+    pub fn cursor_position(&self) -> usize {
+        self.core.cursor_position()
+    }
+
+    pub fn current_text(&self) -> &str {
+        self.core.current_text()
+    }
+
+    pub fn mode(&self) -> AppMode {
+        self.core.mode()
+    }
+
+    pub fn ui_state(&self) -> &EditorState {
+        self.core.ui_state()
+    }
+
+    pub fn selection_state(&self) -> &SelectionState {
+        self.core.selection_state()
+    }
+
+    pub(crate) fn selection_endpoints(&self) -> ((usize, usize), (usize, usize)) {
+        self.core.selection_endpoints()
+    }
+
+    pub fn data_provider(&self) -> &P {
+        self.core.data_provider()
+    }
+
+    pub fn data_provider_mut(&mut self) -> &mut P {
+        self.core.data_provider_mut()
+    }
+
+    pub fn move_left(&mut self) -> anyhow::Result<()> {
+        self.core.move_left()
+    }
+
+    pub fn move_right(&mut self) -> anyhow::Result<()> {
+        self.core.move_right()
+    }
+
+    pub fn move_up(&mut self) -> bool {
+        self.core.move_up()
+    }
+
+    pub fn move_down(&mut self) -> bool {
+        self.core.move_down()
+    }
+
+    pub fn move_first_line(&mut self) -> anyhow::Result<()> {
+        self.core.move_first_line()
+    }
+
+    pub fn move_last_line(&mut self) -> anyhow::Result<()> {
+        self.core.move_last_line()
+    }
+
+    pub fn move_line_start(&mut self) {
+        self.core.move_line_start();
+    }
+
+    pub fn move_line_end(&mut self) {
+        self.core.move_line_end();
+    }
+
+    pub fn set_cursor_position(&mut self, position: usize) {
+        self.core.set_cursor_position(position);
+    }
+
+    pub(crate) fn transition_to_field(&mut self, new_field: usize) -> anyhow::Result<()> {
+        self.core.transition_to_field(new_field)
+    }
+
+    pub fn enter_edit_mode(&mut self) {
+        self.core.enter_edit_mode();
+    }
+
+    pub fn exit_edit_mode(&mut self) -> anyhow::Result<()> {
+        self.core.exit_edit_mode()
+    }
+
+    pub fn set_mode(&mut self, mode: AppMode) {
+        self.core.set_mode(mode);
+    }
+
+    pub fn is_highlight_mode(&self) -> bool {
+        self.core.is_highlight_mode()
+    }
+
+    pub fn enter_highlight_mode(&mut self) {
+        self.core.enter_highlight_mode();
+    }
+
+    pub fn enter_highlight_line_mode(&mut self) {
+        self.core.enter_highlight_line_mode();
+    }
+
+    pub fn exit_highlight_mode(&mut self) {
+        self.core.exit_highlight_mode();
+    }
+
+    #[cfg(feature = "keybindings")]
+    pub(crate) fn enter_edit_mode_vim(&mut self) {
+        self.core.enter_edit_mode_vim();
+    }
+
+    #[cfg(feature = "keybindings")]
+    pub(crate) fn set_mode_vim(&mut self, mode: AppMode) {
+        self.core.set_mode_vim(mode);
+    }
+
+    #[cfg(feature = "keybindings")]
+    pub(crate) fn exit_highlight_mode_vim(&mut self) {
+        self.core.exit_highlight_mode_vim();
+    }
+
+    #[cfg(feature = "keybindings")]
+    pub(crate) fn enter_edit_mode_helix(&mut self) {
+        self.core.enter_edit_mode_helix();
+    }
+
+    #[cfg(feature = "keybindings")]
+    pub(crate) fn ensure_helix_primary_selection(&mut self) {
+        self.core.ensure_helix_primary_selection();
+    }
+
+    #[cfg(feature = "keybindings")]
+    pub(crate) fn collapse_selection_to_cursor(&mut self) {
+        self.core.collapse_selection_to_cursor();
+    }
+
+    #[cfg(feature = "keybindings")]
+    pub(crate) fn exit_highlight_mode_emacs(&mut self) {
+        self.core.exit_highlight_mode_emacs();
+    }
+
+    pub fn insert_char(&mut self, ch: char) -> anyhow::Result<()> {
+        self.core.insert_char(ch)
+    }
+
+    pub fn insert_text(&mut self, text: &str) -> anyhow::Result<()> {
+        self.core.insert_text(text)
+    }
+
+    pub fn delete_backward(&mut self) -> anyhow::Result<()> {
+        self.core.delete_backward()
+    }
+
+    pub fn delete_forward(&mut self) -> anyhow::Result<()> {
+        self.core.delete_forward()
     }
 
     /// Install a built-in keybinding preset and its editing paradigm.
@@ -1001,70 +1168,76 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         &mut self,
         preset: crate::keybindings::BuiltinCanvasKeybindingPreset,
     ) {
-        self.editor.set_keybinding_preset(preset);
+        self.core.set_keybinding_preset(preset);
+    }
+
+    /// Set custom keybindings for this textarea instance.
+    #[cfg(feature = "keybindings")]
+    pub fn set_keybindings(&mut self, keybindings: CanvasKeyBindings) {
+        self.core.set_keybindings(keybindings);
     }
 
     /// Move to the start of the next word.
     pub fn move_word_next(&mut self) {
-        self.editor.move_word_next();
+        self.core.move_word_next();
     }
 
     /// Move to the start of the previous word.
     pub fn move_word_prev(&mut self) {
-        self.editor.move_word_prev();
+        self.core.move_word_prev();
     }
 
     /// Move to the end of the current/next word.
     pub fn move_word_end(&mut self) {
-        self.editor.move_word_end();
+        self.core.move_word_end();
     }
 
     /// Move to the end of the previous word.
     pub fn move_word_end_prev(&mut self) {
-        self.editor.move_word_end_prev();
+        self.core.move_word_end_prev();
     }
 
     /// Move to the start of the next WORD (whitespace-delimited, vim `W`).
     pub fn move_big_word_next(&mut self) {
-        self.editor.move_big_word_next();
+        self.core.move_big_word_next();
     }
 
     /// Move to the start of the previous WORD (vim `B`).
     pub fn move_big_word_prev(&mut self) {
-        self.editor.move_big_word_prev();
+        self.core.move_big_word_prev();
     }
 
     /// Move to the end of the current/next WORD (vim `E`).
     pub fn move_big_word_end(&mut self) {
-        self.editor.move_big_word_end();
+        self.core.move_big_word_end();
     }
 
     /// Move to the end of the previous WORD (vim `gE`).
     pub fn move_big_word_end_prev(&mut self) {
-        self.editor.move_big_word_end_prev();
+        self.core.move_big_word_end_prev();
     }
 
     /// Enter edit mode with the cursor positioned for append (vim `a`).
     pub fn enter_append_mode(&mut self) {
-        self.editor.enter_append_mode();
+        self.core.enter_append_mode();
     }
 
     /// The current line's display text (mask/formatter-aware when the
     /// `validation` feature is enabled; otherwise the raw text).
     #[cfg(feature = "validation")]
     pub fn current_display_text(&self) -> String {
-        self.editor.current_display_text()
+        self.core.current_display_text()
     }
 
     /// The current line's text (raw; no validation feature for masking).
     #[cfg(not(feature = "validation"))]
     pub fn current_display_text(&self) -> String {
-        self.editor.current_text().to_string()
+        self.core.current_text().to_string()
     }
 
     /// Cursor position in display coordinates (accounts for a display mask).
     pub fn display_cursor_position(&self) -> usize {
-        self.editor.display_cursor_position()
+        self.core.display_cursor_position()
     }
 
     /// Update the terminal cursor style to match the textarea's current mode.
@@ -1075,7 +1248,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
     /// `cursor-style` feature disabled this is a no-op.
     #[cfg(feature = "cursor-style")]
     pub fn update_cursor_style(&self) -> io::Result<()> {
-        CursorManager::update_for_mode(self.editor.mode())
+        CursorManager::update_for_mode(self.core.mode())
     }
 
     /// No-op when the `cursor-style` feature is disabled.
@@ -1085,17 +1258,16 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
     }
 }
 
-/// Validation helpers, re-exposed from the underlying [`FormEditor`] so they are
-/// part of `TextAreaState`'s own public API rather than only reachable through
-/// `Deref`.
+/// Validation helpers, re-exposed from the underlying [`EditorCore`] so they are
+/// part of `TextAreaState`'s own public API.
 #[cfg(feature = "validation")]
 impl<P: TextAreaDataProvider> TextAreaState<P> {
     pub fn set_validation_enabled(&mut self, enabled: bool) {
-        self.editor.set_validation_enabled(enabled);
+        self.core.set_validation_enabled(enabled);
     }
 
     pub fn is_validation_enabled(&self) -> bool {
-        self.editor.is_validation_enabled()
+        self.core.is_validation_enabled()
     }
 
     pub fn set_field_validation(
@@ -1103,65 +1275,65 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         field_index: usize,
         config: crate::validation::ValidationConfig,
     ) {
-        self.editor.set_field_validation(field_index, config);
+        self.core.set_field_validation(field_index, config);
     }
 
     pub fn remove_field_validation(&mut self, field_index: usize) {
-        self.editor.remove_field_validation(field_index);
+        self.core.remove_field_validation(field_index);
     }
 
     pub fn validate_current_field(&mut self) -> crate::validation::ValidationResult {
-        self.editor.validate_current_field()
+        self.core.validate_current_field()
     }
 
     pub fn validate_field(
         &mut self,
         field_index: usize,
     ) -> Option<crate::validation::ValidationResult> {
-        self.editor.validate_field(field_index)
+        self.core.validate_field(field_index)
     }
 
     pub fn clear_validation_results(&mut self) {
-        self.editor.clear_validation_results();
+        self.core.clear_validation_results();
     }
 
     pub fn validation_summary(&self) -> crate::validation::ValidationSummary {
-        self.editor.validation_summary()
+        self.core.validation_summary()
     }
 
     pub fn can_switch_fields(&self) -> bool {
-        self.editor.can_switch_fields()
+        self.core.can_switch_fields()
     }
 
     pub fn field_switch_block_reason(&self) -> Option<String> {
-        self.editor.field_switch_block_reason()
+        self.core.field_switch_block_reason()
     }
 
     pub fn last_switch_block(&self) -> Option<&str> {
-        self.editor.last_switch_block()
+        self.core.last_switch_block()
     }
 
     pub fn current_limits_status_text(&self) -> Option<String> {
-        self.editor.current_limits_status_text()
+        self.core.current_limits_status_text()
     }
 
     pub fn current_formatter_warning(&self) -> Option<String> {
-        self.editor.current_formatter_warning()
+        self.core.current_formatter_warning()
     }
 
     pub fn external_validation_of(
         &self,
         field_index: usize,
     ) -> crate::validation::ExternalValidationState {
-        self.editor.external_validation_of(field_index)
+        self.core.external_validation_of(field_index)
     }
 
     pub fn clear_all_external_validation(&mut self) {
-        self.editor.clear_all_external_validation();
+        self.core.clear_all_external_validation();
     }
 
     pub fn clear_external_validation(&mut self, field_index: usize) {
-        self.editor.clear_external_validation(field_index);
+        self.core.clear_external_validation(field_index);
     }
 
     pub fn set_external_validation(
@@ -1169,139 +1341,143 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         field_index: usize,
         state: crate::validation::ExternalValidationState,
     ) {
-        self.editor.set_external_validation(field_index, state);
+        self.core.set_external_validation(field_index, state);
     }
 
     pub fn set_external_validation_callback<F>(&mut self, callback: F)
     where
         F: FnMut(usize, &str) -> crate::validation::ExternalValidationState + Send + Sync + 'static,
     {
-        self.editor.set_external_validation_callback(callback);
+        self.core.set_external_validation_callback(callback);
     }
 }
 
-/// Computed-field helpers, re-exposed from the underlying [`FormEditor`].
+/// Computed-field helpers, re-exposed from the underlying [`EditorCore`].
 #[cfg(feature = "computed")]
 impl<P: TextAreaDataProvider> TextAreaState<P> {
     pub fn register_computed_provider<C>(&mut self, provider: &C)
     where
         C: crate::computed::ComputedProvider,
     {
-        self.editor.register_computed_provider(provider);
+        self.core.register_computed_provider(provider);
     }
 
     pub fn set_computed_provider<C>(&mut self, provider: C)
     where
         C: crate::computed::ComputedProvider,
     {
-        self.editor.set_computed_provider(provider);
+        self.core.set_computed_provider(provider);
     }
 
     pub fn recompute_fields<C>(&mut self, provider: &mut C, field_indices: &[usize])
     where
         C: crate::computed::ComputedProvider,
     {
-        self.editor.recompute_fields(provider, field_indices);
+        self.core.recompute_fields(provider, field_indices);
     }
 
     pub fn recompute_all_fields<C>(&mut self, provider: &mut C)
     where
         C: crate::computed::ComputedProvider,
     {
-        self.editor.recompute_all_fields(provider);
+        self.core.recompute_all_fields(provider);
     }
 
     pub fn on_field_changed<C>(&mut self, provider: &mut C, changed_field: usize)
     where
         C: crate::computed::ComputedProvider,
     {
-        self.editor.on_field_changed(provider, changed_field);
+        self.core.on_field_changed(provider, changed_field);
     }
 
     pub fn effective_field_value(&self, field_index: usize) -> String {
-        self.editor.effective_field_value(field_index)
+        self.core.effective_field_value(field_index)
     }
 }
 
-/// Undo/redo, re-exposed from the underlying [`FormEditor`].
+/// Undo/redo, re-exposed from the underlying [`EditorCore`].
 impl<P: TextAreaDataProvider> TextAreaState<P> {
     pub fn undo(&mut self) -> bool {
-        self.editor.undo()
+        self.core.undo()
     }
 
     pub fn redo(&mut self) -> bool {
-        self.editor.redo()
+        self.core.redo()
     }
 
     pub fn can_undo(&self) -> bool {
-        self.editor.can_undo()
+        self.core.can_undo()
     }
 
     pub fn can_redo(&self) -> bool {
-        self.editor.can_redo()
+        self.core.can_redo()
     }
 
     pub fn clear_history(&mut self) {
-        self.editor.clear_history();
+        self.core.clear_history();
     }
 
     pub fn set_history_limit(&mut self, limit: usize) {
-        self.editor.set_history_limit(limit);
+        self.core.set_history_limit(limit);
     }
 }
 
-/// Dropdown suggestions, re-exposed from the underlying [`FormEditor`] so that
-/// `TextInput`, `TextArea`, and `FormEditor` all share one suggestions
+/// Dropdown suggestions, re-exposed from the underlying [`EditorCore`] so that
+/// `TextInput`, `TextArea`, and `TextFormState` all share one suggestions
 /// mechanism. Render the dropdown with
-/// `canvas::suggestions::render::render_suggestions_dropdown(.., self.editor())`.
+/// `canvas::suggestions::render::render_suggestions_dropdown(.., self.core())`.
 #[cfg(feature = "suggestions")]
 impl<P: TextAreaDataProvider> TextAreaState<P> {
     pub fn open_suggestions(&mut self, field_index: usize) {
-        self.editor.open_suggestions(field_index);
+        self.core.open_suggestions(field_index);
+    }
+
+    pub fn check_suggestion_trigger(&mut self) {
+        self.core.check_suggestion_trigger();
     }
 
     pub fn trigger_suggestions(&mut self) -> Option<(usize, String)> {
-        self.editor.trigger_suggestions()
+        self.core.trigger_suggestions()
     }
 
     pub fn apply_suggestions(&mut self, items: Vec<crate::SuggestionItem>) {
-        self.editor.apply_suggestions(items);
+        self.core.apply_suggestions(items);
     }
 
     pub fn update_suggestions(&mut self, items: Vec<crate::SuggestionItem>) {
-        self.editor.update_suggestions(items);
+        self.core.update_suggestions(items);
     }
 
     pub fn dismiss_suggestions(&mut self) {
-        self.editor.dismiss_suggestions();
+        self.core.dismiss_suggestions();
     }
 
     pub fn cancel_suggestions(&mut self) {
-        self.editor.cancel_suggestions();
+        self.core.cancel_suggestions();
     }
 
     pub fn suggestions_next(&mut self) {
-        self.editor.suggestions_next();
+        self.core.suggestions_next();
     }
 
     pub fn suggestions_prev(&mut self) {
-        self.editor.suggestions_prev();
+        self.core.suggestions_prev();
     }
 
     pub fn apply_suggestion(&mut self) -> Option<String> {
-        self.editor.apply_suggestion()
+        self.core.apply_suggestion()
     }
 
     pub fn is_suggestions_active(&self) -> bool {
-        self.editor.is_suggestions_active()
+        self.core.is_suggestions_active()
     }
 
     pub fn is_suggestions_loading(&self) -> bool {
-        self.editor.ui_state().is_suggestions_loading()
+        self.core.ui_state().is_suggestions_loading()
     }
 
     pub fn dropdown_suggestions(&self) -> &[crate::SuggestionItem] {
-        self.editor.suggestions()
+        self.core.suggestions()
     }
 }
 
@@ -1401,6 +1577,149 @@ mod tests {
         assert_eq!(textarea.current_field(), 1);
         assert_eq!(textarea.cursor_position(), 0);
         assert_eq!(textarea.mode(), crate::canvas::modes::AppMode::Ins);
+    }
+
+    #[cfg(all(feature = "keybindings", feature = "crossterm"))]
+    #[test]
+    fn vscode_move_and_duplicate_line_ops() {
+        use crate::keybindings::CanvasKeyBindings;
+
+        let mut ta = TextAreaState::<TextAreaProvider>::from_text("a\nb\nc");
+        ta.set_keybindings(CanvasKeyBindings::vscode_defaults());
+        let _ = ta.move_down(); // on "b"
+        assert_eq!(ta.current_field(), 1);
+
+        ta.move_line_up(1);
+        assert_eq!(ta.text(), "b\na\nc");
+        assert_eq!(ta.current_field(), 0);
+
+        ta.move_line_down(1);
+        assert_eq!(ta.text(), "a\nb\nc");
+        assert_eq!(ta.current_field(), 1);
+
+        ta.duplicate_line_down(1);
+        assert_eq!(ta.text(), "a\nb\nb\nc");
+        assert_eq!(ta.current_field(), 2);
+
+        ta.duplicate_line_up(1);
+        assert_eq!(ta.text(), "a\nb\nb\nb\nc");
+        assert_eq!(ta.current_field(), 2);
+    }
+
+    #[cfg(all(feature = "keybindings", feature = "crossterm"))]
+    #[test]
+    fn vscode_copy_and_cut_current_line() {
+        use crate::editor::behavior::YankRegister;
+        use crate::keybindings::CanvasKeyBindings;
+
+        let mut ta = TextAreaState::<TextAreaProvider>::from_text("first\nsecond\nthird");
+        ta.set_keybindings(CanvasKeyBindings::vscode_defaults());
+        let _ = ta.move_down(); // on "second"
+
+        ta.copy_current_line();
+        assert_eq!(
+            ta.core.behavior_state.yank().register(),
+            Some(&YankRegister::Lines(vec!["second".to_string()]))
+        );
+
+        ta.cut_current_line();
+        assert_eq!(ta.text(), "first\nthird");
+        assert_eq!(
+            ta.core.behavior_state.yank().register(),
+            Some(&YankRegister::Lines(vec!["second".to_string()]))
+        );
+    }
+
+    #[cfg(all(feature = "keybindings", feature = "crossterm"))]
+    #[test]
+    fn vscode_shift_select_then_type_replaces() {
+        use crate::canvas::state::SelectionState;
+        use crate::keybindings::CanvasKeyBindings;
+        use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+
+        let mut ta = TextAreaState::<TextAreaProvider>::from_text("hello");
+        ta.set_keybindings(CanvasKeyBindings::vscode_defaults());
+        ta.enter_edit_mode();
+        ta.set_cursor_position(0);
+
+        for _ in 0..3 {
+            let _ = ta.handle_key_event(KeyEvent::new(KeyCode::Right, KeyModifiers::SHIFT));
+        }
+        assert!(matches!(
+            ta.selection_state(),
+            SelectionState::Characterwise { anchor: (0, 0) }
+        ));
+        assert_eq!(ta.cursor_position(), 3);
+
+        // Typing over the "hel" selection replaces it.
+        let _ = ta.handle_key_event(KeyEvent::new(KeyCode::Char('X'), KeyModifiers::NONE));
+        assert_eq!(ta.text(), "Xlo");
+        assert!(matches!(ta.selection_state(), SelectionState::None));
+    }
+
+    #[cfg(all(feature = "keybindings", feature = "crossterm"))]
+    #[test]
+    fn vscode_copy_selection_and_collapse() {
+        use crate::canvas::state::SelectionState;
+        use crate::editor::behavior::YankRegister;
+        use crate::keybindings::CanvasKeyBindings;
+        use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+
+        let mut ta = TextAreaState::<TextAreaProvider>::from_text("hello");
+        ta.set_keybindings(CanvasKeyBindings::vscode_defaults());
+        ta.enter_edit_mode();
+        ta.set_cursor_position(0);
+        for _ in 0..3 {
+            let _ = ta.handle_key_event(KeyEvent::new(KeyCode::Right, KeyModifiers::SHIFT));
+        }
+
+        // Ctrl+C copies the selection (exclusive range "hel").
+        let _ = ta.handle_key_event(KeyEvent::new(KeyCode::Char('c'), KeyModifiers::CONTROL));
+        assert_eq!(
+            ta.core.behavior_state.yank().register(),
+            Some(&YankRegister::Text(vec!["hel".to_string()]))
+        );
+        assert_eq!(ta.text(), "hello");
+
+        // A plain arrow collapses the selection without editing.
+        let _ = ta.handle_key_event(KeyEvent::new(KeyCode::Right, KeyModifiers::NONE));
+        assert!(matches!(ta.selection_state(), SelectionState::None));
+    }
+
+    #[cfg(all(feature = "keybindings", feature = "crossterm"))]
+    #[test]
+    fn vscode_backspace_deletes_selection() {
+        use crate::canvas::state::SelectionState;
+        use crate::keybindings::CanvasKeyBindings;
+        use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+
+        let mut ta = TextAreaState::<TextAreaProvider>::from_text("hello");
+        ta.set_keybindings(CanvasKeyBindings::vscode_defaults());
+        ta.enter_edit_mode();
+        ta.set_cursor_position(0);
+        for _ in 0..3 {
+            let _ = ta.handle_key_event(KeyEvent::new(KeyCode::Right, KeyModifiers::SHIFT));
+        }
+
+        let _ = ta.handle_key_event(KeyEvent::new(KeyCode::Backspace, KeyModifiers::NONE));
+        assert_eq!(ta.text(), "lo");
+        assert!(matches!(ta.selection_state(), SelectionState::None));
+    }
+
+    #[cfg(all(feature = "keybindings", feature = "crossterm"))]
+    #[test]
+    fn vscode_alt_up_moves_line_through_keymap() {
+        use crate::keybindings::CanvasKeyBindings;
+        use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+
+        let mut ta = TextAreaState::<TextAreaProvider>::from_text("a\nb\nc");
+        ta.set_keybindings(CanvasKeyBindings::vscode_defaults());
+        ta.enter_edit_mode(); // modeless: the [ins] bindings are the active ones
+        let _ = ta.move_down(); // on "b"
+
+        let _ = ta.handle_key_event(KeyEvent::new(KeyCode::Up, KeyModifiers::ALT));
+        assert_eq!(ta.text(), "b\na\nc");
+        assert_eq!(ta.current_field(), 0);
     }
 
     #[cfg(all(feature = "keybindings", feature = "crossterm"))]
@@ -2507,6 +2826,103 @@ mod tests {
         assert_eq!(textarea.text(), "ac");
         assert_eq!(textarea.cursor_position(), 1);
         assert_eq!(textarea.mode(), crate::canvas::modes::AppMode::Nor);
+    }
+
+    #[cfg(all(feature = "keybindings", feature = "crossterm"))]
+    #[test]
+    fn helix_delete_in_highlight_mode_returns_to_normal() {
+        use crate::keybindings::BuiltinCanvasKeybindingPreset;
+        use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+
+        let mut textarea = TextAreaState::<TextAreaProvider>::from_text("abc");
+        textarea.use_keybinding_preset(BuiltinCanvasKeybindingPreset::Helix);
+
+        let _ = textarea.handle_key_event(KeyEvent::new(KeyCode::Char('v'), KeyModifiers::NONE));
+        assert_eq!(textarea.mode(), crate::canvas::modes::AppMode::Sel);
+        let _ = textarea.handle_key_event(KeyEvent::new(KeyCode::Char('l'), KeyModifiers::NONE));
+
+        let _ = textarea.handle_key_event(KeyEvent::new(KeyCode::Char('d'), KeyModifiers::NONE));
+        assert_eq!(textarea.mode(), crate::canvas::modes::AppMode::Nor);
+    }
+
+    #[cfg(all(feature = "keybindings", feature = "crossterm"))]
+    #[test]
+    fn helix_v_up_delete_collapses_selection() {
+        use crate::canvas::modes::AppMode;
+        use crate::canvas::state::SelectionState;
+        use crate::keybindings::BuiltinCanvasKeybindingPreset;
+        use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+
+        let mut textarea = TextAreaState::<TextAreaProvider>::from_text("one\ntwo\nthree");
+        textarea.use_keybinding_preset(BuiltinCanvasKeybindingPreset::Helix);
+
+        // Move onto the middle line, enter select, extend UP, delete.
+        let _ = textarea.handle_key_event(KeyEvent::new(KeyCode::Char('j'), KeyModifiers::NONE));
+        let _ = textarea.handle_key_event(KeyEvent::new(KeyCode::Char('v'), KeyModifiers::NONE));
+        let _ = textarea.handle_key_event(KeyEvent::new(KeyCode::Char('k'), KeyModifiers::NONE));
+        let _ = textarea.handle_key_event(KeyEvent::new(KeyCode::Char('d'), KeyModifiers::NONE));
+
+        assert_eq!(textarea.mode(), AppMode::Nor);
+        // After the delete the selection must be collapsed to the cursor, not a
+        // stale multi-character range left over from the upward extend.
+        match textarea.selection_state() {
+            SelectionState::None => {}
+            SelectionState::Characterwise { anchor } => {
+                assert_eq!(
+                    *anchor,
+                    (textarea.current_field(), textarea.cursor_position()),
+                    "selection anchor should sit on the cursor"
+                );
+            }
+            other => panic!("expected collapsed selection, got {other:?}"),
+        }
+    }
+
+    #[cfg(all(feature = "keybindings", feature = "crossterm"))]
+    #[test]
+    fn helix_esc_does_not_collapse_selection_in_normal_mode() {
+        use crate::canvas::state::SelectionState;
+        use crate::keybindings::BuiltinCanvasKeybindingPreset;
+        use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+
+        let mut textarea = TextAreaState::<TextAreaProvider>::from_text("one\ntwo");
+        textarea.use_keybinding_preset(BuiltinCanvasKeybindingPreset::Helix);
+
+        // `x` leaves a linewise selection but stays in Normal mode.
+        let _ = textarea.handle_key_event(KeyEvent::new(KeyCode::Char('x'), KeyModifiers::NONE));
+        assert!(matches!(
+            textarea.selection_state(),
+            SelectionState::Linewise { .. }
+        ));
+
+        // Esc must NOT collapse the selection — in Helix it persists in normal
+        // mode and is collapsed explicitly with `;`.
+        let _ = textarea.handle_key_event(KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE));
+        assert!(matches!(
+            textarea.selection_state(),
+            SelectionState::Linewise { .. }
+        ));
+    }
+
+    #[cfg(all(feature = "keybindings", feature = "crossterm"))]
+    #[test]
+    fn helix_append_on_last_character_inserts_after_it() {
+        use crate::keybindings::BuiltinCanvasKeybindingPreset;
+        use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+
+        let mut textarea = TextAreaState::<TextAreaProvider>::from_text("abc");
+        textarea.use_keybinding_preset(BuiltinCanvasKeybindingPreset::Helix);
+
+        // Put the primary selection on the last character.
+        textarea.move_line_end();
+
+        // `a` should enter insert mode positioned *after* the last char.
+        let _ = textarea.handle_key_event(KeyEvent::new(KeyCode::Char('a'), KeyModifiers::NONE));
+        assert_eq!(textarea.mode(), crate::canvas::modes::AppMode::Ins);
+        assert_eq!(textarea.cursor_position(), 3);
+
+        let _ = textarea.handle_key_event(KeyEvent::new(KeyCode::Char('X'), KeyModifiers::NONE));
+        assert_eq!(textarea.text(), "abcX");
     }
 
     #[cfg(all(feature = "keybindings", feature = "crossterm"))]

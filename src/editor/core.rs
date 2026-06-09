@@ -18,7 +18,7 @@ use crate::keybindings::{CanvasKeyBindings, KeySequenceTracker};
 
 #[derive(Derivative)]
 #[derivative(Debug, Default)]
-pub struct FormEditor<D: DataProvider> {
+pub struct EditorCore<D: DataProvider> {
     pub(crate) ui_state: EditorState,
     pub(crate) data_provider: D,
     #[cfg(feature = "suggestions")]
@@ -50,7 +50,7 @@ pub struct FormEditor<D: DataProvider> {
     pub(crate) history_enabled: bool,
 }
 
-impl<D: DataProvider> FormEditor<D> {
+impl<D: DataProvider> EditorCore<D> {
     pub(crate) fn char_to_byte_index(s: &str, char_idx: usize) -> usize {
         s.char_indices()
             .nth(char_idx)
@@ -153,7 +153,7 @@ impl<D: DataProvider> FormEditor<D> {
         if self.keybinding_paradigm() == KeybindingParadigm::Helix
             && self.ui_state.current_mode == AppMode::Nor
         {
-            self.collapse_helix_selection_to_cursor();
+            self.collapse_selection_to_cursor();
         }
     }
 
@@ -164,7 +164,7 @@ impl<D: DataProvider> FormEditor<D> {
         if self.keybinding_paradigm() == KeybindingParadigm::Helix
             && self.ui_state.current_mode == AppMode::Nor
         {
-            self.collapse_helix_selection_to_cursor();
+            self.collapse_selection_to_cursor();
         }
     }
 
@@ -210,7 +210,7 @@ impl<D: DataProvider> FormEditor<D> {
     }
 }
 
-impl<D: DataProvider> Drop for FormEditor<D> {
+impl<D: DataProvider> Drop for EditorCore<D> {
     fn drop(&mut self) {
         let _ = self.cleanup_cursor();
     }

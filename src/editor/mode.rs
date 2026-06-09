@@ -7,10 +7,10 @@ use crate::canvas::modes::AppMode;
 use crate::canvas::state::SelectionState;
 #[cfg(feature = "keybindings")]
 use crate::editor::behavior::KeybindingParadigm;
-use crate::editor::FormEditor;
+use crate::editor::EditorCore;
 use crate::DataProvider;
 
-impl<D: DataProvider> FormEditor<D> {
+impl<D: DataProvider> EditorCore<D> {
     pub(crate) fn set_highlight_mode_selection(&mut self, selection: SelectionState) {
         self.ui_state.current_mode = AppMode::Sel;
         self.ui_state.selection = selection;
@@ -55,7 +55,9 @@ impl<D: DataProvider> FormEditor<D> {
             {
                 match self.keybinding_paradigm() {
                     KeybindingParadigm::Helix => self.set_mode_helix(mode),
-                    KeybindingParadigm::Emacs => self.set_mode_emacs(mode),
+                    KeybindingParadigm::Emacs | KeybindingParadigm::Vscode => {
+                        self.set_mode_emacs(mode)
+                    }
                     KeybindingParadigm::Vim => self.set_mode_vim(mode),
                 }
             }
@@ -165,7 +167,9 @@ impl<D: DataProvider> FormEditor<D> {
             #[cfg(feature = "keybindings")]
             match self.keybinding_paradigm() {
                 KeybindingParadigm::Helix => self.enter_edit_mode_helix(),
-                KeybindingParadigm::Emacs => self.enter_edit_mode_emacs(),
+                KeybindingParadigm::Emacs | KeybindingParadigm::Vscode => {
+                    self.enter_edit_mode_emacs()
+                }
                 KeybindingParadigm::Vim => self.enter_edit_mode_vim(),
             }
             #[cfg(not(feature = "keybindings"))]
@@ -188,7 +192,9 @@ impl<D: DataProvider> FormEditor<D> {
             #[cfg(feature = "keybindings")]
             match self.keybinding_paradigm() {
                 KeybindingParadigm::Helix => self.enter_highlight_mode_helix(),
-                KeybindingParadigm::Emacs => self.enter_highlight_mode_emacs(),
+                KeybindingParadigm::Emacs | KeybindingParadigm::Vscode => {
+                    self.enter_highlight_mode_emacs()
+                }
                 KeybindingParadigm::Vim => self.enter_highlight_mode_vim(),
             }
             #[cfg(not(feature = "keybindings"))]
@@ -205,7 +211,9 @@ impl<D: DataProvider> FormEditor<D> {
             #[cfg(feature = "keybindings")]
             match self.keybinding_paradigm() {
                 KeybindingParadigm::Helix => self.enter_highlight_line_mode_helix(),
-                KeybindingParadigm::Emacs => self.enter_highlight_line_mode_emacs(),
+                KeybindingParadigm::Emacs | KeybindingParadigm::Vscode => {
+                    self.enter_highlight_line_mode_emacs()
+                }
                 KeybindingParadigm::Vim => self.enter_highlight_line_mode_vim(),
             }
             #[cfg(not(feature = "keybindings"))]
@@ -222,7 +230,9 @@ impl<D: DataProvider> FormEditor<D> {
             #[cfg(feature = "keybindings")]
             match self.keybinding_paradigm() {
                 KeybindingParadigm::Helix => self.exit_highlight_mode_helix(),
-                KeybindingParadigm::Emacs => self.exit_highlight_mode_emacs(),
+                KeybindingParadigm::Emacs | KeybindingParadigm::Vscode => {
+                    self.exit_highlight_mode_emacs()
+                }
                 KeybindingParadigm::Vim => self.exit_highlight_mode_vim(),
             }
             #[cfg(not(feature = "keybindings"))]
@@ -354,7 +364,7 @@ mod tests {
 
     #[test]
     fn visual_characterwise_toggles_and_switches_from_linewise() {
-        let mut editor = FormEditor::new(TestProvider::new(&["alpha", "beta"]));
+        let mut editor = EditorCore::new(TestProvider::new(&["alpha", "beta"]));
 
         editor.enter_highlight_mode();
         assert_eq!(editor.mode(), AppMode::Sel);
@@ -383,7 +393,7 @@ mod tests {
 
     #[test]
     fn visual_linewise_toggles_and_switches_from_characterwise() {
-        let mut editor = FormEditor::new(TestProvider::new(&["alpha", "beta"]));
+        let mut editor = EditorCore::new(TestProvider::new(&["alpha", "beta"]));
 
         editor.enter_highlight_line_mode();
         assert_eq!(editor.mode(), AppMode::Sel);
@@ -407,7 +417,7 @@ mod tests {
 
     #[test]
     fn visual_linewise_switch_preserves_selected_line_range() {
-        let mut editor = FormEditor::new(TestProvider::new(&["alpha", "beta", "gamma"]));
+        let mut editor = EditorCore::new(TestProvider::new(&["alpha", "beta", "gamma"]));
 
         editor.enter_highlight_mode();
         editor.move_down();

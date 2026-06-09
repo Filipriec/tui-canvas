@@ -30,7 +30,7 @@ use std::io;
 use tui_canvas::{
     render_canvas_default, AppMode,
     computed::{ComputedContext, ComputedProvider},
-    DataProvider, FormEditor,
+    DataProvider, TextFormState,
 };
 
 /// Invoice data with computed fields
@@ -181,7 +181,7 @@ impl ComputedProvider for InvoiceCalculator {
 
 /// Editor with computed fields
 struct ComputedFieldsEditor<D: DataProvider> {
-    editor: FormEditor<D>,
+    editor: TextFormState<D>,
     calculator: InvoiceCalculator,
     debug_message: String,
     last_computed_values: Vec<String>,
@@ -189,7 +189,7 @@ struct ComputedFieldsEditor<D: DataProvider> {
 
 impl<D: DataProvider> ComputedFieldsEditor<D> {
     fn new(data_provider: D) -> Self {
-        let mut editor = FormEditor::new(data_provider);
+        let mut editor = TextFormState::new(data_provider);
         editor.set_computed_provider(InvoiceCalculator);
 
         let calculator = InvoiceCalculator;

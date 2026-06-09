@@ -2,6 +2,7 @@
 use crate::{
     canvas::modes::AppMode,
     editor::behavior::YankRegister,
+    editor::rows::repeated_text,
     textarea::{TextAreaDataProvider, TextAreaState},
 };
 
@@ -32,7 +33,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
     }
 
     fn paste_yank_vim(&mut self, after: bool, count: usize) {
-        let Some(register) = self.editor.behavior_state.yank().register().cloned() else {
+        let Some(register) = self.core.behavior_state.yank().register().cloned() else {
             return;
         };
 
@@ -63,7 +64,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
     }
 
     fn paste_yank_helix(&mut self, after: bool, count: usize) {
-        let Some(register) = self.editor.behavior_state.yank().register().cloned() else {
+        let Some(register) = self.core.behavior_state.yank().register().cloned() else {
             return;
         };
 
@@ -83,7 +84,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
                 let (target_field, target_col) = self.insert_text_at(field, col, &text);
                 let _ = self.transition_to_field(target_field);
                 self.set_cursor_position(target_col);
-                self.ui_state.current_mode = AppMode::Nor;
+                self.core.ui_state.current_mode = AppMode::Nor;
                 self.ensure_helix_primary_selection();
                 #[cfg(feature = "gui")]
                 {
@@ -94,7 +95,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
     }
 
     fn paste_yank_emacs(&mut self, after: bool, count: usize) {
-        let Some(register) = self.editor.behavior_state.yank().register().cloned() else {
+        let Some(register) = self.core.behavior_state.yank().register().cloned() else {
             return;
         };
 
@@ -124,28 +125,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         if lines.is_empty() {
             return;
         }
-
-        self.editor
-            .record_checkpoint(crate::editor::features::history::EditKind::Other);
-
-        let mut content = self.editor.data_provider().capture_content();
-        let current = self.current_field().min(content.len().saturating_sub(1));
-        let insert_at = if after {
-            current.saturating_add(1).min(content.len())
-        } else {
-            current
-        };
-
-        let repeat = count.max(1);
-        let mut insert = Vec::with_capacity(lines.len() * repeat);
-        for _ in 0..repeat {
-            insert.extend(lines.iter().cloned());
-        }
-
-        content.splice(insert_at..insert_at, insert);
-        self.editor.data_provider_mut().restore_content(&content);
-        let _ = self.transition_to_field(insert_at.min(content.len().saturating_sub(1)));
-        self.move_line_start();
+        self.core.paste_lines_dynamic(after, count, lines);
         self.set_mode(AppMode::Nor);
         #[cfg(feature = "gui")]
         {
@@ -157,29 +137,8 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         if lines.is_empty() {
             return;
         }
-
-        self.editor
-            .record_checkpoint(crate::editor::features::history::EditKind::Other);
-
-        let mut content = self.editor.data_provider().capture_content();
-        let current = self.current_field().min(content.len().saturating_sub(1));
-        let insert_at = if after {
-            current.saturating_add(1).min(content.len())
-        } else {
-            current
-        };
-
-        let repeat = count.max(1);
-        let mut insert = Vec::with_capacity(lines.len() * repeat);
-        for _ in 0..repeat {
-            insert.extend(lines.iter().cloned());
-        }
-
-        content.splice(insert_at..insert_at, insert);
-        self.editor.data_provider_mut().restore_content(&content);
-        let _ = self.transition_to_field(insert_at.min(content.len().saturating_sub(1)));
-        self.move_line_start();
-        self.ui_state.current_mode = AppMode::Nor;
+        self.core.paste_lines_dynamic(after, count, lines);
+        self.core.ui_state.current_mode = AppMode::Nor;
         self.ensure_helix_primary_selection();
         #[cfg(feature = "gui")]
         {
@@ -191,32 +150,10 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         if lines.is_empty() {
             return;
         }
-
-        self.editor
-            .record_checkpoint(crate::editor::features::history::EditKind::Other);
-
         if self.mode() == AppMode::Sel {
             self.exit_highlight_mode_emacs();
         }
-
-        let mut content = self.editor.data_provider().capture_content();
-        let current = self.current_field().min(content.len().saturating_sub(1));
-        let insert_at = if after {
-            current.saturating_add(1).min(content.len())
-        } else {
-            current
-        };
-
-        let repeat = count.max(1);
-        let mut insert = Vec::with_capacity(lines.len() * repeat);
-        for _ in 0..repeat {
-            insert.extend(lines.iter().cloned());
-        }
-
-        content.splice(insert_at..insert_at, insert);
-        self.editor.data_provider_mut().restore_content(&content);
-        let _ = self.transition_to_field(insert_at.min(content.len().saturating_sub(1)));
-        self.move_line_start();
+        self.core.paste_lines_dynamic(after, count, lines);
         self.set_mode(AppMode::Nor);
         #[cfg(feature = "gui")]
         {
@@ -225,49 +162,6 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
     }
 
     fn insert_text_at(&mut self, field: usize, col: usize, text: &str) -> (usize, usize) {
-        self.editor
-            .record_checkpoint(crate::editor::features::history::EditKind::Other);
-
-        let mut content = self.editor.data_provider().capture_content();
-        if content.is_empty() {
-            content.push(String::new());
-        }
-        let field = field.min(content.len().saturating_sub(1));
-        let line = &content[field];
-        let col = col.min(line.chars().count());
-        let prefix: String = line.chars().take(col).collect();
-        let suffix: String = line.chars().skip(col).collect();
-        let parts: Vec<&str> = text.split('\n').collect();
-
-        let target = if parts.len() == 1 {
-            content[field] = format!("{prefix}{}{suffix}", parts[0]);
-            (field, col.saturating_add(parts[0].chars().count()))
-        } else {
-            let mut replacement = Vec::with_capacity(parts.len());
-            replacement.push(format!("{prefix}{}", parts[0]));
-            for part in &parts[1..parts.len() - 1] {
-                replacement.push((*part).to_string());
-            }
-            let last = parts[parts.len() - 1];
-            replacement.push(format!("{last}{suffix}"));
-            content.splice(field..=field, replacement);
-            (field.saturating_add(parts.len() - 1), last.chars().count())
-        };
-
-        self.editor.data_provider_mut().restore_content(&content);
-        target
+        self.core.insert_text_dynamic(field, col, text)
     }
-}
-
-fn repeated_text(lines: &[String], count: usize) -> String {
-    let repeat = count.max(1);
-    let text = lines.join("\n");
-    let mut pasted = String::new();
-    for i in 0..repeat {
-        if i > 0 {
-            pasted.push('\n');
-        }
-        pasted.push_str(&text);
-    }
-    pasted
 }

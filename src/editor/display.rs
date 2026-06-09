@@ -1,10 +1,10 @@
 // src/editor/display.rs
 
 use crate::canvas::modes::AppMode;
-use crate::editor::FormEditor;
+use crate::editor::EditorCore;
 use crate::DataProvider;
 
-impl<D: DataProvider> FormEditor<D> {
+impl<D: DataProvider> EditorCore<D> {
     /// Get current field text for display.
     #[cfg(feature = "validation")]
     pub fn current_display_text(&self) -> String {

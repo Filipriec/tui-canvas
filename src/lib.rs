@@ -27,6 +27,8 @@ pub mod form;
 #[cfg(feature = "textarea")]
 pub mod textarea;
 
+pub mod textform;
+
 #[cfg(feature = "textinput")]
 pub mod textinput;
 
@@ -62,9 +64,7 @@ pub use cursor::CursorManager;
 pub use data_provider::DataProvider;
 #[cfg(feature = "suggestions")]
 pub use data_provider::{SuggestionItem, SuggestionQuery, SuggestionTrigger};
-#[cfg(feature = "crossterm")]
-pub use editor::input::normal::FormInputEventOutcome;
-pub use editor::FormEditor;
+pub use textform::{TextFormEventOutcome, TextFormState};
 
 pub use canvas::modes::AppMode;
 pub use canvas::state::EditorState;
@@ -100,20 +100,21 @@ pub use suggestions::render::render_suggestions_dropdown;
 #[cfg(feature = "keybindings")]
 pub use keybindings::{
     default_builtin_action_bindings, default_emacs_action_bindings, default_helix_action_bindings,
-    default_vim_action_bindings, display_binding, preset, BuiltinCanvasKeybindingPreset,
-    CanvasActionBinding, CanvasActionKeyBinding, CanvasKeyBindingEntry, CanvasKeyBindings,
-    CanvasKeybindingConflictKind, CanvasKeybindingProfile, KeyEventOutcome,
+    default_vim_action_bindings, default_vscode_action_bindings, display_binding, preset,
+    BuiltinCanvasKeybindingPreset, CanvasActionBinding, CanvasActionKeyBinding,
+    CanvasKeyBindingEntry, CanvasKeyBindings, CanvasKeybindingConflictKind,
+    CanvasKeybindingProfile, KeyEventOutcome,
 };
 
 #[cfg(feature = "textarea")]
 pub use textarea::{
-    TextArea, TextAreaDataProvider, TextAreaEditor, TextAreaLineNumberMode, TextAreaProvider,
+    TextArea, TextAreaDataProvider, TextAreaLineNumberMode, TextAreaProvider,
     TextAreaSearchMatch, TextAreaState,
 };
 
 #[cfg(feature = "textinput")]
 pub use textinput::{
-    TextInput, TextInputDataProvider, TextInputEditor, TextInputEventOutcome, TextInputProvider,
+    TextInput, TextInputDataProvider, TextInputEventOutcome, TextInputProvider,
     TextInputState,
 };
 

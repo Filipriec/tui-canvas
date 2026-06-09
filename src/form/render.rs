@@ -12,7 +12,7 @@ use ratatui::{
 use crate::canvas::modes::HighlightState;
 use crate::canvas::theme::{CanvasTheme, DefaultCanvasTheme};
 use crate::data_provider::DataProvider;
-use crate::editor::FormEditor;
+use crate::editor::EditorCore;
 use crate::gui_utils::{
     clip_inline_completion_with_indicator_padded, compute_h_scroll_with_padding, display_width,
     RIGHT_PAD,
@@ -213,7 +213,7 @@ fn render_active_line_with_indicator<T: CanvasTheme>(
 pub fn render_canvas<T: CanvasTheme, D: DataProvider>(
     f: &mut Frame,
     area: Rect,
-    editor: &FormEditor<D>,
+    editor: &EditorCore<D>,
     theme: &T,
 ) -> Option<Rect> {
     let opts = CanvasDisplayOptions::default();
@@ -227,7 +227,7 @@ pub fn render_canvas<T: CanvasTheme, D: DataProvider>(
 pub fn render_canvas_with_options<T: CanvasTheme, D: DataProvider>(
     f: &mut Frame,
     area: Rect,
-    editor: &FormEditor<D>,
+    editor: &EditorCore<D>,
     theme: &T,
     opts: CanvasDisplayOptions,
 ) -> Option<Rect> {
@@ -258,7 +258,7 @@ pub fn render_canvas_with_options<T: CanvasTheme, D: DataProvider>(
 fn render_canvas_with_highlight_and_options<T: CanvasTheme, D: DataProvider>(
     f: &mut Frame,
     area: Rect,
-    editor: &FormEditor<D>,
+    editor: &EditorCore<D>,
     theme: &T,
     highlight_state: &HighlightState,
     active_completion: Option<String>,
@@ -682,7 +682,7 @@ fn set_cursor_position_scrolled(
 pub fn render_canvas_default<D: DataProvider>(
     f: &mut Frame,
     area: Rect,
-    editor: &FormEditor<D>,
+    editor: &EditorCore<D>,
 ) -> Option<Rect> {
     let theme = DefaultCanvasTheme;
     render_canvas(f, area, editor, &theme)

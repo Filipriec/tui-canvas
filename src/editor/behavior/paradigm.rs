@@ -4,6 +4,10 @@ pub(crate) enum KeybindingParadigm {
     Vim,
     Helix,
     Emacs,
+    /// Modeless, VSCode-style editing. Behaves like the non-modal Emacs
+    /// paradigm under the hood (always editing, region-style selection); the
+    /// distinction exists so VSCode-specific behavior can diverge later.
+    Vscode,
 }
 
 impl KeybindingParadigm {

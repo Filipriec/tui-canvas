@@ -1,12 +1,12 @@
 // src/canvas/actions/dispatch.rs
-//! Provides the typed dispatcher that maps CanvasAction → FormEditor method calls.
+//! Provides the typed dispatcher that maps CanvasAction → TextFormState method calls.
 
 use super::types::{ActionResult, CanvasAction};
-use crate::editor::FormEditor;
+use crate::editor::EditorCore;
 use crate::DataProvider;
 use std::fmt::Display;
 
-impl<D: DataProvider> FormEditor<D> {
+impl<D: DataProvider> EditorCore<D> {
     fn into_action_result<T, E: Display>(result: Result<T, E>) -> ActionResult {
         match result {
             Ok(_) => ActionResult::Success,
@@ -274,7 +274,7 @@ mod tests {
 
     #[test]
     fn dispatch_extends_visual_selection_without_reanchoring() {
-        let mut editor = FormEditor::new(TestProvider::new(&["alpha", "beta"]));
+        let mut editor = EditorCore::new(TestProvider::new(&["alpha", "beta"]));
 
         assert!(editor.execute(CanvasAction::EnterHighlightMode).is_success());
         assert!(editor.execute(CanvasAction::MoveRight).is_success());

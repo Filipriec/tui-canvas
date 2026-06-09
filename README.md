@@ -20,6 +20,9 @@ cargo run --example textarea_normal          --features "gui cursor-style textar
 cargo run --example textarea_syntax          --features "gui cursor-style textarea textmode-normal syntect"
 cargo run --example textarea_vim_minimal     --features "textarea keybindings cursor-style commandline"
 cargo run --example textarea_helix_minimal   --features "textarea keybindings cursor-style commandline"
+# VSCode is modeless, so it needs --no-default-features (textmode-normal conflicts with the default textmode-vim).
+# Include `clipboard` so Ctrl+C/Ctrl+X mirror to the OS clipboard (it's a default feature dropped by --no-default-features).
+cargo run --example textarea_vscode_minimal  --no-default-features --features "gui textarea keybindings cursor-style commandline textmode-normal clipboard"
 
 cargo run --example textinput_normal         --features "gui cursor-style textinput textmode-normal"
 cargo run --example undo_redo                --features "gui cursor-style textinput"

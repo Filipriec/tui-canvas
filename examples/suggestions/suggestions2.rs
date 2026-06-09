@@ -37,21 +37,21 @@ use tui_canvas::{
     AppMode,
     CursorManager, // This import only exists when cursor-style feature is enabled
     suggestions::render::render_suggestions_dropdown,
-    DataProvider, FormEditor, SuggestionItem,
+    DataProvider, TextFormState, SuggestionItem,
 };
 
-// FormEditor wrapper for suggestions demo
-struct AutoCursorFormEditor<D: DataProvider> {
-    editor: FormEditor<D>,
+// TextFormState wrapper for suggestions demo
+struct AutoCursorTextForm<D: DataProvider> {
+    editor: TextFormState<D>,
     has_unsaved_changes: bool,
     debug_message: String,
     command_buffer: String, // For multi-key vim commands like "gg"
 }
 
-impl<D: DataProvider> AutoCursorFormEditor<D> {
+impl<D: DataProvider> AutoCursorTextForm<D> {
     fn new(data_provider: D) -> Self {
         Self {
-            editor: FormEditor::new(data_provider),
+            editor: TextFormState::new(data_provider),
             has_unsaved_changes: false,
             debug_message: "🚀 Production-Ready Tab-Triggered Suggestions Demo - Copy this architecture for your app!".to_string(),
             command_buffer: String::new(),
@@ -536,7 +536,7 @@ impl ProductionSuggestionsProvider {
 fn handle_key_press(
     key: KeyCode,
     modifiers: KeyModifiers,
-    editor: &mut AutoCursorFormEditor<ApplicationData>,
+    editor: &mut AutoCursorTextForm<ApplicationData>,
     suggestions_provider: &mut ProductionSuggestionsProvider,
 ) -> anyhow::Result<bool> {
     let mode = editor.mode();
@@ -820,7 +820,7 @@ fn handle_key_press(
 
 fn run_app<B: Backend>(
     terminal: &mut Terminal<B>,
-    mut editor: AutoCursorFormEditor<ApplicationData>,
+    mut editor: AutoCursorTextForm<ApplicationData>,
 ) -> io::Result<()> {
     let mut suggestions_provider = ProductionSuggestionsProvider::new();
 
@@ -849,7 +849,7 @@ fn run_app<B: Backend>(
     Ok(())
 }
 
-fn ui(f: &mut Frame, editor: &AutoCursorFormEditor<ApplicationData>) {
+fn ui(f: &mut Frame, editor: &AutoCursorTextForm<ApplicationData>) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([Constraint::Min(8), Constraint::Length(12)])
@@ -874,7 +874,7 @@ fn ui(f: &mut Frame, editor: &AutoCursorFormEditor<ApplicationData>) {
 fn render_enhanced_canvas(
     f: &mut Frame,
     area: ratatui::layout::Rect,
-    editor: &AutoCursorFormEditor<ApplicationData>,
+    editor: &AutoCursorTextForm<ApplicationData>,
 ) -> Option<ratatui::layout::Rect> {
     render_canvas_default(f, area, &editor.editor)
 }
@@ -882,7 +882,7 @@ fn render_enhanced_canvas(
 fn render_status_and_help(
     f: &mut Frame,
     area: ratatui::layout::Rect,
-    editor: &AutoCursorFormEditor<ApplicationData>,
+    editor: &AutoCursorTextForm<ApplicationData>,
 ) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
@@ -996,7 +996,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut terminal = Terminal::new(backend)?;
 
     let data = ApplicationData::new();
-    let mut editor = AutoCursorFormEditor::new(data);
+    let mut editor = AutoCursorTextForm::new(data);
 
     // Initialize with normal mode - library automatically sets block cursor
     editor.set_mode(AppMode::Nor);

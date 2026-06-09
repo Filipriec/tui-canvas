@@ -41,7 +41,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
     /// `d`/`c`/`y` in normal mode: capture the operator and wait for a motion.
     pub(crate) fn begin_operator_vim(&mut self, operator: VimOperator, count: usize) {
         let anchor = (self.current_field(), self.cursor_position());
-        self.editor
+        self.core
             .behavior_state
             .vim_mut()
             .set_pending_operator(VimPendingOperator {
@@ -52,7 +52,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
     }
 
     fn field_len_vim(&self, field: usize) -> usize {
-        self.editor.data_provider().field_value(field).chars().count()
+        self.core.data_provider().field_value(field).chars().count()
     }
 
     /// The position one character before `pos`, crossing into the previous
@@ -74,7 +74,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         action: &CanvasKeyAction,
         motion_count: usize,
     ) -> KeyEventOutcome {
-        let Some(pending) = self.editor.behavior_state.vim().pending_operator() else {
+        let Some(pending) = self.core.behavior_state.vim().pending_operator() else {
             return self.execute_canvas_key_action(action, motion_count);
         };
         let total = pending
@@ -89,7 +89,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
                 | CanvasKeyAction::OperatorChange
                 | CanvasKeyAction::OperatorYank
         ) {
-            self.editor.behavior_state.vim_mut().clear_pending_operator();
+            self.core.behavior_state.vim_mut().clear_pending_operator();
             let start = pending.anchor.0;
             self.apply_operator_linewise_vim(
                 pending.operator,
@@ -122,7 +122,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
             action,
             CanvasKeyAction::RepeatLastFind | CanvasKeyAction::RepeatLastFindReverse
         ) {
-            self.editor.behavior_state.vim_mut().clear_pending_operator();
+            self.core.behavior_state.vim_mut().clear_pending_operator();
             if let Some(find) = self.vim_last_find {
                 let reverse = matches!(action, CanvasKeyAction::RepeatLastFindReverse);
                 let forward = if reverse { !find.forward } else { find.forward };
@@ -145,7 +145,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
 
         match motion_kind(&resolved) {
             MotionKind::Linewise => {
-                self.editor.behavior_state.vim_mut().clear_pending_operator();
+                self.core.behavior_state.vim_mut().clear_pending_operator();
                 let start_field = pending.anchor.0;
                 let _ = self.execute_canvas_key_action(&resolved, total);
                 let end_field = self.current_field();
@@ -192,17 +192,17 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
                     let field = self.current_field();
                     let len = self.field_len_vim(field);
                     if len > 0 {
-                        self.editor.ui_state.set_cursor(len - 1, len, false);
+                        self.core.ui_state.set_cursor(len - 1, len, false);
                         inclusive = true;
                     }
                 }
 
-                self.editor.behavior_state.vim_mut().clear_pending_operator();
+                self.core.behavior_state.vim_mut().clear_pending_operator();
                 self.finish_operator_charwise_vim(pending.operator, pending.anchor, inclusive);
                 KeyEventOutcome::Consumed(None)
             }
             MotionKind::Unsupported => {
-                self.editor.behavior_state.vim_mut().clear_pending_operator();
+                self.core.behavior_state.vim_mut().clear_pending_operator();
                 KeyEventOutcome::Consumed(None)
             }
         }
@@ -234,25 +234,25 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
             }
         }
 
-        self.editor.ui_state.selection = SelectionState::Characterwise { anchor: lo };
+        self.core.ui_state.selection = SelectionState::Characterwise { anchor: lo };
         let _ = self.transition_to_field(hi.0);
         let len = self.field_len_vim(hi.0);
-        self.editor.ui_state.set_cursor(hi.1, len, false);
+        self.core.ui_state.set_cursor(hi.1, len, false);
 
         match operator {
             VimOperator::Delete => {
                 self.delete_selection_once(true);
-                self.editor.ui_state.selection = SelectionState::None;
+                self.core.ui_state.selection = SelectionState::None;
             }
             VimOperator::Yank => {
                 self.yank_selection();
                 let _ = self.transition_to_field(lo.0);
                 self.set_cursor_position(lo.1);
-                self.editor.ui_state.selection = SelectionState::None;
+                self.core.ui_state.selection = SelectionState::None;
             }
             VimOperator::Change => {
                 self.delete_selection_once(true);
-                self.editor.ui_state.selection = SelectionState::None;
+                self.core.ui_state.selection = SelectionState::None;
                 self.enter_edit_mode_vim();
             }
         }
@@ -265,7 +265,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         start_field: usize,
         end_field: usize,
     ) {
-        let last = self.editor.data_provider().field_count().saturating_sub(1);
+        let last = self.core.data_provider().field_count().saturating_sub(1);
         let start = start_field.min(last);
         let end = end_field.min(last);
         let count = end - start + 1;
@@ -275,33 +275,33 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
             VimOperator::Delete => {
                 // Reuse the linewise selection delete so the lines land in the
                 // yank register (Vim's `dd` is also a yank).
-                self.editor.ui_state.selection = SelectionState::Linewise {
+                self.core.ui_state.selection = SelectionState::Linewise {
                     anchor_field: start,
                 };
                 let _ = self.transition_to_field(end);
                 self.delete_selection_once(true);
-                self.editor.ui_state.selection = SelectionState::None;
+                self.core.ui_state.selection = SelectionState::None;
             }
             VimOperator::Yank => {
-                self.editor.ui_state.selection = SelectionState::Linewise {
+                self.core.ui_state.selection = SelectionState::Linewise {
                     anchor_field: start,
                 };
                 let _ = self.transition_to_field(end);
                 self.yank_selection();
                 let _ = self.transition_to_field(start);
                 self.move_line_start();
-                self.editor.ui_state.selection = SelectionState::None;
+                self.core.ui_state.selection = SelectionState::None;
                 if self.mode() != AppMode::Nor {
                     self.set_mode_vim(AppMode::Nor);
                 }
             }
             VimOperator::Change => {
-                self.editor.ui_state.selection = SelectionState::Linewise {
+                self.core.ui_state.selection = SelectionState::Linewise {
                     anchor_field: start,
                 };
                 let _ = self.transition_to_field(end);
                 self.yank_selection();
-                self.editor.ui_state.selection = SelectionState::None;
+                self.core.ui_state.selection = SelectionState::None;
                 let _ = self.transition_to_field(start);
 
                 if count <= 1 {

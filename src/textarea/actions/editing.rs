@@ -9,10 +9,10 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         let line_idx = self.current_field();
         let col = self.cursor_position();
 
-        self.editor
+        self.core
             .record_checkpoint(crate::editor::features::history::EditKind::Other);
 
-        let new_idx = self.editor.data_provider_mut().split_line_at(line_idx, col);
+        let new_idx = self.core.data_provider_mut().split_line_at(line_idx, col);
 
         let _ = self.transition_to_field(new_idx);
         self.move_line_start();
@@ -35,10 +35,10 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
             return;
         }
 
-        self.editor
+        self.core
             .record_checkpoint(crate::editor::features::history::EditKind::Other);
 
-        if let Some((prev_idx, new_col)) = self.editor.data_provider_mut().join_with_prev(line_idx)
+        if let Some((prev_idx, new_col)) = self.core.data_provider_mut().join_with_prev(line_idx)
         {
             #[cfg(feature = "gui")]
             {
@@ -64,12 +64,12 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
             return;
         }
 
-        if line_idx + 1 < self.editor.data_provider().field_count() {
-            self.editor
+        if line_idx + 1 < self.core.data_provider().field_count() {
+            self.core
                 .record_checkpoint(crate::editor::features::history::EditKind::Other);
         }
 
-        if let Some(new_col) = self.editor.data_provider_mut().join_with_next(line_idx) {
+        if let Some(new_col) = self.core.data_provider_mut().join_with_next(line_idx) {
             #[cfg(feature = "gui")]
             {
                 self.edited_this_frame = true;
@@ -112,12 +112,12 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
             self.edited_this_frame = true;
         }
 
-        self.editor
+        self.core
             .record_checkpoint(crate::editor::features::history::EditKind::Other);
 
         let line_idx = self.current_field();
         let new_idx = self
-            .editor
+            .core
             .data_provider_mut()
             .insert_blank_line_after(line_idx);
 
@@ -132,12 +132,12 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
             self.edited_this_frame = true;
         }
 
-        self.editor
+        self.core
             .record_checkpoint(crate::editor::features::history::EditKind::Other);
 
         let line_idx = self.current_field();
         let new_idx = self
-            .editor
+            .core
             .data_provider_mut()
             .insert_blank_line_before(line_idx);
 

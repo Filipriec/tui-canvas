@@ -18,7 +18,7 @@ compile_error!(
 
 use tui_canvas::{
     render_canvas_default, AppMode, CursorManager, CharacterLimits, DataProvider,
-    FormEditor, ValidationConfig, ValidationConfigBuilder, ValidationResult,
+    TextFormState, ValidationConfig, ValidationConfigBuilder, ValidationResult,
 };
 use crossterm::{
     event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyModifiers},
@@ -38,9 +38,9 @@ use std::io;
 // Import CountMode from the validation module directly
 use tui_canvas::validation::limits::CountMode;
 
-// FormEditor wrapper for validation demo
-struct ValidationFormEditor<D: DataProvider> {
-    editor: FormEditor<D>,
+// TextFormState wrapper for validation demo
+struct ValidationTextForm<D: DataProvider> {
+    editor: TextFormState<D>,
     has_unsaved_changes: bool,
     debug_message: String,
     command_buffer: String,
@@ -49,9 +49,9 @@ struct ValidationFormEditor<D: DataProvider> {
     block_reason: Option<String>,
 }
 
-impl<D: DataProvider> ValidationFormEditor<D> {
+impl<D: DataProvider> ValidationTextForm<D> {
     fn new(data_provider: D) -> Self {
-        let mut editor = FormEditor::new(data_provider);
+        let mut editor = TextFormState::new(data_provider);
         // Enable validation by default
         editor.set_validation_enabled(true);
         Self {
@@ -479,7 +479,7 @@ impl DataProvider for ValidationDemoData {
 fn handle_key_press(
     key: KeyCode,
     modifiers: KeyModifiers,
-    editor: &mut ValidationFormEditor<ValidationDemoData>,
+    editor: &mut ValidationTextForm<ValidationDemoData>,
 ) -> anyhow::Result<bool> {
     let mode = editor.mode();
 
@@ -611,7 +611,7 @@ fn handle_key_press(
 
 fn run_app<B: Backend>(
     terminal: &mut Terminal<B>,
-    mut editor: ValidationFormEditor<ValidationDemoData>,
+    mut editor: ValidationTextForm<ValidationDemoData>,
 ) -> io::Result<()> {
     loop {
         terminal.draw(|f| ui(f, &editor))?;
@@ -632,7 +632,7 @@ fn run_app<B: Backend>(
     Ok(())
 }
 
-fn ui(f: &mut Frame, editor: &ValidationFormEditor<ValidationDemoData>) {
+fn ui(f: &mut Frame, editor: &ValidationTextForm<ValidationDemoData>) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([Constraint::Min(8), Constraint::Length(12)])
@@ -645,7 +645,7 @@ fn ui(f: &mut Frame, editor: &ValidationFormEditor<ValidationDemoData>) {
 fn render_enhanced_canvas(
     f: &mut Frame,
     area: Rect,
-    editor: &ValidationFormEditor<ValidationDemoData>,
+    editor: &ValidationTextForm<ValidationDemoData>,
 ) {
     render_canvas_default(f, area, &editor.editor);
 }
@@ -653,7 +653,7 @@ fn render_enhanced_canvas(
 fn render_validation_status(
     f: &mut Frame,
     area: Rect,
-    editor: &ValidationFormEditor<ValidationDemoData>,
+    editor: &ValidationTextForm<ValidationDemoData>,
 ) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
@@ -808,7 +808,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut terminal = Terminal::new(backend)?;
 
     let data = ValidationDemoData::new();
-    let mut editor = ValidationFormEditor::new(data);
+    let mut editor = ValidationTextForm::new(data);
 
     // Initialize with normal mode - library automatically sets block cursor
     editor.set_mode(AppMode::Nor);

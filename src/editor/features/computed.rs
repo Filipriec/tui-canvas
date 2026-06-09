@@ -1,10 +1,10 @@
 // src/editor/features/computed.rs
 
 use crate::computed::{ComputedContext, ComputedProvider, ComputedState};
-use crate::editor::FormEditor;
+use crate::editor::EditorCore;
 use crate::DataProvider;
 
-impl<D: DataProvider> FormEditor<D> {
+impl<D: DataProvider> EditorCore<D> {
     #[cfg(feature = "computed")]
     pub fn register_computed_provider<C>(&mut self, provider: &C)
     where

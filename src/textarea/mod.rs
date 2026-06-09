@@ -18,7 +18,7 @@ pub use provider::{TextAreaDataProvider, TextAreaProvider};
 #[cfg(feature = "gui")]
 pub use state::TextAreaLineNumberMode;
 pub use state::{
-    TextAreaEditor, TextAreaEventOutcome, TextAreaSearchMatch, TextAreaState, TextOverflowMode,
+    TextAreaEventOutcome, TextAreaSearchMatch, TextAreaState, TextOverflowMode,
 };
 #[cfg(feature = "commandline")]
 pub use state::TextAreaCommandLineState;

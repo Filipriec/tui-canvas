@@ -1,8 +1,8 @@
 // src/editor/navigation.rs
-use crate::editor::FormEditor;
+use crate::editor::EditorCore;
 use crate::DataProvider;
 
-impl<D: DataProvider> FormEditor<D> {
+impl<D: DataProvider> EditorCore<D> {
     /// Resolves the target field, skipping those computed by scripts rather than human input.
     #[cfg(feature = "computed")]
     fn resolved_navigable_field(
@@ -234,7 +234,7 @@ mod tests {
     #[test]
     fn move_down_skips_trailing_computed_fields() {
         let provider = TestProvider::new(&["a", "b", "c", "d", "e"]);
-        let mut editor = FormEditor::new(provider);
+        let mut editor = EditorCore::new(provider);
         editor.register_computed_provider(&TestComputedProvider);
 
         assert!(editor.transition_to_field(1).is_ok());
@@ -247,7 +247,7 @@ mod tests {
     #[test]
     fn move_last_line_lands_on_last_editable_field() {
         let provider = TestProvider::new(&["a", "b", "c", "d", "e"]);
-        let mut editor = FormEditor::new(provider);
+        let mut editor = EditorCore::new(provider);
         editor.register_computed_provider(&TestComputedProvider);
 
         assert!(editor.move_last_line().is_ok());

@@ -9,7 +9,7 @@
 
 use crate::canvas::actions::{ActionResult, CanvasAction};
 use crate::canvas::modes::AppMode;
-use crate::editor::FormEditor;
+use crate::textform::TextFormState;
 use crate::DataProvider;
 
 /// Boundary reached while moving inside the canvas.
@@ -32,7 +32,7 @@ pub enum HostActionOutcome {
 /// - the action is `MoveUp`/`PrevField` at top or `MoveDown`/`NextField` at bottom
 /// - editor is in `Nor` mode
 pub fn execute_action_for_host<D: DataProvider>(
-    editor: &mut FormEditor<D>,
+    editor: &mut TextFormState<D>,
     action: CanvasAction,
 ) -> HostActionOutcome {
     execute_action_for_host_with_options(editor, action, true)
@@ -40,7 +40,7 @@ pub fn execute_action_for_host<D: DataProvider>(
 
 /// Same as [`execute_action_for_host`], but allows disabling boundary exits.
 pub fn execute_action_for_host_with_options<D: DataProvider>(
-    editor: &mut FormEditor<D>,
+    editor: &mut TextFormState<D>,
     action: CanvasAction,
     allow_exit_in_read_only: bool,
 ) -> HostActionOutcome {
@@ -100,7 +100,7 @@ pub fn map_key_event_outcome_for_host(outcome: KeyEventOutcome) -> HostKeyEventO
 /// Handle a key event and directly emit host-friendly handoff outcomes.
 #[cfg(feature = "keybindings")]
 pub fn handle_key_event_for_host<D: DataProvider>(
-    editor: &mut FormEditor<D>,
+    editor: &mut TextFormState<D>,
     evt: KeyEvent,
 ) -> HostKeyEventOutcome {
     let outcome = map_key_event_outcome_for_host(editor.handle_key_event(evt));

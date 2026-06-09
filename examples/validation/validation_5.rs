@@ -60,7 +60,7 @@ use ratatui::{
 
 use tui_canvas::{
     render_canvas_default, AppMode, CursorManager,
-    CustomFormatter, DataProvider, FormEditor, FormattingResult, ValidationConfigBuilder,
+    CustomFormatter, DataProvider, TextFormState, FormattingResult, ValidationConfigBuilder,
 };
 
 /// External validation state with timing and context
@@ -553,7 +553,7 @@ impl DataProvider for ValidationDemoData {
 
 /// Editor with automatic external validation management
 struct ValidationDemoEditor<D: DataProvider> {
-    editor: FormEditor<D>,
+    editor: TextFormState<D>,
     services: Arc<Mutex<ValidationServices>>,
     validation_history: Vec<(usize, String, TimedValidationResult)>,
     debug_message: String,
@@ -565,7 +565,7 @@ struct ValidationDemoEditor<D: DataProvider> {
 
 impl<D: DataProvider> ValidationDemoEditor<D> {
     fn new(data_provider: D) -> Self {
-        let mut editor = FormEditor::new(data_provider);
+        let mut editor = TextFormState::new(data_provider);
         editor.set_validation_enabled(true);
 
         let services = Arc::new(Mutex::new(ValidationServices::new()));

@@ -1,9 +1,9 @@
 // src/editor/features/suggestions.rs
 
-use crate::editor::FormEditor;
+use crate::editor::EditorCore;
 use crate::{DataProvider, SuggestionItem, SuggestionQuery};
 
-impl<D: DataProvider> FormEditor<D> {
+impl<D: DataProvider> EditorCore<D> {
     #[cfg(feature = "suggestions")]
     fn current_suggestion_query(&self) -> Option<SuggestionQuery> {
         let idx = self.current_field();

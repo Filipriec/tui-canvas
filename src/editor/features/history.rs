@@ -1,5 +1,5 @@
 // src/editor/features/history.rs
-//! Snapshot-based undo/redo history for [`FormEditor`].
+//! Snapshot-based undo/redo history for [`EditorCore`].
 //!
 //! See `analysis/UNDO_REDO_DESIGN.md` for the rationale. In short: each
 //! checkpoint stores the full editable content (via
@@ -8,7 +8,7 @@
 //! track. Consecutive same-kind edits coalesce into one undo step.
 
 use crate::canvas::state::SelectionState;
-use crate::editor::FormEditor;
+use crate::editor::EditorCore;
 use crate::DataProvider;
 
 /// Default number of undo steps retained before the oldest is dropped.
@@ -38,7 +38,7 @@ pub(crate) struct EditSnapshot {
     cursor_pos: usize,
 }
 
-impl<D: DataProvider> FormEditor<D> {
+impl<D: DataProvider> EditorCore<D> {
     fn snapshot_now(&self) -> EditSnapshot {
         EditSnapshot {
             content: self.data_provider.capture_content(),

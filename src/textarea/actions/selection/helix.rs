@@ -1,6 +1,6 @@
 use crate::{
     canvas::{modes::AppMode, state::SelectionState},
-    editor::features::history::EditKind,
+    editor::{features::history::EditKind, paradigm::helix_word::HelixWordTarget},
     textarea::{TextAreaDataProvider, TextAreaState},
 };
 
@@ -49,160 +49,45 @@ pub(crate) struct HelixFind {
     pub forward: bool,
 }
 
-/// Which Helix word motion a selection step performs. These mirror Helix's
-/// `WordMotionTarget` variants and drive the faithful port in [`helix_word`].
-#[derive(Clone, Copy)]
-enum HelixWordTarget {
-    NextWordStart,
-    NextWordEnd,
-    PrevWordStart,
-    PrevWordEnd,
-    NextLongWordStart,
-    NextLongWordEnd,
-    PrevLongWordStart,
-    PrevLongWordEnd,
-}
-
 impl<P: TextAreaDataProvider> TextAreaState<P> {
-    /// Apply a Helix word motion `count` times, replacing the primary selection
-    /// with the moved-over range (Helix normal mode), or simply moving when not
-    /// in normal mode.
-    ///
-    /// In normal mode each step is computed with a faithful port of Helix's
-    /// `word_move`/`range_to_target` over the current field. This keeps the
-    /// selection in sync with the block cursor across repeated motions (the
-    /// previous `±1` patch moved the *real* cursor onto the trailing boundary
-    /// char, so a second `w` could not advance). When a step reaches the field
-    /// boundary we fall back to the cross-field vim motion.
-    /// Apply a Helix word motion `count` times.
-    ///
-    /// Each step runs a faithful port of Helix's `word_move`/`range_to_target`
-    /// over the whole document flattened with `\n` between fields, then maps the
-    /// result back to a `(field, char)` position. Running over the flattened
-    /// buffer means line breaks are handled exactly like Helix (a `w` at the end
-    /// of a line crosses into the next line's first word), instead of the old
-    /// per-field fallback that re-anchored onto the previous line.
-    ///
-    /// Normal mode replaces the whole selection with the moved-over range;
-    /// select/extend mode (`v`) keeps the anchor pinned and only advances the
-    /// head. Both share the same head computation so the two modes stay
-    /// consistent.
-    fn select_word_motion_helix(&mut self, count: usize, target: HelixWordTarget) {
-        let extend = self.mode() != AppMode::Nor;
-        for _ in 0..count.max(1) {
-            self.select_word_motion_step_helix(target, extend);
-        }
-    }
-
-    fn select_word_motion_step_helix(&mut self, target: HelixWordTarget, extend: bool) {
-        let field_count = self.editor.data_provider().field_count();
-        if field_count == 0 {
-            return;
-        }
-
-        // Flatten the document into one char buffer with `\n` between fields,
-        // recording where each field starts so positions can be mapped back.
-        let mut chars: Vec<char> = Vec::new();
-        let mut field_starts: Vec<usize> = Vec::with_capacity(field_count);
-        for f in 0..field_count {
-            field_starts.push(chars.len());
-            chars.extend(self.editor.data_provider().field_value(f).chars());
-            if f + 1 < field_count {
-                chars.push('\n');
-            }
-        }
-        let len = chars.len();
-        if len == 0 {
-            return;
-        }
-
-        let field = self.current_field();
-        let cursor = self.cursor_position();
-        let to_flat = |pos: (usize, usize)| field_starts[pos.0] + pos.1;
-
-        let flat_cursor = to_flat((field, cursor));
-        let pinned_anchor = match self.selection_state() {
-            SelectionState::Characterwise { anchor } => *anchor,
-            _ => (field, cursor),
-        };
-        let flat_anchor = to_flat(pinned_anchor);
-
-        // Map our inclusive (anchor, cursor) selection to Helix's (anchor, head)
-        // gap range. `head` is exclusive: just past the block-cursor char for a
-        // forward selection, on the block-cursor char for a backward one.
-        let input = if flat_cursor >= flat_anchor {
-            HelixRange {
-                anchor: flat_anchor,
-                head: flat_cursor + 1,
-            }
-        } else {
-            HelixRange {
-                anchor: flat_anchor + 1,
-                head: flat_cursor,
-            }
-        };
-
-        let result = helix_word_move(&chars, input, target);
-
-        // Convert Helix's exclusive-head range back to inclusive endpoints.
-        let (motion_anchor, new_cursor) = if result.anchor < result.head {
-            (result.anchor, result.head - 1)
-        } else if result.head < result.anchor {
-            (result.anchor - 1, result.head)
-        } else {
-            let c = result.head.min(len - 1);
-            (c, c)
-        };
-
-        // Nothing moved (already at the document edge).
-        if new_cursor == flat_cursor && (extend || motion_anchor == flat_anchor) {
-            return;
-        }
-
-        let (cur_field, cur_char) = flat_to_field(&chars, &field_starts, new_cursor);
-        let _ = self.transition_to_field(cur_field);
-        let field_len = self.current_text().chars().count();
-        self.editor.ui_state.set_cursor(cur_char, field_len, false);
-
-        // Extend keeps the pinned anchor; replace adopts the motion's anchor.
-        let anchor = if extend {
-            pinned_anchor
-        } else {
-            flat_to_field(&chars, &field_starts, motion_anchor)
-        };
-        self.editor.ui_state.selection = SelectionState::Characterwise { anchor };
-    }
-
     pub(crate) fn select_next_word_helix(&mut self, count: usize) {
-        self.select_word_motion_helix(count, HelixWordTarget::NextWordStart);
+        self.core
+            .select_word_motion_helix(count, HelixWordTarget::NextWordStart);
     }
 
     pub(crate) fn select_prev_word_helix(&mut self, count: usize) {
-        self.select_word_motion_helix(count, HelixWordTarget::PrevWordStart);
+        self.core
+            .select_word_motion_helix(count, HelixWordTarget::PrevWordStart);
     }
 
     pub(crate) fn select_word_end_helix(&mut self, count: usize) {
-        self.select_word_motion_helix(count, HelixWordTarget::NextWordEnd);
+        self.core
+            .select_word_motion_helix(count, HelixWordTarget::NextWordEnd);
     }
 
     pub(crate) fn select_word_end_prev_helix(&mut self, count: usize) {
-        self.select_word_motion_helix(count, HelixWordTarget::PrevWordEnd);
+        self.core
+            .select_word_motion_helix(count, HelixWordTarget::PrevWordEnd);
     }
 
     pub(crate) fn select_next_big_word_helix(&mut self, count: usize) {
-        self.select_word_motion_helix(count, HelixWordTarget::NextLongWordStart);
+        self.core
+            .select_word_motion_helix(count, HelixWordTarget::NextLongWordStart);
     }
 
     pub(crate) fn select_prev_big_word_helix(&mut self, count: usize) {
-        self.select_word_motion_helix(count, HelixWordTarget::PrevLongWordStart);
+        self.core
+            .select_word_motion_helix(count, HelixWordTarget::PrevLongWordStart);
     }
 
     pub(crate) fn select_big_word_end_helix(&mut self, count: usize) {
-        self.select_word_motion_helix(count, HelixWordTarget::NextLongWordEnd);
+        self.core
+            .select_word_motion_helix(count, HelixWordTarget::NextLongWordEnd);
     }
 
     pub(crate) fn select_big_word_end_prev_helix(&mut self, count: usize) {
-        self.select_word_motion_helix(count, HelixWordTarget::PrevLongWordEnd);
+        self.core
+            .select_word_motion_helix(count, HelixWordTarget::PrevLongWordEnd);
     }
 
     /// `n` — go to the next search match and select it.
@@ -265,25 +150,25 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         let _ = self.transition_to_field(m.line);
         let len = self.current_text().chars().count();
         let cursor = m.end.saturating_sub(1).min(len.saturating_sub(1));
-        self.editor.ui_state.set_cursor(cursor, len, false);
-        self.editor.ui_state.selection = SelectionState::Characterwise {
+        self.core.ui_state.set_cursor(cursor, len, false);
+        self.core.ui_state.selection = SelectionState::Characterwise {
             anchor: (m.line, m.start),
         };
     }
 
     /// `%` — select the whole document.
     pub(crate) fn select_all_helix(&mut self) {
-        let field_count = self.editor.data_provider().field_count();
+        let field_count = self.core.data_provider().field_count();
         if field_count == 0 {
             return;
         }
         let last = field_count - 1;
         let _ = self.transition_to_field(last);
         let len = self.current_text().chars().count();
-        self.editor
+        self.core
             .ui_state
             .set_cursor(len.saturating_sub(1), len, false);
-        self.editor.ui_state.selection = SelectionState::Characterwise { anchor: (0, 0) };
+        self.core.ui_state.selection = SelectionState::Characterwise { anchor: (0, 0) };
     }
 
     /// `Alt-;` — flip the selection so anchor and head swap places.
@@ -296,8 +181,8 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
                 }
                 let _ = self.transition_to_field(anchor.0);
                 let len = self.current_text().chars().count();
-                self.editor.ui_state.set_cursor(anchor.1, len, false);
-                self.editor.ui_state.selection = SelectionState::Characterwise { anchor: cursor };
+                self.core.ui_state.set_cursor(anchor.1, len, false);
+                self.core.ui_state.selection = SelectionState::Characterwise { anchor: cursor };
             }
             SelectionState::Linewise { anchor_field } => {
                 let current = self.current_field();
@@ -305,7 +190,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
                     return;
                 }
                 let _ = self.transition_to_field(anchor_field);
-                self.editor.ui_state.selection = SelectionState::Linewise {
+                self.core.ui_state.selection = SelectionState::Linewise {
                     anchor_field: current,
                 };
             }
@@ -335,12 +220,12 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
     /// place (1:1, so offsets and the selection are preserved).
     fn map_selection_chars_helix(&mut self, map: impl Fn(char) -> char) {
         let (start, end) = self.selection_endpoints();
-        let mut lines = self.editor.data_provider().capture_content();
+        let mut lines = self.core.data_provider().capture_content();
         if start.0 >= lines.len() || end.0 >= lines.len() {
             return;
         }
 
-        self.editor.record_checkpoint(EditKind::Other);
+        self.core.record_checkpoint(EditKind::Other);
         for field in start.0..=end.0 {
             let count = lines[field].chars().count();
             if count == 0 {
@@ -368,7 +253,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
                 .collect();
             lines[field] = new_line;
         }
-        self.editor.data_provider_mut().restore_content(&lines);
+        self.core.data_provider_mut().restore_content(&lines);
         #[cfg(feature = "gui")]
         {
             self.edited_this_frame = true;
@@ -411,8 +296,8 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         } else {
             ((start.0, new_end), new_start)
         };
-        self.editor.ui_state.set_cursor(cursor_pos, len, false);
-        self.editor.ui_state.selection = SelectionState::Characterwise { anchor: anchor_pos };
+        self.core.ui_state.set_cursor(cursor_pos, len, false);
+        self.core.ui_state.selection = SelectionState::Characterwise { anchor: anchor_pos };
     }
 
     /// `gs` — move to the first non-whitespace character of the current line,
@@ -426,16 +311,16 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
             .unwrap_or(0);
         let extend = self.mode() != AppMode::Nor;
         let len = line.len();
-        self.editor.ui_state.set_cursor(target, len, false);
+        self.core.ui_state.set_cursor(target, len, false);
         if !extend {
-            self.editor.ui_state.selection = SelectionState::Characterwise {
+            self.core.ui_state.selection = SelectionState::Characterwise {
                 anchor: (field, target),
             };
         }
     }
 
     fn current_text_for_field(&self, field: usize) -> Vec<char> {
-        self.editor
+        self.core
             .data_provider()
             .field_value(field)
             .chars()
@@ -476,8 +361,8 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         // Cursor is before the anchor: swap so the head sits at the larger end.
         let _ = self.transition_to_field(anchor.0);
         let len = self.current_text().chars().count();
-        self.editor.ui_state.set_cursor(anchor.1, len, false);
-        self.editor.ui_state.selection = SelectionState::Characterwise { anchor: cursor };
+        self.core.ui_state.set_cursor(anchor.1, len, false);
+        self.core.ui_state.selection = SelectionState::Characterwise { anchor: cursor };
     }
 
     /// `>` — indent every line touched by the selection by `INDENT` spaces.
@@ -485,11 +370,11 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         const INDENT: usize = 4;
         let width = INDENT * count.max(1);
         let (start, end) = self.selection_endpoints();
-        let mut content = self.editor.data_provider().capture_content();
+        let mut content = self.core.data_provider().capture_content();
         if end.0 >= content.len() {
             return;
         }
-        self.editor.record_checkpoint(EditKind::Other);
+        self.core.record_checkpoint(EditKind::Other);
         let indent: String = " ".repeat(width);
         let mut deltas = vec![0isize; content.len()];
         for f in start.0..=end.0 {
@@ -499,7 +384,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
             content[f] = format!("{indent}{}", content[f]);
             deltas[f] = width as isize;
         }
-        self.editor.data_provider_mut().restore_content(&content);
+        self.core.data_provider_mut().restore_content(&content);
         self.shift_selection_columns_helix(&deltas);
         #[cfg(feature = "gui")]
         {
@@ -512,11 +397,11 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         const INDENT: usize = 4;
         let width = INDENT * count.max(1);
         let (start, end) = self.selection_endpoints();
-        let mut content = self.editor.data_provider().capture_content();
+        let mut content = self.core.data_provider().capture_content();
         if end.0 >= content.len() {
             return;
         }
-        self.editor.record_checkpoint(EditKind::Other);
+        self.core.record_checkpoint(EditKind::Other);
         let mut deltas = vec![0isize; content.len()];
         for f in start.0..=end.0 {
             let leading = content[f]
@@ -529,7 +414,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
                 deltas[f] = -(leading as isize);
             }
         }
-        self.editor.data_provider_mut().restore_content(&content);
+        self.core.data_provider_mut().restore_content(&content);
         self.shift_selection_columns_helix(&deltas);
         #[cfg(feature = "gui")]
         {
@@ -551,11 +436,11 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
             (col as isize + d).max(0) as usize
         };
         let len = self.current_text().chars().count();
-        self.editor
+        self.core
             .ui_state
             .set_cursor(shift(field, cursor).min(len), len, false);
         if let Some(a) = anchor {
-            self.editor.ui_state.selection = SelectionState::Characterwise {
+            self.core.ui_state.selection = SelectionState::Characterwise {
                 anchor: (a.0, shift(a.0, a.1)),
             };
         }
@@ -590,15 +475,15 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
                     new_line.extend_from_slice(&line[..num_start]);
                     new_line.extend(new_str.chars());
                     new_line.extend_from_slice(&line[end + 1..]);
-                    self.editor.record_checkpoint(EditKind::Other);
-                    self.editor
+                    self.core.record_checkpoint(EditKind::Other);
+                    self.core
                         .data_provider_mut()
                         .set_field_value(field, new_line.iter().collect());
                     let new_count = new_str.chars().count();
                     let new_end = num_start + new_count - 1;
                     let len = self.current_text().chars().count();
-                    self.editor.ui_state.set_cursor(new_end, len, false);
-                    self.editor.ui_state.selection = SelectionState::Characterwise {
+                    self.core.ui_state.set_cursor(new_end, len, false);
+                    self.core.ui_state.selection = SelectionState::Characterwise {
                         anchor: (field, num_start),
                     };
                     #[cfg(feature = "gui")]
@@ -616,7 +501,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
     pub(crate) fn delete_word_backward_helix(&mut self) {
         use crate::canvas::actions::movement::word::find_prev_word_start;
         let field = self.current_field();
-        let text = self.editor.data_provider().field_value(field).to_string();
+        let text = self.core.data_provider().field_value(field).to_string();
         let cursor = self.cursor_position();
         if cursor == 0 {
             return;
@@ -625,15 +510,15 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         if start == cursor {
             return;
         }
-        self.editor.record_checkpoint(EditKind::Delete);
+        self.core.record_checkpoint(EditKind::Delete);
         let new_line: String = text
             .chars()
             .take(start)
             .chain(text.chars().skip(cursor))
             .collect();
-        self.editor.data_provider_mut().set_field_value(field, new_line);
+        self.core.data_provider_mut().set_field_value(field, new_line);
         let len = self.current_text().chars().count();
-        self.editor.ui_state.set_cursor(start, len, false);
+        self.core.ui_state.set_cursor(start, len, false);
         #[cfg(feature = "gui")]
         {
             self.edited_this_frame = true;
@@ -643,16 +528,16 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
     /// `Ctrl-u` (insert) — delete from the line start to the cursor.
     pub(crate) fn delete_to_line_start_helix(&mut self) {
         let field = self.current_field();
-        let text = self.editor.data_provider().field_value(field).to_string();
+        let text = self.core.data_provider().field_value(field).to_string();
         let cursor = self.cursor_position();
         if cursor == 0 {
             return;
         }
-        self.editor.record_checkpoint(EditKind::Delete);
+        self.core.record_checkpoint(EditKind::Delete);
         let new_line: String = text.chars().skip(cursor).collect();
-        self.editor.data_provider_mut().set_field_value(field, new_line);
+        self.core.data_provider_mut().set_field_value(field, new_line);
         let len = self.current_text().chars().count();
-        self.editor.ui_state.set_cursor(0, len, false);
+        self.core.ui_state.set_cursor(0, len, false);
         #[cfg(feature = "gui")]
         {
             self.edited_this_frame = true;
@@ -663,22 +548,22 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
     pub(crate) fn delete_word_forward_helix(&mut self) {
         use crate::canvas::actions::movement::word::find_next_word_start;
         let field = self.current_field();
-        let text = self.editor.data_provider().field_value(field).to_string();
+        let text = self.core.data_provider().field_value(field).to_string();
         let cursor = self.cursor_position();
         let count = text.chars().count();
         if cursor >= count {
             return;
         }
         let end = find_next_word_start(&text, cursor).max(cursor + 1).min(count);
-        self.editor.record_checkpoint(EditKind::Delete);
+        self.core.record_checkpoint(EditKind::Delete);
         let new_line: String = text
             .chars()
             .take(cursor)
             .chain(text.chars().skip(end))
             .collect();
-        self.editor.data_provider_mut().set_field_value(field, new_line);
+        self.core.data_provider_mut().set_field_value(field, new_line);
         let len = self.current_text().chars().count();
-        self.editor.ui_state.set_cursor(cursor.min(len), len, false);
+        self.core.ui_state.set_cursor(cursor.min(len), len, false);
         #[cfg(feature = "gui")]
         {
             self.edited_this_frame = true;
@@ -749,8 +634,8 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
             SelectionState::Characterwise { anchor } if extend => *anchor,
             _ => (field, cursor),
         };
-        self.editor.ui_state.set_cursor(target, len, false);
-        self.editor.ui_state.selection = SelectionState::Characterwise { anchor };
+        self.core.ui_state.set_cursor(target, len, false);
+        self.core.ui_state.selection = SelectionState::Characterwise { anchor };
     }
 
     /// `r` — replace every character of the selection with `ch`.
@@ -762,11 +647,11 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
     pub(crate) fn surround_add_helix(&mut self, ch: char) {
         let (open, close) = surround_pair(ch);
         let (start, end) = self.selection_endpoints();
-        let mut content = self.editor.data_provider().capture_content();
+        let mut content = self.core.data_provider().capture_content();
         if start.0 >= content.len() || end.0 >= content.len() {
             return;
         }
-        self.editor.record_checkpoint(EditKind::Other);
+        self.core.record_checkpoint(EditKind::Other);
 
         // Insert the closing char first (later position) so the opening insert
         // doesn't shift it.
@@ -780,7 +665,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         start_line.insert(open_at, open);
         content[start.0] = start_line.into_iter().collect();
 
-        self.editor.data_provider_mut().restore_content(&content);
+        self.core.data_provider_mut().restore_content(&content);
 
         // The opening char shifts everything at/after `start` on the start line.
         let bump = |pos: (usize, usize)| -> (usize, usize) {
@@ -797,8 +682,8 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         };
         let _ = self.transition_to_field(cursor.0);
         let len = self.current_text().chars().count();
-        self.editor.ui_state.set_cursor(cursor.1, len, false);
-        self.editor.ui_state.selection = SelectionState::Characterwise { anchor };
+        self.core.ui_state.set_cursor(cursor.1, len, false);
+        self.core.ui_state.selection = SelectionState::Characterwise { anchor };
         #[cfg(feature = "gui")]
         {
             self.edited_this_frame = true;
@@ -815,18 +700,18 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         let Some((open_idx, close_idx)) = find_surround_pair(&line, cursor, open, close) else {
             return;
         };
-        self.editor.record_checkpoint(EditKind::Other);
+        self.core.record_checkpoint(EditKind::Other);
         let mut new_line = line.clone();
         new_line.remove(close_idx);
         new_line.remove(open_idx);
-        self.editor
+        self.core
             .data_provider_mut()
             .set_field_value(field, new_line.into_iter().collect());
 
         // Removing the opening char (before the cursor) shifts the cursor left.
         let new_cursor = self.cursor_position().saturating_sub(1);
         let len = self.current_text().chars().count();
-        self.editor.ui_state.set_cursor(new_cursor.min(len), len, false);
+        self.core.ui_state.set_cursor(new_cursor.min(len), len, false);
         #[cfg(feature = "gui")]
         {
             self.edited_this_frame = true;
@@ -845,11 +730,11 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         else {
             return;
         };
-        self.editor.record_checkpoint(EditKind::Other);
+        self.core.record_checkpoint(EditKind::Other);
         let mut new_line = line.clone();
         new_line[open_idx] = to_open;
         new_line[close_idx] = to_close;
-        self.editor
+        self.core
             .data_provider_mut()
             .set_field_value(field, new_line.into_iter().collect());
         #[cfg(feature = "gui")]
@@ -863,7 +748,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
     pub(crate) fn match_brackets_helix(&mut self) {
         const PAIRS: &[(char, char)] = &[('(', ')'), ('[', ']'), ('{', '}'), ('<', '>')];
 
-        let field_count = self.editor.data_provider().field_count();
+        let field_count = self.core.data_provider().field_count();
         if field_count == 0 {
             return;
         }
@@ -871,7 +756,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         let mut field_starts: Vec<usize> = Vec::with_capacity(field_count);
         for f in 0..field_count {
             field_starts.push(chars.len());
-            chars.extend(self.editor.data_provider().field_value(f).chars());
+            chars.extend(self.core.data_provider().field_value(f).chars());
             if f + 1 < field_count {
                 chars.push('\n');
             }
@@ -925,9 +810,9 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         let extend = self.mode() != AppMode::Nor;
         let _ = self.transition_to_field(tf);
         let len = self.current_text().chars().count();
-        self.editor.ui_state.set_cursor(tc, len, false);
+        self.core.ui_state.set_cursor(tc, len, false);
         if !extend {
-            self.editor.ui_state.selection = SelectionState::Characterwise { anchor: (tf, tc) };
+            self.core.ui_state.selection = SelectionState::Characterwise { anchor: (tf, tc) };
         }
     }
 
@@ -937,9 +822,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
                 break;
             }
         }
-        if self.mode() == AppMode::Nor {
-            self.ensure_helix_primary_selection();
-        }
+        self.core.finish_helix_selection_edit();
     }
 
     pub(crate) fn change_selection_helix(&mut self, yank: bool, count: usize) {
@@ -956,68 +839,16 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
     }
 
     pub(crate) fn yank_primary_selection_helix(&mut self) {
-        self.yank_selection();
-        if self.mode() == AppMode::Sel {
-            self.exit_highlight_mode_helix();
-        }
-    }
-
-    pub(crate) fn collapse_selection_helix(&mut self) {
-        self.collapse_helix_selection_to_cursor();
+        self.core.yank_primary_selection_helix();
     }
 
     pub(crate) fn extend_line_below_helix(&mut self) {
-        let current = self.current_field();
-        let field_count = self.editor.data_provider().field_count();
-        self.ui_state.current_mode = AppMode::Nor;
-
-        match self.selection_state().clone() {
-            SelectionState::Linewise { anchor_field } => {
-                // Already line-wise: grow the selection downward by one line,
-                // keeping the anchored (top) line fixed. Repeated `x` keeps
-                // extending instead of resetting onto the current line.
-                let next = (current + 1).min(field_count.saturating_sub(1));
-                if next != current {
-                    let _ = self.transition_to_field(next);
-                }
-                self.ui_state.selection = SelectionState::Linewise { anchor_field };
-            }
-            SelectionState::Characterwise { anchor } => {
-                // Promote to a full-line selection, snapping to line bounds
-                // while preserving the existing top of the selection.
-                self.ui_state.selection = SelectionState::Linewise {
-                    anchor_field: anchor.0,
-                };
-            }
-            SelectionState::None => {
-                self.ui_state.selection = SelectionState::Linewise {
-                    anchor_field: current,
-                };
-            }
-        }
+        self.core.extend_line_below_helix();
     }
 
     pub(crate) fn extend_to_line_bounds_helix(&mut self) {
-        let current = self.current_field();
-        self.ui_state.current_mode = AppMode::Nor;
-
-        // Snap the selection to whole lines without moving to the next line,
-        // preserving the existing anchor line so it doesn't collapse.
-        let anchor_field = match self.selection_state() {
-            SelectionState::Linewise { anchor_field } => *anchor_field,
-            SelectionState::Characterwise { anchor } => anchor.0,
-            SelectionState::None => current,
-        };
-        self.ui_state.selection = SelectionState::Linewise { anchor_field };
+        self.core.extend_to_line_bounds_helix();
     }
-}
-
-/// A Helix selection range expressed as gap indices, where `head` is exclusive
-/// of the block-cursor character. Mirrors `helix_core::selection::Range`.
-#[derive(Clone, Copy, PartialEq, Eq)]
-struct HelixRange {
-    anchor: usize,
-    head: usize,
 }
 
 /// Find the nearest surrounding `(open, close)` pair around `cursor` on a line.
@@ -1073,258 +904,4 @@ fn flat_to_field(chars: &[char], field_starts: &[usize], flat: usize) -> (usize,
     let last = field_count - 1;
     let start = field_starts[last];
     (last, chars.len().saturating_sub(start).saturating_sub(1))
-}
-
-impl HelixWordTarget {
-    fn is_prev(self) -> bool {
-        matches!(
-            self,
-            HelixWordTarget::PrevWordStart
-                | HelixWordTarget::PrevWordEnd
-                | HelixWordTarget::PrevLongWordStart
-                | HelixWordTarget::PrevLongWordEnd
-        )
-    }
-
-    fn is_long(self) -> bool {
-        matches!(
-            self,
-            HelixWordTarget::NextLongWordStart
-                | HelixWordTarget::NextLongWordEnd
-                | HelixWordTarget::PrevLongWordStart
-                | HelixWordTarget::PrevLongWordEnd
-        )
-    }
-
-    /// Whether the target boundary is reached "after" the previous char (word
-    /// starts) rather than "before" the next char (word ends).
-    fn stops_at_word_start(self) -> bool {
-        matches!(
-            self,
-            HelixWordTarget::NextWordStart
-                | HelixWordTarget::PrevWordEnd
-                | HelixWordTarget::NextLongWordStart
-                | HelixWordTarget::PrevLongWordEnd
-        )
-    }
-}
-
-#[derive(PartialEq, Clone, Copy)]
-enum CharClass {
-    Eol,
-    Whitespace,
-    Word,
-    Punctuation,
-}
-
-fn char_is_line_ending(c: char) -> bool {
-    c == '\n' || c == '\r'
-}
-
-fn classify(c: char) -> CharClass {
-    if char_is_line_ending(c) {
-        CharClass::Eol
-    } else if c.is_whitespace() {
-        CharClass::Whitespace
-    } else if c.is_alphanumeric() {
-        CharClass::Word
-    } else {
-        CharClass::Punctuation
-    }
-}
-
-/// Short-word boundary: every character class is distinct.
-fn is_word_boundary(a: char, b: char) -> bool {
-    classify(a) != classify(b)
-}
-
-/// Long-word ("WORD") boundary: word and punctuation are grouped together, so
-/// only transitions to/from whitespace or end-of-line count.
-fn is_long_word_boundary(a: char, b: char) -> bool {
-    match (classify(a), classify(b)) {
-        (CharClass::Word, CharClass::Punctuation) | (CharClass::Punctuation, CharClass::Word) => {
-            false
-        }
-        (x, y) => x != y,
-    }
-}
-
-fn reached_target(target: HelixWordTarget, prev: char, next: char) -> bool {
-    let boundary = if target.is_long() {
-        is_long_word_boundary(prev, next)
-    } else {
-        is_word_boundary(prev, next)
-    };
-    if !boundary {
-        return false;
-    }
-    // A word start stops where the next char begins a word or a line ends; a
-    // word end stops where the previous char ends one. `Eol` is its own class,
-    // so it is never treated as plain whitespace here (this is what lets a
-    // motion cross a line break instead of stalling on it).
-    if target.stops_at_word_start() {
-        classify(next) != CharClass::Whitespace
-    } else {
-        classify(prev) != CharClass::Whitespace
-    }
-}
-
-/// Bidirectional char cursor over a slice positioned at a gap, mirroring the
-/// semantics of `ropey`'s `chars_at` cursor used by Helix's `range_to_target`.
-struct CharCursor<'a> {
-    chars: &'a [char],
-    pos: usize,
-    reversed: bool,
-}
-
-impl<'a> CharCursor<'a> {
-    fn new(chars: &'a [char], pos: usize) -> Self {
-        Self {
-            chars,
-            pos,
-            reversed: false,
-        }
-    }
-
-    fn reverse(&mut self) {
-        self.reversed = !self.reversed;
-    }
-
-    fn next(&mut self) -> Option<char> {
-        if self.reversed {
-            if self.pos == 0 {
-                return None;
-            }
-            self.pos -= 1;
-            self.chars.get(self.pos).copied()
-        } else {
-            let ch = self.chars.get(self.pos).copied();
-            if ch.is_some() {
-                self.pos += 1;
-            }
-            ch
-        }
-    }
-
-    fn prev(&mut self) -> Option<char> {
-        if self.reversed {
-            let ch = self.chars.get(self.pos).copied();
-            if ch.is_some() {
-                self.pos += 1;
-            }
-            ch
-        } else {
-            if self.pos == 0 {
-                return None;
-            }
-            self.pos -= 1;
-            self.chars.get(self.pos).copied()
-        }
-    }
-}
-
-/// Port of Helix's `range_to_target`. Walks from `origin.head` toward `target`
-/// over a buffer that may contain `\n` line separators, returning the resulting
-/// `(anchor, head)` gap range.
-fn range_to_target(chars: &[char], target: HelixWordTarget, origin: HelixRange) -> HelixRange {
-    let is_prev = target.is_prev();
-    let mut cursor = CharCursor::new(chars, origin.head);
-    if is_prev {
-        cursor.reverse();
-    }
-
-    let advance = |head: &mut usize| {
-        if is_prev {
-            *head = head.saturating_sub(1);
-        } else {
-            *head += 1;
-        }
-    };
-
-    let mut anchor = origin.anchor;
-    let mut head = origin.head;
-
-    // Peek the character just behind the head without moving the cursor.
-    let mut prev_ch = {
-        let ch = cursor.prev();
-        if ch.is_some() {
-            cursor.next();
-        }
-        ch
-    };
-
-    // Skip over any line endings at the head, advancing past them. When the
-    // head started on a line ending, re-anchor just past it so the resulting
-    // selection lives on the destination line rather than spanning the break.
-    while let Some(ch) = cursor.next() {
-        if char_is_line_ending(ch) {
-            prev_ch = Some(ch);
-            advance(&mut head);
-        } else {
-            cursor.prev();
-            break;
-        }
-    }
-    if prev_ch.map(char_is_line_ending).unwrap_or(false) {
-        anchor = head;
-    }
-
-    let head_start = head;
-    while let Some(next_ch) = cursor.next() {
-        if prev_ch.is_none() || reached_target(target, prev_ch.unwrap(), next_ch) {
-            if head == head_start {
-                // Boundary at the very first step: skip it, re-anchoring here.
-                anchor = head;
-            } else {
-                break;
-            }
-        }
-        prev_ch = Some(next_ch);
-        advance(&mut head);
-    }
-
-    HelixRange { anchor, head }
-}
-
-/// Port of Helix's `word_move`: prepares the start range to honor block-cursor
-/// semantics, then advances toward `target` once.
-fn helix_word_move(chars: &[char], range: HelixRange, target: HelixWordTarget) -> HelixRange {
-    let is_prev = target.is_prev();
-    let len = chars.len();
-
-    // Early-out when there is nowhere left to move.
-    if (is_prev && range.head == 0) || (!is_prev && range.head == len) {
-        return range;
-    }
-
-    let start_range = if is_prev {
-        if range.anchor < range.head {
-            HelixRange {
-                anchor: range.head,
-                head: range.head.saturating_sub(1),
-            }
-        } else {
-            HelixRange {
-                anchor: (range.head + 1).min(len),
-                head: range.head,
-            }
-        }
-    } else if range.anchor < range.head {
-        HelixRange {
-            anchor: range.head.saturating_sub(1),
-            head: range.head,
-        }
-    } else {
-        HelixRange {
-            anchor: range.head,
-            head: (range.head + 1).min(len),
-        }
-    };
-
-    let next = range_to_target(chars, target, start_range);
-    if next == start_range {
-        range
-    } else {
-        next
-    }
 }

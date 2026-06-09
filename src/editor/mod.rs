@@ -15,8 +15,11 @@ pub mod features;
 pub mod mode;
 pub mod movement;
 pub mod navigation;
+#[cfg(feature = "keybindings")]
+pub(crate) mod product;
+#[cfg(feature = "keybindings")]
+pub(crate) mod rows;
+#[cfg(feature = "keybindings")]
+pub(crate) mod selection;
 
-pub mod input;
-
-// Re-export the main type
-pub use core::FormEditor;
+pub use core::EditorCore;
