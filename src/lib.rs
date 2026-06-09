@@ -100,8 +100,9 @@ pub use suggestions::render::render_suggestions_dropdown;
 #[cfg(feature = "keybindings")]
 pub use keybindings::{
     default_builtin_action_bindings, default_emacs_action_bindings, default_helix_action_bindings,
-    default_vim_action_bindings, preset, BuiltinCanvasKeybindingPreset, CanvasActionBinding,
-    CanvasActionKeyBinding, CanvasKeyBindings, KeyEventOutcome,
+    default_vim_action_bindings, display_binding, preset, BuiltinCanvasKeybindingPreset,
+    CanvasActionBinding, CanvasActionKeyBinding, CanvasKeyBindingEntry, CanvasKeyBindings,
+    CanvasKeybindingConflictKind, CanvasKeybindingProfile, KeyEventOutcome,
 };
 
 #[cfg(feature = "textarea")]

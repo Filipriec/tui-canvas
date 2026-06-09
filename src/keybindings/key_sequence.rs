@@ -44,6 +44,57 @@ pub fn try_parse_key(token: &str) -> Result<KeyStroke, ParseKeyError> {
     try_parse_chord(token)
 }
 
+impl KeyStroke {
+    pub fn display_string(&self) -> String {
+        let stroke = normalize_stroke(self.clone());
+        let mut out = String::new();
+        if stroke.modifiers.contains(KeyModifiers::CONTROL) {
+            out.push_str("Ctrl+");
+        }
+        if stroke.modifiers.contains(KeyModifiers::ALT) {
+            out.push_str("Alt+");
+        }
+        if stroke.modifiers.contains(KeyModifiers::SHIFT) {
+            out.push_str("Shift+");
+        }
+        if stroke.modifiers.contains(KeyModifiers::SUPER) {
+            out.push_str("Super+");
+        }
+
+        match stroke.code {
+            KeyCode::Char(' ') => out.push_str("Space"),
+            KeyCode::Char(ch) => out.push(ch),
+            KeyCode::Enter => out.push_str("Enter"),
+            KeyCode::Tab => out.push_str("Tab"),
+            KeyCode::BackTab => out.push_str("BackTab"),
+            KeyCode::Backspace => out.push_str("Backspace"),
+            KeyCode::Esc => out.push_str("Esc"),
+            KeyCode::Up => out.push_str("Up"),
+            KeyCode::Down => out.push_str("Down"),
+            KeyCode::Left => out.push_str("Left"),
+            KeyCode::Right => out.push_str("Right"),
+            KeyCode::Home => out.push_str("Home"),
+            KeyCode::End => out.push_str("End"),
+            KeyCode::PageUp => out.push_str("PageUp"),
+            KeyCode::PageDown => out.push_str("PageDown"),
+            KeyCode::Delete => out.push_str("Delete"),
+            KeyCode::Insert => out.push_str("Insert"),
+            KeyCode::F(number) => out.push_str(&format!("F{number}")),
+            other => out.push_str(&format!("{other:?}")),
+        }
+
+        out
+    }
+}
+
+pub fn display_binding(sequence: &[KeyStroke]) -> String {
+    sequence
+        .iter()
+        .map(KeyStroke::display_string)
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
 fn try_parse_binding_token(token: &str) -> Result<Vec<KeyStroke>, ParseKeyError> {
     let token = token.trim();
     if token.is_empty() {
@@ -175,6 +226,10 @@ pub(crate) fn normalize_stroke(mut stroke: KeyStroke) -> KeyStroke {
     stroke
 }
 
+pub(crate) fn normalize_binding(sequence: &[KeyStroke]) -> Vec<KeyStroke> {
+    sequence.iter().cloned().map(normalize_stroke).collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -230,5 +285,33 @@ mod tests {
             try_parse_binding("ctrl+notakey"),
             Err(ParseKeyError::UnknownKey("ctrl+notakey".to_string()))
         );
+    }
+
+    #[test]
+    fn display_binding_round_trips_to_normalized_sequence() {
+        let cases = vec![
+            vec![stroke(KeyCode::Char('u'), KeyModifiers::empty())],
+            vec![stroke(KeyCode::Char('r'), KeyModifiers::CONTROL)],
+            vec![stroke(KeyCode::Char('a'), KeyModifiers::SHIFT)],
+            vec![stroke(KeyCode::Tab, KeyModifiers::SHIFT)],
+            vec![stroke(KeyCode::BackTab, KeyModifiers::SHIFT)],
+            vec![stroke(KeyCode::Char(' '), KeyModifiers::empty())],
+            vec![stroke(KeyCode::F(12), KeyModifiers::empty())],
+            vec![
+                stroke(KeyCode::Char('g'), KeyModifiers::empty()),
+                stroke(KeyCode::Char('g'), KeyModifiers::empty()),
+            ],
+            vec![
+                stroke(KeyCode::Char('z'), KeyModifiers::empty()),
+                stroke(KeyCode::Char('u'), KeyModifiers::empty()),
+            ],
+            vec![stroke(KeyCode::PageDown, KeyModifiers::ALT)],
+            vec![stroke(KeyCode::Insert, KeyModifiers::SUPER)],
+        ];
+
+        for case in cases {
+            let displayed = display_binding(&case);
+            assert_eq!(try_parse_binding(&displayed).unwrap(), normalize_binding(&case));
+        }
     }
 }

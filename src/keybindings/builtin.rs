@@ -1,4 +1,5 @@
 use super::preset::CanvasKeybindingPreset;
+use super::{CanvasKeyBindings, CanvasKeybindingPresetError, CanvasKeybindingProfile};
 use super::{try_parse_binding, CanvasActionKeyBinding};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -27,6 +28,24 @@ impl BuiltinCanvasKeybindingPreset {
 
     pub fn preset(self) -> CanvasKeybindingPreset {
         builtin_preset(self.name(), self.toml())
+    }
+
+    pub fn profile(self) -> CanvasKeybindingProfile {
+        CanvasKeybindingProfile::new(self)
+    }
+
+    pub fn profile_with_overrides(
+        self,
+        source: &str,
+    ) -> Result<CanvasKeybindingProfile, CanvasKeybindingPresetError> {
+        CanvasKeybindingProfile::with_overrides_toml(self, source)
+    }
+
+    pub fn keybindings_with_overrides(
+        self,
+        source: &str,
+    ) -> Result<CanvasKeyBindings, CanvasKeybindingPresetError> {
+        Ok(self.profile_with_overrides(source)?.current().clone())
     }
 }
 

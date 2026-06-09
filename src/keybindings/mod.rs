@@ -2,14 +2,17 @@ pub mod action;
 pub mod builtin;
 pub mod key_sequence;
 pub mod preset;
+pub mod profile;
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::time::{Duration, Instant};
 
 use crate::canvas::actions::CanvasAction;
 use crate::canvas::modes::AppMode;
 #[cfg(feature = "keybindings")]
 use crate::editor::behavior::KeybindingParadigm;
+use crate::keybindings::key_sequence::normalize_binding;
+use crate::keybindings::preset::conflict_kind;
 
 pub use action::CanvasKeyAction;
 pub use builtin::{
@@ -19,12 +22,13 @@ pub use builtin::{
     helix_preset_toml, vim_preset_toml, BuiltinCanvasKeybindingPreset,
 };
 pub use key_sequence::{
-    parse_binding, try_parse_binding, try_parse_key, KeyStroke, ParseKeyError,
+    display_binding, parse_binding, try_parse_binding, try_parse_key, KeyStroke, ParseKeyError,
 };
 pub use preset::{
     CanvasKeybindingPreset, CanvasKeybindingPresetBinding, CanvasKeybindingPresetError,
-    CanvasKeybindingPresetIssue, CanvasKeybindingPresetSection,
+    CanvasKeybindingPresetIssue, CanvasKeybindingPresetSection, CanvasKeybindingConflictKind,
 };
+pub use profile::CanvasKeybindingProfile;
 
 #[derive(Clone, Debug)]
 struct Binding {
@@ -48,6 +52,13 @@ pub struct CanvasActionKeyBinding {
 }
 
 pub type CanvasActionBinding = CanvasActionKeyBinding;
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CanvasKeyBindingEntry {
+    pub mode: AppMode,
+    pub action: CanvasKeyAction,
+    pub sequence: Vec<KeyStroke>,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum KeyEventOutcome {
@@ -210,6 +221,194 @@ impl CanvasKeyBindings {
         let (action, is_prefix) = self.lookup_action(mode, seq);
         (action.map(|action| action.as_str()), is_prefix)
     }
+
+    pub fn entries(&self) -> Vec<CanvasKeyBindingEntry> {
+        let mut entries = Vec::new();
+        for (mode, bindings) in [
+            (AppMode::Nor, &self.ro),
+            (AppMode::Ins, &self.edit),
+            (AppMode::Sel, &self.hl),
+        ] {
+            for binding in bindings {
+                entries.push(CanvasKeyBindingEntry {
+                    mode,
+                    action: binding.action.clone(),
+                    sequence: binding.sequence.clone(),
+                });
+            }
+        }
+        entries
+    }
+
+    pub fn bindings_for(&self, mode: AppMode, action: &CanvasKeyAction) -> Vec<Vec<KeyStroke>> {
+        let Some(bindings) = self.bindings_for_mode(mode) else {
+            return Vec::new();
+        };
+        bindings
+            .iter()
+            .filter(|binding| &binding.action == action)
+            .map(|binding| binding.sequence.clone())
+            .collect()
+    }
+
+    pub fn bind(
+        &mut self,
+        mode: AppMode,
+        action: CanvasKeyAction,
+        binding: &str,
+    ) -> Result<(), CanvasKeybindingPresetError> {
+        let sequence = parse_runtime_binding(mode, &action, binding)?;
+        self.ensure_available(mode, &action, &sequence)?;
+        self.bindings_for_mode_mut(mode)?
+            .push(Binding { action, sequence });
+        Ok(())
+    }
+
+    pub fn unbind(
+        &mut self,
+        mode: AppMode,
+        binding: &str,
+    ) -> Result<Option<CanvasKeyAction>, CanvasKeybindingPresetError> {
+        let sequence = try_parse_binding(binding).map_err(|source| {
+            CanvasKeybindingPresetError::Issues(vec![CanvasKeybindingPresetIssue::InvalidBinding {
+                section: mode_section_name(mode).to_string(),
+                action: CanvasKeyAction::Unknown("<unbind>".to_string()),
+                binding: binding.to_string(),
+                source,
+            }])
+        })?;
+        let sequence = normalize_binding(&sequence);
+        let bindings = self.bindings_for_mode_mut(mode)?;
+        let Some(index) = bindings
+            .iter()
+            .position(|existing| existing.sequence == sequence)
+        else {
+            return Ok(None);
+        };
+        Ok(Some(bindings.remove(index).action))
+    }
+
+    pub fn unbind_action(
+        &mut self,
+        mode: AppMode,
+        action: &CanvasKeyAction,
+    ) -> Result<usize, CanvasKeybindingPresetError> {
+        let bindings = self.bindings_for_mode_mut(mode)?;
+        let before = bindings.len();
+        bindings.retain(|binding| &binding.action != action);
+        Ok(before - bindings.len())
+    }
+
+    pub fn remap_action(
+        &mut self,
+        mode: AppMode,
+        action: CanvasKeyAction,
+        bindings: Vec<String>,
+    ) -> Result<(), CanvasKeybindingPresetError> {
+        let mut sequences = Vec::new();
+        let mut seen = HashSet::new();
+        for binding in &bindings {
+            let sequence = parse_runtime_binding(mode, &action, binding)?;
+            if !seen.insert(sequence.clone()) {
+                return Err(CanvasKeybindingPresetError::Issues(vec![
+                    CanvasKeybindingPresetIssue::BindingConflict {
+                        section: mode_section_name(mode).to_string(),
+                        mode,
+                        binding: display_binding(&sequence),
+                        action: action.clone(),
+                        existing_binding: display_binding(&sequence),
+                        existing_action: action.clone(),
+                        kind: CanvasKeybindingConflictKind::Exact,
+                    },
+                ]));
+            }
+            sequences.push(sequence);
+        }
+
+        for left in 0..sequences.len() {
+            for right in (left + 1)..sequences.len() {
+                let Some(kind) = conflict_kind(&sequences[left], &sequences[right]) else {
+                    continue;
+                };
+                return Err(CanvasKeybindingPresetError::Issues(vec![
+                    CanvasKeybindingPresetIssue::BindingConflict {
+                        section: mode_section_name(mode).to_string(),
+                        mode,
+                        binding: display_binding(&sequences[left]),
+                        action: action.clone(),
+                        existing_binding: display_binding(&sequences[right]),
+                        existing_action: action.clone(),
+                        kind,
+                    },
+                ]));
+            }
+        }
+
+        let mut candidate = self.clone();
+        candidate.unbind_action(mode, &action)?;
+        for sequence in &sequences {
+            candidate.ensure_available(mode, &action, sequence)?;
+        }
+
+        let target = self.bindings_for_mode_mut(mode)?;
+        target.retain(|binding| binding.action != action);
+        for sequence in sequences {
+            target.push(Binding {
+                action: action.clone(),
+                sequence,
+            });
+        }
+        Ok(())
+    }
+
+    fn bindings_for_mode(&self, mode: AppMode) -> Option<&Vec<Binding>> {
+        match mode {
+            AppMode::Nor => Some(&self.ro),
+            AppMode::Ins => Some(&self.edit),
+            AppMode::Sel => Some(&self.hl),
+            AppMode::General | AppMode::Command => None,
+        }
+    }
+
+    fn bindings_for_mode_mut(
+        &mut self,
+        mode: AppMode,
+    ) -> Result<&mut Vec<Binding>, CanvasKeybindingPresetError> {
+        match mode {
+            AppMode::Nor => Ok(&mut self.ro),
+            AppMode::Ins => Ok(&mut self.edit),
+            AppMode::Sel => Ok(&mut self.hl),
+            AppMode::General | AppMode::Command => Err(unsupported_mode_error(mode)),
+        }
+    }
+
+    fn ensure_available(
+        &self,
+        mode: AppMode,
+        action: &CanvasKeyAction,
+        sequence: &[KeyStroke],
+    ) -> Result<(), CanvasKeybindingPresetError> {
+        let Some(bindings) = self.bindings_for_mode(mode) else {
+            return Err(unsupported_mode_error(mode));
+        };
+        for existing in bindings {
+            let Some(kind) = conflict_kind(sequence, &existing.sequence) else {
+                continue;
+            };
+            return Err(CanvasKeybindingPresetError::Issues(vec![
+                CanvasKeybindingPresetIssue::BindingConflict {
+                    section: mode_section_name(mode).to_string(),
+                    mode,
+                    binding: display_binding(sequence),
+                    action: action.clone(),
+                    existing_binding: display_binding(&existing.sequence),
+                    existing_action: existing.action.clone(),
+                    kind,
+                },
+            ]));
+        }
+        Ok(())
+    }
 }
 
 fn collect_bindings(mode_map: &HashMap<String, Vec<String>>) -> Vec<Binding> {
@@ -225,6 +424,39 @@ fn collect_bindings(mode_map: &HashMap<String, Vec<String>>) -> Vec<Binding> {
         }
     }
     out
+}
+
+fn parse_runtime_binding(
+    mode: AppMode,
+    action: &CanvasKeyAction,
+    binding: &str,
+) -> Result<Vec<KeyStroke>, CanvasKeybindingPresetError> {
+    try_parse_binding(binding)
+        .map(|sequence| normalize_binding(&sequence))
+        .map_err(|source| {
+            CanvasKeybindingPresetError::Issues(vec![CanvasKeybindingPresetIssue::InvalidBinding {
+                section: mode_section_name(mode).to_string(),
+                action: action.clone(),
+                binding: binding.to_string(),
+                source,
+            }])
+        })
+}
+
+fn unsupported_mode_error(mode: AppMode) -> CanvasKeybindingPresetError {
+    CanvasKeybindingPresetError::Issues(vec![CanvasKeybindingPresetIssue::UnsupportedMode {
+        mode,
+    }])
+}
+
+fn mode_section_name(mode: AppMode) -> &'static str {
+    match mode {
+        AppMode::Nor => "nor",
+        AppMode::Ins => "ins",
+        AppMode::Sel => "sel",
+        AppMode::General => "general",
+        AppMode::Command => "command",
+    }
 }
 
 #[cfg(test)]
@@ -262,5 +494,126 @@ mod tests {
             keybindings.lookup_action(AppMode::Nor, &redo).0,
             Some(&CanvasKeyAction::Redo)
         );
+    }
+
+    #[test]
+    fn profile_applies_partial_helix_overrides_and_keeps_unmentioned_defaults() {
+        let profile = BuiltinCanvasKeybindingPreset::Helix
+            .profile_with_overrides(
+                r#"
+[nor]
+undo = ["z u"]
+redo = ["z r"]
+"#,
+            )
+            .unwrap();
+
+        let current = profile.current();
+        let old_undo = try_parse_binding("u").unwrap();
+        let new_undo = try_parse_binding("z u").unwrap();
+        let redo = try_parse_binding("z r").unwrap();
+        let move_down = try_parse_binding("j").unwrap();
+
+        assert_eq!(current.lookup_action(AppMode::Nor, &old_undo).0, None);
+        assert_eq!(
+            current.lookup_action(AppMode::Nor, &new_undo).0,
+            Some(&CanvasKeyAction::Undo)
+        );
+        assert_eq!(
+            current.lookup_action(AppMode::Nor, &redo).0,
+            Some(&CanvasKeyAction::Redo)
+        );
+        assert_eq!(
+            current.lookup_action(AppMode::Nor, &move_down).0,
+            Some(&CanvasKeyAction::MoveDown)
+        );
+    }
+
+    #[test]
+    fn profile_serializes_only_normalized_differences() {
+        let mut profile = CanvasKeybindingProfile::new(BuiltinCanvasKeybindingPreset::Helix);
+        profile
+            .remap_action(
+                AppMode::Nor,
+                CanvasKeyAction::Undo,
+                vec!["Shift+u".to_string(), "z u".to_string()],
+            )
+            .unwrap();
+        profile
+            .remap_action(AppMode::Nor, CanvasKeyAction::Redo, Vec::new())
+            .unwrap();
+
+        let overrides = profile.overrides_toml();
+        assert!(overrides.contains("[nor]"));
+        assert!(overrides.contains("undo = [\"U\", \"z u\"]"));
+        assert!(overrides.contains("redo = []"));
+        assert!(!overrides.contains("move_down"));
+
+        let round_tripped = BuiltinCanvasKeybindingPreset::Helix
+            .profile_with_overrides(&overrides)
+            .unwrap();
+        assert_eq!(round_tripped.overrides_toml(), overrides);
+    }
+
+    #[test]
+    fn runtime_remap_reports_prefix_conflicts() {
+        let mut bindings = CanvasKeyBindings::default();
+        bindings
+            .bind(AppMode::Nor, CanvasKeyAction::Undo, "z u")
+            .unwrap();
+        let err = bindings
+            .bind(AppMode::Nor, CanvasKeyAction::Redo, "z")
+            .unwrap_err();
+
+        let CanvasKeybindingPresetError::Issues(issues) = err else {
+            panic!("expected issues");
+        };
+        assert!(issues.iter().any(|issue| matches!(
+            issue,
+            CanvasKeybindingPresetIssue::BindingConflict {
+                kind: CanvasKeybindingConflictKind::PrefixOf,
+                ..
+            }
+        )));
+    }
+
+    #[test]
+    fn runtime_remap_reports_extension_conflicts() {
+        let mut bindings = CanvasKeyBindings::default();
+        bindings
+            .bind(AppMode::Nor, CanvasKeyAction::Undo, "z")
+            .unwrap();
+        let err = bindings
+            .bind(AppMode::Nor, CanvasKeyAction::Redo, "z r")
+            .unwrap_err();
+
+        let CanvasKeybindingPresetError::Issues(issues) = err else {
+            panic!("expected issues");
+        };
+        assert!(issues.iter().any(|issue| matches!(
+            issue,
+            CanvasKeybindingPresetIssue::BindingConflict {
+                kind: CanvasKeybindingConflictKind::ExtensionOf,
+                ..
+            }
+        )));
+    }
+
+    #[test]
+    fn runtime_mutation_rejects_unsupported_modes() {
+        let mut bindings = CanvasKeyBindings::default();
+        let err = bindings
+            .bind(AppMode::Command, CanvasKeyAction::Undo, "u")
+            .unwrap_err();
+
+        let CanvasKeybindingPresetError::Issues(issues) = err else {
+            panic!("expected issues");
+        };
+        assert!(issues.iter().any(|issue| matches!(
+            issue,
+            CanvasKeybindingPresetIssue::UnsupportedMode {
+                mode: AppMode::Command
+            }
+        )));
     }
 }

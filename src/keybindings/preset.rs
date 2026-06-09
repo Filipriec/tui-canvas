@@ -5,7 +5,7 @@ use toml::Value;
 
 use crate::canvas::modes::AppMode;
 
-use super::{try_parse_binding, CanvasKeyAction, KeyStroke, ParseKeyError};
+use super::{display_binding, try_parse_binding, CanvasKeyAction, KeyStroke, ParseKeyError};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CanvasKeybindingPreset {
@@ -72,6 +72,25 @@ pub enum CanvasKeybindingPresetIssue {
         first_action: CanvasKeyAction,
         second_action: CanvasKeyAction,
     },
+    BindingConflict {
+        section: String,
+        mode: AppMode,
+        binding: String,
+        action: CanvasKeyAction,
+        existing_binding: String,
+        existing_action: CanvasKeyAction,
+        kind: CanvasKeybindingConflictKind,
+    },
+    UnsupportedMode {
+        mode: AppMode,
+    },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CanvasKeybindingConflictKind {
+    Exact,
+    PrefixOf,
+    ExtensionOf,
 }
 
 impl fmt::Display for CanvasKeybindingPresetError {
@@ -142,6 +161,30 @@ impl fmt::Display for CanvasKeybindingPresetIssue {
                     first_action.as_str(),
                     second_action.as_str()
                 )
+            }
+            Self::BindingConflict {
+                section,
+                mode,
+                binding,
+                action,
+                existing_binding,
+                existing_action,
+                kind,
+            } => {
+                let relationship = match kind {
+                    CanvasKeybindingConflictKind::Exact => "is already bound as",
+                    CanvasKeybindingConflictKind::PrefixOf => "is a prefix of",
+                    CanvasKeybindingConflictKind::ExtensionOf => "extends",
+                };
+                write!(
+                    f,
+                    "binding {binding:?} for {} in mode {mode:?}, section {section:?} {relationship} {existing_binding:?} for {}",
+                    action.as_str(),
+                    existing_action.as_str()
+                )
+            }
+            Self::UnsupportedMode { mode } => {
+                write!(f, "canvas keybindings do not support runtime storage for mode {mode:?}")
             }
         }
     }
@@ -277,6 +320,8 @@ impl CanvasKeybindingPreset {
         let mut issues = Vec::new();
         let mut seen: HashMap<(String, Vec<KeyStroke>), (String, CanvasKeyAction, String)> =
             HashMap::new();
+        let mut previous: Vec<(String, AppMode, Vec<KeyStroke>, CanvasKeyAction, String)> =
+            Vec::new();
         for section in &self.sections {
             let mode_key = app_mode_name(section.mode).to_string();
             for binding in &section.bindings {
@@ -308,10 +353,41 @@ impl CanvasKeybindingPreset {
                             });
                         }
                         seen.insert(
-                            (mode_key.clone(), sequence),
+                            (mode_key.clone(), sequence.clone()),
                             (first_section, first_action, first_key),
                         );
                     }
+                    for (
+                        _existing_section,
+                        existing_mode,
+                        existing_sequence,
+                        existing_action,
+                        existing_key,
+                    ) in &previous
+                    {
+                        if *existing_mode != section.mode || *existing_action == binding.action {
+                            continue;
+                        }
+                        let Some(kind) = conflict_kind(&sequence, existing_sequence) else {
+                            continue;
+                        };
+                        issues.push(CanvasKeybindingPresetIssue::BindingConflict {
+                            section: section.name.clone(),
+                            mode: section.mode,
+                            binding: display_binding(&sequence),
+                            action: binding.action.clone(),
+                            existing_binding: existing_key.clone(),
+                            existing_action: existing_action.clone(),
+                            kind,
+                        });
+                    }
+                    previous.push((
+                        section.name.clone(),
+                        section.mode,
+                        sequence,
+                        binding.action.clone(),
+                        key.clone(),
+                    ));
                 }
             }
         }
@@ -329,6 +405,21 @@ impl CanvasKeybindingPreset {
         } else {
             Err(CanvasKeybindingPresetError::Issues(issues))
         }
+    }
+}
+
+pub(crate) fn conflict_kind(
+    requested: &[KeyStroke],
+    existing: &[KeyStroke],
+) -> Option<CanvasKeybindingConflictKind> {
+    if requested == existing {
+        Some(CanvasKeybindingConflictKind::Exact)
+    } else if existing.starts_with(requested) {
+        Some(CanvasKeybindingConflictKind::PrefixOf)
+    } else if requested.starts_with(existing) {
+        Some(CanvasKeybindingConflictKind::ExtensionOf)
+    } else {
+        None
     }
 }
 
