@@ -198,7 +198,7 @@ impl DataProvider for DemoData {
     }
 }
 
-fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: KeybindingDemoApp) -> io::Result<()> {
+fn run_app<B: Backend<Error = io::Error>>(terminal: &mut Terminal<B>, mut app: KeybindingDemoApp) -> io::Result<()> {
     loop {
         terminal.draw(|f| ui(f, &app))?;
 

@@ -946,7 +946,7 @@ impl<D: DataProvider> ValidationDemoEditor<D> {
     }
 }
 
-fn run_app<B: Backend>(
+fn run_app<B: Backend<Error = io::Error>>(
     terminal: &mut Terminal<B>,
     mut editor: ValidationDemoEditor<ValidationDemoData>,
 ) -> io::Result<()> {

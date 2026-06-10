@@ -473,7 +473,7 @@ fn handle_key_press(key_event: KeyEvent, editor: &mut AutoCursorTextArea) -> any
     Ok(true)
 }
 
-fn run_app<B: Backend>(
+fn run_app<B: Backend<Error = io::Error>>(
     terminal: &mut Terminal<B>,
     mut editor: AutoCursorTextArea,
 ) -> io::Result<()> {

@@ -518,7 +518,7 @@ fn handle_key_press(
     Ok(true)
 }
 
-fn run_app<B: Backend>(
+fn run_app<B: Backend<Error = io::Error>>(
     terminal: &mut Terminal<B>,
     mut editor: ComputedFieldsEditor<InvoiceData>,
 ) -> io::Result<()> {

@@ -15,6 +15,7 @@ compile_error!(
      Run with: cargo run --example textinput_normal --features \"gui,cursor-style,textinput,textmode-normal\""
 );
 
+use std::io;
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 use ratatui::{
     backend::{Backend, CrosstermBackend},
@@ -104,7 +105,7 @@ fn ui(f: &mut Frame, app: &mut TextInputDemo) {
     f.render_widget(status, chunks[1]);
 }
 
-fn run_app<B: Backend>(
+fn run_app<B: Backend<Error = io::Error>>(
     terminal: &mut Terminal<B>,
     session: &CrosstermInputSession,
 ) -> anyhow::Result<()> {

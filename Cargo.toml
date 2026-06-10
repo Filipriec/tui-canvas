@@ -1,6 +1,7 @@
 [package]
 name = "tui-canvas"
-version.workspace = true
+# version.workspace = true
+version = "0.8.3"
 edition.workspace = true
 license = "MIT"
 authors.workspace = true
@@ -116,17 +117,17 @@ path = "examples/suggestions/suggestions2.rs"
 
 [[example]]
 name = "textarea_vim"
-required-features = ["gui", "cursor-style", "textarea", "textmode-vim"]
+required-features = ["gui", "cursor-style", "textarea", "textmode-vim", "keybindings"]
 path = "examples/textarea/textarea_vim.rs"
 
 [[example]]
 name = "textarea_normal"
-required-features = ["gui", "cursor-style", "textarea", "textmode-normal", "commandline"]
+required-features = ["gui", "cursor-style", "textarea", "textmode-normal", "keybindings", "commandline"]
 path = "examples/textarea/textarea_normal.rs"
 
 [[example]]
 name = "textarea_syntax"
-required-features = ["gui", "cursor-style", "textarea", "textmode-normal", "syntect"]
+required-features = ["gui", "cursor-style", "textarea", "textmode-normal", "keybindings", "syntect"]
 path = "examples/textarea/textarea_syntax.rs"
 
 [[example]]

@@ -10,6 +10,7 @@
 //! Keys (NORMAL):  i insert  ·  u undo  ·  Ctrl+U redo  ·  Ctrl+C quit
 //! Keys (INSERT):  type  ·  Esc back to normal
 
+use std::io;
 use crossterm::event::{Event, KeyCode, KeyModifiers};
 use ratatui::{
     backend::{Backend, CrosstermBackend},
@@ -65,7 +66,7 @@ fn ui(f: &mut Frame, demo: &mut Demo) {
     );
 }
 
-fn run<B: Backend>(
+fn run<B: Backend<Error = io::Error>>(
     terminal: &mut Terminal<B>,
     session: &CrosstermInputSession,
 ) -> anyhow::Result<()> {
