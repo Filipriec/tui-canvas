@@ -1,5 +1,22 @@
 # Changelog
 
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+### Added
+- Canvas keybinding profile overrides for downstream consumers
+
+### Changed
+- Helix mode now clears selection on navigation operations
+
+### Fixed
+- Paste clipboard integration edge case
+- Canvas keybinding conflict validation
+
 ## 0.8.0
 
 ### Added
@@ -121,3 +138,5 @@ use canvas::{
 Use module paths under `canvas::textarea::*`, `canvas::textinput::*`, or
 `canvas::form::*` when depending on widget submodules such as textarea syntax
 highlighting or providers.
+
+[Unreleased]: https://gitlab.com/filipriec/tui-canvas/-/compare/v0.7.5...HEAD
