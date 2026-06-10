@@ -1,14 +1,18 @@
 [package]
 name = "tui-canvas"
 # version.workspace = true
-version = "0.8.3"
+version = "0.8.4"
 edition.workspace = true
-license = "MIT"
 authors.workspace = true
-description = "Form/textarea for TUI"
-readme.workspace = true
-repository.workspace = true
-categories.workspace = true
+license = "MIT"
+description = "Form/textarea/input for TUI"
+readme = "README.md"
+repository = "https://gitlab.com/filipriec/tui-canvas"
+keywords = ["tui", "terminal", "ratatui", "keyboard", "ui"]
+categories = ["command-line-interface"]
+exclude = [".claude/", ".forge/"]
+
+
 
 [dependencies]
 ratatui = { workspace = true, optional = true }
