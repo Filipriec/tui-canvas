@@ -66,7 +66,7 @@ impl DataProvider for Form {
     }
 }
 
-fn run_app<B: Backend>(
+fn run_app<B: Backend<Error = io::Error>>(
     terminal: &mut Terminal<B>,
     session: &CrosstermInputSession,
     mut app: App,

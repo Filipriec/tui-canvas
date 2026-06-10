@@ -201,7 +201,7 @@ impl std::error::Error for CanvasKeybindingPresetError {
 
 impl CanvasKeybindingPreset {
     pub fn from_toml(source: &str) -> Result<Self, CanvasKeybindingPresetError> {
-        let value = source.parse::<Value>().map_err(CanvasKeybindingPresetError::Toml)?;
+        let value = toml::from_str::<Value>(source).map_err(CanvasKeybindingPresetError::Toml)?;
         let Some(table) = value.as_table() else {
             return Err(CanvasKeybindingPresetError::Issues(vec![
                 CanvasKeybindingPresetIssue::RootNotTable,

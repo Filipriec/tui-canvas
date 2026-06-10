@@ -147,7 +147,7 @@ fn parse_override_toml(source: &str) -> Result<Vec<OverrideSection>, CanvasKeybi
         return Ok(Vec::new());
     }
 
-    let value = source.parse::<Value>().map_err(CanvasKeybindingPresetError::Toml)?;
+    let value = toml::from_str::<Value>(source).map_err(CanvasKeybindingPresetError::Toml)?;
     let Some(table) = value.as_table() else {
         return Err(CanvasKeybindingPresetError::Issues(vec![
             CanvasKeybindingPresetIssue::RootNotTable,
