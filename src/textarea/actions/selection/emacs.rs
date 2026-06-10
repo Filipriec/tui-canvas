@@ -45,10 +45,6 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         self.exit_highlight_mode_emacs();
     }
 
-    pub(crate) fn yank_primary_selection_emacs(&mut self) {
-        self.copy_region_emacs();
-    }
-
     fn copy_character_region_emacs(&mut self, anchor: (usize, usize)) -> bool {
         let Some((start, end)) = self.emacs_region_endpoints(anchor) else {
             return false;
@@ -59,11 +55,13 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         }
 
         let yanked = if start.0 == end.0 {
-            vec![lines[start.0]
-                .chars()
-                .skip(start.1)
-                .take(end.1.saturating_sub(start.1))
-                .collect()]
+            vec![
+                lines[start.0]
+                    .chars()
+                    .skip(start.1)
+                    .take(end.1.saturating_sub(start.1))
+                    .collect(),
+            ]
         } else {
             let mut yanked = Vec::new();
             yanked.push(lines[start.0].chars().skip(start.1).collect());

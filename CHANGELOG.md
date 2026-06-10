@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.2]
+
+### Changed
+- Rust edition bumped to 2024
+- Dependency version bumps: `tracing` 0.1.44, `tracing-subscriber` 0.3.23, `once_cell` 1.21.4, `syntect` 5.3.0, `arboard` 3.6, `tokio-test` 0.4.5
+
+### Fixed
+- Cleaned up unused variables and dead code in form render and Emacs selection paths
+
+## [0.8.1]
+
 ### Added
 - Canvas keybinding profile overrides for downstream consumers
 
@@ -139,4 +150,4 @@ Use module paths under `canvas::textarea::*`, `canvas::textinput::*`, or
 `canvas::form::*` when depending on widget submodules such as textarea syntax
 highlighting or providers.
 
-[Unreleased]: https://gitlab.com/filipriec/tui-canvas/-/compare/v0.7.5...HEAD
+[Unreleased]: https://gitlab.com/filipriec/tui-canvas/-/compare/v0.8.2...HEAD

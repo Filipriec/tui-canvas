@@ -2,11 +2,11 @@
 //! Canvas GUI rendering helpers.
 
 use ratatui::{
+    Frame,
     layout::{Alignment, Rect},
     style::{Modifier, Style},
     text::{Line, Span},
     widgets::{Paragraph, Wrap},
-    Frame,
 };
 
 use crate::canvas::modes::HighlightState;
@@ -14,8 +14,8 @@ use crate::canvas::theme::{CanvasTheme, DefaultCanvasTheme};
 use crate::data_provider::DataProvider;
 use crate::editor::EditorCore;
 use crate::gui_utils::{
-    clip_inline_completion_with_indicator_padded, compute_h_scroll_with_padding, display_width,
-    RIGHT_PAD,
+    RIGHT_PAD, clip_inline_completion_with_indicator_padded, compute_h_scroll_with_padding,
+    display_width,
 };
 use unicode_width::UnicodeWidthChar;
 
@@ -284,7 +284,6 @@ fn render_canvas_with_highlight_and_options<T: CanvasTheme, D: DataProvider>(
     }
 
     let current_field_idx = ui_state.current_field();
-    let is_edit_mode = matches!(ui_state.mode(), crate::canvas::modes::AppMode::Ins);
 
     render_canvas_fields_with_options(
         f,
@@ -293,10 +292,8 @@ fn render_canvas_with_highlight_and_options<T: CanvasTheme, D: DataProvider>(
         &current_field_idx,
         &inputs,
         theme,
-        is_edit_mode,
         highlight_state,
         editor.display_cursor_position(),
-        false,
         #[cfg(feature = "validation")]
         |field_idx| editor.display_text_for_field(field_idx),
         #[cfg(not(feature = "validation"))]
@@ -341,10 +338,8 @@ fn render_canvas_fields_with_options<T: CanvasTheme, F1, F2>(
     current_field_idx: &usize,
     inputs: &[String],
     theme: &T,
-    is_edit_mode: bool,
     highlight_state: &HighlightState,
     current_cursor_pos: usize,
-    has_unsaved_changes: bool,
     get_display_value: F1,
     has_display_override: F2,
     active_completion: Option<String>,
