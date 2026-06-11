@@ -63,6 +63,19 @@ impl<D: DataProvider> EditorCore<D> {
         s[..byte_idx].chars().count()
     }
 
+    /// Whether a multi-key command is mid-flight in the shared editor state: a
+    /// partially-matched key sequence (e.g. `g` of `gg`), a pending count
+    /// (`2…`), or an operator awaiting its motion (vim `d`/`c`/`y`). A host can
+    /// use this to keep routing subsequent keys to the editor instead of letting
+    /// an outer keymap claim them. (Literal-char captures like `f`/`r` live on
+    /// the concrete widget state and are folded in there.)
+    #[cfg(feature = "keybindings")]
+    pub(crate) fn is_sequence_pending(&self) -> bool {
+        !self.seq_tracker.sequence().is_empty()
+            || self.behavior_state.vim().has_count()
+            || self.behavior_state.vim().has_pending_operator()
+    }
+
     pub fn new(data_provider: D) -> Self {
         let editor = Self {
             ui_state: EditorState::new(),

@@ -110,6 +110,15 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         handle_product_key_event(self, evt)
     }
 
+    /// Whether a multi-key command is mid-flight: the shared editor pending state
+    /// (key sequence, count, operator) plus this widget's literal-char captures
+    /// (vim/helix `f`/`t`/`r`/surround waiting for the next character).
+    pub fn is_sequence_pending(&self) -> bool {
+        self.core.is_sequence_pending()
+            || self.vim_pending.is_some()
+            || self.helix_pending.is_some()
+    }
+
     fn dispatch_textarea_key_action(
         &mut self,
         action: &CanvasKeyAction,

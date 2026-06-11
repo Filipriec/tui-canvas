@@ -346,6 +346,14 @@ impl<D: DataProvider> TextFormState<D> {
         self.with_fixed_rows(|this| handle_product_key_event(this, evt))
     }
 
+    /// Whether a multi-key command (key sequence, count, or pending operator) is
+    /// in flight, so a host should keep routing keys here rather than letting an
+    /// outer keymap claim the next stroke.
+    #[cfg(feature = "keybindings")]
+    pub fn is_sequence_pending(&self) -> bool {
+        self.core.is_sequence_pending()
+    }
+
     #[cfg(feature = "cursor-style")]
     pub fn update_cursor_style(&self) -> io::Result<()> {
         CursorManager::update_for_mode(self.core.mode())
