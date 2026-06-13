@@ -36,6 +36,7 @@ open_suggestions = ["Ctrl+space"]
 suggestion_down = ["Alt+n"]
 suggestion_up = ["Alt+p"]
 apply_suggestion = ["Enter"]
+exit_suggestions = ["Ctrl+g"]
 
 [sel]
 mode = "sel"

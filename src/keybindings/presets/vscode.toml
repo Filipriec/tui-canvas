@@ -73,6 +73,7 @@ select_all = ["Ctrl+a"]
 open_suggestions = ["Ctrl+space"]
 suggestion_down = ["Ctrl+n"]
 suggestion_up = ["Ctrl+p"]
+exit_suggestions = ["Ctrl+g"]
 
 [nor]
 mode = "nor"

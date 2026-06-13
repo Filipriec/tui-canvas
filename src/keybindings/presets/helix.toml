@@ -90,6 +90,7 @@ open_suggestions = ["Ctrl+x"]
 suggestion_down = ["Ctrl+n"]
 suggestion_up = ["Ctrl+p"]
 apply_suggestion = ["Enter"]
+exit_suggestions = ["Ctrl+g"]
 
 [sel]
 mode = "sel"

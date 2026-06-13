@@ -68,6 +68,7 @@ open_suggestions = ["Ctrl+space"]
 suggestion_down = ["Ctrl+n"]
 suggestion_up = ["Ctrl+p"]
 apply_suggestion = ["Ctrl+y"]
+exit_suggestions = ["Ctrl+g"]
 
 [sel]
 mode = "sel"

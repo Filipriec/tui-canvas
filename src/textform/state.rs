@@ -65,6 +65,7 @@ fn textform_action_policy(action: &CanvasKeyAction) -> TextFormActionPolicy {
         | Redo
         | OpenSuggestions
         | ApplySuggestion
+        | ExitSuggestions
         | SuggestionDown
         | SuggestionUp
         | EnterEditModeBefore

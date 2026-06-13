@@ -328,6 +328,7 @@ mod tests {
                 CanvasAction::SuggestionDown,
                 CanvasAction::SuggestionUp,
                 CanvasAction::SelectSuggestion,
+                CanvasAction::ExitSuggestions,
             ] {
                 assert!(
                     bindings
