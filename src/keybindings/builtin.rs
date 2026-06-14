@@ -4,7 +4,8 @@ use super::preset::CanvasKeybindingPreset;
 use super::{CanvasKeyBindings, CanvasKeybindingPresetError, CanvasKeybindingProfile};
 use super::{try_parse_binding, CanvasActionKeyBinding};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Deserialize, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
 pub enum BuiltinCanvasKeybindingPreset {
     Vim,
     Helix,
@@ -32,13 +33,23 @@ impl fmt::Display for ParseBuiltinCanvasKeybindingPresetError {
 impl std::error::Error for ParseBuiltinCanvasKeybindingPresetError {}
 
 impl BuiltinCanvasKeybindingPreset {
-    pub fn name(&self) -> &'static str {
+    fn as_name(&self) -> &'static str {
         match self {
             Self::Vim => "vim",
             Self::Helix => "helix",
             Self::Emacs => "emacs",
             Self::Vscode => "vscode",
         }
+    }
+
+    #[deprecated(
+        since = "0.8.5",
+        note = "use Display/to_string(); this compatibility shim will be removed in 1.0.0"
+    )]
+    pub fn name(&self) -> &'static str {
+        panic!(
+            "BuiltinCanvasKeybindingPreset::name() is deprecated; use Display/to_string() instead. It will be removed in 1.0.0."
+        )
     }
 
     pub fn toml(&self) -> &str {
@@ -51,7 +62,7 @@ impl BuiltinCanvasKeybindingPreset {
     }
 
     pub fn preset(self) -> CanvasKeybindingPreset {
-        builtin_preset(self.name(), self.toml())
+        builtin_preset(self.as_name(), self.toml())
     }
 
     pub fn profile(self) -> CanvasKeybindingProfile {
@@ -91,7 +102,7 @@ impl FromStr for BuiltinCanvasKeybindingPreset {
 
 impl fmt::Display for BuiltinCanvasKeybindingPreset {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(self.name())
+        f.write_str(self.as_name())
     }
 }
 
@@ -191,12 +202,34 @@ mod tests {
             BuiltinCanvasKeybindingPreset::Emacs,
             BuiltinCanvasKeybindingPreset::Vscode,
         ] {
-            assert_eq!(preset.name().parse::<BuiltinCanvasKeybindingPreset>(), Ok(preset));
-            assert_eq!(preset.to_string(), preset.name());
+            assert_eq!(preset.to_string().parse::<BuiltinCanvasKeybindingPreset>(), Ok(preset));
+            assert_eq!(preset.to_string(), preset.as_name());
 
             let parsed = CanvasKeybindingPreset::from_toml(preset.toml()).unwrap();
             assert_eq!(parsed.sections().len(), 3);
         }
+    }
+
+    #[test]
+    fn serde_uses_config_names() {
+        #[derive(Debug, serde::Deserialize, serde::Serialize)]
+        struct Config {
+            preset: BuiltinCanvasKeybindingPreset,
+        }
+
+        assert_eq!(
+            toml::from_str::<Config>("preset = \"helix\"")
+                .unwrap()
+                .preset,
+            BuiltinCanvasKeybindingPreset::Helix
+        );
+        assert_eq!(
+            toml::to_string(&Config {
+                preset: BuiltinCanvasKeybindingPreset::Vscode,
+            })
+            .unwrap(),
+            "preset = \"vscode\"\n"
+        );
     }
 
     #[test]
