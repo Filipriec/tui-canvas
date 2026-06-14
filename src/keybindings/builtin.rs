@@ -1,3 +1,5 @@
+use std::{fmt, str::FromStr};
+
 use super::preset::CanvasKeybindingPreset;
 use super::{CanvasKeyBindings, CanvasKeybindingPresetError, CanvasKeybindingProfile};
 use super::{try_parse_binding, CanvasActionKeyBinding};
@@ -10,8 +12,27 @@ pub enum BuiltinCanvasKeybindingPreset {
     Vscode,
 }
 
-impl BuiltinCanvasKeybindingPreset {
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParseBuiltinCanvasKeybindingPresetError {
+    name: String,
+}
+
+impl ParseBuiltinCanvasKeybindingPresetError {
     pub fn name(&self) -> &str {
+        &self.name
+    }
+}
+
+impl fmt::Display for ParseBuiltinCanvasKeybindingPresetError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "unknown built-in canvas keybinding preset {:?}", self.name)
+    }
+}
+
+impl std::error::Error for ParseBuiltinCanvasKeybindingPresetError {}
+
+impl BuiltinCanvasKeybindingPreset {
+    pub fn name(&self) -> &'static str {
         match self {
             Self::Vim => "vim",
             Self::Helix => "helix",
@@ -49,6 +70,28 @@ impl BuiltinCanvasKeybindingPreset {
         source: &str,
     ) -> Result<CanvasKeyBindings, CanvasKeybindingPresetError> {
         Ok(self.profile_with_overrides(source)?.current().clone())
+    }
+}
+
+impl FromStr for BuiltinCanvasKeybindingPreset {
+    type Err = ParseBuiltinCanvasKeybindingPresetError;
+
+    fn from_str(name: &str) -> Result<Self, Self::Err> {
+        match name {
+            "vim" => Ok(Self::Vim),
+            "helix" => Ok(Self::Helix),
+            "emacs" => Ok(Self::Emacs),
+            "vscode" => Ok(Self::Vscode),
+            _ => Err(ParseBuiltinCanvasKeybindingPresetError {
+                name: name.to_string(),
+            }),
+        }
+    }
+}
+
+impl fmt::Display for BuiltinCanvasKeybindingPreset {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.name())
     }
 }
 
@@ -148,6 +191,9 @@ mod tests {
             BuiltinCanvasKeybindingPreset::Emacs,
             BuiltinCanvasKeybindingPreset::Vscode,
         ] {
+            assert_eq!(preset.name().parse::<BuiltinCanvasKeybindingPreset>(), Ok(preset));
+            assert_eq!(preset.to_string(), preset.name());
+
             let parsed = CanvasKeybindingPreset::from_toml(preset.toml()).unwrap();
             assert_eq!(parsed.sections().len(), 3);
         }

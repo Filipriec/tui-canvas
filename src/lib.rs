@@ -103,7 +103,7 @@ pub use keybindings::{
     default_vim_action_bindings, default_vscode_action_bindings, display_binding, preset,
     BuiltinCanvasKeybindingPreset, CanvasActionBinding, CanvasActionKeyBinding,
     CanvasKeyBindingEntry, CanvasKeyBindings, CanvasKeybindingConflictKind,
-    CanvasKeybindingProfile, KeyEventOutcome,
+    CanvasKeybindingProfile, KeyEventOutcome, ParseBuiltinCanvasKeybindingPresetError,
 };
 
 #[cfg(feature = "textarea")]

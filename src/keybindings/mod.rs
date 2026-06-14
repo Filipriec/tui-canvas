@@ -20,7 +20,7 @@ pub use builtin::{
     default_builtin_action_bindings, default_emacs_action_bindings,
     default_helix_action_bindings, default_vim_action_bindings, default_vscode_action_bindings,
     emacs_preset_toml, helix_preset_toml, vim_preset_toml, vscode_preset_toml,
-    BuiltinCanvasKeybindingPreset,
+    BuiltinCanvasKeybindingPreset, ParseBuiltinCanvasKeybindingPresetError,
 };
 pub use key_sequence::{
     display_binding, parse_binding, try_parse_binding, try_parse_key, KeyStroke, ParseKeyError,
