@@ -199,15 +199,13 @@ impl<D: DataProvider> TextFormState<D> {
         self.fixed_field_count
     }
 
-    fn assert_fixed_rows(&mut self) {
+    fn sync_fixed_rows(&mut self) {
         let actual = self.core.data_provider().field_count();
-        assert_eq!(
-            actual, self.fixed_field_count,
-            "TextFormState invariant violated: fixed field count changed"
-        );
+        self.fixed_field_count = actual;
 
         if self.fixed_field_count == 0 {
             self.core.ui_state.current_field = 0;
+            self.core.set_cursor_raw(0);
             return;
         }
 
@@ -221,9 +219,9 @@ impl<D: DataProvider> TextFormState<D> {
     }
 
     fn with_fixed_rows<R>(&mut self, f: impl FnOnce(&mut Self) -> R) -> R {
-        self.assert_fixed_rows();
+        self.sync_fixed_rows();
         let result = f(self);
-        self.assert_fixed_rows();
+        self.sync_fixed_rows();
         result
     }
 
@@ -1801,13 +1799,15 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "TextFormState invariant violated: fixed field count changed")]
-    fn guard_rejects_field_count_changes_before_textform_mutation() {
+    fn guard_resyncs_field_count_changes_before_textform_mutation() {
         let mut form = TextFormState::new(VecProvider {
             fields: vec!["one".to_string(), "two".to_string()],
         });
         form.core.data_provider_mut().fields.pop();
 
         let _ = form.paste("x");
+
+        assert_eq!(form.fixed_field_count(), 1);
+        assert_eq!(form.data_provider().capture_content(), vec!["xone"]);
     }
 }
