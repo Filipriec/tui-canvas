@@ -486,8 +486,11 @@ impl<'a, P: TextAreaDataProvider> StatefulWidget for TextArea<'a, P> {
                         let start_cols = if i == state.current_field() {
                             let col_idx = state.display_cursor_position();
                             let cursor_cols = display_cols_up_to(s, col_idx);
-                            let (target_h, _left_cols) =
-                                compute_h_scroll_with_padding(cursor_cols, content.width);
+                            let (target_h, _left_cols) = compute_h_scroll_with_padding(
+                                cursor_cols,
+                                display_width(s),
+                                content.width,
+                            );
 
                             if fits {
                                 if edited_now {

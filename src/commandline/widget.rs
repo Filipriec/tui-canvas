@@ -134,7 +134,8 @@ impl StatefulWidget for CommandLine {
                 state.input.h_scroll
             } else {
                 let cursor_cols = display_cols_up_to(text, state.input.display_cursor_position());
-                let (target_h, _) = compute_h_scroll_with_padding(cursor_cols, input_width);
+                let (target_h, _) =
+                    compute_h_scroll_with_padding(cursor_cols, display_width(text), input_width);
                 target_h.max(state.input.h_scroll)
             };
             clip_window_with_indicator_padded(

@@ -14,8 +14,8 @@ use crate::canvas::theme::{CanvasTheme, DefaultCanvasTheme};
 use crate::data_provider::DataProvider;
 use crate::editor::EditorCore;
 use crate::gui_utils::{
-    RIGHT_PAD, clip_inline_completion_with_indicator_padded, compute_h_scroll_with_padding,
-    display_width,
+    clip_inline_completion_with_indicator_padded, compute_h_scroll_with_padding, display_width,
+    effective_right_pad,
 };
 use unicode_width::UnicodeWidthChar;
 
@@ -190,7 +190,8 @@ fn render_active_line_with_indicator<T: CanvasTheme>(
         cursor_cols = cursor_cols.saturating_add(UnicodeWidthChar::width(ch).unwrap_or(0) as u16);
     }
 
-    let (h_scroll, left_cols) = compute_h_scroll_with_padding(cursor_cols, width);
+    let total_cols = display_width(typed_text);
+    let (h_scroll, left_cols) = compute_h_scroll_with_padding(cursor_cols, total_cols, width);
 
     (
         clip_inline_completion_with_indicator_padded(
@@ -664,7 +665,10 @@ fn set_cursor_position_scrolled(
 
     let mut visible_x = cols.saturating_sub(h_scroll).saturating_add(left_offset);
 
-    let limit = field_rect.width.saturating_sub(1 + RIGHT_PAD);
+    let total_cols = display_width(text);
+    let limit = field_rect
+        .width
+        .saturating_sub(1 + effective_right_pad(cols, total_cols));
     if visible_x > limit {
         visible_x = limit;
     }

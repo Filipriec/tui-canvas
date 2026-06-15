@@ -239,7 +239,7 @@ impl<'a> StatefulWidget for TextAreaSyntax<'a> {
                     let col_idx = state.textarea.display_cursor_position();
                     let cursor_cols = display_cols_up_to(s, col_idx);
                     let (target_h, _left_cols) =
-                        compute_h_scroll_with_padding(cursor_cols, content.width);
+                        compute_h_scroll_with_padding(cursor_cols, display_width(s), content.width);
 
                     if fits {
                         if edited_now {

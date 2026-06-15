@@ -8,7 +8,7 @@ use crate::{canvas::modes::AppMode, CursorManager};
 use crate::{canvas::state::EditorState, textform::TextFormState};
 #[cfg(feature = "gui")]
 use crate::gui_utils::{
-    compute_h_scroll_with_padding, display_cols_up_to, display_width, RIGHT_PAD,
+    compute_h_scroll_with_padding, display_cols_up_to, display_width, effective_right_pad,
 };
 use crate::textinput::provider::{TextInputDataProvider, TextInputProvider};
 
@@ -265,13 +265,16 @@ impl<P: TextInputDataProvider> TextInputState<P> {
             area
         };
         let cursor_cols = self.current_cursor_cols();
+        let total_cols = display_width(&self.current_display_text_for_render());
         let left_cols = if self.h_scroll > 0 { 1 } else { 0 };
 
         let mut x_off_visible = cursor_cols
             .saturating_sub(self.h_scroll)
             .saturating_add(left_cols);
 
-        let limit = inner.width.saturating_sub(1 + RIGHT_PAD);
+        let limit = inner
+            .width
+            .saturating_sub(1 + effective_right_pad(cursor_cols, total_cols));
         if x_off_visible > limit {
             x_off_visible = limit;
         }
@@ -297,7 +300,7 @@ impl<P: TextInputDataProvider> TextInputState<P> {
         }
 
         let cursor_cols = self.current_cursor_cols();
-        let (target_h, _) = compute_h_scroll_with_padding(cursor_cols, inner.width);
+        let (target_h, _) = compute_h_scroll_with_padding(cursor_cols, total_cols, inner.width);
 
         if target_h > self.h_scroll {
             self.h_scroll = target_h;

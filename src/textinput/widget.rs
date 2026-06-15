@@ -101,7 +101,8 @@ impl<'a, P: TextInputDataProvider> StatefulWidget for TextInput<'a, P> {
                 }
             } else {
                 let cursor_cols = display_cols_up_to(&text, state.display_cursor_position());
-                let (target_h, _) = compute_h_scroll_with_padding(cursor_cols, inner.width);
+                let (target_h, _) =
+                    compute_h_scroll_with_padding(cursor_cols, display_width(&text), inner.width);
                 target_h.max(state.h_scroll)
             };
 

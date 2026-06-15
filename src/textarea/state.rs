@@ -17,7 +17,7 @@ use crate::keybindings::KeyEventOutcome;
 #[cfg(feature = "keybindings")]
 use crate::keybindings::CanvasKeyBindings;
 #[cfg(feature = "gui")]
-use crate::gui_utils::{compute_h_scroll_with_padding, RIGHT_PAD};
+use crate::gui_utils::{compute_h_scroll_with_padding, effective_right_pad};
 use crate::textarea::provider::{TextAreaDataProvider, TextAreaProvider};
 #[cfg(feature = "cursor-style")]
 use std::io;
@@ -868,7 +868,9 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
                     .saturating_sub(self.h_scroll)
                     .saturating_add(left_cols);
 
-                let limit = inner.width.saturating_sub(1 + RIGHT_PAD);
+                let limit = inner
+                    .width
+                    .saturating_sub(1 + effective_right_pad(x_cols, total_cols));
 
                 if x_off_visible > limit {
                     x_off_visible = limit;
@@ -929,7 +931,8 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
                         cursor_cols.saturating_add(UnicodeWidthChar::width(ch).unwrap_or(0) as u16);
                 }
 
-                let (target_h, _left_cols) = compute_h_scroll_with_padding(cursor_cols, width);
+                let (target_h, _left_cols) =
+                    compute_h_scroll_with_padding(cursor_cols, total_cols, width);
 
                 if target_h > self.h_scroll {
                     self.h_scroll = target_h;

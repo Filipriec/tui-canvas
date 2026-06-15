@@ -64,12 +64,29 @@ pub(crate) fn slice_by_display_cols(s: &str, start_cols: u16, max_cols: u16) -> 
     out
 }
 
+/// The number of right-hand scroll-ahead columns to reserve for the cursor.
+///
+/// `RIGHT_PAD` is a scroll margin: it keeps a few columns of text visible to the
+/// right of the cursor as you move through a line. That margin only makes sense
+/// when there *is* text to the right to scroll toward. At end-of-line there is
+/// nothing to the right, so the margin collapses to zero and the cursor rides
+/// the right edge instead of leaving a blank gap.
 #[cfg(feature = "gui")]
-pub(crate) fn compute_h_scroll_with_padding(cursor_cols: u16, width: u16) -> (u16, u16) {
+pub(crate) fn effective_right_pad(cursor_cols: u16, total_cols: u16) -> u16 {
+    RIGHT_PAD.min(total_cols.saturating_sub(cursor_cols))
+}
+
+#[cfg(feature = "gui")]
+pub(crate) fn compute_h_scroll_with_padding(
+    cursor_cols: u16,
+    total_cols: u16,
+    width: u16,
+) -> (u16, u16) {
+    let right_pad = effective_right_pad(cursor_cols, total_cols);
     let mut h = 0u16;
     for _ in 0..2 {
         let left_cols = if h > 0 { 1 } else { 0 };
-        let max_x_visible = width.saturating_sub(1 + RIGHT_PAD + left_cols);
+        let max_x_visible = width.saturating_sub(1 + right_pad + left_cols);
         let needed = cursor_cols.saturating_sub(max_x_visible);
         if needed <= h {
             return (h, left_cols);
