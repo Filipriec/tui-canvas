@@ -202,20 +202,7 @@ impl<D: DataProvider> TextFormState<D> {
     fn sync_fixed_rows(&mut self) {
         let actual = self.core.data_provider().field_count();
         self.fixed_field_count = actual;
-
-        if self.fixed_field_count == 0 {
-            self.core.ui_state.current_field = 0;
-            self.core.set_cursor_raw(0);
-            return;
-        }
-
-        if self.core.ui_state.current_field >= self.fixed_field_count {
-            let target = self.fixed_field_count - 1;
-            self.core.ui_state.current_field = target;
-            let len = self.core.current_text().chars().count();
-            let cursor = self.core.cursor_position().min(len);
-            self.core.set_cursor_raw(cursor);
-        }
+        self.core.clamp_current_field_to_count(self.fixed_field_count);
     }
 
     fn with_fixed_rows<R>(&mut self, f: impl FnOnce(&mut Self) -> R) -> R {
@@ -792,6 +779,7 @@ impl<D: DataProvider> Deref for TextFormState<D> {
 
 impl<D: DataProvider> DerefMut for TextFormState<D> {
     fn deref_mut(&mut self) -> &mut Self::Target {
+        self.sync_fixed_rows();
         &mut self.core
     }
 }
@@ -1087,6 +1075,33 @@ mod tests {
             if let Some(field) = self.fields.get_mut(index) {
                 *field = value;
             }
+        }
+    }
+
+    #[derive(Default)]
+    struct StrictVecProvider {
+        fields: Vec<String>,
+    }
+
+    impl DataProvider for StrictVecProvider {
+        fn field_count(&self) -> usize {
+            self.fields.len()
+        }
+
+        fn field_name(&self, index: usize) -> &str {
+            match index {
+                0 => "first",
+                1 => "second",
+                _ => "",
+            }
+        }
+
+        fn field_value(&self, index: usize) -> &str {
+            &self.fields[index]
+        }
+
+        fn set_field_value(&mut self, index: usize, value: String) {
+            self.fields[index] = value;
         }
     }
 
@@ -1809,5 +1824,33 @@ mod tests {
 
         assert_eq!(form.fixed_field_count(), 1);
         assert_eq!(form.data_provider().capture_content(), vec!["xone"]);
+    }
+
+    #[test]
+    fn deref_mut_resyncs_field_count_changes_before_core_method() {
+        let mut form = TextFormState::new(StrictVecProvider {
+            fields: vec!["one".to_string(), "two".to_string()],
+        });
+        let _ = form.transition_to_field(1);
+        form.core.data_provider_mut().fields.pop();
+
+        let moved = form.move_down();
+
+        assert!(!moved);
+        assert_eq!(form.fixed_field_count(), 1);
+        assert_eq!(form.current_field(), 0);
+    }
+
+    #[cfg(feature = "validation")]
+    #[test]
+    fn transition_clamps_stale_previous_field_before_validation() {
+        let mut form = TextFormState::new(StrictVecProvider {
+            fields: vec!["one".to_string(), "two".to_string()],
+        });
+        let _ = form.transition_to_field(1);
+        form.core.data_provider_mut().fields.pop();
+
+        assert!(form.core.transition_to_field(0).is_ok());
+        assert_eq!(form.core.current_field(), 0);
     }
 }

@@ -160,6 +160,24 @@ impl<D: DataProvider> EditorCore<D> {
         }
     }
 
+    pub(crate) fn clamp_current_field_to_count(&mut self, field_count: usize) -> Option<usize> {
+        if field_count == 0 {
+            self.ui_state.current_field = 0;
+            self.set_cursor_raw(0);
+            return None;
+        }
+
+        let field_index = self.ui_state.current_field.min(field_count - 1);
+        if field_index != self.ui_state.current_field {
+            self.ui_state.current_field = field_index;
+            let len = self.current_text().chars().count();
+            let cursor = self.cursor_position().min(len);
+            self.set_cursor_raw(cursor);
+        }
+
+        Some(field_index)
+    }
+
     pub(crate) fn set_cursor_raw(&mut self, pos: usize) {
         self.ui_state.set_cursor(pos, pos, true);
         #[cfg(feature = "keybindings")]

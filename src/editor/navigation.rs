@@ -48,10 +48,13 @@ impl<D: DataProvider> EditorCore<D> {
 
         let field_count = self.data_provider.field_count();
         if field_count == 0 {
+            self.clamp_current_field_to_count(field_count);
             return Ok(());
         }
 
-        let prev_field = self.ui_state.current_field;
+        let prev_field = self
+            .clamp_current_field_to_count(field_count)
+            .unwrap_or(0);
 
         #[cfg(feature = "computed")]
         let target_field = self.resolved_navigable_field(new_field, prev_field, field_count);
