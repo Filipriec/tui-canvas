@@ -16,24 +16,24 @@ compile_error!(
      Run with: cargo run --example validation_1 --features \"gui,validation,cursor-style\""
 );
 
-use tui_canvas::{
-    render_canvas_default, AppMode, CursorManager, CharacterLimits, DataProvider,
-    TextFormState, ValidationConfig, ValidationConfigBuilder, ValidationResult,
-};
 use crossterm::{
     event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyModifiers},
     execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
 use ratatui::{
+    Frame, Terminal,
     backend::{Backend, CrosstermBackend},
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Paragraph, Wrap},
-    Frame, Terminal,
 };
 use std::io;
+use tui_canvas::{
+    AppMode, CharacterLimits, CursorManager, DataProvider, TextFormState, ValidationConfig,
+    ValidationConfigBuilder, ValidationResult, render_canvas_default,
+};
 
 // Import CountMode from the validation module directly
 use tui_canvas::validation::limits::CountMode;

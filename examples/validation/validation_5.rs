@@ -46,21 +46,21 @@ use std::time::{Duration, Instant};
 use crossterm::{
     event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyModifiers},
     execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
 
 use ratatui::{
+    Frame, Terminal,
     backend::{Backend, CrosstermBackend},
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Style},
     text::{Line, Span},
     widgets::{Block, Borders, List, ListItem, Paragraph, Wrap},
-    Frame, Terminal,
 };
 
 use tui_canvas::{
-    render_canvas_default, AppMode, CursorManager,
-    CustomFormatter, DataProvider, TextFormState, FormattingResult, ValidationConfigBuilder,
+    AppMode, CursorManager, CustomFormatter, DataProvider, FormattingResult, TextFormState,
+    ValidationConfigBuilder, render_canvas_default,
 };
 
 /// External validation state with timing and context
@@ -90,7 +90,10 @@ impl TimedValidationResult {
         self
     }
 
-    fn from_cache(state: tui_canvas::validation::ExternalValidationState, validation_type: String) -> Self {
+    fn from_cache(
+        state: tui_canvas::validation::ExternalValidationState,
+        validation_type: String,
+    ) -> Self {
         Self {
             state,
             started_at: Instant::now(),
@@ -225,8 +228,12 @@ impl ValidationServices {
                 message: "PSC does not exist".to_string(),
                 suggestion: Some("Check postal code".to_string()),
             },
-            "01001" => tui_canvas::validation::ExternalValidationState::Valid(Some("Prague 1 - verified".to_string())),
-            "10000" => tui_canvas::validation::ExternalValidationState::Valid(Some("Bratislava - verified".to_string())),
+            "01001" => tui_canvas::validation::ExternalValidationState::Valid(Some(
+                "Prague 1 - verified".to_string(),
+            )),
+            "10000" => tui_canvas::validation::ExternalValidationState::Valid(Some(
+                "Bratislava - verified".to_string(),
+            )),
             "12345" => tui_canvas::validation::ExternalValidationState::Warning {
                 message: "PSC region deprecated - still valid".to_string(),
             },
@@ -242,7 +249,9 @@ impl ValidationServices {
                     "20" | "21" => "Brno region",
                     _ => "Valid postal region",
                 };
-                tui_canvas::validation::ExternalValidationState::Valid(Some(format!("{region} - verified")))
+                tui_canvas::validation::ExternalValidationState::Valid(Some(format!(
+                    "{region} - verified"
+                )))
             }
         };
 
@@ -282,19 +291,25 @@ impl ValidationServices {
 
         let domain = parts[1];
         let result = match domain {
-            "gmail.com" | "outlook.com" | "yahoo.com" => tui_canvas::validation::ExternalValidationState::Valid(Some(
-                "Popular email provider - verified".to_string(),
-            )),
-            "example.com" | "test.com" => tui_canvas::validation::ExternalValidationState::Warning {
-                message: "Test domain - email may not be deliverable".to_string(),
-            },
-            "blocked.com" | "spam.com" => tui_canvas::validation::ExternalValidationState::Invalid {
-                message: "Domain blocked".to_string(),
-                suggestion: Some("Use different email provider".to_string()),
-            },
-            _ if domain.contains('.') => tui_canvas::validation::ExternalValidationState::Valid(Some(
-                "Domain appears valid - not verified".to_string(),
-            )),
+            "gmail.com" | "outlook.com" | "yahoo.com" => {
+                tui_canvas::validation::ExternalValidationState::Valid(Some(
+                    "Popular email provider - verified".to_string(),
+                ))
+            }
+            "example.com" | "test.com" => {
+                tui_canvas::validation::ExternalValidationState::Warning {
+                    message: "Test domain - email may not be deliverable".to_string(),
+                }
+            }
+            "blocked.com" | "spam.com" => {
+                tui_canvas::validation::ExternalValidationState::Invalid {
+                    message: "Domain blocked".to_string(),
+                    suggestion: Some("Use different email provider".to_string()),
+                }
+            }
+            _ if domain.contains('.') => tui_canvas::validation::ExternalValidationState::Valid(
+                Some("Domain appears valid - not verified".to_string()),
+            ),
             _ => tui_canvas::validation::ExternalValidationState::Invalid {
                 message: "Invalid domain format".to_string(),
                 suggestion: Some("Domain must contain '.'".to_string()),
@@ -306,7 +321,10 @@ impl ValidationServices {
     }
 
     /// Username validation: simulates availability checking
-    fn validate_username(&mut self, username: &str) -> tui_canvas::validation::ExternalValidationState {
+    fn validate_username(
+        &mut self,
+        username: &str,
+    ) -> tui_canvas::validation::ExternalValidationState {
         let cache_key = format!("username:{username}");
         if let Some(cached) = self.cache.get(&cache_key) {
             return cached.clone();
@@ -335,17 +353,21 @@ impl ValidationServices {
         }
 
         let result = match username {
-            "admin" | "root" | "user" | "test" => tui_canvas::validation::ExternalValidationState::Invalid {
-                message: "Username reserved".to_string(),
-                suggestion: Some("Choose different username".to_string()),
-            },
+            "admin" | "root" | "user" | "test" => {
+                tui_canvas::validation::ExternalValidationState::Invalid {
+                    message: "Username reserved".to_string(),
+                    suggestion: Some("Choose different username".to_string()),
+                }
+            }
             "john123" | "alice_dev" => tui_canvas::validation::ExternalValidationState::Invalid {
                 message: "Username already taken".to_string(),
                 suggestion: Some("Try variations or add numbers".to_string()),
             },
-            username if username.starts_with("temp_") => tui_canvas::validation::ExternalValidationState::Warning {
-                message: "Temporary username pattern - are you sure?".to_string(),
-            },
+            username if username.starts_with("temp_") => {
+                tui_canvas::validation::ExternalValidationState::Warning {
+                    message: "Temporary username pattern - are you sure?".to_string(),
+                }
+            }
             _ => tui_canvas::validation::ExternalValidationState::Valid(Some(
                 "Username available - good choice!".to_string(),
             )),
@@ -387,9 +409,11 @@ impl ValidationServices {
             "limited_key_12345678901" => tui_canvas::validation::ExternalValidationState::Warning {
                 message: "API key has limited permissions".to_string(),
             },
-            key if key.starts_with("test_") => tui_canvas::validation::ExternalValidationState::Warning {
-                message: "Test API key - limited functionality".to_string(),
-            },
+            key if key.starts_with("test_") => {
+                tui_canvas::validation::ExternalValidationState::Warning {
+                    message: "Test API key - limited functionality".to_string(),
+                }
+            }
             _ if key.len() >= 32 => tui_canvas::validation::ExternalValidationState::Valid(Some(
                 "API key authenticated - full access".to_string(),
             )),
@@ -404,7 +428,10 @@ impl ValidationServices {
     }
 
     /// Credit Card validation: simulates bank verification
-    fn validate_credit_card(&mut self, card: &str) -> tui_canvas::validation::ExternalValidationState {
+    fn validate_credit_card(
+        &mut self,
+        card: &str,
+    ) -> tui_canvas::validation::ExternalValidationState {
         let cache_key = format!("card:{card}");
         if let Some(cached) = self.cache.get(&cache_key) {
             return cached.clone();
@@ -431,11 +458,7 @@ impl ValidationServices {
             .map(|(i, digit)| {
                 if i % 2 == 0 {
                     let doubled = digit * 2;
-                    if doubled > 9 {
-                        doubled - 9
-                    } else {
-                        doubled
-                    }
+                    if doubled > 9 { doubled - 9 } else { doubled }
                 } else {
                     digit
                 }
@@ -452,10 +475,12 @@ impl ValidationServices {
         }
 
         let result = match &card[..4] {
-            "4000" => tui_canvas::validation::ExternalValidationState::Valid(Some("Visa - card verified".to_string())),
-            "5555" => {
-                tui_canvas::validation::ExternalValidationState::Valid(Some("Mastercard - card verified".to_string()))
-            }
+            "4000" => tui_canvas::validation::ExternalValidationState::Valid(Some(
+                "Visa - card verified".to_string(),
+            )),
+            "5555" => tui_canvas::validation::ExternalValidationState::Valid(Some(
+                "Mastercard - card verified".to_string(),
+            )),
             "4111" => tui_canvas::validation::ExternalValidationState::Warning {
                 message: "Test card number - not for real transactions".to_string(),
             },
@@ -694,8 +719,10 @@ impl<D: DataProvider> ValidationDemoEditor<D> {
         }
 
         // Set to validating state first
-        self.editor
-            .set_external_validation(field_index, tui_canvas::validation::ExternalValidationState::Validating);
+        self.editor.set_external_validation(
+            field_index,
+            tui_canvas::validation::ExternalValidationState::Validating,
+        );
 
         let validation_type = match field_index {
             0 => "PSC Lookup",
@@ -877,7 +904,10 @@ impl<D: DataProvider> ValidationDemoEditor<D> {
         format!("Total: {total_validations} validations, Avg: {avg_time_ms}ms")
     }
 
-    fn get_field_validation_state(&self, field_index: usize) -> tui_canvas::validation::ExternalValidationState {
+    fn get_field_validation_state(
+        &self,
+        field_index: usize,
+    ) -> tui_canvas::validation::ExternalValidationState {
         self.editor
             .ui_state()
             .validation_state()
@@ -1106,12 +1136,24 @@ fn render_validation_panel(
         let state = editor.get_field_validation_state(i);
 
         let (state_text, color) = match state {
-            tui_canvas::validation::ExternalValidationState::NotValidated => ("Not validated", Color::Gray),
-            tui_canvas::validation::ExternalValidationState::Validating => ("Validating…", Color::Blue),
-            tui_canvas::validation::ExternalValidationState::Valid(Some(ref msg)) => (msg.as_str(), Color::Green),
-            tui_canvas::validation::ExternalValidationState::Valid(None) => ("Valid ✓", Color::Green),
-            tui_canvas::validation::ExternalValidationState::Invalid { ref message, .. } => (message.as_str(), Color::Red),
-            tui_canvas::validation::ExternalValidationState::Warning { ref message } => (message.as_str(), Color::Yellow),
+            tui_canvas::validation::ExternalValidationState::NotValidated => {
+                ("Not validated", Color::Gray)
+            }
+            tui_canvas::validation::ExternalValidationState::Validating => {
+                ("Validating…", Color::Blue)
+            }
+            tui_canvas::validation::ExternalValidationState::Valid(Some(ref msg)) => {
+                (msg.as_str(), Color::Green)
+            }
+            tui_canvas::validation::ExternalValidationState::Valid(None) => {
+                ("Valid ✓", Color::Green)
+            }
+            tui_canvas::validation::ExternalValidationState::Invalid { ref message, .. } => {
+                (message.as_str(), Color::Red)
+            }
+            tui_canvas::validation::ExternalValidationState::Warning { ref message } => {
+                (message.as_str(), Color::Yellow)
+            }
         };
 
         let indicator = if i == editor.current_field() {
@@ -1177,7 +1219,9 @@ fn render_validation_panel(
                     tui_canvas::validation::ExternalValidationState::Invalid { .. } => "✖ Invalid",
                     tui_canvas::validation::ExternalValidationState::Warning { .. } => "⚠ Warning",
                     tui_canvas::validation::ExternalValidationState::Validating => "… Validating",
-                    tui_canvas::validation::ExternalValidationState::NotValidated => "○ Not validated",
+                    tui_canvas::validation::ExternalValidationState::NotValidated => {
+                        "○ Not validated"
+                    }
                 };
 
                 ListItem::new(format!(
@@ -1215,7 +1259,7 @@ fn render_validation_panel(
                  \n\
                  Esc=exit edit, arrows=navigate, Backspace/Del=delete"
             }
-            _ => "🧪 Enhanced Fully Automatic External Validation Demo"
+            _ => "🧪 Enhanced Fully Automatic External Validation Demo",
         };
 
         let help = Paragraph::new(help_text)

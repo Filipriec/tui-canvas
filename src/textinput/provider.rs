@@ -57,11 +57,7 @@ impl DataProvider for TextInputProvider {
     }
 
     fn field_value(&self, index: usize) -> &str {
-        if index == 0 {
-            &self.value
-        } else {
-            ""
-        }
+        if index == 0 { &self.value } else { "" }
     }
 
     fn set_field_value(&mut self, index: usize, value: String) {

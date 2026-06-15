@@ -97,8 +97,7 @@ pub(crate) fn compute_h_scroll_with_padding(
     for _ in 0..2 {
         let left_cols = if h > 0 { 1 } else { 0 };
         let right_indicator_cols = if cursor_cols < total_cols { 1 } else { 0 };
-        let max_x_visible =
-            width.saturating_sub(1 + right_pad + left_cols + right_indicator_cols);
+        let max_x_visible = width.saturating_sub(1 + right_pad + left_cols + right_indicator_cols);
         let needed = cursor_cols.saturating_sub(max_x_visible);
         if needed <= h {
             return (h, left_cols);
@@ -183,8 +182,7 @@ mod tests {
     #[test]
     fn horizontal_scroll_keeps_cursor_before_right_indicator() {
         let (start_cols, _) = compute_h_scroll_with_padding(8, 20, 10);
-        let line =
-            clip_window_with_indicator_padded("abcdefghijklmnopqrst", 10, '$', start_cols);
+        let line = clip_window_with_indicator_padded("abcdefghijklmnopqrst", 10, '$', start_cols);
 
         assert_eq!(rendered(line), "$efghijkl$");
     }

@@ -3,10 +3,10 @@
 //! selection clears the affected slots in place and pasting writes into existing
 //! slots. Nothing here shifts later rows or creates new ones.
 
-use crate::canvas::state::SelectionState;
-use crate::editor::features::history::EditKind;
-use crate::editor::EditorCore;
 use crate::DataProvider;
+use crate::canvas::state::SelectionState;
+use crate::editor::EditorCore;
+use crate::editor::features::history::EditKind;
 
 impl<D: DataProvider> EditorCore<D> {
     /// Delete the active selection, clearing slots in place. Returns `true` if
@@ -146,7 +146,8 @@ impl<D: DataProvider> EditorCore<D> {
                 if field >= field_count {
                     break;
                 }
-                self.data_provider_mut().set_field_value(field, line.clone());
+                self.data_provider_mut()
+                    .set_field_value(field, line.clone());
                 offset += 1;
             }
         }

@@ -20,21 +20,20 @@ compile_error!(
 );
 
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
-use std::io;
 use ratatui::{
+    Frame, Terminal,
     backend::{Backend, CrosstermBackend},
     layout::{Constraint, Direction, Layout},
     style::{Color, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Paragraph},
-    Frame, Terminal,
 };
+use std::io;
 
 use tui_canvas::{
     CommandLine, CommandLineCommand, CommandLineEventOutcome, CommandLineRegistry,
-    CommandLineState, CommandLineSubmit,
+    CommandLineState, CommandLineSubmit, CursorManager, TextArea, TextAreaState,
     integration::crossterm_input::{CrosstermInputOptions, CrosstermInputSession},
-    CursorManager, TextArea, TextAreaState,
 };
 
 /// TextArea demo adapted for NORMALMODE (always editing)
@@ -475,7 +474,11 @@ fn render_textarea(f: &mut Frame, area: ratatui::layout::Rect, editor: &mut Auto
     f.set_cursor_position((cx, cy));
 }
 
-fn render_status_and_help(f: &mut Frame, area: ratatui::layout::Rect, editor: &mut AutoCursorTextArea) {
+fn render_status_and_help(
+    f: &mut Frame,
+    area: ratatui::layout::Rect,
+    editor: &mut AutoCursorTextArea,
+) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([

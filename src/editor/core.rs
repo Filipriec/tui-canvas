@@ -2,15 +2,15 @@
 #[cfg(feature = "cursor-style")]
 use crate::cursor::CursorManager;
 
+use crate::DataProvider;
+#[cfg(feature = "suggestions")]
+use crate::SuggestionItem;
 use crate::canvas::modes::AppMode;
 use crate::canvas::state::EditorState;
 #[cfg(feature = "keybindings")]
 use crate::editor::behavior::{EditorBehaviorState, KeybindingParadigm};
 #[cfg(feature = "keybindings")]
 use crate::keybindings::BuiltinCanvasKeybindingPreset;
-use crate::DataProvider;
-#[cfg(feature = "suggestions")]
-use crate::SuggestionItem;
 use derivative::Derivative;
 
 #[cfg(feature = "keybindings")]

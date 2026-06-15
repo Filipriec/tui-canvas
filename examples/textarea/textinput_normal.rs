@@ -15,20 +15,20 @@ compile_error!(
      Run with: cargo run --example textinput_normal --features \"gui,cursor-style,textinput,textmode-normal\""
 );
 
-use std::io;
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 use ratatui::{
+    Frame, Terminal,
     backend::{Backend, CrosstermBackend},
     layout::{Constraint, Direction, Layout},
     style::{Color, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Paragraph},
-    Frame, Terminal,
 };
+use std::io;
 
 use tui_canvas::{
-    integration::crossterm_input::{CrosstermInputOptions, CrosstermInputSession},
     CursorManager, TextInput, TextInputEventOutcome, TextInputState,
+    integration::crossterm_input::{CrosstermInputOptions, CrosstermInputSession},
 };
 
 struct TextInputDemo {

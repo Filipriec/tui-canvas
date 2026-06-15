@@ -10,19 +10,19 @@
 //! Keys (NORMAL):  i insert  ·  u undo  ·  Ctrl+U redo  ·  Ctrl+C quit
 //! Keys (INSERT):  type  ·  Esc back to normal
 
-use std::io;
 use crossterm::event::{Event, KeyCode, KeyModifiers};
 use ratatui::{
+    Frame, Terminal,
     backend::{Backend, CrosstermBackend},
     layout::{Constraint, Direction, Layout},
     text::{Line, Span},
     widgets::{Block, Borders, Paragraph},
-    Frame, Terminal,
 };
+use std::io;
 
 use tui_canvas::{
-    integration::crossterm_input::{CrosstermInputOptions, CrosstermInputSession},
     CursorManager, TextInput, TextInputState,
+    integration::crossterm_input::{CrosstermInputOptions, CrosstermInputSession},
 };
 
 struct Demo {

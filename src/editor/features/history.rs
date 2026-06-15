@@ -7,9 +7,9 @@
 //! the mask/validation/rope edit paths that an inverse-op log would have to
 //! track. Consecutive same-kind edits coalesce into one undo step.
 
+use crate::DataProvider;
 use crate::canvas::state::SelectionState;
 use crate::editor::EditorCore;
-use crate::DataProvider;
 
 /// Default number of undo steps retained before the oldest is dropped.
 pub(crate) const DEFAULT_HISTORY_LIMIT: usize = 100;

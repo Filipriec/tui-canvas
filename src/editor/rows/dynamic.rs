@@ -4,10 +4,10 @@
 //! current row. All structural edits go through the base-trait
 //! `capture_content`/`restore_content` so this stays generic over any provider.
 
-use crate::canvas::state::SelectionState;
-use crate::editor::features::history::EditKind;
-use crate::editor::EditorCore;
 use crate::DataProvider;
+use crate::canvas::state::SelectionState;
+use crate::editor::EditorCore;
+use crate::editor::features::history::EditKind;
 
 impl<D: DataProvider> EditorCore<D> {
     /// Delete the active selection, removing/merging rows. Returns `true` if

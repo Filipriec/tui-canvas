@@ -9,7 +9,7 @@ use crate::{
     canvas::modes::AppMode,
     editor::{
         behavior::KeybindingParadigm,
-        product::{handle_product_key_event, KeybindingProduct},
+        product::{KeybindingProduct, handle_product_key_event},
     },
     keybindings::{CanvasKeyAction, KeyEventOutcome},
     textarea::{TextAreaDataProvider, TextAreaState},

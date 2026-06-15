@@ -7,14 +7,12 @@ use ratatui::{
     widgets::{Block, BorderType, Borders, Paragraph, StatefulWidget, Widget},
 };
 
-use super::chunks::{
-    clip_chunks_window_with_indicator_padded, wrap_chunks_indented, StyledChunk,
-};
+use super::chunks::{StyledChunk, clip_chunks_window_with_indicator_padded, wrap_chunks_indented};
 use super::state::TextAreaSyntaxState;
 
 use crate::data_provider::DataProvider;
 use crate::gui_utils::{compute_h_scroll_with_padding, display_cols_up_to, display_width};
-use crate::textarea::state::{count_wrapped_rows_indented, TextOverflowMode};
+use crate::textarea::state::{TextOverflowMode, count_wrapped_rows_indented};
 
 #[derive(Debug, Clone)]
 pub struct TextAreaSyntax<'a> {
@@ -242,11 +240,7 @@ impl<'a> StatefulWidget for TextAreaSyntax<'a> {
                         compute_h_scroll_with_padding(cursor_cols, display_width(s), content.width);
 
                     if fits {
-                        if edited_now {
-                            target_h
-                        } else {
-                            0
-                        }
+                        if edited_now { target_h } else { 0 }
                     } else {
                         target_h.max(state.textarea.h_scroll)
                     }

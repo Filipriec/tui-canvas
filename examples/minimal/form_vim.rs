@@ -18,17 +18,18 @@ use std::io;
 
 use crossterm::event::{Event, KeyCode, KeyModifiers};
 use ratatui::{
+    Frame, Terminal,
     backend::{Backend, CrosstermBackend},
     layout::{Constraint, Direction, Layout},
     text::{Line, Span},
     widgets::{Block, Borders, Paragraph},
-    Frame, Terminal,
 };
 
 use tui_canvas::{
+    DataProvider, TextFormState,
     integration::crossterm_input::{CrosstermInputOptions, CrosstermInputSession},
     keybindings::CanvasKeyBindings,
-    render_canvas_default, DataProvider, TextFormState,
+    render_canvas_default,
 };
 
 struct App {

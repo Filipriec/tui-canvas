@@ -17,23 +17,22 @@ compile_error!(
 use crossterm::{
     event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyEvent},
     execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
 use ratatui::{
+    Frame, Terminal,
     backend::{Backend, CrosstermBackend},
     layout::{Constraint, Direction, Layout},
     style::{Color, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Paragraph},
-    Frame, Terminal,
 };
 use std::io;
 
 use tui_canvas::{
-    render_canvas_default,
-    AppMode,
+    AppMode, DataProvider, TextFormState,
     keybindings::{CanvasKeyBindings, KeyEventOutcome},
-    DataProvider, TextFormState,
+    render_canvas_default,
 };
 
 /// Demo application using centralized keybinding system
@@ -52,7 +51,8 @@ impl KeybindingDemoApp {
 
         Self {
             editor,
-            message: "🎯 Keybinding system loaded! Try: gg, ge, hjkl, w/b/e, v, i, etc.".to_string(),
+            message: "🎯 Keybinding system loaded! Try: gg, ge, hjkl, w/b/e, v, i, etc."
+                .to_string(),
             quit: false,
         }
     }
@@ -91,7 +91,8 @@ impl KeybindingDemoApp {
             }
             (KeyCode::F(1), _) => {
                 self.message =
-                    "ℹ️  F1: This is a client action (not handled by canvas keybindings)".to_string();
+                    "ℹ️  F1: This is a client action (not handled by canvas keybindings)"
+                        .to_string();
             }
             (KeyCode::F(2), _) => {
                 // Demonstrate saving
@@ -198,7 +199,10 @@ impl DataProvider for DemoData {
     }
 }
 
-fn run_app<B: Backend<Error = io::Error>>(terminal: &mut Terminal<B>, mut app: KeybindingDemoApp) -> io::Result<()> {
+fn run_app<B: Backend<Error = io::Error>>(
+    terminal: &mut Terminal<B>,
+    mut app: KeybindingDemoApp,
+) -> io::Result<()> {
     loop {
         terminal.draw(|f| ui(f, &app))?;
 

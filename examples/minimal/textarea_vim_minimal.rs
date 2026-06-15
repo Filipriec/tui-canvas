@@ -31,15 +31,15 @@ use std::io;
 
 use crossterm::event::{Event, KeyCode, KeyModifiers};
 use ratatui::{
+    Frame, Terminal,
     backend::{Backend, CrosstermBackend},
     widgets::Block,
-    Frame, Terminal,
 };
 
 use tui_canvas::{
+    TextArea, TextAreaState,
     integration::crossterm_input::{CrosstermInputOptions, CrosstermInputSession},
     keybindings::CanvasKeyBindings,
-    TextArea, TextAreaState,
 };
 
 fn run_app<B: Backend<Error = io::Error>>(

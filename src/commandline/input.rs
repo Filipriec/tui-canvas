@@ -1,6 +1,4 @@
-use super::state::{
-    CommandLineEventOutcome, CommandLineMode, CommandLineState,
-};
+use super::state::{CommandLineEventOutcome, CommandLineMode, CommandLineState};
 use crate::TextInputEventOutcome;
 
 #[cfg(feature = "crossterm")]
@@ -59,9 +57,7 @@ impl CommandLineState {
             (KeyCode::Up, _) | (KeyCode::Char('p'), KeyModifiers::CONTROL) => {
                 self.history_previous()
             }
-            (KeyCode::Down, _) | (KeyCode::Char('n'), KeyModifiers::CONTROL) => {
-                self.history_next()
-            }
+            (KeyCode::Down, _) | (KeyCode::Char('n'), KeyModifiers::CONTROL) => self.history_next(),
             _ => match self.input.input(key) {
                 TextInputEventOutcome::Ignored => CommandLineEventOutcome::Ignored,
                 TextInputEventOutcome::Handled | TextInputEventOutcome::Submitted => {

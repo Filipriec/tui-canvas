@@ -3,14 +3,14 @@ use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 #[cfg(feature = "cursor-style")]
 use std::io;
 
-#[cfg(feature = "cursor-style")]
-use crate::{canvas::modes::AppMode, CursorManager};
-use crate::{canvas::state::EditorState, textform::TextFormState};
 #[cfg(feature = "gui")]
 use crate::gui_utils::{
     compute_h_scroll_with_padding, display_cols_up_to, display_width, effective_right_pad,
 };
 use crate::textinput::provider::{TextInputDataProvider, TextInputProvider};
+#[cfg(feature = "cursor-style")]
+use crate::{CursorManager, canvas::modes::AppMode};
+use crate::{canvas::state::EditorState, textform::TextFormState};
 
 #[cfg(feature = "gui")]
 use ratatui::{layout::Rect, widgets::Block};

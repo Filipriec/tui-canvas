@@ -311,7 +311,10 @@ mod tests {
 
         for case in cases {
             let displayed = display_binding(&case);
-            assert_eq!(try_parse_binding(&displayed).unwrap(), normalize_binding(&case));
+            assert_eq!(
+                try_parse_binding(&displayed).unwrap(),
+                normalize_binding(&case)
+            );
         }
     }
 }

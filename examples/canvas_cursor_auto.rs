@@ -19,23 +19,24 @@ compile_error!(
 use crossterm::{
     event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyModifiers},
     execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
 use ratatui::{
+    Frame, Terminal,
     backend::{Backend, CrosstermBackend},
     layout::{Constraint, Direction, Layout},
     style::{Color, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Paragraph},
-    Frame, Terminal,
 };
 use std::io;
 
 use tui_canvas::{
-    render_canvas_default,
     AppMode,
     CursorManager, // This import only exists when cursor-style feature is enabled
-    DataProvider, TextFormState,
+    DataProvider,
+    TextFormState,
+    render_canvas_default,
 };
 
 // TextFormState wrapper for automatic cursor demo
@@ -101,7 +102,8 @@ impl<D: DataProvider> AutoCursorTextForm<D> {
                 SelectionState::Characterwise { anchor } => {
                     self.debug_message = format!(
                         "🎯 Visual selection: anchor=({},{}) current=({},{}) - Cursor: Blinking Block █",
-                        anchor.0, anchor.1,
+                        anchor.0,
+                        anchor.1,
                         self.editor.current_field(),
                         self.editor.cursor_position()
                     );

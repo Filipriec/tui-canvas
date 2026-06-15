@@ -1,6 +1,6 @@
+use crate::DataProvider;
 use crate::canvas::state::SelectionState;
 use crate::editor::EditorCore;
-use crate::DataProvider;
 
 impl<D: DataProvider> EditorCore<D> {
     pub(crate) fn selection_endpoints(&self) -> ((usize, usize), (usize, usize)) {

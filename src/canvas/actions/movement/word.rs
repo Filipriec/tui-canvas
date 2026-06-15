@@ -213,11 +213,7 @@ pub fn find_prev_word_end(text: &str, current_pos: usize) -> usize {
         }
     }
 
-    if found {
-        last_end_before_current
-    } else {
-        0
-    }
+    if found { last_end_before_current } else { 0 }
 }
 
 /// Find the start of the next big_word (whitespace-separated)

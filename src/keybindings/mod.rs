@@ -16,18 +16,18 @@ use crate::keybindings::preset::conflict_kind;
 
 pub use action::CanvasKeyAction;
 pub use builtin::{
-    builtin_emacs_preset, builtin_helix_preset, builtin_vim_preset, builtin_vscode_preset,
-    default_builtin_action_bindings, default_emacs_action_bindings,
-    default_helix_action_bindings, default_vim_action_bindings, default_vscode_action_bindings,
-    emacs_preset_toml, helix_preset_toml, vim_preset_toml, vscode_preset_toml,
-    BuiltinCanvasKeybindingPreset, ParseBuiltinCanvasKeybindingPresetError,
+    BuiltinCanvasKeybindingPreset, ParseBuiltinCanvasKeybindingPresetError, builtin_emacs_preset,
+    builtin_helix_preset, builtin_vim_preset, builtin_vscode_preset,
+    default_builtin_action_bindings, default_emacs_action_bindings, default_helix_action_bindings,
+    default_vim_action_bindings, default_vscode_action_bindings, emacs_preset_toml,
+    helix_preset_toml, vim_preset_toml, vscode_preset_toml,
 };
 pub use key_sequence::{
-    display_binding, parse_binding, try_parse_binding, try_parse_key, KeyStroke, ParseKeyError,
+    KeyStroke, ParseKeyError, display_binding, parse_binding, try_parse_binding, try_parse_key,
 };
 pub use preset::{
-    CanvasKeybindingPreset, CanvasKeybindingPresetBinding, CanvasKeybindingPresetError,
-    CanvasKeybindingPresetIssue, CanvasKeybindingPresetSection, CanvasKeybindingConflictKind,
+    CanvasKeybindingConflictKind, CanvasKeybindingPreset, CanvasKeybindingPresetBinding,
+    CanvasKeybindingPresetError, CanvasKeybindingPresetIssue, CanvasKeybindingPresetSection,
 };
 pub use profile::CanvasKeybindingProfile;
 
@@ -98,8 +98,7 @@ impl KeySequenceTracker {
         if now.duration_since(self.last_key_time) > self.timeout {
             self.reset();
         }
-        self.sequence
-            .push(key_sequence::normalize_stroke(stroke));
+        self.sequence.push(key_sequence::normalize_stroke(stroke));
         self.last_key_time = now;
     }
 
@@ -450,9 +449,7 @@ fn parse_runtime_binding(
 }
 
 fn unsupported_mode_error(mode: AppMode) -> CanvasKeybindingPresetError {
-    CanvasKeybindingPresetError::Issues(vec![CanvasKeybindingPresetIssue::UnsupportedMode {
-        mode,
-    }])
+    CanvasKeybindingPresetError::Issues(vec![CanvasKeybindingPresetIssue::UnsupportedMode { mode }])
 }
 
 fn mode_section_name(mode: AppMode) -> &'static str {
@@ -470,12 +467,9 @@ mod tests {
         read_only.insert("undo".to_string(), vec!["u".to_string()]);
         read_only.insert("redo".to_string(), vec!["ctrl+r".to_string()]);
 
-        let keybindings = CanvasKeyBindings::try_from_mode_maps(
-            &read_only,
-            &HashMap::new(),
-            &HashMap::new(),
-        )
-        .unwrap();
+        let keybindings =
+            CanvasKeyBindings::try_from_mode_maps(&read_only, &HashMap::new(), &HashMap::new())
+                .unwrap();
 
         let undo = [KeyStroke {
             code: KeyCode::Char('u'),

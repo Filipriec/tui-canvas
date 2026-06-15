@@ -7,10 +7,10 @@
 //! Use this module when you want a clear outside-world contract instead of
 //! matching on low-level internals in your app code.
 
+use crate::DataProvider;
 use crate::canvas::actions::{ActionResult, CanvasAction};
 use crate::canvas::modes::AppMode;
 use crate::textform::TextFormState;
-use crate::DataProvider;
 
 /// Boundary reached while moving inside the canvas.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

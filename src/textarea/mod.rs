@@ -2,9 +2,9 @@
 //! Text area convenience exports.
 
 mod actions;
+mod input;
 #[cfg(feature = "keybindings")]
 mod paradigm;
-mod input;
 pub mod provider;
 pub mod state;
 
@@ -15,13 +15,11 @@ pub mod widget;
 pub mod highlight;
 
 pub use provider::{TextAreaDataProvider, TextAreaProvider};
-#[cfg(feature = "gui")]
-pub use state::{ParseTextAreaLineNumberModeError, TextAreaLineNumberMode};
-pub use state::{
-    TextAreaEventOutcome, TextAreaSearchMatch, TextAreaState, TextOverflowMode,
-};
 #[cfg(feature = "commandline")]
 pub use state::TextAreaCommandLineState;
+#[cfg(feature = "gui")]
+pub use state::{ParseTextAreaLineNumberModeError, TextAreaLineNumberMode};
+pub use state::{TextAreaEventOutcome, TextAreaSearchMatch, TextAreaState, TextOverflowMode};
 
 #[cfg(feature = "gui")]
 pub use widget::TextArea;

@@ -26,8 +26,14 @@ enum MotionKind {
 fn motion_kind(action: &CanvasKeyAction) -> MotionKind {
     use CanvasKeyAction::*;
     match action {
-        MoveWordNext | MoveBigWordNext | MoveWordPrev | MoveBigWordPrev | MoveLeft | MoveRight
-        | MoveLineStart | GotoFirstNonWhitespace => MotionKind::CharExclusive,
+        MoveWordNext
+        | MoveBigWordNext
+        | MoveWordPrev
+        | MoveBigWordPrev
+        | MoveLeft
+        | MoveRight
+        | MoveLineStart
+        | GotoFirstNonWhitespace => MotionKind::CharExclusive,
         MoveWordEnd | MoveBigWordEnd | MoveWordEndPrev | MoveBigWordEndPrev | MoveLineEnd => {
             MotionKind::CharInclusive
         }
@@ -77,10 +83,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         let Some(pending) = self.core.behavior_state.vim().pending_operator() else {
             return self.execute_canvas_key_action(action, motion_count);
         };
-        let total = pending
-            .count
-            .saturating_mul(motion_count.max(1))
-            .max(1);
+        let total = pending.count.saturating_mul(motion_count.max(1)).max(1);
 
         // Doubled operator (`dd`, `cc`, `yy`) → linewise on the current line(s).
         if matches!(

@@ -5,7 +5,7 @@ use toml::Value;
 
 use crate::canvas::modes::AppMode;
 
-use super::{display_binding, try_parse_binding, CanvasKeyAction, KeyStroke, ParseKeyError};
+use super::{CanvasKeyAction, KeyStroke, ParseKeyError, display_binding, try_parse_binding};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CanvasKeybindingPreset {
@@ -29,9 +29,7 @@ pub struct CanvasKeybindingPresetBinding {
 pub enum CanvasKeybindingPresetError {
     Toml(toml::de::Error),
     Issues(Vec<CanvasKeybindingPresetIssue>),
-    UnknownSection {
-        section: String,
-    },
+    UnknownSection { section: String },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -119,13 +117,19 @@ impl fmt::Display for CanvasKeybindingPresetIssue {
                 write!(f, "canvas keybinding section {section:?} must be a table")
             }
             Self::ModeNotString { section } => {
-                write!(f, "canvas keybinding section {section:?} has a non-string mode")
+                write!(
+                    f,
+                    "canvas keybinding section {section:?} has a non-string mode"
+                )
             }
             Self::UnknownMode { section, mode } => {
                 write!(f, "unknown canvas mode {mode:?} in section {section:?}")
             }
             Self::UnknownAction { section, action } => {
-                write!(f, "unknown canvas key action {action:?} in section {section:?}")
+                write!(
+                    f,
+                    "unknown canvas key action {action:?} in section {section:?}"
+                )
             }
             Self::BindingsNotStringList { section, action } => {
                 write!(
@@ -134,7 +138,10 @@ impl fmt::Display for CanvasKeybindingPresetIssue {
                 )
             }
             Self::EmptyBindings { section, action } => {
-                write!(f, "action {action:?} in section {section:?} has no bindings")
+                write!(
+                    f,
+                    "action {action:?} in section {section:?} has no bindings"
+                )
             }
             Self::InvalidBinding {
                 section,
@@ -184,7 +191,10 @@ impl fmt::Display for CanvasKeybindingPresetIssue {
                 )
             }
             Self::UnsupportedMode { mode } => {
-                write!(f, "canvas keybindings do not support runtime storage for mode {mode:?}")
+                write!(
+                    f,
+                    "canvas keybindings do not support runtime storage for mode {mode:?}"
+                )
             }
         }
     }
@@ -535,18 +545,22 @@ mod tests {
         let CanvasKeybindingPresetError::Issues(issues) = err else {
             panic!("expected validation issues");
         };
-        assert!(issues
-            .iter()
-            .any(|issue| matches!(issue, CanvasKeybindingPresetIssue::UnknownAction { .. })));
+        assert!(
+            issues
+                .iter()
+                .any(|issue| matches!(issue, CanvasKeybindingPresetIssue::UnknownAction { .. }))
+        );
         assert!(issues.iter().any(|issue| {
             matches!(
                 issue,
                 CanvasKeybindingPresetIssue::BindingsNotStringList { .. }
             )
         }));
-        assert!(issues
-            .iter()
-            .any(|issue| matches!(issue, CanvasKeybindingPresetIssue::EmptyBindings { .. })));
+        assert!(
+            issues
+                .iter()
+                .any(|issue| matches!(issue, CanvasKeybindingPresetIssue::EmptyBindings { .. }))
+        );
         assert!(issues.iter().any(|issue| {
             matches!(
                 issue,
@@ -556,8 +570,10 @@ mod tests {
                 }
             )
         }));
-        assert!(issues
-            .iter()
-            .any(|issue| matches!(issue, CanvasKeybindingPresetIssue::DuplicateBinding { .. })));
+        assert!(
+            issues
+                .iter()
+                .any(|issue| matches!(issue, CanvasKeybindingPresetIssue::DuplicateBinding { .. }))
+        );
     }
 }

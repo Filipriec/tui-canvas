@@ -3,10 +3,10 @@
 
 #[cfg(feature = "gui")]
 use ratatui::{
+    Frame,
     layout::{Alignment, Rect},
     style::{Modifier, Style},
     widgets::{Block, List, ListItem, ListState, Paragraph},
-    Frame,
 };
 
 #[cfg(feature = "gui")]

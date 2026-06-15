@@ -1,8 +1,8 @@
 use std::{fmt, str::FromStr};
 
 use super::preset::CanvasKeybindingPreset;
+use super::{CanvasActionKeyBinding, try_parse_binding};
 use super::{CanvasKeyBindings, CanvasKeybindingPresetError, CanvasKeybindingProfile};
-use super::{try_parse_binding, CanvasActionKeyBinding};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -26,7 +26,11 @@ impl ParseBuiltinCanvasKeybindingPresetError {
 
 impl fmt::Display for ParseBuiltinCanvasKeybindingPresetError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "unknown built-in canvas keybinding preset {:?}", self.name)
+        write!(
+            f,
+            "unknown built-in canvas keybinding preset {:?}",
+            self.name
+        )
     }
 }
 
@@ -202,7 +206,10 @@ mod tests {
             BuiltinCanvasKeybindingPreset::Emacs,
             BuiltinCanvasKeybindingPreset::Vscode,
         ] {
-            assert_eq!(preset.to_string().parse::<BuiltinCanvasKeybindingPreset>(), Ok(preset));
+            assert_eq!(
+                preset.to_string().parse::<BuiltinCanvasKeybindingPreset>(),
+                Ok(preset)
+            );
             assert_eq!(preset.to_string(), preset.as_name());
 
             let parsed = CanvasKeybindingPreset::from_toml(preset.toml()).unwrap();
@@ -389,10 +396,10 @@ mod tests {
                 .0,
             Some(&CanvasKeyAction::DeleteSelection)
         );
-        assert!(emacs
-            .iter()
-            .any(|binding| binding.mode == AppMode::Ins
-                && binding.action == CanvasAction::DeleteForward));
+        assert!(
+            emacs.iter().any(|binding| binding.mode == AppMode::Ins
+                && binding.action == CanvasAction::DeleteForward)
+        );
     }
 
     #[test]
@@ -412,8 +419,7 @@ mod tests {
                 assert!(
                     bindings
                         .iter()
-                        .any(|binding| binding.mode == AppMode::Ins
-                            && binding.action == action),
+                        .any(|binding| binding.mode == AppMode::Ins && binding.action == action),
                     "missing edit mode binding for {action:?}"
                 );
             }
@@ -435,7 +441,10 @@ mod tests {
             }
         }
 
-        for bindings in [default_helix_action_bindings(), default_emacs_action_bindings()] {
+        for bindings in [
+            default_helix_action_bindings(),
+            default_emacs_action_bindings(),
+        ] {
             for mode in [AppMode::Nor, AppMode::Sel] {
                 for action in [CanvasAction::Undo, CanvasAction::Redo] {
                     assert!(

@@ -1,8 +1,8 @@
 // src/editor/display.rs
 
+use crate::DataProvider;
 use crate::canvas::modes::AppMode;
 use crate::editor::EditorCore;
-use crate::DataProvider;
 
 impl<D: DataProvider> EditorCore<D> {
     /// Get current field text for display.

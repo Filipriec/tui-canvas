@@ -395,7 +395,7 @@ impl CanvasKeyAction {
             | Self::OperatorYank
             | Self::JoinLineBelow
             | Self::YankLine
-            |             Self::PasteAfter
+            | Self::PasteAfter
             | Self::PasteBefore
             | Self::DeleteSelection
             | Self::DeleteSelectionNoYank

@@ -20,24 +20,26 @@ compile_error!(
 use crossterm::{
     event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyModifiers},
     execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
 use ratatui::{
+    Frame, Terminal,
     backend::{Backend, CrosstermBackend},
     layout::{Constraint, Direction, Layout},
     style::{Color, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Paragraph},
-    Frame, Terminal,
 };
 use std::io;
 
 use tui_canvas::{
-    render_canvas_default,
     AppMode,
     CursorManager, // This import only exists when cursor-style feature is enabled
+    DataProvider,
+    SuggestionItem,
+    TextFormState,
+    render_canvas_default,
     suggestions::render::render_suggestions_dropdown,
-    DataProvider, TextFormState, SuggestionItem,
 };
 
 // TextFormState wrapper for suggestions demo
@@ -112,7 +114,8 @@ impl<D: DataProvider> AutoCursorTextForm<D> {
                 SelectionState::Characterwise { anchor } => {
                     self.debug_message = format!(
                         "🎯 Visual selection: anchor=({},{}) current=({},{}) - Cursor: Blinking Block █",
-                        anchor.0, anchor.1,
+                        anchor.0,
+                        anchor.1,
                         self.editor.current_field(),
                         self.editor.cursor_position()
                     );
@@ -952,7 +955,7 @@ fn render_status_and_help(
              Selection: hjkl/arrows=extend, w/b/e=word selection, Esc=normal\n\
              Professional editor experience with Tab-triggered autocomplete!"
         }
-        _ => "🚀 Copy this suggestions architecture for your production app!"
+        _ => "🚀 Copy this suggestions architecture for your production app!",
     };
 
     let help = Paragraph::new(help_text)

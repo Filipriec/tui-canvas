@@ -305,10 +305,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
     pub(crate) fn goto_first_nonwhitespace_helix(&mut self) {
         let field = self.current_field();
         let line: Vec<char> = self.current_text_for_field(field);
-        let target = line
-            .iter()
-            .position(|c| !c.is_whitespace())
-            .unwrap_or(0);
+        let target = line.iter().position(|c| !c.is_whitespace()).unwrap_or(0);
         let extend = self.mode() != AppMode::Nor;
         let len = line.len();
         self.core.ui_state.set_cursor(target, len, false);
@@ -516,7 +513,9 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
             .take(start)
             .chain(text.chars().skip(cursor))
             .collect();
-        self.core.data_provider_mut().set_field_value(field, new_line);
+        self.core
+            .data_provider_mut()
+            .set_field_value(field, new_line);
         let len = self.current_text().chars().count();
         self.core.ui_state.set_cursor(start, len, false);
         #[cfg(feature = "gui")]
@@ -535,7 +534,9 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         }
         self.core.record_checkpoint(EditKind::Delete);
         let new_line: String = text.chars().skip(cursor).collect();
-        self.core.data_provider_mut().set_field_value(field, new_line);
+        self.core
+            .data_provider_mut()
+            .set_field_value(field, new_line);
         let len = self.current_text().chars().count();
         self.core.ui_state.set_cursor(0, len, false);
         #[cfg(feature = "gui")]
@@ -554,14 +555,18 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         if cursor >= count {
             return;
         }
-        let end = find_next_word_start(&text, cursor).max(cursor + 1).min(count);
+        let end = find_next_word_start(&text, cursor)
+            .max(cursor + 1)
+            .min(count);
         self.core.record_checkpoint(EditKind::Delete);
         let new_line: String = text
             .chars()
             .take(cursor)
             .chain(text.chars().skip(end))
             .collect();
-        self.core.data_provider_mut().set_field_value(field, new_line);
+        self.core
+            .data_provider_mut()
+            .set_field_value(field, new_line);
         let len = self.current_text().chars().count();
         self.core.ui_state.set_cursor(cursor.min(len), len, false);
         #[cfg(feature = "gui")]
@@ -711,7 +716,9 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         // Removing the opening char (before the cursor) shifts the cursor left.
         let new_cursor = self.cursor_position().saturating_sub(1);
         let len = self.current_text().chars().count();
-        self.core.ui_state.set_cursor(new_cursor.min(len), len, false);
+        self.core
+            .ui_state
+            .set_cursor(new_cursor.min(len), len, false);
         #[cfg(feature = "gui")]
         {
             self.edited_this_frame = true;

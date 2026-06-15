@@ -1,12 +1,12 @@
 // src/editor/movement.rs
 
+use crate::DataProvider;
 use crate::canvas::actions::movement::line::{line_end_position, line_start_position};
 use crate::canvas::actions::movement::word::{
     find_last_big_word_start_in_field, find_last_word_start_in_field,
 };
 use crate::canvas::modes::AppMode;
 use crate::editor::EditorCore;
-use crate::DataProvider;
 
 impl<D: DataProvider> EditorCore<D> {
     /// Move cursor left within current field (mask-aware)

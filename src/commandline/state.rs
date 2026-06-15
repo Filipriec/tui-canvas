@@ -301,9 +301,7 @@ impl CommandLineState {
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        CommandLineEventOutcome, CommandLineMode, CommandLineState, CommandLineSubmit,
-    };
+    use super::{CommandLineEventOutcome, CommandLineMode, CommandLineState, CommandLineSubmit};
 
     #[test]
     fn submit_command_closes_and_returns_payload() {
@@ -354,11 +352,17 @@ mod tests {
         let _ = commandline.submit();
 
         commandline.open(CommandLineMode::Command);
-        assert_eq!(commandline.history_previous(), CommandLineEventOutcome::Handled);
+        assert_eq!(
+            commandline.history_previous(),
+            CommandLineEventOutcome::Handled
+        );
         assert_eq!(commandline.mode(), Some(CommandLineMode::SearchForward));
         assert_eq!(commandline.input(), "needle");
 
-        assert_eq!(commandline.history_previous(), CommandLineEventOutcome::Handled);
+        assert_eq!(
+            commandline.history_previous(),
+            CommandLineEventOutcome::Handled
+        );
         assert_eq!(commandline.mode(), Some(CommandLineMode::Command));
         assert_eq!(commandline.input(), "set number");
 

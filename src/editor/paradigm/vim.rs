@@ -1,10 +1,10 @@
 #[cfg(feature = "cursor-style")]
 use crate::cursor::CursorManager;
 
+use crate::DataProvider;
 use crate::canvas::modes::AppMode;
 use crate::canvas::state::SelectionState;
 use crate::editor::EditorCore;
-use crate::DataProvider;
 
 impl<D: DataProvider> EditorCore<D> {
     pub(crate) fn apply_after_mode_change_vim(&mut self) {

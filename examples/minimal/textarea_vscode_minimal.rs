@@ -59,15 +59,15 @@ use crossterm::{
     terminal::supports_keyboard_enhancement,
 };
 use ratatui::{
+    Frame, Terminal,
     backend::{Backend, CrosstermBackend},
     widgets::Block,
-    Frame, Terminal,
 };
 
 use tui_canvas::{
+    TextArea, TextAreaState,
     integration::crossterm_input::{CrosstermInputOptions, CrosstermInputSession},
     keybindings::BuiltinCanvasKeybindingPreset,
-    TextArea, TextAreaState,
 };
 
 fn run_app<B: Backend<Error = io::Error>>(

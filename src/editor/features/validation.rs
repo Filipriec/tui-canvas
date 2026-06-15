@@ -1,7 +1,7 @@
 // src/editor/features/validation.rs
 
-use crate::editor::EditorCore;
 use crate::DataProvider;
+use crate::editor::EditorCore;
 
 impl<D: DataProvider> EditorCore<D> {
     #[cfg(feature = "validation")]

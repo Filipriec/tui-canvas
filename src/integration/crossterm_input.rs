@@ -11,7 +11,7 @@ use crossterm::{
         Event,
     },
     execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
 #[cfg(feature = "crossterm")]
 use std::{io, time::Duration};

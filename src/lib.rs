@@ -99,11 +99,11 @@ pub use suggestions::render::render_suggestions_dropdown;
 
 #[cfg(feature = "keybindings")]
 pub use keybindings::{
-    default_builtin_action_bindings, default_emacs_action_bindings, default_helix_action_bindings,
-    default_vim_action_bindings, default_vscode_action_bindings, display_binding, preset,
     BuiltinCanvasKeybindingPreset, CanvasActionBinding, CanvasActionKeyBinding,
     CanvasKeyBindingEntry, CanvasKeyBindings, CanvasKeybindingConflictKind,
     CanvasKeybindingProfile, KeyEventOutcome, ParseBuiltinCanvasKeybindingPresetError,
+    default_builtin_action_bindings, default_emacs_action_bindings, default_helix_action_bindings,
+    default_vim_action_bindings, default_vscode_action_bindings, display_binding, preset,
 };
 
 #[cfg(feature = "textarea")]
@@ -114,14 +114,13 @@ pub use textarea::{
 
 #[cfg(feature = "textinput")]
 pub use textinput::{
-    TextInput, TextInputDataProvider, TextInputEventOutcome, TextInputProvider,
-    TextInputState,
+    TextInput, TextInputDataProvider, TextInputEventOutcome, TextInputProvider, TextInputState,
 };
 
 #[cfg(feature = "commandline")]
 pub use commandline::{
-    parse_command_args, parse_command_line, CommandLine, CommandLineCommand,
-    CommandLineCommandInvocation, CommandLineDispatchError, CommandLineEventOutcome,
-    CommandLineMode, CommandLineParseError, CommandLineParsedCommand, CommandLinePlacement,
-    CommandLineRegistry, CommandLineRegistrationError, CommandLineState, CommandLineSubmit,
+    CommandLine, CommandLineCommand, CommandLineCommandInvocation, CommandLineDispatchError,
+    CommandLineEventOutcome, CommandLineMode, CommandLineParseError, CommandLineParsedCommand,
+    CommandLinePlacement, CommandLineRegistrationError, CommandLineRegistry, CommandLineState,
+    CommandLineSubmit, parse_command_args, parse_command_line,
 };

@@ -24,22 +24,20 @@ use crossterm::{
         self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEvent, KeyModifiers,
     },
     execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
 use ratatui::{
+    Frame, Terminal,
     backend::{Backend, CrosstermBackend},
     layout::{Constraint, Direction, Layout},
     style::{Color, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Paragraph},
-    Frame, Terminal,
 };
 use std::io;
 use std::time::Duration;
 
-use tui_canvas::{
-    render_canvas_default, AppMode, CursorManager, TextArea, TextAreaState,
-};
+use tui_canvas::{AppMode, CursorManager, TextArea, TextAreaState, render_canvas_default};
 
 /// TextArea demo with automatic cursor management.
 struct AutoCursorTextArea {

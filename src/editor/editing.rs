@@ -1,6 +1,6 @@
 // src/editor/editing.rs
-use crate::editor::EditorCore;
 use crate::DataProvider;
+use crate::editor::EditorCore;
 
 impl<D: DataProvider> EditorCore<D> {
     /// Open new line below (vim o)

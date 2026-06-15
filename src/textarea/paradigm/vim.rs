@@ -20,17 +20,11 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
 
         match action {
             CanvasKeyAction::OperatorDelete => {
-                self.begin_operator_vim(
-                    crate::editor::behavior::VimOperator::Delete,
-                    count,
-                );
+                self.begin_operator_vim(crate::editor::behavior::VimOperator::Delete, count);
                 return KeyEventOutcome::Consumed(None);
             }
             CanvasKeyAction::OperatorChange => {
-                self.begin_operator_vim(
-                    crate::editor::behavior::VimOperator::Change,
-                    count,
-                );
+                self.begin_operator_vim(crate::editor::behavior::VimOperator::Change, count);
                 return KeyEventOutcome::Consumed(None);
             }
             CanvasKeyAction::OperatorYank => {

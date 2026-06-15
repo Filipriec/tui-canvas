@@ -9,11 +9,11 @@ mod shared;
 mod vim;
 
 #[cfg(feature = "keybindings")]
-use crate::editor::behavior::KeybindingParadigm;
+use crate::DataProvider;
 #[cfg(feature = "keybindings")]
 use crate::editor::EditorCore;
 #[cfg(feature = "keybindings")]
-use crate::DataProvider;
+use crate::editor::behavior::KeybindingParadigm;
 
 #[cfg(feature = "keybindings")]
 impl<D: DataProvider> EditorCore<D> {

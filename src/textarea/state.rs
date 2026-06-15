@@ -1,24 +1,22 @@
 // src/textarea/state.rs
+#[cfg(all(feature = "commandline", feature = "keybindings"))]
+use crate::commandline::CommandLineSubmit;
+#[cfg(feature = "commandline")]
+use crate::commandline::{CommandLineCommand, CommandLineRegistry, CommandLineState};
 #[cfg(feature = "cursor-style")]
 use crate::cursor::CursorManager;
+#[cfg(feature = "gui")]
+use crate::gui_utils::{compute_h_scroll_with_padding, effective_right_pad};
+#[cfg(feature = "keybindings")]
+use crate::keybindings::CanvasKeyBindings;
+#[cfg(all(feature = "commandline", feature = "keybindings"))]
+use crate::keybindings::KeyEventOutcome;
+use crate::textarea::provider::{TextAreaDataProvider, TextAreaProvider};
 use crate::{
     canvas::modes::AppMode,
     canvas::state::{EditorState, SelectionState},
     editor::EditorCore,
 };
-#[cfg(feature = "commandline")]
-use crate::{
-    commandline::{CommandLineCommand, CommandLineRegistry, CommandLineState},
-};
-#[cfg(all(feature = "commandline", feature = "keybindings"))]
-use crate::commandline::CommandLineSubmit;
-#[cfg(all(feature = "commandline", feature = "keybindings"))]
-use crate::keybindings::KeyEventOutcome;
-#[cfg(feature = "keybindings")]
-use crate::keybindings::CanvasKeyBindings;
-#[cfg(feature = "gui")]
-use crate::gui_utils::{compute_h_scroll_with_padding, effective_right_pad};
-use crate::textarea::provider::{TextAreaDataProvider, TextAreaProvider};
 #[cfg(feature = "cursor-style")]
 use std::io;
 #[cfg(feature = "gui")]
@@ -273,7 +271,11 @@ fn default_textarea_commandline_commands() -> CommandLineRegistry {
                 .pattern(["set", "nonu"]),
         )
         .unwrap()
-        .register(CommandLineCommand::new("no-highlight").alias("noh").alias("nohlsearch"))
+        .register(
+            CommandLineCommand::new("no-highlight")
+                .alias("noh")
+                .alias("nohlsearch"),
+        )
         .unwrap();
     registry
 }
@@ -523,7 +525,11 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         self.cursor(area, block)
     }
 
-    #[cfg(all(feature = "commandline", feature = "keybindings", feature = "crossterm"))]
+    #[cfg(all(
+        feature = "commandline",
+        feature = "keybindings",
+        feature = "crossterm"
+    ))]
     pub fn handle_key_event_with_commandline(
         &mut self,
         key: crossterm::event::KeyEvent,
@@ -702,10 +708,8 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
 
     fn move_to_search_match(&mut self, target: TextAreaSearchMatch) -> bool {
         let moved = self.core.transition_to_field(target.line).is_ok();
-        self.core.set_cursor_for_mode(
-            target.start,
-            self.core.current_text().chars().count(),
-        );
+        self.core
+            .set_cursor_for_mode(target.start, self.core.current_text().chars().count());
         self.active_search_match = Some(target);
         moved
     }
@@ -1036,7 +1040,11 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
             return false;
         };
 
-        let target_text = self.core.data_provider().field_value(target_line).to_string();
+        let target_text = self
+            .core
+            .data_provider()
+            .field_value(target_line)
+            .to_string();
         let target_ranges = wrap_segment_ranges(&target_text, width, indent);
         let target_subrow = if target_line == line_idx {
             if down {
@@ -2276,49 +2284,49 @@ mod tests {
 
         let cases: &[(&str, &str, &str)] = &[
             // --- charwise delete, inclusive vs exclusive ---
-            ("hello world", "dw", "world"),       // exclusive to next word
-            ("hello", "dw", ""),                  // dw on the last word -> EOL
-            ("hello", "dW", ""),                  // dW on the last word -> EOL
-            ("foo bar", "wdw", "foo "),           // dw on last word keeps the space
-            ("foo.bar", "dw", ".bar"),            // w stops at punctuation
-            ("ab\ncd", "dw", "\ncd"),             // exclusive end-of-line rule
-            ("hello world", "lldw", "heworld"),   // dw from mid-word
-            ("hello world", "de", " world"),      // inclusive to word end
-            ("hello", "llde", "he"),              // de from mid-word
-            ("hello world", "d$", ""),            // to end of line
+            ("hello world", "dw", "world"), // exclusive to next word
+            ("hello", "dw", ""),            // dw on the last word -> EOL
+            ("hello", "dW", ""),            // dW on the last word -> EOL
+            ("foo bar", "wdw", "foo "),     // dw on last word keeps the space
+            ("foo.bar", "dw", ".bar"),      // w stops at punctuation
+            ("ab\ncd", "dw", "\ncd"),       // exclusive end-of-line rule
+            ("hello world", "lldw", "heworld"), // dw from mid-word
+            ("hello world", "de", " world"), // inclusive to word end
+            ("hello", "llde", "he"),        // de from mid-word
+            ("hello world", "d$", ""),      // to end of line
             ("hello world", "llld0", "lo world"), // d0 deletes before cursor
-            ("hello", "dl", "ello"),              // dl == one char right
-            ("hello", "lldh", "hllo"),            // dh deletes the char to the left
-            ("hello", "dh", "hello"),             // dh at col 0 is a no-op
+            ("hello", "dl", "ello"),        // dl == one char right
+            ("hello", "lldh", "hllo"),      // dh deletes the char to the left
+            ("hello", "dh", "hello"),       // dh at col 0 is a no-op
             // --- backward word ---
-            ("hello world", "$db", "hello d"),    // db from last col
+            ("hello world", "$db", "hello d"), // db from last col
             // --- counts ---
-            ("a b c d", "2dw", "c d"),            // 2dw
-            ("a b c d", "d2w", "c d"),            // d2w (count on motion)
-            ("a b", "d3w", ""),                   // count past last word -> EOL
+            ("a b c d", "2dw", "c d"), // 2dw
+            ("a b c d", "d2w", "c d"), // d2w (count on motion)
+            ("a b", "d3w", ""),        // count past last word -> EOL
             // --- delete yanks, then paste ---
-            ("one\ntwo", "ddp", "two\none"),      // dd yanks the line
-            ("foo bar baz", "dwP", "foo bar baz"),// dw yanks "foo ", P puts it back
-            ("abc", "cc\x1bp", "\nabc"),           // cc yanks before changing
+            ("one\ntwo", "ddp", "two\none"), // dd yanks the line
+            ("foo bar baz", "dwP", "foo bar baz"), // dw yanks "foo ", P puts it back
+            ("abc", "cc\x1bp", "\nabc"),     // cc yanks before changing
             ("one\ntwo\nthree", "cj\x1bp", "\none\ntwo\nthree"),
             // --- linewise ---
             ("one\ntwo\nthree", "dd", "two\nthree"),
-            ("only", "dd", ""),                   // dd on the sole line
-            ("one\ntwo\nthree", "dj", "three"),   // dj deletes 2 lines
-            ("one\ntwo", "jdj", "one\ntwo"),      // dj on last line: no-op
-            ("one\ntwo", "dk", "one\ntwo"),       // dk on first line: no-op
-            ("one\ntwo", "jdk", ""),              // dk from last line deletes both
-            ("a\nb\nc\nd", "jdG", "a"),           // dG to end of buffer
-            ("a\nb\nc", "jjdgg", ""),             // dgg to start of buffer
+            ("only", "dd", ""),                 // dd on the sole line
+            ("one\ntwo\nthree", "dj", "three"), // dj deletes 2 lines
+            ("one\ntwo", "jdj", "one\ntwo"),    // dj on last line: no-op
+            ("one\ntwo", "dk", "one\ntwo"),     // dk on first line: no-op
+            ("one\ntwo", "jdk", ""),            // dk from last line deletes both
+            ("a\nb\nc\nd", "jdG", "a"),         // dG to end of buffer
+            ("a\nb\nc", "jjdgg", ""),           // dgg to start of buffer
             // --- find-motion operators ---
-            ("hello world", "dfo", " world"),     // df<o> inclusive
-            ("hello world", "dto", "o world"),    // dt<o> stops short
-            ("hello world", "dfz", "hello world"),// find miss: no-op
-            ("hello world", "fod;", "hellrld"),   // repeat last find as a motion
-            ("hello world", "fo;d,", "hellorld"), // reverse-repeat as a motion
+            ("hello world", "dfo", " world"),      // df<o> inclusive
+            ("hello world", "dto", "o world"),     // dt<o> stops short
+            ("hello world", "dfz", "hello world"), // find miss: no-op
+            ("hello world", "fod;", "hellrld"),    // repeat last find as a motion
+            ("hello world", "fo;d,", "hellorld"),  // reverse-repeat as a motion
             // --- cancellation ---
-            ("hello", "d\x1b", "hello"),          // Esc cancels operator
-            ("hello", "dx", "hello"),             // d + non-motion cancels
+            ("hello", "d\x1b", "hello"), // Esc cancels operator
+            ("hello", "dx", "hello"),    // d + non-motion cancels
             // --- non-operator deletes still work ---
             ("hello", "x", "ello"),
             ("hello", "llX", "hllo"),
@@ -2471,7 +2479,11 @@ mod tests {
         assert_eq!(t.text(), "o world");
     }
 
-    #[cfg(all(feature = "keybindings", feature = "crossterm", feature = "commandline"))]
+    #[cfg(all(
+        feature = "keybindings",
+        feature = "crossterm",
+        feature = "commandline"
+    ))]
     #[test]
     fn helix_active_search_match_invalidated_by_edit() {
         use crate::keybindings::BuiltinCanvasKeybindingPreset;
@@ -2500,7 +2512,11 @@ mod tests {
         assert_eq!(starts, vec![0, 13]);
     }
 
-    #[cfg(all(feature = "keybindings", feature = "crossterm", feature = "commandline"))]
+    #[cfg(all(
+        feature = "keybindings",
+        feature = "crossterm",
+        feature = "commandline"
+    ))]
     #[test]
     fn helix_star_then_n_and_shift_n_navigate() {
         use crate::keybindings::BuiltinCanvasKeybindingPreset;
@@ -2714,7 +2730,11 @@ mod tests {
         assert_eq!(t.text(), "v -2 w");
     }
 
-    #[cfg(all(feature = "keybindings", feature = "crossterm", feature = "commandline"))]
+    #[cfg(all(
+        feature = "keybindings",
+        feature = "crossterm",
+        feature = "commandline"
+    ))]
     #[test]
     fn helix_wave1_movement_and_selection_ops() {
         use crate::canvas::state::SelectionState;
@@ -3185,7 +3205,8 @@ mod tests {
         // The heads must match normal-mode word motions (3, 7, 12) exactly,
         // while the anchor stays pinned at (0, 0) and the mode stays Sel.
         for (k, head) in [('w', 3usize), ('w', 7), ('e', 12)] {
-            let out = textarea.handle_key_event(KeyEvent::new(KeyCode::Char(k), KeyModifiers::NONE));
+            let out =
+                textarea.handle_key_event(KeyEvent::new(KeyCode::Char(k), KeyModifiers::NONE));
             assert!(matches!(out, KeyEventOutcome::Consumed(None)));
             assert_eq!(textarea.mode(), crate::canvas::modes::AppMode::Sel);
             assert_eq!(textarea.cursor_position(), head);
@@ -3205,7 +3226,11 @@ mod tests {
         ));
     }
 
-    #[cfg(all(feature = "keybindings", feature = "crossterm", feature = "commandline"))]
+    #[cfg(all(
+        feature = "keybindings",
+        feature = "crossterm",
+        feature = "commandline"
+    ))]
     #[test]
     fn helix_search_selects_match_and_n_advances() {
         use crate::canvas::state::SelectionState;
@@ -3289,8 +3314,8 @@ mod tests {
     #[cfg(all(feature = "keybindings", feature = "crossterm"))]
     #[test]
     fn helix_x_extends_line_selection() {
-        use crate::keybindings::{BuiltinCanvasKeybindingPreset, KeyEventOutcome};
         use crate::canvas::state::SelectionState;
+        use crate::keybindings::{BuiltinCanvasKeybindingPreset, KeyEventOutcome};
         use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
         let mut textarea = TextAreaState::<TextAreaProvider>::from_text("one\ntwo\nthree\nfour");
@@ -3373,10 +3398,8 @@ mod tests {
         let mut textarea = TextAreaState::<TextAreaProvider>::from_text("abc");
         textarea.use_keybinding_preset(BuiltinCanvasKeybindingPreset::Emacs);
 
-        let out = textarea.handle_key_event(KeyEvent::new(
-            KeyCode::Char(' '),
-            KeyModifiers::CONTROL,
-        ));
+        let out =
+            textarea.handle_key_event(KeyEvent::new(KeyCode::Char(' '), KeyModifiers::CONTROL));
         assert!(matches!(out, KeyEventOutcome::Consumed(None)));
         assert_eq!(textarea.mode(), crate::canvas::modes::AppMode::Sel);
         assert!(matches!(
@@ -3384,7 +3407,8 @@ mod tests {
             SelectionState::Characterwise { anchor: (0, 0) }
         ));
 
-        let out = textarea.handle_key_event(KeyEvent::new(KeyCode::Char('f'), KeyModifiers::CONTROL));
+        let out =
+            textarea.handle_key_event(KeyEvent::new(KeyCode::Char('f'), KeyModifiers::CONTROL));
         assert!(matches!(out, KeyEventOutcome::Consumed(None)));
 
         let out = textarea.handle_key_event(KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE));
@@ -3403,13 +3427,11 @@ mod tests {
         textarea.use_keybinding_preset(BuiltinCanvasKeybindingPreset::Emacs);
         let _ = textarea.move_right();
 
-        let _ = textarea.handle_key_event(KeyEvent::new(
-            KeyCode::Char(' '),
-            KeyModifiers::CONTROL,
-        ));
+        let _ = textarea.handle_key_event(KeyEvent::new(KeyCode::Char(' '), KeyModifiers::CONTROL));
         let _ = textarea.handle_key_event(KeyEvent::new(KeyCode::Char('f'), KeyModifiers::CONTROL));
 
-        let out = textarea.handle_key_event(KeyEvent::new(KeyCode::Char('w'), KeyModifiers::CONTROL));
+        let out =
+            textarea.handle_key_event(KeyEvent::new(KeyCode::Char('w'), KeyModifiers::CONTROL));
         assert!(matches!(out, KeyEventOutcome::Consumed(None)));
         assert_eq!(textarea.text(), "ac");
         assert_eq!(textarea.cursor_position(), 1);
@@ -3426,10 +3448,7 @@ mod tests {
         textarea.use_keybinding_preset(BuiltinCanvasKeybindingPreset::Emacs);
         let _ = textarea.move_right();
 
-        let _ = textarea.handle_key_event(KeyEvent::new(
-            KeyCode::Char(' '),
-            KeyModifiers::CONTROL,
-        ));
+        let _ = textarea.handle_key_event(KeyEvent::new(KeyCode::Char(' '), KeyModifiers::CONTROL));
         let _ = textarea.handle_key_event(KeyEvent::new(KeyCode::Char('f'), KeyModifiers::CONTROL));
 
         let out = textarea.handle_key_event(KeyEvent::new(KeyCode::Char('w'), KeyModifiers::ALT));
@@ -3448,10 +3467,7 @@ mod tests {
         textarea.use_keybinding_preset(BuiltinCanvasKeybindingPreset::Emacs);
         let _ = textarea.move_right();
 
-        let _ = textarea.handle_key_event(KeyEvent::new(
-            KeyCode::Char(' '),
-            KeyModifiers::CONTROL,
-        ));
+        let _ = textarea.handle_key_event(KeyEvent::new(KeyCode::Char(' '), KeyModifiers::CONTROL));
         let _ = textarea.handle_key_event(KeyEvent::new(KeyCode::Char('f'), KeyModifiers::CONTROL));
         let _ = textarea.handle_key_event(KeyEvent::new(KeyCode::Char('w'), KeyModifiers::CONTROL));
         assert_eq!(textarea.text(), "ac");
@@ -3459,7 +3475,8 @@ mod tests {
         let _ = textarea.handle_key_event(KeyEvent::new(KeyCode::Char('i'), KeyModifiers::NONE));
         assert_eq!(textarea.mode(), crate::canvas::modes::AppMode::Ins);
 
-        let out = textarea.handle_key_event(KeyEvent::new(KeyCode::Char('y'), KeyModifiers::CONTROL));
+        let out =
+            textarea.handle_key_event(KeyEvent::new(KeyCode::Char('y'), KeyModifiers::CONTROL));
         assert!(matches!(out, KeyEventOutcome::Consumed(None)));
         assert_eq!(textarea.text(), "abc");
     }
@@ -3473,18 +3490,17 @@ mod tests {
         let mut textarea = TextAreaState::<TextAreaProvider>::from_text("ab\ncd");
         textarea.use_keybinding_preset(BuiltinCanvasKeybindingPreset::Emacs);
 
-        let _ = textarea.handle_key_event(KeyEvent::new(
-            KeyCode::Char(' '),
-            KeyModifiers::CONTROL,
-        ));
+        let _ = textarea.handle_key_event(KeyEvent::new(KeyCode::Char(' '), KeyModifiers::CONTROL));
         let _ = textarea.handle_key_event(KeyEvent::new(KeyCode::Char('n'), KeyModifiers::CONTROL));
         let _ = textarea.handle_key_event(KeyEvent::new(KeyCode::Char('f'), KeyModifiers::CONTROL));
-        let out = textarea.handle_key_event(KeyEvent::new(KeyCode::Char('w'), KeyModifiers::CONTROL));
+        let out =
+            textarea.handle_key_event(KeyEvent::new(KeyCode::Char('w'), KeyModifiers::CONTROL));
         assert!(matches!(out, KeyEventOutcome::Consumed(None)));
         assert_eq!(textarea.text(), "d");
 
         let _ = textarea.handle_key_event(KeyEvent::new(KeyCode::Char('i'), KeyModifiers::NONE));
-        let out = textarea.handle_key_event(KeyEvent::new(KeyCode::Char('y'), KeyModifiers::CONTROL));
+        let out =
+            textarea.handle_key_event(KeyEvent::new(KeyCode::Char('y'), KeyModifiers::CONTROL));
         assert!(matches!(out, KeyEventOutcome::Consumed(None)));
         assert_eq!(textarea.text(), "ab\ncd");
     }

@@ -38,8 +38,7 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
         self.core
             .record_checkpoint(crate::editor::features::history::EditKind::Other);
 
-        if let Some((prev_idx, new_col)) = self.core.data_provider_mut().join_with_prev(line_idx)
-        {
+        if let Some((prev_idx, new_col)) = self.core.data_provider_mut().join_with_prev(line_idx) {
             #[cfg(feature = "gui")]
             {
                 self.edited_this_frame = true;

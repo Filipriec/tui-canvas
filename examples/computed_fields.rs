@@ -15,22 +15,22 @@ compile_error!(
 use crossterm::{
     event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyModifiers},
     execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
 use ratatui::{
+    Frame, Terminal,
     backend::{Backend, CrosstermBackend},
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Paragraph, Wrap},
-    Frame, Terminal,
 };
 use std::io;
 
 use tui_canvas::{
-    render_canvas_default, AppMode,
+    AppMode, DataProvider, TextFormState,
     computed::{ComputedContext, ComputedProvider},
-    DataProvider, TextFormState,
+    render_canvas_default,
 };
 
 /// Invoice data with computed fields

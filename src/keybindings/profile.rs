@@ -5,8 +5,8 @@ use toml::Value;
 use crate::canvas::modes::AppMode;
 
 use super::{
-    display_binding, BuiltinCanvasKeybindingPreset, CanvasKeyAction, CanvasKeyBindingEntry,
-    CanvasKeyBindings, CanvasKeybindingPresetError, CanvasKeybindingPresetIssue,
+    BuiltinCanvasKeybindingPreset, CanvasKeyAction, CanvasKeyBindingEntry, CanvasKeyBindings,
+    CanvasKeybindingPresetError, CanvasKeybindingPresetIssue, display_binding,
 };
 
 #[derive(Clone, Debug)]
@@ -195,21 +195,15 @@ fn parse_override_toml(source: &str) -> Result<Vec<OverrideSection>, CanvasKeybi
                 });
                 continue;
             }
-            let Some(keys) = parse_override_string_list(
-                section_name,
-                action_name,
-                bindings_value,
-                &mut issues,
-            ) else {
+            let Some(keys) =
+                parse_override_string_list(section_name, action_name, bindings_value, &mut issues)
+            else {
                 continue;
             };
             bindings.push((action, keys));
         }
 
-        sections.push(OverrideSection {
-            mode,
-            bindings,
-        });
+        sections.push(OverrideSection { mode, bindings });
     }
 
     if issues.is_empty() {

@@ -1,1 +1,1 @@
-pub use validation_core::{count_text, CharacterLimits, CountMode, LimitCheckResult};
+pub use validation_core::{CharacterLimits, CountMode, LimitCheckResult, count_text};

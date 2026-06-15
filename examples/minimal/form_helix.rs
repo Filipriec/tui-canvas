@@ -28,17 +28,18 @@ use std::io;
 
 use crossterm::event::{Event, KeyCode, KeyModifiers};
 use ratatui::{
+    Frame, Terminal,
     backend::{Backend, CrosstermBackend},
     layout::{Constraint, Direction, Layout},
     text::{Line, Span},
     widgets::{Block, Borders, Paragraph},
-    Frame, Terminal,
 };
 
 use tui_canvas::{
+    DataProvider, TextFormState,
     integration::crossterm_input::{CrosstermInputOptions, CrosstermInputSession},
     keybindings::BuiltinCanvasKeybindingPreset,
-    render_canvas_default, DataProvider, TextFormState,
+    render_canvas_default,
 };
 
 const ROW_NAMES: [&str; 3] = ["Name", "Email", "Message"];

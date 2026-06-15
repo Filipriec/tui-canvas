@@ -7,7 +7,6 @@
 
 #[cfg(feature = "keybindings")]
 pub(crate) mod behavior;
-pub(crate) mod paradigm;
 pub mod core;
 pub mod display;
 pub mod editing;
@@ -15,6 +14,7 @@ pub mod features;
 pub mod mode;
 pub mod movement;
 pub mod navigation;
+pub(crate) mod paradigm;
 #[cfg(feature = "keybindings")]
 pub(crate) mod product;
 #[cfg(feature = "keybindings")]

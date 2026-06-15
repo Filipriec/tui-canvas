@@ -1,6 +1,6 @@
 // src/editor/navigation.rs
-use crate::editor::EditorCore;
 use crate::DataProvider;
+use crate::editor::EditorCore;
 
 impl<D: DataProvider> EditorCore<D> {
     /// Resolves the target field, skipping those computed by scripts rather than human input.
@@ -52,9 +52,7 @@ impl<D: DataProvider> EditorCore<D> {
             return Ok(());
         }
 
-        let prev_field = self
-            .clamp_current_field_to_count(field_count)
-            .unwrap_or(0);
+        let prev_field = self.clamp_current_field_to_count(field_count).unwrap_or(0);
 
         #[cfg(feature = "computed")]
         let target_field = self.resolved_navigable_field(new_field, prev_field, field_count);

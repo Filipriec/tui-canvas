@@ -19,8 +19,8 @@ use crate::textarea::provider::{TextAreaDataProvider, TextAreaProvider};
 
 #[cfg(feature = "gui")]
 use crate::textarea::state::{
-    continuation_prefix, continuation_prefix_width, count_wrapped_rows_indented, TextAreaState,
-    TextOverflowMode,
+    TextAreaState, TextOverflowMode, continuation_prefix, continuation_prefix_width,
+    count_wrapped_rows_indented,
 };
 
 #[cfg(feature = "gui")]
@@ -197,9 +197,7 @@ fn styled_segment_line<'a, P: TextAreaDataProvider>(
                 {
                     selected
                 } else if active_match
-                    .map(|m| {
-                        m.line == line_idx && original_idx >= m.start && original_idx < m.end
-                    })
+                    .map(|m| m.line == line_idx && original_idx >= m.start && original_idx < m.end)
                     .unwrap_or(false)
                 {
                     active_search
@@ -493,11 +491,7 @@ impl<'a, P: TextAreaDataProvider> StatefulWidget for TextArea<'a, P> {
                             );
 
                             if fits {
-                                if edited_now {
-                                    target_h
-                                } else {
-                                    0
-                                }
+                                if edited_now { target_h } else { 0 }
                             } else {
                                 target_h.max(state.h_scroll)
                             }

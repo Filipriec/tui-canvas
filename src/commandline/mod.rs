@@ -8,13 +8,11 @@ pub mod state;
 pub mod widget;
 
 pub use registry::{
-    parse_command_args, parse_command_line, CommandLineCommand, CommandLineCommandInvocation,
-    CommandLineDispatchError, CommandLineParseError, CommandLineParsedCommand,
-    CommandLineRegistrationError, CommandLineRegistry,
+    CommandLineCommand, CommandLineCommandInvocation, CommandLineDispatchError,
+    CommandLineParseError, CommandLineParsedCommand, CommandLineRegistrationError,
+    CommandLineRegistry, parse_command_args, parse_command_line,
 };
-pub use state::{
-    CommandLineEventOutcome, CommandLineMode, CommandLineState, CommandLineSubmit,
-};
+pub use state::{CommandLineEventOutcome, CommandLineMode, CommandLineState, CommandLineSubmit};
 
 #[cfg(feature = "gui")]
 pub use widget::{CommandLine, CommandLinePlacement};

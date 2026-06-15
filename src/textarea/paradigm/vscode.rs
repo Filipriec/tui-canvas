@@ -110,9 +110,9 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
 
             // --- Plain caret movement collapses any active selection ---
             MoveLeft | MoveRight | MoveUp | MoveDown | MoveWordNext | MoveWordPrev
-            | MoveWordEnd | MoveWordEndPrev | MoveBigWordNext | MoveBigWordPrev | MoveBigWordEnd
-            | MoveBigWordEndPrev | MoveLineStart | MoveLineEnd | MoveFirstLine | MoveLastLine
-            | MovePageUp | MovePageDown | MoveHalfPageUp | MoveHalfPageDown
+            | MoveWordEnd | MoveWordEndPrev | MoveBigWordNext | MoveBigWordPrev
+            | MoveBigWordEnd | MoveBigWordEndPrev | MoveLineStart | MoveLineEnd | MoveFirstLine
+            | MoveLastLine | MovePageUp | MovePageDown | MoveHalfPageUp | MoveHalfPageDown
                 if self.vscode_selection_active() =>
             {
                 self.vscode_clear_selection();

@@ -5,14 +5,14 @@ use std::io;
 
 use std::ops::{Deref, DerefMut};
 
+#[cfg(feature = "cursor-style")]
+use crate::CursorManager;
 use crate::canvas::actions::{ActionResult, CanvasAction};
 #[cfg(feature = "keybindings")]
 use crate::canvas::state::SelectionState;
 #[cfg(feature = "gui")]
 use crate::gui_utils::{display_cols_up_to, display_width};
-use crate::{editor::EditorCore, DataProvider};
-#[cfg(feature = "cursor-style")]
-use crate::CursorManager;
+use crate::{DataProvider, editor::EditorCore};
 #[cfg(feature = "gui")]
 use ratatui::{layout::Rect, widgets::Block};
 
@@ -21,9 +21,9 @@ use crate::{
     editor::{
         behavior::{KeybindingParadigm, VimOperator, VimPendingOperator, YankRegister},
         paradigm::helix_word::HelixWordTarget,
-        product::{handle_product_key_event, KeybindingProduct},
+        product::{KeybindingProduct, handle_product_key_event},
     },
-    integration::focus_handoff::{key_outcome_for_vertical_navigation, BoundaryExit},
+    integration::focus_handoff::{BoundaryExit, key_outcome_for_vertical_navigation},
     keybindings::{CanvasKeyAction, CanvasKeyBindings, KeyEventOutcome},
 };
 
@@ -102,11 +102,9 @@ fn textform_action_policy(action: &CanvasKeyAction) -> TextFormActionPolicy {
         | ExtendLineBelow
         | ExtendToLineBounds => TextFormActionPolicy::ProductHandled,
 
-        JoinLineBelow
-        | MoveLineUp
-        | MoveLineDown
-        | DuplicateLineUp
-        | DuplicateLineDown => TextFormActionPolicy::StructuralNoOp,
+        JoinLineBelow | MoveLineUp | MoveLineDown | DuplicateLineUp | DuplicateLineDown => {
+            TextFormActionPolicy::StructuralNoOp
+        }
 
         EnterDecider
         | Exit
@@ -202,7 +200,8 @@ impl<D: DataProvider> TextFormState<D> {
     fn sync_fixed_rows(&mut self) {
         let actual = self.core.data_provider().field_count();
         self.fixed_field_count = actual;
-        self.core.clamp_current_field_to_count(self.fixed_field_count);
+        self.core
+            .clamp_current_field_to_count(self.fixed_field_count);
     }
 
     fn with_fixed_rows<R>(&mut self, f: impl FnOnce(&mut Self) -> R) -> R {
@@ -368,7 +367,10 @@ impl<D: DataProvider> TextFormState<D> {
         let cursor_cols = display_cols_up_to(current_text, self.core.display_cursor_position());
 
         (
-            inner.x.saturating_add(label_width).saturating_add(cursor_cols),
+            inner
+                .x
+                .saturating_add(label_width)
+                .saturating_add(cursor_cols),
             inner.y.saturating_add(row),
         )
     }
@@ -443,10 +445,7 @@ impl<D: DataProvider> TextFormState<D> {
             .min(self.fixed_field_count - 1);
         let lines = self.selected_fixed_field_values(start, end);
         if !lines.is_empty() {
-            self.core
-                .behavior_state
-                .yank_mut()
-                .set_line_register(lines);
+            self.core.behavior_state.yank_mut().set_line_register(lines);
         }
     }
 
@@ -547,8 +546,7 @@ impl<D: DataProvider> TextFormState<D> {
                 if field >= self.fixed_field_count {
                     return;
                 }
-                let (target_field, target_col) =
-                    self.core.insert_text_fixed(field, col, &text);
+                let (target_field, target_col) = self.core.insert_text_fixed(field, col, &text);
                 let _ = self.core.transition_to_field(target_field);
                 self.core.set_cursor_position(target_col);
                 self.core.ensure_helix_primary_selection();
@@ -678,10 +676,7 @@ impl<D: DataProvider> TextFormState<D> {
         };
 
         self.core.behavior_state.vim_mut().clear_pending_operator();
-        let total = pending
-            .count
-            .saturating_mul(motion_count.max(1))
-            .max(1);
+        let total = pending.count.saturating_mul(motion_count.max(1)).max(1);
 
         if matches!(
             action,
@@ -700,10 +695,7 @@ impl<D: DataProvider> TextFormState<D> {
                 VimOperator::Yank => {
                     let lines = self.selected_fixed_field_values(start, end);
                     if !lines.is_empty() {
-                        self.core
-                            .behavior_state
-                            .yank_mut()
-                            .set_line_register(lines);
+                        self.core.behavior_state.yank_mut().set_line_register(lines);
                     }
                 }
             }
@@ -736,10 +728,7 @@ impl<D: DataProvider> TextFormState<D> {
                 VimOperator::Yank => {
                     let lines = self.selected_fixed_field_values(start, end);
                     if !lines.is_empty() {
-                        self.core
-                            .behavior_state
-                            .yank_mut()
-                            .set_line_register(lines);
+                        self.core.behavior_state.yank_mut().set_line_register(lines);
                     }
                 }
             }
@@ -1015,9 +1004,9 @@ mod tests {
     #[cfg(feature = "crossterm")]
     use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
-    use super::TextFormState;
     #[cfg(feature = "crossterm")]
     use super::TextFormEventOutcome;
+    use super::TextFormState;
     use crate::DataProvider;
 
     #[derive(Default)]
@@ -1485,18 +1474,17 @@ mod tests {
         use crate::keybindings::CanvasKeyAction;
 
         let mut form = TextFormState::new(VecProvider {
-            fields: vec![
-                "row1".to_string(),
-                "row2".to_string(),
-                "row3".to_string(),
-            ],
+            fields: vec!["row1".to_string(), "row2".to_string(), "row3".to_string()],
         });
         let _ = form.transition_to_field(1);
 
         let _ = form.dispatch_product_key_action(&CanvasKeyAction::CutLine, 1);
 
         assert_eq!(form.fixed_field_count(), 3);
-        assert_eq!(form.data_provider().capture_content(), vec!["row1", "", "row3"]);
+        assert_eq!(
+            form.data_provider().capture_content(),
+            vec!["row1", "", "row3"]
+        );
         assert_eq!(form.current_field(), 1);
     }
 
@@ -1504,11 +1492,7 @@ mod tests {
     #[test]
     fn vim_counted_dd_clears_fixed_slots_without_shifting_later_fields() {
         let mut form = TextFormState::new(VecProvider {
-            fields: vec![
-                "row1".to_string(),
-                "row2".to_string(),
-                "row3".to_string(),
-            ],
+            fields: vec!["row1".to_string(), "row2".to_string(), "row3".to_string()],
         });
         form.set_keybindings(crate::keybindings::CanvasKeyBindings::vim_defaults());
 
@@ -1585,11 +1569,7 @@ mod tests {
     #[test]
     fn helix_extended_line_delete_clears_fixed_slots_without_shifting_later_fields() {
         let mut form = TextFormState::new(VecProvider {
-            fields: vec![
-                "row1".to_string(),
-                "row2".to_string(),
-                "row3".to_string(),
-            ],
+            fields: vec!["row1".to_string(), "row2".to_string(), "row3".to_string()],
         });
         form.use_keybinding_preset(crate::keybindings::BuiltinCanvasKeybindingPreset::Helix);
 
@@ -1694,11 +1674,7 @@ mod tests {
         use crate::keybindings::BuiltinCanvasKeybindingPreset;
 
         let mut form = TextFormState::new(VecProvider {
-            fields: vec![
-                "row1".to_string(),
-                "row2".to_string(),
-                "row3".to_string(),
-            ],
+            fields: vec!["row1".to_string(), "row2".to_string(), "row3".to_string()],
         });
         form.use_keybinding_preset(BuiltinCanvasKeybindingPreset::Helix);
 
@@ -1707,7 +1683,10 @@ mod tests {
         let _ = form.handle_key_event(KeyEvent::new(KeyCode::Char('p'), KeyModifiers::NONE));
 
         assert_eq!(form.fixed_field_count(), 3);
-        assert_eq!(form.data_provider().capture_content(), vec!["row1", "row1", "row3"]);
+        assert_eq!(
+            form.data_provider().capture_content(),
+            vec!["row1", "row1", "row3"]
+        );
     }
 
     #[cfg(all(feature = "keybindings", feature = "crossterm"))]
@@ -1795,11 +1774,7 @@ mod tests {
         use crate::keybindings::CanvasKeyAction;
 
         let mut form = TextFormState::new(VecProvider {
-            fields: vec![
-                "aaZZ".to_string(),
-                "row2".to_string(),
-                "row3".to_string(),
-            ],
+            fields: vec!["aaZZ".to_string(), "row2".to_string(), "row3".to_string()],
         });
         form.set_cursor_position(2);
         form.core
@@ -1810,7 +1785,10 @@ mod tests {
         let _ = form.dispatch_product_key_action(&CanvasKeyAction::PasteBefore, 1);
 
         assert_eq!(form.fixed_field_count(), 3);
-        assert_eq!(form.data_provider().capture_content(), vec!["aaX", "YZZ", "row3"]);
+        assert_eq!(
+            form.data_provider().capture_content(),
+            vec!["aaX", "YZZ", "row3"]
+        );
     }
 
     #[test]

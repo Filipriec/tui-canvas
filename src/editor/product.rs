@@ -3,10 +3,10 @@ use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 
 #[cfg(feature = "keybindings")]
 use crate::{
-    canvas::modes::AppMode,
-    editor::{behavior::KeybindingParadigm, EditorCore},
-    keybindings::{CanvasKeyAction, KeyEventOutcome, KeyStroke},
     DataProvider,
+    canvas::modes::AppMode,
+    editor::{EditorCore, behavior::KeybindingParadigm},
+    keybindings::{CanvasKeyAction, KeyEventOutcome, KeyStroke},
 };
 
 #[cfg(feature = "keybindings")]
@@ -30,10 +30,7 @@ pub(crate) trait KeybindingProduct {
     ) -> KeyEventOutcome;
 
     fn take_vim_count(&mut self) -> usize {
-        self.core_mut()
-            .behavior_state
-            .vim_mut()
-            .take_count_or_one()
+        self.core_mut().behavior_state.vim_mut().take_count_or_one()
     }
 
     fn clear_unmatched_pending(&mut self) {

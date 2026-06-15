@@ -5,9 +5,9 @@
 
 #![cfg(feature = "keybindings")]
 
+use crate::DataProvider;
 use crate::canvas::state::SelectionState;
 use crate::editor::EditorCore;
-use crate::DataProvider;
 
 impl<D: DataProvider> EditorCore<D> {
     /// Copy the active selection into the yank register without modifying the

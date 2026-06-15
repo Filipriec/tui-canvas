@@ -1,7 +1,7 @@
 use crate::{
+    DataProvider,
     canvas::{modes::AppMode, state::SelectionState},
     editor::EditorCore,
-    DataProvider,
 };
 
 /// Which Helix word motion a selection step performs. These mirror Helix's
@@ -401,9 +401,5 @@ fn helix_word_move(chars: &[char], range: HelixRange, target: HelixWordTarget) -
     };
 
     let next = range_to_target(chars, target, start_range);
-    if next == start_range {
-        range
-    } else {
-        next
-    }
+    if next == start_range { range } else { next }
 }

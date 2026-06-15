@@ -13,27 +13,26 @@ compile_error!(
      Run with: cargo run --example validation_advanced_patterns --features \"validation,gui,cursor-style\""
 );
 
-use tui_canvas::ValidationResult;
 use crossterm::{
     event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyModifiers},
     execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
 use ratatui::{
+    Frame, Terminal,
     backend::{Backend, CrosstermBackend},
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Paragraph, Wrap},
-    Frame, Terminal,
 };
 use std::io;
 use std::sync::Arc;
+use tui_canvas::ValidationResult;
 
 use tui_canvas::{
-    render_canvas_default, AppMode, CursorManager, CharacterFilter, DataProvider,
-    TextFormState, PatternFilters, PositionFilter, PositionRange, ValidationConfig,
-    ValidationConfigBuilder,
+    AppMode, CharacterFilter, CursorManager, DataProvider, PatternFilters, PositionFilter,
+    PositionRange, TextFormState, ValidationConfig, ValidationConfigBuilder, render_canvas_default,
 };
 
 struct AdvancedPatternTextForm<D: DataProvider> {
@@ -786,7 +785,7 @@ fn render_advanced_validation_status(
              Try entering invalid characters to see detailed error messages\n\
              arrows=move, Backspace/Del=delete, Esc=normal, Tab=next field"
         }
-        _ => "🚀 Advanced Pattern Validation Active!"
+        _ => "🚀 Advanced Pattern Validation Active!",
     };
 
     let help = Paragraph::new(help_text)

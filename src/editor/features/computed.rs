@@ -1,8 +1,8 @@
 // src/editor/features/computed.rs
 
+use crate::DataProvider;
 use crate::computed::{ComputedContext, ComputedProvider, ComputedState};
 use crate::editor::EditorCore;
-use crate::DataProvider;
 
 impl<D: DataProvider> EditorCore<D> {
     #[cfg(feature = "computed")]

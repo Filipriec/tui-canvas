@@ -2,8 +2,8 @@
 //! Provides the typed dispatcher that maps CanvasAction → TextFormState method calls.
 
 use super::types::{ActionResult, CanvasAction};
-use crate::editor::EditorCore;
 use crate::DataProvider;
+use crate::editor::EditorCore;
 use std::fmt::Display;
 
 impl<D: DataProvider> EditorCore<D> {
@@ -276,7 +276,11 @@ mod tests {
     fn dispatch_extends_visual_selection_without_reanchoring() {
         let mut editor = EditorCore::new(TestProvider::new(&["alpha", "beta"]));
 
-        assert!(editor.execute(CanvasAction::EnterHighlightMode).is_success());
+        assert!(
+            editor
+                .execute(CanvasAction::EnterHighlightMode)
+                .is_success()
+        );
         assert!(editor.execute(CanvasAction::MoveRight).is_success());
         assert_eq!(editor.current_field(), 0);
         assert_eq!(editor.cursor_position(), 1);

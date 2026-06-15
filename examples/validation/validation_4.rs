@@ -25,20 +25,20 @@ use std::sync::Arc;
 use crossterm::{
     event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyModifiers},
     execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
 use ratatui::{
+    Frame, Terminal,
     backend::{Backend, CrosstermBackend},
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Paragraph, Wrap},
-    Frame, Terminal,
 };
 
 use tui_canvas::{
-    render_canvas_default, AppMode, CursorManager, CustomFormatter, DataProvider,
-    TextFormState, FormattingResult, ValidationConfig, ValidationConfigBuilder,
+    AppMode, CursorManager, CustomFormatter, DataProvider, FormattingResult, TextFormState,
+    ValidationConfig, ValidationConfigBuilder, render_canvas_default,
 };
 
 /// PSC (Postal Code) Formatter: "01001" -> "010 01"

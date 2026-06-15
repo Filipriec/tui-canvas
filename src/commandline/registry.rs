@@ -141,7 +141,9 @@ impl CommandLineRegistry {
     ) -> Result<CommandLineCommandInvocation, CommandLineDispatchError> {
         let args = parse_command_args(input).map_err(CommandLineDispatchError::Parse)?;
         if args.is_empty() {
-            return Err(CommandLineDispatchError::Parse(CommandLineParseError::Empty));
+            return Err(CommandLineDispatchError::Parse(
+                CommandLineParseError::Empty,
+            ));
         }
 
         if let Some((matched_len, command)) = self.longest_pattern_match(&args) {
@@ -240,10 +242,7 @@ impl CommandLineRegistry {
     }
 }
 
-fn validate_name_or_alias(
-    value: &str,
-    is_name: bool,
-) -> Result<(), CommandLineRegistrationError> {
+fn validate_name_or_alias(value: &str, is_name: bool) -> Result<(), CommandLineRegistrationError> {
     if value.is_empty() {
         return if is_name {
             Err(CommandLineRegistrationError::EmptyName)
@@ -253,9 +252,11 @@ fn validate_name_or_alias(
     }
 
     if value.chars().any(char::is_whitespace) {
-        return Err(CommandLineRegistrationError::NameOrAliasContainsWhitespace {
-            value: value.to_string(),
-        });
+        return Err(
+            CommandLineRegistrationError::NameOrAliasContainsWhitespace {
+                value: value.to_string(),
+            },
+        );
     }
 
     Ok(())
@@ -337,8 +338,8 @@ pub fn parse_command_args(input: &str) -> Result<Vec<String>, CommandLineParseEr
 #[cfg(test)]
 mod tests {
     use super::{
-        parse_command_args, parse_command_line, CommandLineCommand, CommandLineDispatchError,
-        CommandLineParseError, CommandLineRegistrationError, CommandLineRegistry,
+        CommandLineCommand, CommandLineDispatchError, CommandLineParseError,
+        CommandLineRegistrationError, CommandLineRegistry, parse_command_args, parse_command_line,
     };
 
     #[test]
@@ -409,7 +410,10 @@ mod tests {
 
         assert_eq!(invocation.command.name, "set-number");
         assert_eq!(invocation.parsed.name, "set");
-        assert_eq!(invocation.parsed.args, vec!["number".to_string(), "now".to_string()]);
+        assert_eq!(
+            invocation.parsed.args,
+            vec!["number".to_string(), "now".to_string()]
+        );
         assert_eq!(invocation.remaining_args, vec!["now".to_string()]);
     }
 

@@ -16,34 +16,26 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
             CanvasKeyAction::NextField if self.mode() == AppMode::Ins => {
                 Some(self.consume_action(|this| this.insert_tab_spaces()))
             }
-            CanvasKeyAction::DeleteCharBackward => {
-                Some(self.consume_action(|this| {
-                    for _ in 0..count {
-                        this.delete_backward_preserving_mode();
-                    }
-                }))
-            }
-            CanvasKeyAction::DeleteCharForward => {
-                Some(self.consume_action(|this| {
-                    for _ in 0..count {
-                        this.delete_forward_preserving_mode();
-                    }
-                }))
-            }
-            CanvasKeyAction::OpenLineBelow => {
-                Some(self.consume_action(|this| {
-                    for _ in 0..count {
-                        this.open_line_below();
-                    }
-                }))
-            }
-            CanvasKeyAction::OpenLineAbove => {
-                Some(self.consume_action(|this| {
-                    for _ in 0..count {
-                        this.open_line_above();
-                    }
-                }))
-            }
+            CanvasKeyAction::DeleteCharBackward => Some(self.consume_action(|this| {
+                for _ in 0..count {
+                    this.delete_backward_preserving_mode();
+                }
+            })),
+            CanvasKeyAction::DeleteCharForward => Some(self.consume_action(|this| {
+                for _ in 0..count {
+                    this.delete_forward_preserving_mode();
+                }
+            })),
+            CanvasKeyAction::OpenLineBelow => Some(self.consume_action(|this| {
+                for _ in 0..count {
+                    this.open_line_below();
+                }
+            })),
+            CanvasKeyAction::OpenLineAbove => Some(self.consume_action(|this| {
+                for _ in 0..count {
+                    this.open_line_above();
+                }
+            })),
             CanvasKeyAction::MoveHalfPageUp => {
                 Some(self.consume_action(|this| this.move_half_page_up(count)))
             }
@@ -89,12 +81,8 @@ impl<P: TextAreaDataProvider> TextAreaState<P> {
             CanvasKeyAction::DuplicateLineDown => {
                 Some(self.consume_action(|this| this.duplicate_line_down(count)))
             }
-            CanvasKeyAction::CopyLine => {
-                Some(self.consume_action(|this| this.copy_current_line()))
-            }
-            CanvasKeyAction::CutLine => {
-                Some(self.consume_action(|this| this.cut_current_line()))
-            }
+            CanvasKeyAction::CopyLine => Some(self.consume_action(|this| this.copy_current_line())),
+            CanvasKeyAction::CutLine => Some(self.consume_action(|this| this.cut_current_line())),
             _ => None,
         }
     }
