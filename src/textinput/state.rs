@@ -294,11 +294,6 @@ impl<P: TextInputDataProvider> TextInputState<P> {
         }
 
         let total_cols = display_width(&self.current_display_text_for_render());
-        if total_cols <= inner.width {
-            self.h_scroll = 0;
-            return;
-        }
-
         let cursor_cols = self.current_cursor_cols();
         let (target_h, _) = compute_h_scroll_with_padding(cursor_cols, total_cols, inner.width);
 
@@ -718,6 +713,8 @@ mod tests {
     #[cfg(feature = "crossterm")]
     use crossterm::event::Event;
     use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+    #[cfg(feature = "gui")]
+    use ratatui::layout::Rect;
 
     use super::{TextInputEventOutcome, TextInputState};
     use crate::textinput::provider::TextInputProvider;
@@ -841,5 +838,17 @@ mod tests {
         assert_eq!(input.text(), "ab");
         assert!(input.undo()); // undo "ab"
         assert_eq!(input.text(), "");
+    }
+
+    #[cfg(feature = "gui")]
+    #[test]
+    fn ensure_visible_scrolls_before_text_overflows_to_keep_end_margin() {
+        let mut input = TextInputState::<TextInputProvider>::from_text("123456789");
+        input.enter_edit_mode();
+        input.set_cursor_position(9);
+
+        input.ensure_visible(Rect::new(0, 0, 10, 1), None);
+
+        assert_eq!(input.h_scroll, 3);
     }
 }

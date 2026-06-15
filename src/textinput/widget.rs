@@ -85,7 +85,7 @@ impl<'a, P: TextInputDataProvider> StatefulWidget for TextInput<'a, P> {
             area
         };
 
-        let edited_now = state.take_edited_flag();
+        let _ = state.take_edited_flag();
         let text = state.current_display_text_for_render();
         let suggestion = state.suggestion_suffix();
 
@@ -94,11 +94,7 @@ impl<'a, P: TextInputDataProvider> StatefulWidget for TextInput<'a, P> {
         } else {
             let fits = display_width(&text) <= inner.width;
             let start_cols = if fits {
-                if edited_now {
-                    0
-                } else {
-                    state.h_scroll
-                }
+                state.h_scroll
             } else {
                 let cursor_cols = display_cols_up_to(&text, state.display_cursor_position());
                 let (target_h, _) =

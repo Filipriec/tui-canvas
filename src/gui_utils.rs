@@ -11,6 +11,9 @@ use unicode_width::UnicodeWidthChar;
 pub(crate) const RIGHT_PAD: u16 = 3;
 
 #[cfg(feature = "gui")]
+pub(crate) const END_RIGHT_PAD: u16 = 2;
+
+#[cfg(feature = "gui")]
 pub(crate) fn display_width(s: &str) -> u16 {
     s.chars()
         .map(|c| UnicodeWidthChar::width(c).unwrap_or(0) as u16)
@@ -67,13 +70,16 @@ pub(crate) fn slice_by_display_cols(s: &str, start_cols: u16, max_cols: u16) -> 
 /// The number of right-hand scroll-ahead columns to reserve for the cursor.
 ///
 /// `RIGHT_PAD` is a scroll margin: it keeps a few columns of text visible to the
-/// right of the cursor as you move through a line. That margin only makes sense
-/// when there *is* text to the right to scroll toward. At end-of-line there is
-/// nothing to the right, so the margin collapses to zero and the cursor rides
-/// the right edge instead of leaving a blank gap.
+/// right of the cursor as you move through a line. At end-of-line, keep a small
+/// trailing margin so typing does not pin the cursor to the right border.
 #[cfg(feature = "gui")]
 pub(crate) fn effective_right_pad(cursor_cols: u16, total_cols: u16) -> u16 {
-    RIGHT_PAD.min(total_cols.saturating_sub(cursor_cols))
+    let right_text_cols = total_cols.saturating_sub(cursor_cols);
+    if right_text_cols == 0 {
+        END_RIGHT_PAD
+    } else {
+        RIGHT_PAD.min(right_text_cols)
+    }
 }
 
 #[cfg(feature = "gui")]
@@ -82,11 +88,17 @@ pub(crate) fn compute_h_scroll_with_padding(
     total_cols: u16,
     width: u16,
 ) -> (u16, u16) {
+    if width == 0 {
+        return (0, 0);
+    }
+
     let right_pad = effective_right_pad(cursor_cols, total_cols);
     let mut h = 0u16;
     for _ in 0..2 {
         let left_cols = if h > 0 { 1 } else { 0 };
-        let max_x_visible = width.saturating_sub(1 + right_pad + left_cols);
+        let right_indicator_cols = if cursor_cols < total_cols { 1 } else { 0 };
+        let max_x_visible =
+            width.saturating_sub(1 + right_pad + left_cols + right_indicator_cols);
         let needed = cursor_cols.saturating_sub(max_x_visible);
         if needed <= h {
             return (h, left_cols);
@@ -112,13 +124,14 @@ pub(crate) fn clip_window_with_indicator_padded(
     let total = display_width(text);
     let show_left = start_cols > 0;
     let left_cols: u16 = if show_left { 1 } else { 0 };
-    let cap_with_right = view_width.saturating_sub(left_cols + 1);
     let remaining = total.saturating_sub(start_cols);
-    let show_right = remaining > cap_with_right;
+    let cap_without_right = view_width.saturating_sub(left_cols);
+    let show_right = remaining > cap_without_right;
+    let cap_with_right = view_width.saturating_sub(left_cols + 1);
     let max_visible = if show_right {
         cap_with_right
     } else {
-        view_width.saturating_sub(left_cols)
+        cap_without_right
     };
 
     let visible = slice_by_display_cols(text, start_cols, max_visible);
@@ -143,6 +156,69 @@ pub(crate) fn clip_window_with_indicator_padded(
     Line::from(spans)
 }
 
+#[cfg(all(test, feature = "gui"))]
+mod tests {
+    use super::{
+        clip_inline_completion_with_indicator_padded, clip_window_with_indicator_padded,
+        compute_h_scroll_with_padding,
+    };
+    use ratatui::style::Style;
+
+    fn rendered(line: ratatui::text::Line<'_>) -> String {
+        line.spans
+            .iter()
+            .map(|span| span.content.as_ref())
+            .collect()
+    }
+
+    #[test]
+    fn horizontal_scroll_does_not_show_right_indicator_at_end() {
+        let (start_cols, _) = compute_h_scroll_with_padding(11, 11, 10);
+        let line = clip_window_with_indicator_padded("abcdefghijk", 10, '$', start_cols);
+
+        assert_eq!(start_cols, 5);
+        assert_eq!(rendered(line), "$fghijk");
+    }
+
+    #[test]
+    fn horizontal_scroll_keeps_cursor_before_right_indicator() {
+        let (start_cols, _) = compute_h_scroll_with_padding(8, 20, 10);
+        let line =
+            clip_window_with_indicator_padded("abcdefghijklmnopqrst", 10, '$', start_cols);
+
+        assert_eq!(rendered(line), "$efghijkl$");
+    }
+
+    #[test]
+    fn exact_fit_does_not_show_right_indicator() {
+        let line = clip_window_with_indicator_padded("abcdefghij", 10, '$', 0);
+
+        assert_eq!(rendered(line), "abcdefghij");
+    }
+
+    #[test]
+    fn exact_fit_after_left_scroll_does_not_show_right_indicator() {
+        let line = clip_window_with_indicator_padded("abcdefghijk", 10, '$', 2);
+
+        assert_eq!(rendered(line), "$cdefghijk");
+    }
+
+    #[test]
+    fn exact_fit_inline_completion_does_not_show_right_indicator() {
+        let line = clip_inline_completion_with_indicator_padded(
+            "abcdefghij",
+            None,
+            10,
+            '$',
+            0,
+            Style::default(),
+            Style::default(),
+        );
+
+        assert_eq!(rendered(line), "abcdefghij");
+    }
+}
+
 #[cfg(feature = "gui")]
 pub(crate) fn clip_inline_completion_with_indicator_padded(
     typed_text: &str,
@@ -160,9 +236,9 @@ pub(crate) fn clip_inline_completion_with_indicator_padded(
     let total = display_width(typed_text);
     let show_left = start_cols > 0;
     let left_cols: u16 = if show_left { 1 } else { 0 };
-    let cap_with_right = view_width.saturating_sub(left_cols + 1);
     let remaining = total.saturating_sub(start_cols);
-    let show_right = remaining > cap_with_right;
+    let cap_without_right = view_width.saturating_sub(left_cols);
+    let show_right = remaining > cap_without_right;
     let right_cols: u16 = if show_right { 1 } else { 0 };
     let visible_cols = view_width.saturating_sub(left_cols + right_cols);
 

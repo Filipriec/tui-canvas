@@ -38,7 +38,7 @@ use ratatui::{
 
 use tui_canvas::{
     integration::crossterm_input::{CrosstermInputOptions, CrosstermInputSession},
-    keybindings::CanvasKeyBindings,
+    keybindings::BuiltinCanvasKeybindingPreset,
     TextInput, TextInputState,
 };
 
@@ -86,7 +86,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut input = TextInputState::from_text("A Vim-powered input. Type here.");
     input.set_placeholder("i to edit, Esc to normal, Ctrl+C to quit");
-    input.set_keybindings(CanvasKeyBindings::vim_defaults());
+    input.use_keybinding_preset(BuiltinCanvasKeybindingPreset::Vim);
     input.update_cursor_style()?;
 
     let res = run_app(&mut terminal, &session, input);
