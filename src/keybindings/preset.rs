@@ -227,7 +227,7 @@ impl CanvasKeybindingPreset {
                 }),
                 None => section_name.as_str(),
             };
-            let Some(mode) = app_mode_from_name(mode_name) else {
+            let Ok(mode) = mode_name.parse::<AppMode>() else {
                 issues.push(CanvasKeybindingPresetIssue::UnknownMode {
                     section: section_name.clone(),
                     mode: mode_name.to_string(),
@@ -509,25 +509,8 @@ fn parse_string_list_value(value: &Value) -> Option<Vec<String>> {
         .collect()
 }
 
-pub(crate) fn app_mode_from_name(name: &str) -> Option<AppMode> {
-    match name {
-        "nor" | "read_only" | "normal" => Some(AppMode::Nor),
-        "ins" | "edit" | "insert" => Some(AppMode::Ins),
-        "sel" | "highlight" | "select" => Some(AppMode::Sel),
-        "command" => Some(AppMode::Command),
-        "general" => Some(AppMode::General),
-        _ => None,
-    }
-}
-
 pub(crate) fn app_mode_name(mode: AppMode) -> &'static str {
-    match mode {
-        AppMode::Nor => "nor",
-        AppMode::Ins => "ins",
-        AppMode::Sel => "sel",
-        AppMode::Command => "command",
-        AppMode::General => "general",
-    }
+    mode.as_str()
 }
 
 #[cfg(test)]

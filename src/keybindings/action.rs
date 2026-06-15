@@ -1,3 +1,5 @@
+use std::{convert::Infallible, fmt, str::FromStr};
+
 use crate::canvas::actions::CanvasAction;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -453,5 +455,67 @@ impl CanvasKeyAction {
             | Self::SelectDocEnd => return None,
             Self::EnterDecider | Self::Exit | Self::Unknown(_) => return None,
         })
+    }
+}
+
+impl FromStr for CanvasKeyAction {
+    type Err = Infallible;
+
+    fn from_str(name: &str) -> Result<Self, Self::Err> {
+        Ok(Self::from_name(name))
+    }
+}
+
+impl fmt::Display for CanvasKeyAction {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+impl serde::Serialize for CanvasKeyAction {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(self.as_str())
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for CanvasKeyAction {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let name = <String as serde::Deserialize>::deserialize(deserializer)?;
+        Ok(Self::from_name(&name))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn action_names_round_trip_through_traits_and_serde() {
+        assert_eq!("undo".parse::<CanvasKeyAction>(), Ok(CanvasKeyAction::Undo));
+        assert_eq!(CanvasKeyAction::Redo.to_string(), "redo");
+        assert_eq!(
+            toml::from_str::<ActionConfig>("action = \"custom_action\"")
+                .unwrap()
+                .action,
+            CanvasKeyAction::Unknown("custom_action".to_string())
+        );
+        assert_eq!(
+            toml::to_string(&ActionConfig {
+                action: CanvasKeyAction::MoveLeft,
+            })
+            .unwrap(),
+            "action = \"move_left\"\n"
+        );
+    }
+
+    #[derive(Debug, serde::Deserialize, serde::Serialize)]
+    struct ActionConfig {
+        action: CanvasKeyAction,
     }
 }

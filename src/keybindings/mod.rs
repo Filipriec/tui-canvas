@@ -456,13 +456,7 @@ fn unsupported_mode_error(mode: AppMode) -> CanvasKeybindingPresetError {
 }
 
 fn mode_section_name(mode: AppMode) -> &'static str {
-    match mode {
-        AppMode::Nor => "nor",
-        AppMode::Ins => "ins",
-        AppMode::Sel => "sel",
-        AppMode::General => "general",
-        AppMode::Command => "command",
-    }
+    mode.as_str()
 }
 
 #[cfg(test)]

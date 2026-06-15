@@ -11,4 +11,4 @@ pub mod state;
 #[cfg(feature = "gui")]
 pub mod theme;
 
-pub use modes::{AppMode, HighlightState};
+pub use modes::{AppMode, HighlightState, ParseAppModeError};

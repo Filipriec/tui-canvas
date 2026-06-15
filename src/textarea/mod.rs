@@ -16,7 +16,7 @@ pub mod highlight;
 
 pub use provider::{TextAreaDataProvider, TextAreaProvider};
 #[cfg(feature = "gui")]
-pub use state::TextAreaLineNumberMode;
+pub use state::{ParseTextAreaLineNumberModeError, TextAreaLineNumberMode};
 pub use state::{
     TextAreaEventOutcome, TextAreaSearchMatch, TextAreaState, TextOverflowMode,
 };

@@ -21,6 +21,8 @@ use crate::gui_utils::{compute_h_scroll_with_padding, RIGHT_PAD};
 use crate::textarea::provider::{TextAreaDataProvider, TextAreaProvider};
 #[cfg(feature = "cursor-style")]
 use std::io;
+#[cfg(feature = "gui")]
+use std::{fmt, str::FromStr};
 
 #[cfg(feature = "gui")]
 use ratatui::{layout::Rect, widgets::Block};
@@ -277,11 +279,101 @@ fn default_textarea_commandline_commands() -> CommandLineRegistry {
 }
 
 #[cfg(feature = "gui")]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
 pub enum TextAreaLineNumberMode {
     None,
     Absolute,
     Relative,
+}
+
+#[cfg(feature = "gui")]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParseTextAreaLineNumberModeError {
+    name: String,
+}
+
+#[cfg(feature = "gui")]
+impl ParseTextAreaLineNumberModeError {
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+}
+
+#[cfg(feature = "gui")]
+impl fmt::Display for ParseTextAreaLineNumberModeError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "unknown textarea line number mode {:?}", self.name)
+    }
+}
+
+#[cfg(feature = "gui")]
+impl std::error::Error for ParseTextAreaLineNumberModeError {}
+
+#[cfg(feature = "gui")]
+impl TextAreaLineNumberMode {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            TextAreaLineNumberMode::None => "none",
+            TextAreaLineNumberMode::Absolute => "absolute",
+            TextAreaLineNumberMode::Relative => "relative",
+        }
+    }
+}
+
+#[cfg(feature = "gui")]
+impl FromStr for TextAreaLineNumberMode {
+    type Err = ParseTextAreaLineNumberModeError;
+
+    fn from_str(name: &str) -> Result<Self, Self::Err> {
+        match name {
+            "none" => Ok(TextAreaLineNumberMode::None),
+            "absolute" => Ok(TextAreaLineNumberMode::Absolute),
+            "relative" => Ok(TextAreaLineNumberMode::Relative),
+            _ => Err(ParseTextAreaLineNumberModeError {
+                name: name.to_string(),
+            }),
+        }
+    }
+}
+
+#[cfg(feature = "gui")]
+impl fmt::Display for TextAreaLineNumberMode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+#[cfg(all(test, feature = "gui"))]
+mod line_number_mode_tests {
+    use super::*;
+
+    #[derive(Debug, serde::Deserialize, serde::Serialize)]
+    struct LineNumberConfig {
+        mode: TextAreaLineNumberMode,
+    }
+
+    #[test]
+    fn line_number_modes_round_trip_through_traits_and_serde() {
+        assert_eq!(
+            "relative".parse::<TextAreaLineNumberMode>(),
+            Ok(TextAreaLineNumberMode::Relative)
+        );
+        assert_eq!(TextAreaLineNumberMode::Absolute.to_string(), "absolute");
+        assert_eq!(
+            toml::from_str::<LineNumberConfig>("mode = \"none\"")
+                .unwrap()
+                .mode,
+            TextAreaLineNumberMode::None
+        );
+        assert_eq!(
+            toml::to_string(&LineNumberConfig {
+                mode: TextAreaLineNumberMode::Relative,
+            })
+            .unwrap(),
+            "mode = \"relative\"\n"
+        );
+    }
 }
 
 /// Multi-line textarea widget state.

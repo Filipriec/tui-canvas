@@ -66,7 +66,7 @@ pub use data_provider::DataProvider;
 pub use data_provider::{SuggestionItem, SuggestionQuery, SuggestionTrigger};
 pub use textform::{TextFormEventOutcome, TextFormState};
 
-pub use canvas::modes::AppMode;
+pub use canvas::modes::{AppMode, ParseAppModeError};
 pub use canvas::state::EditorState;
 
 pub use canvas::actions::{ActionResult, CanvasAction};
@@ -108,8 +108,8 @@ pub use keybindings::{
 
 #[cfg(feature = "textarea")]
 pub use textarea::{
-    TextArea, TextAreaDataProvider, TextAreaLineNumberMode, TextAreaProvider,
-    TextAreaSearchMatch, TextAreaState,
+    ParseTextAreaLineNumberModeError, TextArea, TextAreaDataProvider, TextAreaLineNumberMode,
+    TextAreaProvider, TextAreaSearchMatch, TextAreaState,
 };
 
 #[cfg(feature = "textinput")]

@@ -174,7 +174,7 @@ fn parse_override_toml(source: &str) -> Result<Vec<OverrideSection>, CanvasKeybi
             None => section_name.as_str(),
         };
 
-        let Some(mode) = app_mode_from_name(mode_name) else {
+        let Ok(mode) = mode_name.parse::<AppMode>() else {
             issues.push(CanvasKeybindingPresetIssue::UnknownMode {
                 section: section_name.clone(),
                 mode: mode_name.to_string(),
@@ -254,23 +254,6 @@ fn binding_set(bindings: Vec<Vec<super::KeyStroke>>) -> HashSet<Vec<super::KeySt
     bindings.into_iter().collect()
 }
 
-fn app_mode_from_name(name: &str) -> Option<AppMode> {
-    match name {
-        "nor" | "normal" | "read_only" | "readonly" => Some(AppMode::Nor),
-        "ins" | "insert" | "edit" => Some(AppMode::Ins),
-        "sel" | "select" | "selection" | "highlight" => Some(AppMode::Sel),
-        "general" => Some(AppMode::General),
-        "command" => Some(AppMode::Command),
-        _ => None,
-    }
-}
-
 fn mode_section_name(mode: AppMode) -> &'static str {
-    match mode {
-        AppMode::Nor => "nor",
-        AppMode::Ins => "ins",
-        AppMode::Sel => "sel",
-        AppMode::General => "general",
-        AppMode::Command => "command",
-    }
+    mode.as_str()
 }
