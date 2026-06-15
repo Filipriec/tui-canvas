@@ -168,3 +168,13 @@ path = "examples/minimal/textarea_helix_minimal.rs"
 name = "textarea_vscode_minimal"
 required-features = ["textarea", "keybindings", "cursor-style", "commandline", "textmode-normal"]
 path = "examples/minimal/textarea_vscode_minimal.rs"
+
+[[example]]
+name = "textinput_helix_minimal"
+required-features = ["gui", "textinput", "keybindings", "cursor-style"]
+path = "examples/minimal/textinput_helix_minimal.rs"
+
+[[example]]
+name = "textinput_vim_minimal"
+required-features = ["gui", "textinput", "keybindings", "cursor-style"]
+path = "examples/minimal/textinput_vim_minimal.rs"
