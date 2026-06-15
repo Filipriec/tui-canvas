@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `AppMode` now implements `Display`, `FromStr`, `Serialize`, and `Deserialize` for serde interop with downstream configuration formats like TOML.
+- `CanvasKeyAction` now implements `Display`, `FromStr`, `Serialize`, and `Deserialize` for serde interop.
+- `BuiltinCanvasKeybindingPreset` now implements `Serialize` and `Deserialize`.
+- New `textinput_helix_minimal` and `textinput_vim_minimal` examples demonstrating keybinding-paradigm usage with `TextInputState`.
+
+### Changed
+- `TextFormState` now automatically resynchronizes its internal fixed-field count from the data provider instead of panicking when the field count changes (`sync_fixed_rows` replaces `assert_fixed_rows`).
+- `EditorCore::clamp_current_field_to_count` added as a shared cursor-clamping primitive used by both `sync_fixed_rows` and navigation, preventing out-of-bounds cursor positions when the field/row count shrinks.
+
+### Fixed
+- Fixed panic in `TextFormState` when the data provider's field count changes between operations (added dynamic resync via `DerefMut` and `with_fixed_rows`).
+- Fixed stale previous-field index in `transition_to_field` when the underlying field count had been reduced (now clamped before validation).
+
 ## [0.8.2]
 
 ### Changed
