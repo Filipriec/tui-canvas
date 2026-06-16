@@ -7,19 +7,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.5]
+
 ### Added
 - `AppMode` now implements `Display`, `FromStr`, `Serialize`, and `Deserialize` for serde interop with downstream configuration formats like TOML.
 - `CanvasKeyAction` now implements `Display`, `FromStr`, `Serialize`, and `Deserialize` for serde interop.
-- `BuiltinCanvasKeybindingPreset` now implements `Serialize` and `Deserialize`.
+- `BuiltinCanvasKeybindingPreset` now implements `Display`, `FromStr` (with `ParseBuiltinCanvasKeybindingPresetError`), `Serialize`, and `Deserialize`.
+- `TextAreaLineNumberMode` now implements `Display`, `FromStr` (with `ParseTextAreaLineNumberModeError`), `Serialize`, and `Deserialize`.
 - New `textinput_helix_minimal` and `textinput_vim_minimal` examples demonstrating keybinding-paradigm usage with `TextInputState`.
+- New `CanvasKeyAction::ExitSuggestions` and `exit_suggestions` keybindings added to all built-in presets (Vim, Helix, Emacs, VSCode).
+- `EditorCore::is_sequence_pending()`, `TextAreaState::is_sequence_pending()`, and `TextFormState::is_sequence_pending()` APIs for detecting multi-key commands in flight (key sequences, pending counts, pending operators, literal-char captures). Intended for hosts such as tui-pages that need to decide whether to route subsequent keys to the editor or to an outer keymap.
 
 ### Changed
 - `TextFormState` now automatically resynchronizes its internal fixed-field count from the data provider instead of panicking when the field count changes (`sync_fixed_rows` replaces `assert_fixed_rows`).
 - `EditorCore::clamp_current_field_to_count` added as a shared cursor-clamping primitive used by both `sync_fixed_rows` and navigation, preventing out-of-bounds cursor positions when the field/row count shrinks.
+- `DerefMut` on `TextFormState` now calls `sync_fixed_rows` before handing out the mutable core reference, so field-count changes by external data providers are picked up transparently.
+
+### Deprecated
+- **Breaking:** `BuiltinCanvasKeybindingPreset::name()` is deprecated and now panics at runtime. The method previously returned a `&'static str`; callers must migrate to `Display` / `to_string()`. The deprecated shim will be removed in 1.0.0.
 
 ### Fixed
 - Fixed panic in `TextFormState` when the data provider's field count changes between operations (added dynamic resync via `DerefMut` and `with_fixed_rows`).
 - Fixed stale previous-field index in `transition_to_field` when the underlying field count had been reduced (now clamped before validation).
+- Fixed cursor scroll-at-end-of-line: the cursor now keeps a small trailing margin (`END_RIGHT_PAD`) at end of line instead of collapsing the right pad to zero, so typing at the end of a line does not pin the cursor to the right border.
+- Fixed horizontal scroll calculation to account for right-indicator width when the cursor is at end of line, preventing off-by-one scroll jitter.
+- Fixed textinput `ensure_visible` no longer resetting `h_scroll` to zero on edit when the text fits the viewport.
+- Fixed right-indicator visibility in `clip_window_with_indicator_padded` and `clip_inline_completion_with_indicator_padded`: indicator now correctly hidden when all text fits within the viewport width.
+
+## [0.8.4]
+
+### Changed
+- Cargo.toml metadata restructured: `readme`, `repository`, `keywords`, `categories`, and `exclude` moved from workspace inheritance to crate-local values. Description updated to "Form/textarea/input for TUI".
+
+## [0.8.3]
+
+### Changed
+- Rust edition reverted from hardcoded `"2024"` to workspace-wide `workspace = true`, resolving build issues in workspace contexts.
+
+### Fixed
+- Fixed broken `Backend` trait bounds in all examples: `Backend` → `Backend<Error = io::Error>` for compatibility with rust-analyzer and newer compiler versions.
+- Fixed TOML preset/profile parsing that relied on `str::parse::<Value>()` (broken in Rust 2024 edition); replaced with `toml::from_str::<Value>()`.
+- Added missing `keybindings` feature requirement to example manifest entries (`textarea_vim`, `textarea_normal`, `textarea_syntax`) so they compile correctly with `--example`.
 
 ## [0.8.2]
 
@@ -36,7 +64,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Canvas keybinding profile overrides for downstream consumers
 
 ### Changed
-- Helix mode now clears selection on navigation operations
+- **Breaking:** Helix mode now clears selection on navigation operations, matching upstream Helix behavior. Downstream code that relied on the previous selection-preserving behavior should collapse selections explicitly before navigating.
 
 ### Fixed
 - Paste clipboard integration edge case
@@ -164,4 +192,9 @@ Use module paths under `canvas::textarea::*`, `canvas::textinput::*`, or
 `canvas::form::*` when depending on widget submodules such as textarea syntax
 highlighting or providers.
 
-[Unreleased]: https://gitlab.com/filipriec/tui-canvas/-/compare/v0.8.2...HEAD
+[Unreleased]: https://gitlab.com/filipriec/tui-canvas/-/compare/v0.8.5...HEAD
+[0.8.5]: https://gitlab.com/filipriec/tui-canvas/-/compare/v0.8.4...v0.8.5
+[0.8.4]: https://gitlab.com/filipriec/tui-canvas/-/compare/v0.8.3...v0.8.4
+[0.8.3]: https://gitlab.com/filipriec/tui-canvas/-/compare/v0.8.2...v0.8.3
+[0.8.2]: https://gitlab.com/filipriec/tui-canvas/-/compare/v0.8.1...v0.8.2
+[0.8.1]: https://gitlab.com/filipriec/tui-canvas/-/compare/v0.8.0...v0.8.1
