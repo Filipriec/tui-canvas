@@ -155,6 +155,93 @@ pub(crate) fn clip_window_with_indicator_padded(
     Line::from(spans)
 }
 
+/// Same as [`clip_window_with_indicator_padded`] but preserves span styles
+/// from the input [`Line`] so that selection highlighting is not lost during
+/// horizontal scrolling.
+#[cfg(feature = "gui")]
+pub(crate) fn clip_line_with_indicator_padded(
+    line: Line<'_>,
+    view_width: u16,
+    indicator: char,
+    start_cols: u16,
+) -> Line<'static> {
+    if view_width == 0 {
+        return Line::from("");
+    }
+
+    let total = display_width_of_line(&line);
+    let show_left = start_cols > 0;
+    let left_cols: u16 = if show_left { 1 } else { 0 };
+    let remaining = total.saturating_sub(start_cols);
+    let cap_without_right = view_width.saturating_sub(left_cols);
+    let show_right = remaining > cap_without_right;
+    let right_cols: u16 = if show_right { 1 } else { 0 };
+    let visible_cols = view_width.saturating_sub(left_cols + right_cols);
+
+    let clipped_spans = extract_line_display_cols(&line, start_cols, visible_cols);
+
+    let mut spans: Vec<Span<'static>> = Vec::with_capacity(clipped_spans.len() + 2);
+    if show_left {
+        spans.push(Span::raw(indicator.to_string()));
+    }
+    spans.extend(clipped_spans);
+    if show_right {
+        spans.push(Span::raw(indicator.to_string()));
+    }
+    Line::from(spans)
+}
+
+/// Sum of [`display_width`] across all spans.
+#[cfg(feature = "gui")]
+fn display_width_of_line(line: &Line) -> u16 {
+    line.spans
+        .iter()
+        .map(|span| display_width(&span.content))
+        .sum()
+}
+
+/// Extract `max_cols` display columns of styled content from `line`,
+/// skipping the first `skip_cols` display columns.
+///
+/// Preserves span styles. If the extraction window falls in the middle of
+/// a span, that span is split so styles remain correct.
+#[cfg(feature = "gui")]
+fn extract_line_display_cols(line: &Line, mut skip_cols: u16, max_cols: u16) -> Vec<Span<'static>> {
+    if max_cols == 0 {
+        return vec![];
+    }
+
+    let mut result: Vec<Span<'static>> = Vec::new();
+    let mut taken: u16 = 0;
+
+    for span in &line.spans {
+        if taken >= max_cols {
+            break;
+        }
+
+        let mut span_out = String::new();
+        for ch in span.content.chars() {
+            let w = UnicodeWidthChar::width(ch).unwrap_or(0) as u16;
+            if skip_cols > 0 {
+                skip_cols = skip_cols.saturating_sub(w);
+                continue;
+            }
+            if taken + w > max_cols {
+                taken = max_cols;
+                break;
+            }
+            span_out.push(ch);
+            taken += w;
+        }
+
+        if !span_out.is_empty() {
+            result.push(Span::styled(span_out, span.style));
+        }
+    }
+
+    result
+}
+
 #[cfg(all(test, feature = "gui"))]
 mod tests {
     use super::{

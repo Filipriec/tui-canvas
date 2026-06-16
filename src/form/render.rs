@@ -14,8 +14,8 @@ use crate::canvas::theme::{CanvasTheme, DefaultCanvasTheme};
 use crate::data_provider::DataProvider;
 use crate::editor::EditorCore;
 use crate::gui_utils::{
-    clip_inline_completion_with_indicator_padded, compute_h_scroll_with_padding, display_width,
-    effective_right_pad,
+    clip_inline_completion_with_indicator_padded, clip_line_with_indicator_padded,
+    compute_h_scroll_with_padding, display_width, effective_right_pad,
 };
 use unicode_width::UnicodeWidthChar;
 
@@ -373,7 +373,7 @@ where
 
         let line = match highlight_state {
             HighlightState::Characterwise { .. } | HighlightState::Linewise { .. } => {
-                apply_highlighting(
+                let highlighted = apply_highlighting(
                     &typed_text,
                     i,
                     current_field_idx,
@@ -381,7 +381,43 @@ where
                     highlight_state,
                     theme,
                     is_active,
-                )
+                );
+
+                if is_active {
+                    // Compute scroll values for cursor positioning, exactly as
+                    // render_active_line_with_indicator does for the no-selection path.
+                    let mut cursor_cols: u16 = 0;
+                    for (j, ch) in typed_text.chars().enumerate() {
+                        if j >= current_cursor_pos {
+                            break;
+                        }
+                        cursor_cols = cursor_cols
+                            .saturating_add(UnicodeWidthChar::width(ch).unwrap_or(0) as u16);
+                    }
+                    let total_cols = display_width(&typed_text);
+                    let (hs, lc) =
+                        compute_h_scroll_with_padding(cursor_cols, total_cols, inner_width);
+                    h_scroll_for_cursor = hs;
+                    left_offset_for_cursor = lc;
+                }
+
+                // Clip the highlighted line when text overflows, preserving
+                // span styles through horizontal scrolling.
+                match opts.overflow {
+                    OverflowMode::Indicator(ind) => {
+                        if inner_width > 0 && display_width(&typed_text) > inner_width {
+                            clip_line_with_indicator_padded(
+                                highlighted,
+                                inner_width,
+                                ind,
+                                h_scroll_for_cursor,
+                            )
+                        } else {
+                            highlighted
+                        }
+                    }
+                    OverflowMode::Wrap => highlighted,
+                }
             }
 
             HighlightState::Off => match opts.overflow {

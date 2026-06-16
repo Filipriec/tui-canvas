@@ -1,7 +1,7 @@
 //! Minimal form example using the default vim keybindings.
 //!
 //! Demonstrates the smallest viable setup: a `TextFormState` backed by a
-//! `DataProvider`, with `CanvasKeyBindings::vim_defaults()` wiring up all
+//! `DataProvider`, with `BuiltinCanvasKeybindingPreset::Vim` wiring up all
 //! modal navigation, editing, and field traversal through the centralized
 //! keybinding system.
 //!
@@ -28,7 +28,7 @@ use ratatui::{
 use tui_canvas::{
     DataProvider, TextFormState,
     integration::crossterm_input::{CrosstermInputOptions, CrosstermInputSession},
-    keybindings::CanvasKeyBindings,
+    keybindings::BuiltinCanvasKeybindingPreset,
     render_canvas_default,
 };
 
@@ -73,6 +73,7 @@ fn run_app<B: Backend<Error = io::Error>>(
     mut app: App,
 ) -> io::Result<()> {
     loop {
+        app.editor.update_cursor_style()?;
         terminal.draw(|f| ui(f, &app))?;
 
         match session.read_event()? {
@@ -127,7 +128,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // x/X delete, undo/redo, Tab/Shift+Tab field nav, and the suggestion
     // actions (Ctrl+space, Ctrl+n/p, Ctrl+y) added in recent versions.
     app.editor
-        .set_keybindings(CanvasKeyBindings::vim_defaults());
+        .use_keybinding_preset(BuiltinCanvasKeybindingPreset::Vim);
+    app.editor.update_cursor_style()?;
 
     let res = run_app(&mut terminal, &session, app);
 

@@ -156,9 +156,6 @@ fn ui(f: &mut Frame, app: &mut App) {
     let bar = Paragraph::new(Line::from(Span::raw(status)))
         .block(Block::default().borders(Borders::ALL).title("form_helix"));
     f.render_widget(bar, chunks[1]);
-
-    let (x, y) = app.form.cursor(chunks[0], None);
-    f.set_cursor_position((x, y));
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {

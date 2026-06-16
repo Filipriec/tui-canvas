@@ -33,7 +33,9 @@ use crossterm::event::{Event, KeyCode, KeyModifiers};
 use ratatui::{
     Frame, Terminal,
     backend::{Backend, CrosstermBackend},
-    widgets::Block,
+    layout::{Constraint, Direction, Layout},
+    text::{Line, Span},
+    widgets::{Block, Borders, Paragraph},
 };
 
 use tui_canvas::{
@@ -69,12 +71,23 @@ fn run_app<B: Backend<Error = io::Error>>(
 }
 
 fn ui(f: &mut Frame, input: &mut TextInputState) {
-    let area = f.area();
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Length(3), Constraint::Length(3)])
+        .split(f.area());
+
     let block = Block::bordered().title("textinput_helix_minimal");
+    f.render_stateful_widget(TextInput::default().block(block.clone()), chunks[0], input);
 
-    f.render_stateful_widget(TextInput::default().block(block.clone()), area, input);
+    let status = format!(
+        "mode: {:?}  i to edit  Esc to normal  Ctrl+C quit",
+        input.mode(),
+    );
+    let bar = Paragraph::new(Line::from(Span::raw(status)))
+        .block(Block::default().borders(Borders::ALL).title("input_helix"));
+    f.render_widget(bar, chunks[1]);
 
-    let (x, y) = input.cursor(area, Some(&block));
+    let (x, y) = input.cursor(chunks[0], Some(&block));
     f.set_cursor_position((x, y));
 }
 

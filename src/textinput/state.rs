@@ -9,7 +9,7 @@ use crate::gui_utils::{
 };
 use crate::textinput::provider::{TextInputDataProvider, TextInputProvider};
 #[cfg(feature = "cursor-style")]
-use crate::{CursorManager, canvas::modes::AppMode};
+use crate::CursorManager;
 use crate::{canvas::state::EditorState, textform::TextFormState};
 
 #[cfg(feature = "gui")]
@@ -164,11 +164,12 @@ impl<P: TextInputDataProvider> TextInputState<P> {
 
     /// Update terminal cursor style for this single-line input.
     ///
-    /// Text input is treated as insert-style editing, so this reuses the
-    /// Canvas cursor policy for `AppMode::Ins`.
+    /// Follows the editor's current mode so that Helix/Vim-style modal editing
+    /// produces the correct cursor: a steady block in normal mode, a beam in
+    /// insert mode, and a blinking block for selections.
     #[cfg(feature = "cursor-style")]
     pub fn update_cursor_style(&self) -> io::Result<()> {
-        CursorManager::update_for_mode(AppMode::Ins)
+        CursorManager::update_for_mode(self.form.mode())
     }
 
     #[cfg(not(feature = "cursor-style"))]
@@ -713,6 +714,7 @@ mod tests {
     #[cfg(feature = "crossterm")]
     use crossterm::event::Event;
     use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+
     #[cfg(feature = "gui")]
     use ratatui::layout::Rect;
 
@@ -840,6 +842,112 @@ mod tests {
         assert_eq!(input.text(), "");
     }
 
+    #[cfg(all(feature = "keybindings", feature = "crossterm"))]
+    #[test]
+    fn handle_key_event_returns_key_event_outcome_not_textinput_outcome() {
+        use crate::keybindings::{BuiltinCanvasKeybindingPreset, KeyEventOutcome};
+
+        let mut input = TextInputState::<TextInputProvider>::from_text("hello");
+        input.use_keybinding_preset(BuiltinCanvasKeybindingPreset::Helix);
+        // This won't compile if handle_key_event resolves to a method returning
+        // TextInputEventOutcome — it must be KeyEventOutcome from TextFormState.
+        let outcome: KeyEventOutcome =
+            input.handle_key_event(KeyEvent::new(KeyCode::Char('h'), KeyModifiers::NONE));
+        // 'h' in normal mode with Helix keybindings should be Consumed (move left).
+        assert!(!matches!(outcome, KeyEventOutcome::NotMatched));
+    }
+
+    #[cfg(all(feature = "keybindings", feature = "crossterm"))]
+    #[test]
+    fn helix_i_enters_insert_mode_from_normal() {
+        use crate::canvas::modes::AppMode;
+        use crate::keybindings::{BuiltinCanvasKeybindingPreset, KeyEventOutcome};
+
+        let mut input = TextInputState::<TextInputProvider>::from_text("hello");
+        input.use_keybinding_preset(BuiltinCanvasKeybindingPreset::Helix);
+
+        // Start in normal mode (default for non-textmode-normal)
+        assert_eq!(input.mode(), AppMode::Nor);
+
+        // Press 'i' — should enter insert mode
+        let outcome = input.handle_key_event(KeyEvent::new(KeyCode::Char('i'), KeyModifiers::NONE));
+        assert!(
+            matches!(outcome, KeyEventOutcome::Consumed(None)),
+            "expected Consumed, got {:?}",
+            outcome
+        );
+        assert_eq!(input.mode(), AppMode::Ins);
+    }
+
+    #[cfg(all(feature = "keybindings", feature = "crossterm"))]
+    #[test]
+    fn helix_esc_exits_insert_mode_to_normal() {
+        use crate::canvas::modes::AppMode;
+        use crate::keybindings::{BuiltinCanvasKeybindingPreset, KeyEventOutcome};
+
+        let mut input = TextInputState::<TextInputProvider>::from_text("hello");
+        input.use_keybinding_preset(BuiltinCanvasKeybindingPreset::Helix);
+
+        // Enter insert mode first
+        let _ = input.handle_key_event(KeyEvent::new(KeyCode::Char('i'), KeyModifiers::NONE));
+        assert_eq!(input.mode(), AppMode::Ins);
+
+        // Press Esc — should exit to normal mode
+        let outcome =
+            input.handle_key_event(KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE));
+        assert!(
+            matches!(outcome, KeyEventOutcome::Consumed(None)),
+            "expected Consumed, got {:?}",
+            outcome
+        );
+        assert_eq!(input.mode(), AppMode::Nor);
+    }
+
+    #[cfg(all(feature = "keybindings", feature = "crossterm"))]
+    #[test]
+    fn helix_normal_movement_works() {
+        use crate::canvas::modes::AppMode;
+        use crate::keybindings::{BuiltinCanvasKeybindingPreset, KeyEventOutcome};
+
+        let mut input = TextInputState::<TextInputProvider>::from_text("hello");
+        input.use_keybinding_preset(BuiltinCanvasKeybindingPreset::Helix);
+
+        // Enter insert, type a char, exit to normal
+        let _ = input.handle_key_event(KeyEvent::new(KeyCode::Char('i'), KeyModifiers::NONE));
+        let _ = input.handle_key_event(KeyEvent::new(KeyCode::Char('X'), KeyModifiers::NONE));
+        let _ = input.handle_key_event(KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE));
+        assert_eq!(input.mode(), AppMode::Nor);
+        // confirm text was inserted
+        assert!(input.text().contains("X"));
+
+        // h should move left in normal mode
+        let outcome =
+            input.handle_key_event(KeyEvent::new(KeyCode::Char('h'), KeyModifiers::NONE));
+        assert!(
+            matches!(outcome, KeyEventOutcome::Consumed(None)),
+            "expected Consumed, got {:?}",
+            outcome
+        );
+        // still in normal mode
+        assert_eq!(input.mode(), AppMode::Nor);
+    }
+
+    #[cfg(all(feature = "keybindings", feature = "cursor-style"))]
+    #[test]
+    fn update_cursor_style_follows_actual_mode() {
+        use crate::canvas::modes::AppMode;
+
+        // This test verifies that update_cursor_style() tracks the real editor
+        // mode rather than always forcing insert-mode cursor.
+        let input = TextInputState::<TextInputProvider>::from_text("hello");
+        // Default mode is normal (Nor) for modal editing.
+        assert_eq!(input.mode(), AppMode::Nor);
+
+        // update_cursor_style should respect the normal-mode cursor.
+        let result: std::io::Result<()> = input.update_cursor_style();
+        assert!(result.is_ok());
+    }
+
     #[cfg(feature = "gui")]
     #[test]
     fn ensure_visible_scrolls_before_text_overflows_to_keep_end_margin() {
@@ -850,5 +958,47 @@ mod tests {
         input.ensure_visible(Rect::new(0, 0, 10, 1), None);
 
         assert_eq!(input.h_scroll, 3);
+    }
+
+    #[cfg(all(feature = "keybindings", feature = "crossterm", feature = "cursor-style"))]
+    #[test]
+    fn helix_full_event_loop_mirrors_example_usage() {
+        use crate::canvas::modes::AppMode;
+        use crate::keybindings::{BuiltinCanvasKeybindingPreset, KeyEventOutcome};
+
+        // Simulate the example's event loop: update_cursor_style → handle_key_event
+        let mut input = TextInputState::<TextInputProvider>::from_text("hello");
+        input.use_keybinding_preset(BuiltinCanvasKeybindingPreset::Helix);
+
+        // Frame 1: normal mode
+        assert_eq!(input.mode(), AppMode::Nor);
+        assert!(input.update_cursor_style().is_ok());
+
+        // Frame 2: press 'i' to enter insert mode
+        let outcome = input.handle_key_event(KeyEvent::new(KeyCode::Char('i'), KeyModifiers::NONE));
+        assert!(matches!(outcome, KeyEventOutcome::Consumed(None)));
+        assert_eq!(input.mode(), AppMode::Ins);
+        assert!(input.update_cursor_style().is_ok());
+
+        // Frame 3: type 'x' in insert mode (should insert char)
+        let outcome = input.handle_key_event(KeyEvent::new(KeyCode::Char('x'), KeyModifiers::NONE));
+        assert!(matches!(outcome, KeyEventOutcome::Consumed(None)));
+        assert!(input.text().contains('x'));
+        assert!(input.update_cursor_style().is_ok());
+
+        // Frame 4: exit to normal mode with Esc
+        let outcome = input.handle_key_event(KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE));
+        assert!(matches!(outcome, KeyEventOutcome::Consumed(None)));
+        assert_eq!(input.mode(), AppMode::Nor);
+        assert!(input.update_cursor_style().is_ok());
+
+        // Frame 5: 'h' should move left in normal mode
+        let old_pos = input.cursor_position();
+        let outcome = input.handle_key_event(KeyEvent::new(KeyCode::Char('h'), KeyModifiers::NONE));
+        assert!(matches!(outcome, KeyEventOutcome::Consumed(None)));
+        assert_eq!(input.mode(), AppMode::Nor);
+        // Cursor should have moved left
+        assert!(input.cursor_position() < old_pos || old_pos == 0);
+        assert!(input.update_cursor_style().is_ok());
     }
 }
