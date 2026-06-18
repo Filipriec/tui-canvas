@@ -111,7 +111,7 @@ fn clip_with_indicator_line(s: &str, width: u16, indicator: char, style: Style) 
         return Line::from("");
     }
     if display_width(s) <= width {
-        return Line::from(Span::styled(s, style));
+        return Line::from(Span::styled(s.to_string(), style));
     }
     let budget = width.saturating_sub(1);
     let mut out = String::new();
