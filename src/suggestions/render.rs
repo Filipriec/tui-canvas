@@ -5,7 +5,6 @@
 use ratatui::{
     Frame,
     layout::{Alignment, Rect},
-    style::{Modifier, Style},
     widgets::{Block, List, ListItem, ListState, Paragraph},
 };
 
@@ -61,11 +60,11 @@ fn render_loading_indicator<T: CanvasTheme>(
     let dropdown_area =
         calculate_dropdown_position(input_rect, frame_area, loading_width, loading_height);
 
-    let loading_block = Block::default().style(Style::default().bg(theme.bg()));
+    let loading_block = Block::default().style(theme.background());
 
     let loading_paragraph = Paragraph::new(loading_text)
         .block(loading_block)
-        .style(Style::default().fg(theme.fg()))
+        .style(theme.input())
         .alignment(Alignment::Center);
 
     f.render_widget(loading_paragraph, dropdown_area);
@@ -95,7 +94,7 @@ fn render_suggestions_dropdown_list<T: CanvasTheme>(
     );
 
     // Background
-    let dropdown_block = Block::default().style(Style::default().bg(theme.bg()));
+    let dropdown_block = Block::default().style(theme.background());
 
     // List items
     let items = create_suggestion_list_items(
@@ -173,12 +172,9 @@ fn create_suggestion_list_items<'a, T: CanvasTheme>(
             let padded_text = format!("{}{}", text, " ".repeat(padding_needed as usize));
 
             ListItem::new(padded_text).style(if is_selected {
-                Style::default()
-                    .fg(theme.bg())
-                    .bg(theme.highlight())
-                    .add_modifier(Modifier::BOLD)
+                theme.suggestion_selected()
             } else {
-                Style::default().fg(theme.fg()).bg(theme.bg())
+                theme.suggestions()
             })
         })
         .collect()

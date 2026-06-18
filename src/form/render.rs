@@ -4,9 +4,9 @@
 use ratatui::{
     Frame,
     layout::{Alignment, Rect},
-    style::{Modifier, Style},
+    style::Style,
     text::{Line, Span},
-    widgets::{Paragraph, Wrap},
+    widgets::{Block, Paragraph, Wrap},
 };
 
 use crate::canvas::modes::HighlightState;
@@ -104,13 +104,14 @@ impl CanvasDisplayOptions {
     }
 }
 
-/// Utility: clip a string to fit width, append indicator if overflow
-fn clip_with_indicator_line<'a>(s: &'a str, width: u16, indicator: char) -> Line<'a> {
+/// Utility: clip a string to fit width, append indicator if overflow.
+/// All spans inherit `style` so that inactive plain-text fields remain themed.
+fn clip_with_indicator_line(s: &str, width: u16, indicator: char, style: Style) -> Line<'static> {
     if width == 0 {
         return Line::from("");
     }
     if display_width(s) <= width {
-        return Line::from(Span::raw(s));
+        return Line::from(Span::styled(s, style));
     }
     let budget = width.saturating_sub(1);
     let mut out = String::new();
@@ -123,7 +124,10 @@ fn clip_with_indicator_line<'a>(s: &'a str, width: u16, indicator: char) -> Line
         out.push(ch);
         used = used.saturating_add(w);
     }
-    Line::from(vec![Span::raw(out), Span::raw(indicator.to_string())])
+    Line::from(vec![
+        Span::styled(out, style),
+        Span::styled(indicator.to_string(), style),
+    ])
 }
 
 fn clip_label_with_ellipsis(s: &str, width: u16) -> String {
@@ -200,8 +204,8 @@ fn render_active_line_with_indicator<T: CanvasTheme>(
             width,
             indicator,
             h_scroll,
-            Style::default().fg(theme.fg()),
-            Style::default().fg(theme.suggestion_gray()),
+            theme.input_active(),
+            theme.completion(),
         ),
         h_scroll,
         left_cols,
@@ -209,7 +213,6 @@ fn render_active_line_with_indicator<T: CanvasTheme>(
 }
 
 /// Render the canvas into the provided frame using default display options.
-///
 /// Returns the rectangle of the active input field if present.
 pub fn render_canvas<T: CanvasTheme, D: DataProvider>(
     f: &mut Frame,
@@ -350,6 +353,11 @@ where
     F1: Fn(usize) -> String,
     F2: Fn(usize) -> bool,
 {
+    // Fill the canvas area with the theme's background so the surface
+    // never inherits whatever the parent frame had underneath.
+    let bg_block = Block::default().style(theme.background());
+    f.render_widget(bg_block, area);
+
     let label_width = form_label_width(fields, opts.max_label_width, area.width);
     let available_input_width = area.width.saturating_sub(label_width);
 
@@ -435,9 +443,14 @@ where
                         left_offset_for_cursor = left_cols;
                         l
                     } else if display_width(&typed_text) <= inner_width {
-                        Line::from(Span::raw(typed_text.clone()))
+                        Line::from(Span::styled(typed_text.clone(), theme.input()))
                     } else {
-                        clip_with_indicator_line(&typed_text, inner_width, ind)
+                        clip_with_indicator_line(
+                            &typed_text,
+                            inner_width,
+                            ind,
+                            theme.input(),
+                        )
                     }
                 }
 
@@ -446,19 +459,19 @@ where
                         let mut spans: Vec<Span> = Vec::new();
                         spans.push(Span::styled(
                             typed_text.clone(),
-                            Style::default().fg(theme.fg()),
+                            theme.input_active(),
                         ));
                         if let Some(completion) = &active_completion {
                             if !completion.is_empty() {
                                 spans.push(Span::styled(
                                     completion.clone(),
-                                    Style::default().fg(theme.suggestion_gray()),
+                                    theme.completion(),
                                 ));
                             }
                         }
                         Line::from(spans)
                     } else {
-                        Line::from(Span::raw(typed_text.clone()))
+                        Line::from(Span::styled(typed_text.clone(), theme.input()))
                     }
                 }
             },
@@ -507,7 +520,7 @@ fn render_field_labels<T: CanvasTheme>(
         let clipped_label = clip_label_with_ellipsis(field, label_text_width);
         let label = Paragraph::new(Line::from(Span::styled(
             clipped_label,
-            Style::default().fg(theme.fg()),
+            theme.label(),
         )));
         f.render_widget(
             label,
@@ -534,7 +547,7 @@ fn apply_highlighting<'a, T: CanvasTheme>(
     let text_len = text.chars().count();
 
     match highlight_state {
-        HighlightState::Off => Line::from(Span::styled(text, Style::default().fg(theme.fg()))),
+        HighlightState::Off => Line::from(Span::styled(text, theme.input())),
         HighlightState::Characterwise { anchor } => apply_characterwise_highlighting(
             text,
             text_len,
@@ -571,12 +584,9 @@ fn apply_characterwise_highlighting<'a, T: CanvasTheme>(
     let start_field = min(anchor_field, *current_field_idx);
     let end_field = max(anchor_field, *current_field_idx);
 
-    let highlight_style = Style::default()
-        .fg(theme.highlight())
-        .bg(theme.highlight_bg())
-        .add_modifier(Modifier::BOLD);
+    let highlight_style = theme.selection();
 
-    let normal_style = Style::default().fg(theme.fg());
+    let normal_style = theme.input();
 
     if field_index >= start_field && field_index <= end_field {
         if start_field == end_field {
@@ -667,12 +677,9 @@ fn apply_linewise_highlighting<'a, T: CanvasTheme>(
     let start_field = min(*anchor_line, *current_field_idx);
     let end_field = max(*anchor_line, *current_field_idx);
 
-    let highlight_style = Style::default()
-        .fg(theme.highlight())
-        .bg(theme.highlight_bg())
-        .add_modifier(Modifier::BOLD);
+    let highlight_style = theme.selection();
 
-    let normal_style = Style::default().fg(theme.fg());
+    let normal_style = theme.input();
 
     if field_index >= start_field && field_index <= end_field {
         Line::from(Span::styled(text, highlight_style))
