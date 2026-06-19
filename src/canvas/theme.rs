@@ -14,6 +14,8 @@ pub trait CanvasTheme {
     fn background(&self) -> Style;
     /// Field labels rendered beside each input.
     fn label(&self) -> Style;
+    /// Field label for the row containing the primary cursor.
+    fn label_active(&self) -> Style;
     /// Non-active input field text.
     fn input(&self) -> Style;
     /// Active (focused) input field text.
@@ -65,6 +67,9 @@ impl CanvasTheme for DefaultCanvasTheme {
     }
     fn label(&self) -> Style {
         Style::default().fg(Color::White)
+    }
+    fn label_active(&self) -> Style {
+        Style::default().fg(Color::Yellow)
     }
     fn input(&self) -> Style {
         Style::default().fg(Color::White)

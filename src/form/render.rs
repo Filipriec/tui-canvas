@@ -423,7 +423,7 @@ where
     let label_width = form_label_width(fields, opts.max_label_width, area.width);
     let available_input_width = area.width.saturating_sub(label_width);
 
-    render_field_labels(f, area, label_width, fields, theme);
+    render_field_labels(f, area, label_width, fields, *current_field_idx, theme);
 
     let mut active_field_input_rect = None;
 
@@ -585,6 +585,7 @@ fn render_field_labels<T: CanvasTheme>(
     area: Rect,
     label_width: u16,
     fields: &[&str],
+    current_field_idx: usize,
     theme: &T,
 ) {
     if label_width == 0 {
@@ -595,9 +596,14 @@ fn render_field_labels<T: CanvasTheme>(
 
     for (i, field) in fields.iter().enumerate() {
         let clipped_label = clip_label_with_ellipsis(field, label_text_width);
+        let label_style = if i == current_field_idx {
+            theme.label_active()
+        } else {
+            theme.label()
+        };
         let label = Paragraph::new(Line::from(Span::styled(
             clipped_label,
-            theme.label(),
+            label_style,
         )));
         f.render_widget(
             label,
@@ -894,5 +900,7 @@ mod tests {
         assert_eq!(buffer[(0, 0)].bg, Color::DarkGray);
         assert_eq!(buffer[(19, 0)].bg, Color::DarkGray);
         assert_eq!(buffer[(0, 1)].bg, Color::Black);
+        assert_eq!(buffer[(0, 0)].fg, Color::Yellow);
+        assert_eq!(buffer[(0, 1)].fg, Color::White);
     }
 }
