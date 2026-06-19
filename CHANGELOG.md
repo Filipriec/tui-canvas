@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.10]
+
+### Added
+- `CanvasTheme` trait expanded with `label_active()`, `cursor_insert()`, `cursor_select()`, `suggestion_selected()`, `warning()`, `border()`, and `border_active()` methods, all returning `ratatui::style::Style`.
+- `DefaultCanvasTheme` struct with sensible default colors for all theme roles.
+- `CursorManager` struct with `update_for_mode()` and `reset()` methods for managing terminal cursor styles per editing mode.
+- Form rendering: terminal block-cursor color inversion, cursorline row background highlighting, and theme-aware cursor styles per editing mode.
+- Form cursor positioning accounts for horizontal scroll offset, left indicator columns, and end-of-line right-padding via `set_cursor_position_scrolled`.
+
+### Changed
+- **Breaking:** `CanvasTheme` trait gained 7 new required methods (`label_active`, `cursor_insert`, `cursor_select`, `suggestion_selected`, `warning`, `border`, `border_active`). All implementors must provide these; `DefaultCanvasTheme` supplies sensible defaults.
+- Insert-mode cursor style changed to `SteadyBlock` (was platform-dependent default). Selection mode uses `BlinkingBlock`; command mode uses `SteadyUnderScore`.
+- All `CanvasTheme` methods now return full `ratatui::style::Style` (foreground + background) rather than individual color components.
+- Suggestions dropdown now uses theme-aware styling via `suggestion_selected()` and `background()` methods instead of hardcoded colors.
+
+### Fixed
+- Cursor position now correctly accounts for horizontal scroll offset, left indicator columns, and end-of-line right padding across form rendering and TextInput.
+- Selection highlighting preserved during horizontal scroll via `clip_line_with_indicator_padded` (preserves `Span` styles across scroll boundaries).
+- Form cursor no longer lands past the visible area when horizontally scrolled.
+
+## [0.8.8]
+
+### Changed
+- Version bump only (0.8.5 → 0.8.8); no code changes.
+
 ## [0.8.5]
 
 ### Added
@@ -17,6 +42,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - New `textinput_helix_minimal` and `textinput_vim_minimal` examples demonstrating keybinding-paradigm usage with `TextInputState`.
 - New `CanvasKeyAction::ExitSuggestions` and `exit_suggestions` keybindings added to all built-in presets (Vim, Helix, Emacs, VSCode).
 - `EditorCore::is_sequence_pending()`, `TextAreaState::is_sequence_pending()`, and `TextFormState::is_sequence_pending()` APIs for detecting multi-key commands in flight (key sequences, pending counts, pending operators, literal-char captures). Intended for hosts such as tui-pages that need to decide whether to route subsequent keys to the editor or to an outer keymap.
+- New `gui_utils` module providing shared rendering primitives: `display_width`, `slice_by_display_cols`, `effective_right_pad`, `compute_h_scroll_with_padding`, and styled-line clipping utilities (`clip_line_with_indicator_padded`, `clip_inline_completion_with_indicator_padded`).
+- `TextInputState` now exposes `cursor()`, `ensure_visible()`, `take_edited_flag()`, `current_cursor_cols()`, and `current_display_text_for_render()` methods for display-coordinate-aware cursor management.
+- `TextInput` widget gains `suggestion_style()`, `highlight_style()`, and `border_type()` builder methods.
+- Characterwise selection highlighting in `TextInput` widget rendering, with highlight-preserving scroll via `clip_line_with_indicator_padded`.
+- `CanvasDisplayOptions::row_input_width` callback for per-row input column-width overrides in form rendering.
+- Active-row label styling via `label_active()` theme method and cursorline row background in form rendering.
 
 ### Changed
 - `TextFormState` now automatically resynchronizes its internal fixed-field count from the data provider instead of panicking when the field count changes (`sync_fixed_rows` replaces `assert_fixed_rows`).
@@ -33,6 +64,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed horizontal scroll calculation to account for right-indicator width when the cursor is at end of line, preventing off-by-one scroll jitter.
 - Fixed textinput `ensure_visible` no longer resetting `h_scroll` to zero on edit when the text fits the viewport.
 - Fixed right-indicator visibility in `clip_window_with_indicator_padded` and `clip_inline_completion_with_indicator_padded`: indicator now correctly hidden when all text fits within the viewport width.
+- Fixed inline suggestion suffix not consistently cleared across all TextInput edit operations.
+- Fixed undo coalescing in TextInput (now properly tracked via `edited_this_frame` flag, preventing stale undo history entries).
 
 ## [0.8.4]
 
@@ -192,7 +225,9 @@ Use module paths under `canvas::textarea::*`, `canvas::textinput::*`, or
 `canvas::form::*` when depending on widget submodules such as textarea syntax
 highlighting or providers.
 
-[Unreleased]: https://gitlab.com/filipriec/tui-canvas/-/compare/v0.8.5...HEAD
+[Unreleased]: https://gitlab.com/filipriec/tui-canvas/-/compare/v0.8.10...HEAD
+[0.8.10]: https://gitlab.com/filipriec/tui-canvas/-/compare/v0.8.8...v0.8.10
+[0.8.8]: https://gitlab.com/filipriec/tui-canvas/-/compare/v0.8.5...v0.8.8
 [0.8.5]: https://gitlab.com/filipriec/tui-canvas/-/compare/v0.8.4...v0.8.5
 [0.8.4]: https://gitlab.com/filipriec/tui-canvas/-/compare/v0.8.3...v0.8.4
 [0.8.3]: https://gitlab.com/filipriec/tui-canvas/-/compare/v0.8.2...v0.8.3
