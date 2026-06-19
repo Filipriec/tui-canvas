@@ -218,6 +218,10 @@ fn cursor_style_for_mode<T: CanvasTheme>(mode: AppMode, theme: &T) -> Style {
     }
 }
 
+fn active_text_style<T: CanvasTheme>(theme: &T) -> Style {
+    theme.input().patch(theme.cursorline())
+}
+
 fn terminal_block_cell_style(style: Style) -> Style {
     // We keep using the terminal's built-in steady block cursor for the primary
     // cursor. Terminals render that block by reversing the cell under the
@@ -245,18 +249,21 @@ fn active_line_with_cursor<T: CanvasTheme>(
 
     let mut spans = Vec::new();
     if !before.is_empty() {
-        spans.push(Span::styled(before, theme.input_active()));
+        spans.push(Span::styled(before, active_text_style(theme)));
     }
     spans.push(Span::styled(
         cursor_char.to_string(),
         terminal_block_cell_style(cursor_style_for_mode(mode, theme)),
     ));
     if !after.is_empty() {
-        spans.push(Span::styled(after, theme.input_active()));
+        spans.push(Span::styled(after, active_text_style(theme)));
     }
     if let Some(completion) = completion {
         if !completion.is_empty() {
-            spans.push(Span::styled(completion.to_string(), theme.completion()));
+            spans.push(Span::styled(
+                completion.to_string(),
+                theme.completion().patch(theme.cursorline()),
+            ));
         }
     }
 
@@ -411,6 +418,8 @@ where
     let bg_block = Block::default().style(theme.background());
     f.render_widget(bg_block, area);
 
+    render_cursorline_row(f, area, *current_field_idx, theme);
+
     let label_width = form_label_width(fields, opts.max_label_width, area.width);
     let available_input_width = area.width.saturating_sub(label_width);
 
@@ -549,6 +558,27 @@ where
     active_field_input_rect
 }
 
+fn render_cursorline_row<T: CanvasTheme>(
+    f: &mut Frame,
+    area: Rect,
+    current_field_idx: usize,
+    theme: &T,
+) {
+    if current_field_idx as u16 >= area.height {
+        return;
+    }
+
+    f.render_widget(
+        Block::default().style(theme.cursorline()),
+        Rect {
+            x: area.x,
+            y: area.y + current_field_idx as u16,
+            width: area.width,
+            height: 1,
+        },
+    );
+}
+
 /// Render field labels
 fn render_field_labels<T: CanvasTheme>(
     f: &mut Frame,
@@ -625,7 +655,7 @@ fn apply_characterwise_highlighting<'a, T: CanvasTheme>(
     current_cursor_pos: usize,
     anchor: &(usize, usize),
     theme: &T,
-    _is_active: bool,
+    is_active: bool,
 ) -> Line<'a> {
     let (anchor_field, anchor_char) = *anchor;
     let start_field = min(anchor_field, *current_field_idx);
@@ -633,7 +663,11 @@ fn apply_characterwise_highlighting<'a, T: CanvasTheme>(
 
     let highlight_style = theme.selection();
 
-    let normal_style = theme.input();
+    let normal_style = if is_active {
+        active_text_style(theme)
+    } else {
+        theme.input()
+    };
 
     if field_index >= start_field && field_index <= end_field {
         if start_field == end_field {
@@ -719,14 +753,18 @@ fn apply_linewise_highlighting<'a, T: CanvasTheme>(
     current_field_idx: &usize,
     anchor_line: &usize,
     theme: &T,
-    _is_active: bool,
+    is_active: bool,
 ) -> Line<'a> {
     let start_field = min(*anchor_line, *current_field_idx);
     let end_field = max(*anchor_line, *current_field_idx);
 
     let highlight_style = theme.selection();
 
-    let normal_style = theme.input();
+    let normal_style = if is_active {
+        active_text_style(theme)
+    } else {
+        theme.input()
+    };
 
     if field_index >= start_field && field_index <= end_field {
         Line::from(Span::styled(text, highlight_style))
@@ -780,7 +818,41 @@ pub fn render_canvas_default<D: DataProvider>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ratatui::style::Color;
+    use ratatui::{Terminal, backend::TestBackend, style::Color};
+
+    struct Provider {
+        values: Vec<String>,
+    }
+
+    impl Provider {
+        fn new(values: &[&str]) -> Self {
+            Self {
+                values: values.iter().map(|value| value.to_string()).collect(),
+            }
+        }
+    }
+
+    impl DataProvider for Provider {
+        fn field_count(&self) -> usize {
+            self.values.len()
+        }
+
+        fn field_name(&self, index: usize) -> &str {
+            match index {
+                0 => "first",
+                1 => "second",
+                _ => "",
+            }
+        }
+
+        fn field_value(&self, index: usize) -> &str {
+            &self.values[index]
+        }
+
+        fn set_field_value(&mut self, index: usize, value: String) {
+            self.values[index] = value;
+        }
+    }
 
     #[test]
     fn insert_mode_active_line_uses_inverse_style_for_terminal_block_cursor() {
@@ -791,5 +863,36 @@ mod tests {
         assert_eq!(cursor.content.as_ref(), " ");
         assert_eq!(cursor.style.fg, Some(Color::Green));
         assert_eq!(cursor.style.bg, Some(Color::Black));
+    }
+
+    #[test]
+    fn current_row_has_cursorline_background_in_normal_mode() {
+        let mut editor = EditorCore::new(Provider::new(&["alpha", "beta"]));
+        editor.ui_state.current_mode = AppMode::Nor;
+
+        let backend = TestBackend::new(20, 4);
+        let mut terminal = Terminal::new(backend).unwrap();
+
+        terminal
+            .draw(|frame| {
+                render_canvas_with_options(
+                    frame,
+                    frame.area(),
+                    &editor,
+                    &DefaultCanvasTheme,
+                    CanvasDisplayOptions {
+                        max_label_width: 8,
+                        max_input_width: None,
+                        row_input_width: None,
+                        ..Default::default()
+                    },
+                );
+            })
+            .unwrap();
+
+        let buffer = terminal.backend().buffer();
+        assert_eq!(buffer[(0, 0)].bg, Color::DarkGray);
+        assert_eq!(buffer[(19, 0)].bg, Color::DarkGray);
+        assert_eq!(buffer[(0, 1)].bg, Color::Black);
     }
 }

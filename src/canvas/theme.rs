@@ -20,6 +20,8 @@ pub trait CanvasTheme {
     fn input_active(&self) -> Style;
     /// Text selection highlight (characterwise and linewise).
     fn selection(&self) -> Style;
+    /// Background for the row containing the primary cursor.
+    fn cursorline(&self) -> Style;
     /// Inline completion / ghost text shown after the cursor.
     fn completion(&self) -> Style;
     /// Cursor cell in normal/navigation mode.
@@ -75,6 +77,9 @@ impl CanvasTheme for DefaultCanvasTheme {
             .fg(Color::Yellow)
             .bg(Color::Blue)
             .add_modifier(Modifier::BOLD)
+    }
+    fn cursorline(&self) -> Style {
+        Style::default().bg(Color::DarkGray)
     }
     fn completion(&self) -> Style {
         Style::default().fg(Color::DarkGray)
