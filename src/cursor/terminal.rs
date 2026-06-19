@@ -12,6 +12,17 @@ use std::io;
 
 use crate::canvas::modes::AppMode;
 
+#[cfg(feature = "cursor-style")]
+fn cursor_style_for_mode(mode: AppMode) -> SetCursorStyle {
+    match mode {
+        AppMode::Ins => SetCursorStyle::SteadyBlock,
+        AppMode::Nor => SetCursorStyle::SteadyBlock,
+        AppMode::Sel => SetCursorStyle::BlinkingBlock,
+        AppMode::General => SetCursorStyle::SteadyBlock,
+        AppMode::Command => SetCursorStyle::SteadyUnderScore,
+    }
+}
+
 /// Manages cursor styles based on canvas modes
 pub struct CursorManager;
 
@@ -32,13 +43,7 @@ impl CursorManager {
         // Default (not normal): original mapping
         #[cfg(not(feature = "textmode-normal"))]
         {
-            let style = match mode {
-                AppMode::Ins => SetCursorStyle::SteadyBar, // Thin line for insert
-                AppMode::Nor => SetCursorStyle::SteadyBlock, // Block for normal
-                AppMode::Sel => SetCursorStyle::BlinkingBlock, // Blinking for visual
-                AppMode::General => SetCursorStyle::SteadyBlock, // Block for general
-                AppMode::Command => SetCursorStyle::SteadyUnderScore, // Underscore for command
-            };
+            let style = cursor_style_for_mode(mode);
 
             return execute!(io::stdout(), style);
         }
@@ -60,5 +65,22 @@ impl CursorManager {
     #[cfg(not(feature = "cursor-style"))]
     pub fn reset() -> io::Result<()> {
         Ok(())
+    }
+}
+
+#[cfg(all(test, feature = "cursor-style"))]
+mod tests {
+    use super::*;
+    use crossterm::Command;
+
+    fn ansi_for_mode(mode: AppMode) -> String {
+        let mut out = String::new();
+        cursor_style_for_mode(mode).write_ansi(&mut out).unwrap();
+        out
+    }
+
+    #[test]
+    fn insert_mode_uses_block_cursor_shape() {
+        assert_eq!(ansi_for_mode(AppMode::Ins), "\x1b[2 q");
     }
 }

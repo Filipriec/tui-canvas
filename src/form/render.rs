@@ -9,13 +9,13 @@ use ratatui::{
     widgets::{Block, Paragraph, Wrap},
 };
 
-use crate::canvas::modes::HighlightState;
+use crate::canvas::modes::{AppMode, HighlightState};
 use crate::canvas::theme::{CanvasTheme, DefaultCanvasTheme};
 use crate::data_provider::DataProvider;
 use crate::editor::EditorCore;
 use crate::gui_utils::{
-    clip_inline_completion_with_indicator_padded, clip_line_with_indicator_padded,
-    compute_h_scroll_with_padding, display_width, effective_right_pad,
+    clip_line_with_indicator_padded, compute_h_scroll_with_padding, display_width,
+    effective_right_pad,
 };
 use unicode_width::UnicodeWidthChar;
 
@@ -179,6 +179,7 @@ fn render_active_line_with_indicator<T: CanvasTheme>(
     width: u16,
     indicator: char,
     cursor_chars: usize,
+    mode: AppMode,
     theme: &T,
 ) -> (Line<'static>, u16, u16) {
     if width == 0 {
@@ -198,18 +199,68 @@ fn render_active_line_with_indicator<T: CanvasTheme>(
     let (h_scroll, left_cols) = compute_h_scroll_with_padding(cursor_cols, total_cols, width);
 
     (
-        clip_inline_completion_with_indicator_padded(
-            typed_text,
-            completion,
+        clip_line_with_indicator_padded(
+            active_line_with_cursor(typed_text, completion, cursor_chars, mode, theme),
             width,
             indicator,
             h_scroll,
-            theme.input_active(),
-            theme.completion(),
         ),
         h_scroll,
         left_cols,
     )
+}
+
+fn cursor_style_for_mode<T: CanvasTheme>(mode: AppMode, theme: &T) -> Style {
+    match mode {
+        AppMode::Ins => theme.cursor_insert(),
+        AppMode::Sel => theme.cursor_select(),
+        AppMode::Nor | AppMode::General | AppMode::Command => theme.cursor_normal(),
+    }
+}
+
+fn terminal_block_cell_style(style: Style) -> Style {
+    // We keep using the terminal's built-in steady block cursor for the primary
+    // cursor. Terminals render that block by reversing the cell under the
+    // cursor, so write the inverse style into the ratatui buffer. After the
+    // terminal applies its reversal, the visible cursor matches the Helix
+    // `ui.cursor.*` color from the theme.
+    Style {
+        fg: style.bg,
+        bg: style.fg,
+        ..style
+    }
+}
+
+fn active_line_with_cursor<T: CanvasTheme>(
+    typed_text: &str,
+    completion: Option<&str>,
+    cursor_chars: usize,
+    mode: AppMode,
+    theme: &T,
+) -> Line<'static> {
+    let cursor_pos = cursor_chars.min(typed_text.chars().count());
+    let before: String = typed_text.chars().take(cursor_pos).collect();
+    let cursor_char = typed_text.chars().nth(cursor_pos).unwrap_or(' ');
+    let after: String = typed_text.chars().skip(cursor_pos + 1).collect();
+
+    let mut spans = Vec::new();
+    if !before.is_empty() {
+        spans.push(Span::styled(before, theme.input_active()));
+    }
+    spans.push(Span::styled(
+        cursor_char.to_string(),
+        terminal_block_cell_style(cursor_style_for_mode(mode, theme)),
+    ));
+    if !after.is_empty() {
+        spans.push(Span::styled(after, theme.input_active()));
+    }
+    if let Some(completion) = completion {
+        if !completion.is_empty() {
+            spans.push(Span::styled(completion.to_string(), theme.completion()));
+        }
+    }
+
+    Line::from(spans)
 }
 
 /// Render the canvas into the provided frame using default display options.
@@ -298,6 +349,7 @@ fn render_canvas_with_highlight_and_options<T: CanvasTheme, D: DataProvider>(
         theme,
         highlight_state,
         editor.display_cursor_position(),
+        editor.mode(),
         #[cfg(feature = "validation")]
         |field_idx| editor.display_text_for_field(field_idx),
         #[cfg(not(feature = "validation"))]
@@ -344,6 +396,7 @@ fn render_canvas_fields_with_options<T: CanvasTheme, F1, F2>(
     theme: &T,
     highlight_state: &HighlightState,
     current_cursor_pos: usize,
+    current_mode: AppMode,
     get_display_value: F1,
     has_display_override: F2,
     active_completion: Option<String>,
@@ -437,6 +490,7 @@ where
                             inner_width,
                             ind,
                             current_cursor_pos,
+                            current_mode,
                             theme,
                         );
                         h_scroll_for_cursor = hs;
@@ -456,20 +510,13 @@ where
 
                 OverflowMode::Wrap => {
                     if is_active {
-                        let mut spans: Vec<Span> = Vec::new();
-                        spans.push(Span::styled(
-                            typed_text.clone(),
-                            theme.input_active(),
-                        ));
-                        if let Some(completion) = &active_completion {
-                            if !completion.is_empty() {
-                                spans.push(Span::styled(
-                                    completion.clone(),
-                                    theme.completion(),
-                                ));
-                            }
-                        }
-                        Line::from(spans)
+                        active_line_with_cursor(
+                            &typed_text,
+                            active_completion.as_deref(),
+                            current_cursor_pos,
+                            current_mode,
+                            theme,
+                        )
                     } else {
                         Line::from(Span::styled(typed_text.clone(), theme.input()))
                     }
@@ -728,4 +775,21 @@ pub fn render_canvas_default<D: DataProvider>(
 ) -> Option<Rect> {
     let theme = DefaultCanvasTheme;
     render_canvas(f, area, editor, &theme)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ratatui::style::Color;
+
+    #[test]
+    fn insert_mode_active_line_uses_inverse_style_for_terminal_block_cursor() {
+        let theme = DefaultCanvasTheme;
+        let line = active_line_with_cursor("abc", None, 3, AppMode::Ins, &theme);
+
+        let cursor = line.spans.last().unwrap();
+        assert_eq!(cursor.content.as_ref(), " ");
+        assert_eq!(cursor.style.fg, Some(Color::Green));
+        assert_eq!(cursor.style.bg, Some(Color::Black));
+    }
 }

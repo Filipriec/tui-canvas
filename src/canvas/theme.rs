@@ -22,6 +22,12 @@ pub trait CanvasTheme {
     fn selection(&self) -> Style;
     /// Inline completion / ghost text shown after the cursor.
     fn completion(&self) -> Style;
+    /// Cursor cell in normal/navigation mode.
+    fn cursor_normal(&self) -> Style;
+    /// Cursor cell in insert mode.
+    fn cursor_insert(&self) -> Style;
+    /// Cursor cell in selection mode.
+    fn cursor_select(&self) -> Style;
     /// Non-selected suggestions dropdown items.
     fn suggestions(&self) -> Style;
     /// Selected / highlighted suggestion in the dropdown.
@@ -72,6 +78,15 @@ impl CanvasTheme for DefaultCanvasTheme {
     }
     fn completion(&self) -> Style {
         Style::default().fg(Color::DarkGray)
+    }
+    fn cursor_normal(&self) -> Style {
+        Style::default().fg(Color::Black).bg(Color::White)
+    }
+    fn cursor_insert(&self) -> Style {
+        Style::default().fg(Color::Black).bg(Color::Green)
+    }
+    fn cursor_select(&self) -> Style {
+        Style::default().fg(Color::Black).bg(Color::Blue)
     }
     fn suggestions(&self) -> Style {
         Style::default().fg(Color::White).bg(Color::Black)
