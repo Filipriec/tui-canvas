@@ -219,7 +219,9 @@ fn cursor_style_for_mode<T: CanvasTheme>(mode: AppMode, theme: &T) -> Style {
 }
 
 fn active_text_style<T: CanvasTheme>(theme: &T) -> Style {
-    theme.input().patch(theme.cursorline())
+    // Revert form-field background: change this back to
+    // `theme.input().patch(theme.cursorline())`.
+    theme.input_active()
 }
 
 fn terminal_block_cell_style(style: Style) -> Style {
@@ -533,7 +535,10 @@ where
             },
         };
 
-        let mut p = Paragraph::new(line).alignment(Alignment::Left);
+        // Revert form-field background: remove this paragraph base style.
+        let mut p = Paragraph::new(line)
+            .style(active_text_style(theme))
+            .alignment(Alignment::Left);
 
         if matches!(opts.overflow, OverflowMode::Wrap) {
             p = p.wrap(Wrap { trim: false });
@@ -661,7 +666,7 @@ fn apply_characterwise_highlighting<'a, T: CanvasTheme>(
     current_cursor_pos: usize,
     anchor: &(usize, usize),
     theme: &T,
-    is_active: bool,
+    _is_active: bool,
 ) -> Line<'a> {
     let (anchor_field, anchor_char) = *anchor;
     let start_field = min(anchor_field, *current_field_idx);
@@ -669,11 +674,7 @@ fn apply_characterwise_highlighting<'a, T: CanvasTheme>(
 
     let highlight_style = theme.selection();
 
-    let normal_style = if is_active {
-        active_text_style(theme)
-    } else {
-        theme.input()
-    };
+    let normal_style = theme.input();
 
     if field_index >= start_field && field_index <= end_field {
         if start_field == end_field {
@@ -759,18 +760,14 @@ fn apply_linewise_highlighting<'a, T: CanvasTheme>(
     current_field_idx: &usize,
     anchor_line: &usize,
     theme: &T,
-    is_active: bool,
+    _is_active: bool,
 ) -> Line<'a> {
     let start_field = min(*anchor_line, *current_field_idx);
     let end_field = max(*anchor_line, *current_field_idx);
 
     let highlight_style = theme.selection();
 
-    let normal_style = if is_active {
-        active_text_style(theme)
-    } else {
-        theme.input()
-    };
+    let normal_style = theme.input();
 
     if field_index >= start_field && field_index <= end_field {
         Line::from(Span::styled(text, highlight_style))
@@ -900,7 +897,47 @@ mod tests {
         assert_eq!(buffer[(0, 0)].bg, Color::DarkGray);
         assert_eq!(buffer[(19, 0)].bg, Color::DarkGray);
         assert_eq!(buffer[(0, 1)].bg, Color::Black);
+        assert_eq!(buffer[(8, 1)].bg, Color::DarkGray);
         assert_eq!(buffer[(0, 0)].fg, Color::Yellow);
         assert_eq!(buffer[(0, 1)].fg, Color::White);
+        assert_eq!(buffer[(8, 0)].bg, Color::DarkGray);
+    }
+
+    #[test]
+    fn form_selection_background_overrides_active_input_background() {
+        let mut editor = EditorCore::new(Provider::new(&["alpha", "beta"]));
+        editor.ui_state.current_mode = AppMode::Sel;
+        editor.ui_state.selection = crate::canvas::state::SelectionState::Characterwise {
+            anchor: (0, 0),
+        };
+        editor.set_cursor_position(1);
+
+        let backend = TestBackend::new(20, 4);
+        let mut terminal = Terminal::new(backend).unwrap();
+
+        terminal
+            .draw(|frame| {
+                render_canvas_with_options(
+                    frame,
+                    frame.area(),
+                    &editor,
+                    &DefaultCanvasTheme,
+                    CanvasDisplayOptions {
+                        max_label_width: 8,
+                        max_input_width: None,
+                        row_input_width: None,
+                        ..Default::default()
+                    },
+                );
+            })
+            .unwrap();
+
+        let buffer = terminal.backend().buffer();
+        assert_eq!(buffer[(7, 0)].bg, Color::Blue);
+        assert_eq!(buffer[(8, 0)].bg, Color::Blue);
+        assert_eq!(buffer[(9, 0)].bg, Color::DarkGray);
+        assert_eq!(buffer[(19, 0)].bg, Color::DarkGray);
+        assert_eq!(buffer[(0, 1)].bg, Color::Black);
+        assert_eq!(buffer[(8, 1)].bg, Color::DarkGray);
     }
 }

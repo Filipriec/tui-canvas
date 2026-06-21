@@ -75,7 +75,8 @@ impl CanvasTheme for DefaultCanvasTheme {
         Style::default().fg(Color::White)
     }
     fn input_active(&self) -> Style {
-        Style::default().fg(Color::White)
+        // Revert form-field background: remove `.bg(Color::DarkGray)`.
+        Style::default().fg(Color::White).bg(Color::DarkGray)
     }
     fn selection(&self) -> Style {
         Style::default()
