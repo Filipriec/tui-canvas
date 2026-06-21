@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Form rendering now keeps the editable form-field background visible for every input cell, while the active cursor row extends that same color across the whole row. Selection highlighting still takes priority over the field/row background. Commit trace for comparison: introduced in `53c6aea`; compare against the previous behavior with `2c3c40a..53c6aea`.
+
 ## [0.8.10]
 
 ### Added
