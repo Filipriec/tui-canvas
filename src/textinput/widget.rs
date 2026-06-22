@@ -10,6 +10,8 @@ use ratatui::{
 #[cfg(feature = "gui")]
 use crate::canvas::state::SelectionState;
 #[cfg(feature = "gui")]
+use crate::canvas::AppMode;
+#[cfg(feature = "gui")]
 use crate::gui_utils::{
     clip_inline_completion_with_indicator_padded, clip_line_with_indicator_padded,
     clip_window_with_indicator_padded, compute_h_scroll_with_padding, display_cols_up_to,
@@ -28,6 +30,10 @@ pub struct TextInput<'a, P: TextInputDataProvider = TextInputProvider> {
     pub(crate) style: Style,
     pub(crate) suggestion_style: Style,
     pub(crate) highlight_style: Style,
+    pub(crate) cursor_normal_style: Style,
+    pub(crate) cursor_insert_style: Style,
+    pub(crate) cursor_select_style: Style,
+    pub(crate) draw_cursor: bool,
     pub(crate) border_type: BorderType,
     pub(crate) _provider: std::marker::PhantomData<P>,
 }
@@ -44,6 +50,10 @@ impl<'a, P: TextInputDataProvider> Default for TextInput<'a, P> {
             style: Style::default(),
             suggestion_style: Style::default().fg(Color::DarkGray),
             highlight_style: Style::default().bg(Color::DarkGray).add_modifier(Modifier::BOLD),
+            cursor_normal_style: Style::default().fg(Color::Black).bg(Color::White),
+            cursor_insert_style: Style::default().fg(Color::Black).bg(Color::Green),
+            cursor_select_style: Style::default().fg(Color::Black).bg(Color::Blue),
+            draw_cursor: true,
             border_type: BorderType::Rounded,
             _provider: std::marker::PhantomData,
         }
@@ -72,12 +82,33 @@ impl<'a, P: TextInputDataProvider> TextInput<'a, P> {
         self
     }
 
+    pub fn cursor_styles(mut self, normal: Style, insert: Style, select: Style) -> Self {
+        self.cursor_normal_style = normal;
+        self.cursor_insert_style = insert;
+        self.cursor_select_style = select;
+        self
+    }
+
+    pub fn draw_cursor(mut self, draw: bool) -> Self {
+        self.draw_cursor = draw;
+        self
+    }
+
     pub fn border_type(mut self, ty: BorderType) -> Self {
         self.border_type = ty;
         if let Some(b) = &mut self.block {
             *b = b.clone().border_type(ty);
         }
         self
+    }
+}
+
+#[cfg(feature = "gui")]
+fn cursor_style_for_mode(mode: AppMode, normal: Style, insert: Style, select: Style) -> Style {
+    match mode {
+        AppMode::Ins => insert,
+        AppMode::Sel => select,
+        AppMode::Nor | AppMode::General | AppMode::Command => normal,
     }
 }
 
@@ -204,6 +235,27 @@ impl<'a, P: TextInputDataProvider> StatefulWidget for TextInput<'a, P> {
             .style(self.style);
 
         p.render(inner, buf);
+
+        if self.draw_cursor {
+            let (cursor_x, cursor_y) = state.cursor(area, self.block.as_ref());
+            if cursor_x >= inner.x
+                && cursor_x < inner.right()
+                && cursor_y >= inner.y
+                && cursor_y < inner.bottom()
+            {
+                if let Some(cell) = buf.cell_mut((cursor_x, cursor_y)) {
+                    if state.display_cursor_position() >= text.chars().count() {
+                        cell.set_symbol(" ");
+                    }
+                    cell.set_style(cursor_style_for_mode(
+                        state.mode(),
+                        self.cursor_normal_style,
+                        self.cursor_insert_style,
+                        self.cursor_select_style,
+                    ));
+                }
+            }
+        }
     }
 }
 

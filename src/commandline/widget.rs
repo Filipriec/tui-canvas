@@ -6,6 +6,7 @@ use ratatui::{
     widgets::{Paragraph, StatefulWidget, Widget},
 };
 
+use crate::canvas::AppMode;
 use crate::gui_utils::{
     clip_window_with_indicator_padded, compute_h_scroll_with_padding, display_cols_up_to,
     display_width,
@@ -33,6 +34,9 @@ pub struct CommandLine {
     pub(crate) style: Style,
     pub(crate) prompt_style: Style,
     pub(crate) placeholder_style: Style,
+    pub(crate) cursor_normal_style: Style,
+    pub(crate) cursor_insert_style: Style,
+    pub(crate) cursor_select_style: Style,
     pub(crate) overflow_indicator: char,
     pub(crate) placement: CommandLinePlacement,
 }
@@ -43,6 +47,9 @@ impl Default for CommandLine {
             style: Style::default(),
             prompt_style: Style::default().fg(Color::Yellow),
             placeholder_style: Style::default().fg(Color::DarkGray),
+            cursor_normal_style: Style::default().fg(Color::Black).bg(Color::White),
+            cursor_insert_style: Style::default().fg(Color::Black).bg(Color::Green),
+            cursor_select_style: Style::default().fg(Color::Black).bg(Color::Blue),
             overflow_indicator: '$',
             placement: CommandLinePlacement::Bottom,
         }
@@ -98,10 +105,25 @@ impl CommandLine {
         self
     }
 
+    pub fn cursor_styles(mut self, normal: Style, insert: Style, select: Style) -> Self {
+        self.cursor_normal_style = normal;
+        self.cursor_insert_style = insert;
+        self.cursor_select_style = select;
+        self
+    }
+
     /// Character shown when input is horizontally clipped.
     pub fn overflow_indicator(mut self, ch: char) -> Self {
         self.overflow_indicator = ch;
         self
+    }
+}
+
+fn cursor_style_for_mode(mode: AppMode, normal: Style, insert: Style, select: Style) -> Style {
+    match mode {
+        AppMode::Ins => insert,
+        AppMode::Sel => select,
+        AppMode::Nor | AppMode::General | AppMode::Command => normal,
     }
 }
 
@@ -154,5 +176,24 @@ impl StatefulWidget for CommandLine {
             .alignment(Alignment::Left)
             .style(self.style);
         paragraph.render(area, buf);
+
+        let (cursor_x, cursor_y) = state.cursor_inline(area);
+        if cursor_x >= input_area.x
+            && cursor_x < input_area.right()
+            && cursor_y >= input_area.y
+            && cursor_y < input_area.bottom()
+        {
+            if let Some(cell) = buf.cell_mut((cursor_x, cursor_y)) {
+                if state.input.display_cursor_position() >= text.chars().count() {
+                    cell.set_symbol(" ");
+                }
+                cell.set_style(cursor_style_for_mode(
+                    state.input.mode(),
+                    self.cursor_normal_style,
+                    self.cursor_insert_style,
+                    self.cursor_select_style,
+                ));
+            }
+        }
     }
 }

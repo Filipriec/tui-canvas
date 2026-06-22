@@ -61,6 +61,11 @@ pub enum OverflowMode {
 pub struct CanvasDisplayOptions {
     /// How to handle horizontal overflow for fields.
     pub overflow: OverflowMode,
+    /// Whether to draw the canvas-owned cursor cell.
+    ///
+    /// Set this to `false` when the canvas is visible but focus is outside of
+    /// it, so the host terminal cursor can show the inactive underscore.
+    pub draw_cursor: bool,
     /// Maximum label column width, including the trailing space before the input.
     ///
     /// Change this by setting `CanvasDisplayOptions::max_label_width`.
@@ -83,6 +88,7 @@ impl Default for CanvasDisplayOptions {
     fn default() -> Self {
         Self {
             overflow: OverflowMode::Indicator('$'),
+            draw_cursor: true,
             max_label_width: 24,
             max_input_width: Some(25),
             row_input_width: None,
@@ -224,19 +230,6 @@ fn active_text_style<T: CanvasTheme>(theme: &T) -> Style {
     theme.input_active()
 }
 
-fn terminal_block_cell_style(style: Style) -> Style {
-    // We keep using the terminal's built-in steady block cursor for the primary
-    // cursor. Terminals render that block by reversing the cell under the
-    // cursor, so write the inverse style into the ratatui buffer. After the
-    // terminal applies its reversal, the visible cursor matches the Helix
-    // `ui.cursor.*` color from the theme.
-    Style {
-        fg: style.bg,
-        bg: style.fg,
-        ..style
-    }
-}
-
 fn active_line_with_cursor<T: CanvasTheme>(
     typed_text: &str,
     completion: Option<&str>,
@@ -255,11 +248,29 @@ fn active_line_with_cursor<T: CanvasTheme>(
     }
     spans.push(Span::styled(
         cursor_char.to_string(),
-        terminal_block_cell_style(cursor_style_for_mode(mode, theme)),
+        cursor_style_for_mode(mode, theme),
     ));
     if !after.is_empty() {
         spans.push(Span::styled(after, active_text_style(theme)));
     }
+    if let Some(completion) = completion {
+        if !completion.is_empty() {
+            spans.push(Span::styled(
+                completion.to_string(),
+                theme.completion().patch(theme.cursorline()),
+            ));
+        }
+    }
+
+    Line::from(spans)
+}
+
+fn active_line_without_cursor<T: CanvasTheme>(
+    typed_text: &str,
+    completion: Option<&str>,
+    theme: &T,
+) -> Line<'static> {
+    let mut spans = vec![Span::styled(typed_text.to_string(), active_text_style(theme))];
     if let Some(completion) = completion {
         if !completion.is_empty() {
             spans.push(Span::styled(
@@ -495,18 +506,33 @@ where
             HighlightState::Off => match opts.overflow {
                 OverflowMode::Indicator(ind) => {
                     if is_active {
-                        let (l, hs, left_cols) = render_active_line_with_indicator(
-                            &typed_text,
-                            active_completion.as_deref(),
-                            inner_width,
-                            ind,
-                            current_cursor_pos,
-                            current_mode,
-                            theme,
-                        );
-                        h_scroll_for_cursor = hs;
-                        left_offset_for_cursor = left_cols;
-                        l
+                        if opts.draw_cursor {
+                            let (l, hs, left_cols) = render_active_line_with_indicator(
+                                &typed_text,
+                                active_completion.as_deref(),
+                                inner_width,
+                                ind,
+                                current_cursor_pos,
+                                current_mode,
+                                theme,
+                            );
+                            h_scroll_for_cursor = hs;
+                            left_offset_for_cursor = left_cols;
+                            l
+                        } else if display_width(&typed_text) <= inner_width {
+                            active_line_without_cursor(
+                                &typed_text,
+                                active_completion.as_deref(),
+                                theme,
+                            )
+                        } else {
+                            clip_with_indicator_line(
+                                &typed_text,
+                                inner_width,
+                                ind,
+                                active_text_style(theme),
+                            )
+                        }
                     } else if display_width(&typed_text) <= inner_width {
                         Line::from(Span::styled(typed_text.clone(), theme.input()))
                     } else {
@@ -521,13 +547,21 @@ where
 
                 OverflowMode::Wrap => {
                     if is_active {
-                        active_line_with_cursor(
-                            &typed_text,
-                            active_completion.as_deref(),
-                            current_cursor_pos,
-                            current_mode,
-                            theme,
-                        )
+                        if opts.draw_cursor {
+                            active_line_with_cursor(
+                                &typed_text,
+                                active_completion.as_deref(),
+                                current_cursor_pos,
+                                current_mode,
+                                theme,
+                            )
+                        } else {
+                            active_line_without_cursor(
+                                &typed_text,
+                                active_completion.as_deref(),
+                                theme,
+                            )
+                        }
                     } else {
                         Line::from(Span::styled(typed_text.clone(), theme.input()))
                     }
@@ -548,8 +582,10 @@ where
 
         if is_active {
             active_field_input_rect = Some(input_row);
-            set_cursor_position_scrolled(
-                f,
+        }
+
+        if is_active && opts.draw_cursor {
+            let (cursor_x, cursor_y) = cursor_position_scrolled(
                 input_row,
                 &typed_text,
                 current_cursor_pos,
@@ -557,6 +593,28 @@ where
                 h_scroll_for_cursor,
                 left_offset_for_cursor,
             );
+            if cursor_x >= input_row.x
+                && cursor_x < input_row.right()
+                && cursor_y >= input_row.y
+                && cursor_y < input_row.bottom()
+            {
+                if let Some(cell) = f.buffer_mut().cell_mut((cursor_x, cursor_y)) {
+                    if current_cursor_pos >= typed_text.chars().count() {
+                        cell.set_symbol(" ");
+                    }
+                    cell.set_style(cursor_style_for_mode(current_mode, theme));
+                }
+            }
+        } else if is_active {
+            let (cursor_x, cursor_y) = cursor_position_scrolled(
+                input_row,
+                &typed_text,
+                current_cursor_pos,
+                has_display_override(i),
+                h_scroll_for_cursor,
+                left_offset_for_cursor,
+            );
+            f.set_cursor_position((cursor_x, cursor_y));
         }
     }
 
@@ -776,16 +834,15 @@ fn apply_linewise_highlighting<'a, T: CanvasTheme>(
     }
 }
 
-/// Set cursor position (x clamp only; no Y offset with wrap in this version)
-fn set_cursor_position_scrolled(
-    f: &mut Frame,
+/// Calculate cursor position (x clamp only; no Y offset with wrap in this version)
+fn cursor_position_scrolled(
     field_rect: Rect,
     text: &str,
     current_cursor_pos: usize,
     _has_display_override: bool,
     h_scroll: u16,
     left_offset: u16,
-) {
+) -> (u16, u16) {
     let mut cols: u16 = 0;
     for (i, ch) in text.chars().enumerate() {
         if i >= current_cursor_pos {
@@ -806,7 +863,7 @@ fn set_cursor_position_scrolled(
 
     let cursor_x = field_rect.x.saturating_add(visible_x);
     let cursor_y = field_rect.y;
-    f.set_cursor_position((cursor_x, cursor_y));
+    (cursor_x, cursor_y)
 }
 
 pub fn render_canvas_default<D: DataProvider>(
@@ -858,14 +915,14 @@ mod tests {
     }
 
     #[test]
-    fn insert_mode_active_line_uses_inverse_style_for_terminal_block_cursor() {
+    fn insert_mode_active_line_uses_direct_cursor_style() {
         let theme = DefaultCanvasTheme;
         let line = active_line_with_cursor("abc", None, 3, AppMode::Ins, &theme);
 
         let cursor = line.spans.last().unwrap();
         assert_eq!(cursor.content.as_ref(), " ");
-        assert_eq!(cursor.style.fg, Some(Color::Green));
-        assert_eq!(cursor.style.bg, Some(Color::Black));
+        assert_eq!(cursor.style.fg, Some(Color::Black));
+        assert_eq!(cursor.style.bg, Some(Color::Green));
     }
 
     #[test]

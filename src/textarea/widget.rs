@@ -10,6 +10,8 @@ use ratatui::{
 
 #[cfg(feature = "gui")]
 use crate::canvas::state::SelectionState;
+#[cfg(feature = "gui")]
+use crate::canvas::AppMode;
 #[cfg(all(feature = "gui", feature = "commandline"))]
 use crate::commandline::CommandLine;
 #[cfg(feature = "gui")]
@@ -31,6 +33,9 @@ use unicode_width::UnicodeWidthChar;
 pub struct TextArea<'a, P: TextAreaDataProvider = TextAreaProvider> {
     pub(crate) block: Option<Block<'a>>,
     pub(crate) style: Style,
+    pub(crate) cursor_normal_style: Style,
+    pub(crate) cursor_insert_style: Style,
+    pub(crate) cursor_select_style: Style,
     pub(crate) border_type: BorderType,
     pub(crate) _provider: std::marker::PhantomData<P>,
 }
@@ -45,6 +50,9 @@ impl<'a, P: TextAreaDataProvider> Default for TextArea<'a, P> {
                     .border_type(BorderType::Rounded),
             ),
             style: Style::default(),
+            cursor_normal_style: Style::default().fg(Color::Black).bg(Color::White),
+            cursor_insert_style: Style::default().fg(Color::Black).bg(Color::Green),
+            cursor_select_style: Style::default().fg(Color::Black).bg(Color::Blue),
             border_type: BorderType::Rounded,
             _provider: std::marker::PhantomData,
         }
@@ -63,12 +71,28 @@ impl<'a, P: TextAreaDataProvider> TextArea<'a, P> {
         self
     }
 
+    pub fn cursor_styles(mut self, normal: Style, insert: Style, select: Style) -> Self {
+        self.cursor_normal_style = normal;
+        self.cursor_insert_style = insert;
+        self.cursor_select_style = select;
+        self
+    }
+
     pub fn border_type(mut self, ty: BorderType) -> Self {
         self.border_type = ty;
         if let Some(b) = &mut self.block {
             *b = b.clone().border_type(ty);
         }
         self
+    }
+}
+
+#[cfg(feature = "gui")]
+fn cursor_style_for_mode(mode: AppMode, normal: Style, insert: Style, select: Style) -> Style {
+    match mode {
+        AppMode::Ins => insert,
+        AppMode::Sel => select,
+        AppMode::Nor | AppMode::General | AppMode::Command => normal,
     }
 }
 
@@ -523,7 +547,36 @@ impl<'a, P: TextAreaDataProvider> StatefulWidget for TextArea<'a, P> {
 
         #[cfg(feature = "commandline")]
         if let Some(commandline) = state.commandline_mut() {
-            CommandLine::default().render(area, buf, commandline.state_mut());
+            let commandline_active = commandline.state().is_active();
+            CommandLine::default()
+                .cursor_styles(
+                    self.cursor_normal_style,
+                    self.cursor_insert_style,
+                    self.cursor_select_style,
+                )
+                .render(area, buf, commandline.state_mut());
+            if commandline_active {
+                return;
+            }
+        }
+
+        let (cursor_x, cursor_y) = state.cursor(area, self.block.as_ref());
+        if cursor_x >= content.x
+            && cursor_x < content.right()
+            && cursor_y >= content.y
+            && cursor_y < content.bottom()
+        {
+            if let Some(cell) = buf.cell_mut((cursor_x, cursor_y)) {
+                if state.display_cursor_position() >= state.current_text().chars().count() {
+                    cell.set_symbol(" ");
+                }
+                cell.set_style(cursor_style_for_mode(
+                    state.mode(),
+                    self.cursor_normal_style,
+                    self.cursor_insert_style,
+                    self.cursor_select_style,
+                ));
+            }
         }
     }
 }
