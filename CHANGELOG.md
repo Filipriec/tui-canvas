@@ -5,10 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.8.11] - 2026-06-22
+
+### Added
+- `CanvasDisplayOptions::draw_cursor` — control whether the form renders its canvas-owned cursor cell; set to `false` when focus is outside the canvas to let the host terminal show an inactive cursor
+- `TextArea::cursor_styles(normal, insert, select)`, `TextInput::cursor_styles(normal, insert, select)`, and `CommandLine::cursor_styles(normal, insert, select)` builder methods for per-mode cursor cell styling
+- `TextInput::draw_cursor(bool)` builder method to toggle canvas-owned cursor drawing
+- `CommandLine` widget now renders its own mode-aware cursor cell directly in the ratatui buffer (previously relied on terminal block cursor)
 
 ### Changed
-- Form rendering now keeps the editable form-field background visible for every input cell, while the active cursor row extends that same color across the whole row. Selection highlighting still takes priority over the field/row background. Commit trace for comparison: introduced in `53c6aea`; compare against the previous behavior with `2c3c40a..53c6aea`.
+- **Cursor rendering moved into widgets**: Form, TextArea, TextInput, and CommandLine now render their own cursor cells directly into the ratatui buffer instead of relying on `Frame::set_cursor_position()`. This makes cursor visibility terminal-agnostic and independent of terminal block-cursor reversal
+- **Form-field background re-enabled**: `DefaultCanvasTheme::input_active()` now includes `.bg(Color::DarkGray)`, giving form fields a consistent background color across the full row width. The active cursor row extends the same background across the entire row, while selection highlighting still takes priority over the field/row background
+- `active_text_style()` simplified: uses `theme.input_active()` directly instead of `theme.input().patch(theme.cursorline())`. Active fields now use the unified `input_active` style consistently
+- Form cursor styling uses direct style application instead of inverted terminal block-cursor style (`terminal_block_cell_style` removed)
+- `set_cursor_position_scrolled()` refactored into `cursor_position_scrolled()` returning `(u16, u16)` — cursor position is calculated by the rendering function and applied by the caller
+- Selection highlighting in forms now uses `theme.input()` as the normal-style background, removing conditional `is_active` branching that mixed input and active styles
+- Form field rendering always applies `active_text_style(theme)` as the paragraph base style, providing consistent background for every field cell
+- `render_canvas()`, `render_canvas_with_options()`, `render_canvas_default()` now manage cursor internally based on `CanvasDisplayOptions::draw_cursor`
+- Crate version bumped to `0.8.11`
+
+### Fixed
+- Cursor visibility made terminal-agnostic by drawing the cursor cell in the ratatui buffer, avoiding inconsistencies across terminals with different block-cursor behaviors
+- Form-field background now correctly spans the entire input row width instead of only covering typed text
+- Selection highlighting properly overrides active input background (verification test added)
+- CommandLine cursor no longer conflicts with TextArea cursor — TextArea skips cursor rendering when commandline is active
+
+## [Unreleased]
 
 ## [0.8.10]
 
@@ -228,7 +250,8 @@ Use module paths under `canvas::textarea::*`, `canvas::textinput::*`, or
 `canvas::form::*` when depending on widget submodules such as textarea syntax
 highlighting or providers.
 
-[Unreleased]: https://gitlab.com/filipriec/tui-canvas/-/compare/v0.8.10...HEAD
+[0.8.11]: https://gitlab.com/filipriec/tui-canvas/-/compare/v0.8.10...v0.8.11
+[Unreleased]: https://gitlab.com/filipriec/tui-canvas/-/compare/v0.8.11...HEAD
 [0.8.10]: https://gitlab.com/filipriec/tui-canvas/-/compare/v0.8.8...v0.8.10
 [0.8.8]: https://gitlab.com/filipriec/tui-canvas/-/compare/v0.8.5...v0.8.8
 [0.8.5]: https://gitlab.com/filipriec/tui-canvas/-/compare/v0.8.4...v0.8.5
