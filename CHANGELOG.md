@@ -30,6 +30,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Selection highlighting properly overrides active input background (verification test added)
 - CommandLine cursor no longer conflicts with TextArea cursor — TextArea skips cursor rendering when commandline is active
 
+## [0.8.12] - 2026-06-22
+
+### Changed
+
+- **Breaking:** Removed `TextInput::draw_cursor(bool)` builder method — the cursor cell is now always rendered directly in the ratatui buffer by the `StatefulWidget` implementation, making cursor visibility terminal-agnostic without requiring per-widget configuration
+- `StatefulWidget` impl for `TextInput` now unconditionally renders the mode-aware cursor cell instead of gating on `self.draw_cursor`
+
+### Removed
+
+- `TextInput::draw_cursor(bool)` — the public builder setter for toggleable cursor drawing is no longer available; cursor rendering cannot be disabled at the widget level
+
 ## [Unreleased]
 
 ## [0.8.10]
@@ -250,8 +261,9 @@ Use module paths under `canvas::textarea::*`, `canvas::textinput::*`, or
 `canvas::form::*` when depending on widget submodules such as textarea syntax
 highlighting or providers.
 
+[0.8.12]: https://gitlab.com/filipriec/tui-canvas/-/compare/v0.8.11...v0.8.12
 [0.8.11]: https://gitlab.com/filipriec/tui-canvas/-/compare/v0.8.10...v0.8.11
-[Unreleased]: https://gitlab.com/filipriec/tui-canvas/-/compare/v0.8.11...HEAD
+[Unreleased]: https://gitlab.com/filipriec/tui-canvas/-/compare/v0.8.12...HEAD
 [0.8.10]: https://gitlab.com/filipriec/tui-canvas/-/compare/v0.8.8...v0.8.10
 [0.8.8]: https://gitlab.com/filipriec/tui-canvas/-/compare/v0.8.5...v0.8.8
 [0.8.5]: https://gitlab.com/filipriec/tui-canvas/-/compare/v0.8.4...v0.8.5

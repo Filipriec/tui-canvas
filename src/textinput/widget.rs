@@ -33,7 +33,6 @@ pub struct TextInput<'a, P: TextInputDataProvider = TextInputProvider> {
     pub(crate) cursor_normal_style: Style,
     pub(crate) cursor_insert_style: Style,
     pub(crate) cursor_select_style: Style,
-    pub(crate) draw_cursor: bool,
     pub(crate) border_type: BorderType,
     pub(crate) _provider: std::marker::PhantomData<P>,
 }
@@ -53,7 +52,6 @@ impl<'a, P: TextInputDataProvider> Default for TextInput<'a, P> {
             cursor_normal_style: Style::default().fg(Color::Black).bg(Color::White),
             cursor_insert_style: Style::default().fg(Color::Black).bg(Color::Green),
             cursor_select_style: Style::default().fg(Color::Black).bg(Color::Blue),
-            draw_cursor: true,
             border_type: BorderType::Rounded,
             _provider: std::marker::PhantomData,
         }
@@ -86,11 +84,6 @@ impl<'a, P: TextInputDataProvider> TextInput<'a, P> {
         self.cursor_normal_style = normal;
         self.cursor_insert_style = insert;
         self.cursor_select_style = select;
-        self
-    }
-
-    pub fn draw_cursor(mut self, draw: bool) -> Self {
-        self.draw_cursor = draw;
         self
     }
 
@@ -236,24 +229,22 @@ impl<'a, P: TextInputDataProvider> StatefulWidget for TextInput<'a, P> {
 
         p.render(inner, buf);
 
-        if self.draw_cursor {
-            let (cursor_x, cursor_y) = state.cursor(area, self.block.as_ref());
-            if cursor_x >= inner.x
-                && cursor_x < inner.right()
-                && cursor_y >= inner.y
-                && cursor_y < inner.bottom()
-            {
-                if let Some(cell) = buf.cell_mut((cursor_x, cursor_y)) {
-                    if state.display_cursor_position() >= text.chars().count() {
-                        cell.set_symbol(" ");
-                    }
-                    cell.set_style(cursor_style_for_mode(
-                        state.mode(),
-                        self.cursor_normal_style,
-                        self.cursor_insert_style,
-                        self.cursor_select_style,
-                    ));
+        let (cursor_x, cursor_y) = state.cursor(area, self.block.as_ref());
+        if cursor_x >= inner.x
+            && cursor_x < inner.right()
+            && cursor_y >= inner.y
+            && cursor_y < inner.bottom()
+        {
+            if let Some(cell) = buf.cell_mut((cursor_x, cursor_y)) {
+                if state.display_cursor_position() >= text.chars().count() {
+                    cell.set_symbol(" ");
                 }
+                cell.set_style(cursor_style_for_mode(
+                    state.mode(),
+                    self.cursor_normal_style,
+                    self.cursor_insert_style,
+                    self.cursor_select_style,
+                ));
             }
         }
     }

@@ -86,10 +86,10 @@ pub use computed::{ComputedContext, ComputedProvider, ComputedState};
 pub use canvas::theme::{CanvasTheme, DefaultCanvasTheme};
 
 #[cfg(feature = "gui")]
-pub use form::{render_canvas, render_canvas_default};
+pub use form::{render_canvas, render_canvas_default, render_canvas_without_cursor};
 
 #[cfg(feature = "gui")]
-pub use form::render_canvas_with_options;
+pub use form::{render_canvas_with_options, render_canvas_with_options_without_cursor};
 
 #[cfg(feature = "gui")]
 pub use form::{CanvasDisplayOptions, OverflowMode};

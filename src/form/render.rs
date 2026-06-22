@@ -61,11 +61,6 @@ pub enum OverflowMode {
 pub struct CanvasDisplayOptions {
     /// How to handle horizontal overflow for fields.
     pub overflow: OverflowMode,
-    /// Whether to draw the canvas-owned cursor cell.
-    ///
-    /// Set this to `false` when the canvas is visible but focus is outside of
-    /// it, so the host terminal cursor can show the inactive underscore.
-    pub draw_cursor: bool,
     /// Maximum label column width, including the trailing space before the input.
     ///
     /// Change this by setting `CanvasDisplayOptions::max_label_width`.
@@ -88,7 +83,6 @@ impl Default for CanvasDisplayOptions {
     fn default() -> Self {
         Self {
             overflow: OverflowMode::Indicator('$'),
-            draw_cursor: true,
             max_label_width: 24,
             max_input_width: Some(25),
             row_input_width: None,
@@ -295,6 +289,20 @@ pub fn render_canvas<T: CanvasTheme, D: DataProvider>(
     render_canvas_with_options(f, area, editor, theme, opts)
 }
 
+/// Render the canvas without drawing the canvas-owned cursor cell.
+///
+/// Use this when the canvas is visible but focus is outside of it, so the host
+/// terminal cursor can show the inactive cursor shape.
+pub fn render_canvas_without_cursor<T: CanvasTheme, D: DataProvider>(
+    f: &mut Frame,
+    area: Rect,
+    editor: &EditorCore<D>,
+    theme: &T,
+) -> Option<Rect> {
+    let opts = CanvasDisplayOptions::default();
+    render_canvas_with_options_without_cursor(f, area, editor, theme, opts)
+}
+
 /// Render the canvas into the provided frame with explicit display options.
 ///
 /// This is the more configurable entrypoint for rendering and is useful for
@@ -305,6 +313,29 @@ pub fn render_canvas_with_options<T: CanvasTheme, D: DataProvider>(
     editor: &EditorCore<D>,
     theme: &T,
     opts: CanvasDisplayOptions,
+) -> Option<Rect> {
+    render_canvas_with_options_inner(f, area, editor, theme, opts, true)
+}
+
+/// Render the canvas with explicit display options, without drawing the
+/// canvas-owned cursor cell.
+pub fn render_canvas_with_options_without_cursor<T: CanvasTheme, D: DataProvider>(
+    f: &mut Frame,
+    area: Rect,
+    editor: &EditorCore<D>,
+    theme: &T,
+    opts: CanvasDisplayOptions,
+) -> Option<Rect> {
+    render_canvas_with_options_inner(f, area, editor, theme, opts, false)
+}
+
+fn render_canvas_with_options_inner<T: CanvasTheme, D: DataProvider>(
+    f: &mut Frame,
+    area: Rect,
+    editor: &EditorCore<D>,
+    theme: &T,
+    opts: CanvasDisplayOptions,
+    draw_cursor: bool,
 ) -> Option<Rect> {
     let highlight_state = convert_selection_to_highlight(editor.ui_state().selection_state());
 
@@ -327,6 +358,7 @@ pub fn render_canvas_with_options<T: CanvasTheme, D: DataProvider>(
         &highlight_state,
         active_completion,
         opts,
+        draw_cursor,
     )
 }
 
@@ -338,6 +370,7 @@ fn render_canvas_with_highlight_and_options<T: CanvasTheme, D: DataProvider>(
     highlight_state: &HighlightState,
     active_completion: Option<String>,
     opts: CanvasDisplayOptions,
+    draw_cursor: bool,
 ) -> Option<Rect> {
     let ui_state = editor.ui_state();
     let data_provider = editor.data_provider();
@@ -387,6 +420,7 @@ fn render_canvas_with_highlight_and_options<T: CanvasTheme, D: DataProvider>(
         |_field_idx| false,
         active_completion,
         opts,
+        draw_cursor,
     )
 }
 
@@ -421,6 +455,7 @@ fn render_canvas_fields_with_options<T: CanvasTheme, F1, F2>(
     has_display_override: F2,
     active_completion: Option<String>,
     opts: CanvasDisplayOptions,
+    draw_cursor: bool,
 ) -> Option<Rect>
 where
     F1: Fn(usize) -> String,
@@ -506,7 +541,7 @@ where
             HighlightState::Off => match opts.overflow {
                 OverflowMode::Indicator(ind) => {
                     if is_active {
-                        if opts.draw_cursor {
+                        if draw_cursor {
                             let (l, hs, left_cols) = render_active_line_with_indicator(
                                 &typed_text,
                                 active_completion.as_deref(),
@@ -547,7 +582,7 @@ where
 
                 OverflowMode::Wrap => {
                     if is_active {
-                        if opts.draw_cursor {
+                        if draw_cursor {
                             active_line_with_cursor(
                                 &typed_text,
                                 active_completion.as_deref(),
@@ -584,7 +619,7 @@ where
             active_field_input_rect = Some(input_row);
         }
 
-        if is_active && opts.draw_cursor {
+        if is_active && draw_cursor {
             let (cursor_x, cursor_y) = cursor_position_scrolled(
                 input_row,
                 &typed_text,
